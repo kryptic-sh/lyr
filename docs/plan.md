@@ -79,7 +79,9 @@ The author's current waybar also shows a **battery** module — see
 
 ### 3.8 Volume & mic (right)
 
-- Click toggles mute; scroll adjusts level.
+- Click toggles mute; scroll adjusts level (step: ±5%, per the current waybar);
+  right-click opens the audio menu (`krypt menu audio`, pending Q7).
+- Muted/active icon + percentage format, per the current waybar.
 - Spec'd semantics (confirmed in Q9):
   - Muting **output** also mutes the **mic**.
   - Muting **mic** only mutes the mic.
@@ -90,12 +92,19 @@ The author's current waybar also shows a **battery** module — see
 - Date render (per author's waybar format: `YYYY/MM/DD HH:MM`).
 - Click expands a calendar showing the current month, with a **month** selector
   (`<` / `>`) and a **year** selector.
+- Styled like the current waybar calendar (colored cells: month, day, week,
+  today), as a theming concern (Q10).
 - Open question: also a clock time render with 1 Hz updates, or date only? (Q12)
 
 ### 3.10 Notifications (right)
 
-- Icon reflecting state (notifications pending / none / DND).
-- Click opens a **notification drawer** (history center).
+- Icon reflecting state, per the current waybar: none / notifications /
+  DND / inhibited combinations.
+- **Click toggles DND**; **right-click dismisses all** (current waybar
+  behaviour via `swaync-client -t` / `-d`).
+- Click opens a **notification drawer** (history center) with a Clear All
+  action and per-urgency timeouts (10 s normal / 5 s low / never for
+  critical), mirroring the current swaync config.
 - Open question: own `org.freedesktop.Notifications` daemon (like ashell —
   replaces swaync) vs a client of an existing daemon (Q6).
 
@@ -121,6 +130,14 @@ The author's current waybar also shows a **battery** module — see
 
 - Hyprland first (the author's daily driver); socket events + the Lua-protocol
   dispatch form. Other compositors later (Q4).
+- **All compositor actions** (workspace focus, exit, dpms, …) must use the
+  Lua dispatch forms (`hl.dsp.focus({ workspace = N })`, `hl.dsp.exit()`, …) —
+  the old `dispatch workspace N` / `dispatch exit` forms are parse errors under
+  Hyprland 0.55+ Lua configs (already hit in the author's config migration).
+- Reference implementations to crib from: ironbar
+  (`detect_lua_config()` → `Dispatch::call(DispatchType::Custom("hl.dsp.focus",
+  …))`) and ashell (`hyprctl eval "hl.dispatch(hl.dsp.focus({ workspace = N }))"`),
+  both verified Lua-safe.
 
 ## 5. Performance & power
 
