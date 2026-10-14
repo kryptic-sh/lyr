@@ -30,11 +30,13 @@ implementation follows until they are answered. The ones that block a milestone:
   callback, or can block in FIFO `vkQueuePresentKHR` on an output that is off
   (hypridle DPMS), is unverified
   ([plan/04](plan/04-rendering-and-theme.md#repaint-on-change-only)).
-- **pikr: move to crcbl** once S1, S8, S9 and S12 – S14 exist, dropping its
-  floem and winit forks. pikr's own research
-  (`pikr/docs/gui-backend-research.md`) predates crcbl's candidacy and
-  recommends iced + `iced_layershell`. It should be revisited with crcbl as an
-  option.
+- **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
+  the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
+  S8 – S27. pikr's session tracks the move in pikr's own backlog and
+  `gui-backend-research.md`.
+- **wayr's README still names pikr as a consumer.** That is now wrong, and no
+  wayr session exists to fix it. It is a one-line change in the wayr repo, for
+  the owner.
 - **dotfiles: switch from waybar to lyr** at M6 (`hyprland.lua`
   `hl.exec_cmd("waybar")`;
   [plan/05](plan/05-layout-and-config.md#migration-from-waybar)).
