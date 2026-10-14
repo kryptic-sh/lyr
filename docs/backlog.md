@@ -11,21 +11,27 @@ implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
   `neli`) block M4's audio and network sources.
-- **crcbl's release** (timing, publish set) blocks M9. The owner expects it
-  soon; crcbl's own backlog records cutting v0.1.0 as left to the owner.
+- **crcbl's release** blocks M9. The owner decided (2026-10-15) that crcbl's
+  first crates.io release waits until S1 – S27 are built and the shell and UI
+  are usable without the rest of the engine.
 
 ## Cross-repo work
 
 - **crcbl: window kinds and platform features for lyr and pikr.** Requirements
-  S1 – S15 in
-  [plan/03-surfaces-and-input.md](plan/03-surfaces-and-input.md#what-crcbl-must-provide).
-  They were sent to crcbl's development session on 2026-10-15, and it recorded
-  them in crcbl's `docs/backlog.md`. Nothing is scheduled there yet. M1 needs
-  S1, S2, S6, S7, S10 and S11.
-- **crcbl: release pipeline.** The owner asked crcbl to get a tmxr-style
-  pipeline (crates.io, AUR, Scoop, Homebrew, Alpine, GitHub releases). This was
-  relayed to crcbl's session on 2026-10-15. lyr's M9 depends on its
-  `publish-crates` part.
+  S1 – S27 in
+  [plan/03-surfaces-and-input.md](plan/03-surfaces-and-input.md#what-crcbl-must-provide)
+  are crcbl's top-priority program ("lyr and pikr before the first release" in
+  crcbl's `docs/backlog.md`), started 2026-10-15. The order is: the seam (S10,
+  S15); the loop (S6, S19, S25); window kinds (S2, S3, S8, S16); Wayland (S1,
+  S3, S17, S21); Win32 (S4, S27); AppKit (S5); outputs (S7); text (S11, S12,
+  S22); input (S9, S20); UI fit (S23, S24); start-up and failure (S13, S26);
+  FreeBSD CI (S18); AccessKit (S14) last. crcbl's session reports each row as it
+  lands on main. Until the release, lyr pins crcbl by git revision on a green
+  commit. M1 needs S1, S2, S6, S7, S10 and S11.
+- **crcbl: release pipeline.** Built and pushed by crcbl's session on 2026-10-15
+  (tmxr-style: crates.io, AUR, Homebrew, Scoop, GitHub releases; no Alpine,
+  because crcbl links ALSA), with the org secrets granted. It is not used until
+  the release above.
 - **crcbl: Wayland present path.** Whether crcbl presents only after a frame
   callback, or can block in FIFO `vkQueuePresentKHR` on an output that is off
   (hypridle DPMS), is unverified
