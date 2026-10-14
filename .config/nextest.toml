@@ -1,0 +1,7 @@
+# cargo-nextest config.
+#
+# nextest runs each test in its own process, in parallel.
+
+[profile.default]
+# A deadlocked test is killed and reported by name instead of hanging CI.
+slow-timeout = { period = "120s", terminate-after = 4 }

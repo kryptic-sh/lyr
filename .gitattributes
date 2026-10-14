@@ -1,0 +1,14 @@
+# Check every text file out with LF, on every platform. Without this, git's
+# Windows default (`core.autocrlf=true`) rewrites LF to CRLF on checkout, and
+# anything lyr embeds with `include_str!` (the default config, the theme) would
+# differ byte-for-byte between Windows builds and the rest.
+* text=auto eol=lf
+
+*.rs text eol=lf
+*.toml text eol=lf
+*.md text eol=lf
+
+*.png binary
+*.ico binary
+*.ttf binary
+*.otf binary

@@ -1,1 +1,6 @@
 /target
+**/*.rs.bk
+*.pdb
+
+# Binary repo: track the lockfile (override any global *.lock ignore).
+!Cargo.lock

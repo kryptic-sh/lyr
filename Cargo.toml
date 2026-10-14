@@ -1,6 +1,37 @@
-[package]
-name = "lyr"
+[workspace]
+resolver = "3"
+members = ["crates/*", "apps/*"]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.95"
+license = "MIT"
+repository = "https://github.com/kryptic-sh/lyr"
+homepage = "https://github.com/kryptic-sh/lyr"
+authors = ["mxaddict <mxaddict@kryptic.sh>"]
+readme = "README.md"
 
-[dependencies]
+[workspace.lints.clippy]
+or_fun_call = "deny"
+unused_peekable = "deny"
+assigning_clones = "warn"
+format_push_string = "warn"
+manual_let_else = "warn"
+map_unwrap_or = "warn"
+use_self = "warn"
+redundant_pub_crate = "warn"
+
+[workspace.dependencies]
+# internal
+lyr-config = { path = "crates/lyr-config", version = "0.1.0" }
+lyr-core = { path = "crates/lyr-core", version = "0.1.0" }
+lyr-render = { path = "crates/lyr-render", version = "0.1.0" }
+lyr-shell = { path = "crates/lyr-shell", version = "0.1.0" }
+lyr-wm = { path = "crates/lyr-wm", version = "0.1.0" }
+lyr-sources = { path = "crates/lyr-sources", version = "0.1.0" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

@@ -1,0 +1,16 @@
+[package]
+name = "lyr-config"
+description = "Config for lyr: TOML schema, the built-in defaults and reload."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+readme.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
