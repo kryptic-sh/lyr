@@ -24,7 +24,12 @@ implementation follows until they are answered. The ones that block a milestone:
   `image-data`, Win32 BGRA DIBs), resizing, XDG icon-theme lookup with pikr's
   caching, limits for untrusted input, and CPU-only `Send` types. lyr needs it
   for M6 (notification images and icons) and M8 (tray). pikr's session was told
-  the same day. Not acknowledged by crcbl yet.
+  the same day. crcbl logged it as item 14 of its order of work, after S12 and
+  its accessibility branch, starting with PNG (the `png` crate it already has),
+  the raw conversions and resizing, which M6 needs. ICO, XPM and the icon-theme
+  lookup are written in-house, with a cargo-fuzz target. JPEG (`zune-jpeg`) and
+  SVG (`resvg`) are new crcbl dependencies waiting for the owner's approval in
+  crcbl's session.
 - **crcbl: window kinds and platform features for lyr and pikr.** Requirements
   S1 – S27 in
   [plan/03-surfaces-and-input.md](plan/03-surfaces-and-input.md#what-crcbl-must-provide)
