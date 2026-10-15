@@ -62,3 +62,10 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
 16. **New dependencies.** `libpulse-binding` and an rtnetlink crate are new to
     the org and need the owner's approval before M4
     ([02](02-architecture.md#dependencies-initial)).
+17. **Where lyr differs from waybar on purpose.** Everything else in the
+    dotfiles' waybar setup is carried exactly (reviewed against `config.jsonc`
+    and `style.css` on 2026-10-16). Defaults that differ: with no Bluetooth
+    controller the module is hidden (waybar shows the on icon), and the mic's
+    tooltip names the source (waybar names the sink there too). Say if either
+    should match waybar instead ([07](07-modules.md#bluetooth),
+    [07](07-modules.md#mic)).

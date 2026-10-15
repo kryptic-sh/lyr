@@ -1,9 +1,15 @@
 # 06 — Workspaces
 
 The centre zone. The bar shows one button per workspace, highlights the active
-one and any urgent ones, switches on click and cycles on scroll. Like waybar's
-`hyprland/workspaces` with `all-outputs: true` and `format: "{}"`: every bar
-shows every workspace, labelled by name.
+one in `#2bc5e3` (and the hovered one, as `style.css` does), and switches on
+click. Like waybar's `hyprland/workspaces` with `all-outputs: true` and
+`format: "{}"`: every bar shows every workspace, labelled by name.
+
+Two things waybar's setup does not do are off by default. Urgent workspaces are
+tracked (waybar adds an `urgent` class), but `style.css` gives that class no
+style, so they look like any other until `theme.workspace_urgent` sets a colour.
+Scrolling to cycle workspaces is not in the config, and waybar has no built-in
+scroll for this module, so it waits for `workspaces.scroll = true`.
 
 What a "workspace" is differs per platform, so the module talks to a
 `WorkspaceBackend` trait in `lyr-wm`. Each platform has one implementation

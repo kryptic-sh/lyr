@@ -3,8 +3,16 @@
 ## What the current bar does
 
 The waybar `custom/notification` module runs `swaync-client -swb` for its state
-and maps it onto eight icons: notification, none, DND, inhibited, and the
-combinations of those. Its clicks are:
+and maps its eight states onto three glyphs:
+
+| State                                                                                      | Glyph  |
+| ------------------------------------------------------------------------------------------ | ------ |
+| `notification`, `dnd-notification`, `inhibited-notification`, `dnd-inhibited-notification` | U+F071 |
+| `none`, `inhibited-none`                                                                   | U+F0A2 |
+| `dnd-none`, `dnd-inhibited-none`                                                           | U+F1F7 |
+
+It has no tooltip (`"tooltip": false`), and it only exists when `swaync-client`
+is installed (`"exec-if": "which swaync-client"`). Its clicks are:
 
 | Input       | Command                | Meaning                           |
 | ----------- | ---------------------- | --------------------------------- |
@@ -34,10 +42,14 @@ not a notification daemon.
   (`ToggleDnd`) do. The exact method names are confirmed against the installed
   swaync's introspection XML when M4 starts. They are not re-derived from
   memory.
-- When swaync is not running, the module shows the "none" icon greyed out and
-  its tooltip says swaync is not running. It does not fail at start, because
-  swaync may start after lyr does (they are both started from
+- When swaync is not running, the module is hidden, as waybar hides it, and it
+  appears when swaync's bus name does. It does not fail at start, because swaync
+  may start after lyr does (they are both started from
   `hl.on("hyprland.start")`).
+- Both waybar clicks run `sleep 0.1 && swaync-client ...`. Why is not recorded.
+  The likely reason is that the panel would otherwise see the click that opened
+  it as an outside click and close at once. M4 checks whether lyr's D-Bus call
+  on button release needs the same delay, rather than copying it blind.
 
 Becoming the `org.freedesktop.Notifications` daemon (as ashell does) would
 replace swaync, but it means owning **toast popups** with their stacking,

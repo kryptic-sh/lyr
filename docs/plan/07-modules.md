@@ -4,7 +4,11 @@ Every module is a **source** (in `lyr-sources` or `lyr-wm`) that pushes state
 changes as events, plus a **view** (in `lyr-core`) that turns that state into
 glyphs, text and a tooltip. Sources never poll unless a row below says so and
 names the interval. Defaults copy `dotfiles/.config/waybar/config.jsonc`:
-formats, icons, click and scroll actions.
+formats, icons, click and scroll actions. Where waybar's behaviour comes from
+its own defaults rather than the config, it was read in waybar 0.15.0's source.
+
+Icons are Nerd Font glyphs, written here as code points (`U+F011`) because the
+glyphs themselves are private-use characters that tools strip without a trace.
 
 A module whose source cannot run on the current platform fails **loudly at
 config load**: lyr logs `module '<name>' is not supported on <os>: <reason>` and
@@ -20,8 +24,9 @@ and notifications are big enough to get their own sections ([08](08-tray.md),
 
 ### Power button
 
-- Glyph `` (waybar `custom/power`), tooltip "Power Button".
-- Click opens the power menu ([10](10-popups-and-menus.md#power-menu)).
+- Glyph U+F011 (waybar `custom/power`), tooltip "Power Button".
+- Click opens the power menu ([10](10-popups-and-menus.md#power-menu)); a second
+  click closes it, as `krypt menu power` does today.
 
 ### Battery
 
@@ -29,8 +34,11 @@ Shown in the current waybar between the power button and the power profile, so
 it is in the default layout there. On a machine with no battery the module hides
 itself; that is not an error.
 
-- Icon from the 5-step ramp `      ` by capacity. Charging adds `󱐋`. Plugged in
-  and full shows ``.
+- Icon from the 5-step ramp U+F244, U+F243, U+F242, U+F241, U+F240 (empty to
+  full) by capacity. Charging shows `{icon} U+F140B`. Plugged in below 100 %
+  (for example held at a charge threshold) shows U+EE9E alone. At 100 % waybar
+  reports the battery as full, and with no `format-full` in the config that
+  shows the ramp's top icon.
 - States `warning` at ≤ 30 % and `critical` at ≤ 10 % (waybar `states`), which
   colour the module ([04](04-rendering-and-theme.md#theme)).
 - Tooltip `{capacity}% {power}W {timeTo}`.
@@ -43,11 +51,12 @@ itself; that is not an error.
 
 ### Power profile
 
-- Icons per waybar's `power-profiles-daemon`: performance `󰓅`, balanced
-  `, power-saver `. The tooltip reads `Profile: {profile}\nDriver: {driver}`.
-- Click cycles to the next profile. That is new: waybar's module only cycles
-  when its own default `on-click` is left in place, which the current config
-  does.
+- Icons per waybar's `power-profiles-daemon`: performance and `default` U+F04C5,
+  balanced U+F24E, power-saver U+F06C. The tooltip reads
+  `Profile: {profile}\nDriver: {driver}`.
+- Left click cycles to the next profile, any other button to the previous one.
+  That is waybar's built-in click, which applies because the config sets no
+  `on-click`.
 - Linux: power-profiles-daemon over D-Bus
   (`org.freedesktop.UPower.PowerProfiles`, with the older
   `net.hadess.PowerProfiles` name as a fallback). Profile names are
@@ -63,7 +72,8 @@ itself; that is not an error.
 
 ### Network
 
-- Icons: wired `, wifi `, disconnected `󰅛`.
+- Icons: wired U+EF09, wifi U+F1EB, disconnected U+F015B. Waybar's key for the
+  first is `default`, which covers every connected state that is not WiFi.
 - Tooltips: wired `{ifname} {ipaddr}/{cidr}`, wifi
   `{ifname} {ipaddr}/{cidr} {essid} ({signalStrength}%)`, disconnected
   `YOU IN THE WOODS?`. These are the current strings.
@@ -83,8 +93,10 @@ itself; that is not an error.
 
 ### Bluetooth
 
-- Icons: on `󰂯`, off or disabled `󰂲`. When a device is connected and reports its
-  battery: `{icon} {device_alias} {device_battery_percentage}%`.
+- Icons: on U+F00AF, off or disabled U+F00B2. When a device is connected and
+  reports its battery: `{icon} {device_alias} {device_battery_percentage}%`.
+- With no Bluetooth controller, waybar still shows the on icon. lyr hides the
+  module instead, as battery does on a machine with no battery.
 - Tooltip `Bluetooth {status}`.
 - Click runs the bluetooth action ([10](10-popups-and-menus.md#menus)).
 - Linux: BlueZ over D-Bus (`org.bluez.Adapter1` `Powered`, `org.bluez.Device1`
@@ -107,17 +119,22 @@ See [08-tray.md](08-tray.md).
 
 ### Volume
 
-- Format `{icon} {volume}%`. When muted, ` {volume}%`. Icons by output port:
-  headphone `, hands-free and headset `, phone `, portable `, car ``, otherwise
-  the ramp `  `.
-- Click toggles output mute. Scroll changes the volume by **5 %**. Right-click
-  runs the audio action ([10](10-popups-and-menus.md#menus)).
+- Format `{icon} {volume}%`. When muted, `U+EEE8 {volume}%`. Icons by output
+  port: headphone, hands-free and headset U+F025; phone and portable U+F095; car
+  U+F1B9; otherwise the ramp U+F026, U+F027, U+F028.
+- Click toggles output mute. Scroll up raises and scroll down lowers the volume
+  by **5 %**, with no ceiling at 100 %, as `pactl set-sink-volume ... +5%` has
+  none. Right-click runs the audio action ([10](10-popups-and-menus.md#menus)).
+- Tooltip: the default sink's description, which is waybar's default when no
+  `tooltip-format` is set.
 - Colour `#89b4fa` (waybar `#pulseaudio`).
 
 ### Mic
 
-- Format ` {volume}%`, muted ` {volume}%`. The same click, scroll and
-  right-click as volume, applied to the default source.
+- Format `U+F130 {volume}%`, muted `U+F131 {volume}%`. The same click, scroll
+  and right-click as volume, applied to the default source.
+- Tooltip: the default source's description. Waybar shows the sink's here too,
+  because both modules are its one `pulseaudio` module; that is not carried.
 - Colour `#cba6f7` (waybar `#pulseaudio.microphone`).
 
 ### Mute linkage
@@ -150,11 +167,12 @@ muted, and unmuting output restores that state.
   The draft plan's 1 Hz timer was 59 wasted wakeups a minute. A format with `%S`
   switches it to 1 Hz. The timer interval is derived from the format, not
   configured separately.
-- Click opens the calendar popup ([10](10-popups-and-menus.md#calendar)). That
-  changes how it behaves today: waybar shows a year-mode **tooltip**,
-  right-click switches between month and year mode, and scroll moves the range.
-  lyr's popup keeps scroll for the range and adds `<` / `>` buttons for the
-  month and the year.
+- Hovering shows the calendar ([10](10-popups-and-menus.md#calendar)), as
+  waybar's `tooltip-format: "<tt><small>{calendar}</small></tt>"` does. Left and
+  right click both switch it between year and month mode (`actions`
+  `on-click: "mode"` and `calendar` `on-click-right: "mode"`). Scroll shifts it
+  by one unit of the current mode (`on-scroll: 1`, `shift_up` / `shift_down`): a
+  year in year mode, a month in month mode.
 - Time zone: the system's. On Linux it is re-read on a `timedate1`
   `PropertiesChanged` signal, so `krypt menu time` changing the zone takes
   effect immediately.

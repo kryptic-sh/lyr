@@ -18,18 +18,25 @@ All popups share one renderer and theme, and draw the same `DrawList`
 
 ## Tooltips
 
-Every module has one. The text comes from the module's tooltip format, and it
+Every module has one except notifications, which waybar's config turns off
+(`"tooltip": false`). The text comes from the module's tooltip format, and it
 shows after the platform's hover delay. The theme matches waybar's `tooltip`
 block: background `#1e1e2e`, text `#cdd6f4`.
 
 ## Calendar
 
-Opened from the clock ([07](07-modules.md#clock)).
+Shown while the pointer is over the clock ([07](07-modules.md#clock)), as a
+popup that takes no input (`PopupInput::Passthrough`), so clicks and scrolls
+still reach the clock, which switches the mode and shifts the range.
 
-- A month grid with ISO week numbers in a right-hand column. The current waybar
-  uses `weeks-pos: right`, and its year mode has 3 columns (`mode-mon-col: 3`).
-- A header with `<` / `>` buttons for the month and the year. Scroll moves by a
-  month, and a year view is one click on the header.
+- Opens in **year** mode (`mode: "year"`): twelve months in 3 columns
+  (`mode-mon-col: 3`). Month mode is a single month.
+- ISO week numbers in a right-hand column (`weeks-pos: right`), prefixed `W`
+  (`<b>W{}</b>`).
+- Monospace and smaller than the bar's text, as waybar's `<tt><small>` makes it.
+  The monospace family is the theme's `calendar_font`, defaulting to the bar
+  font, which is proportional (Hack Nerd Font **Propo**), so the default needs
+  checking against waybar's look in M5.
 - Colours come from the waybar calendar format: months `#ffead3`, days
   `#ecc6d9`, weeks `#99ffdd`, weekdays `#ffcc66`, today `#ff6699` underlined.
   All bold.
@@ -37,20 +44,28 @@ Opened from the clock ([07](07-modules.md#clock)).
 
 ## Power menu
 
-Opened from the power button. Entries are lock, log out, suspend, hibernate,
-reboot and power off. Each entry is a configured command or a built-in action.
+Opened from the power button, closed by a second click on it. Entries, in the
+order and with the labels `.menu-power` uses today: Lock, Sleep, Hibernate,
+Shutdown, Logout, Reboot. Each entry is a configured command or a built-in
+action.
 
 | Action    | Linux (logind over D-Bus)          | Windows                       | macOS                                  |
 | --------- | ---------------------------------- | ----------------------------- | -------------------------------------- |
 | Lock      | `loginctl lock-session` (hyprlock) | `LockWorkStation`             | `pmset displaysleepnow` (lock on wake) |
 | Log out   | compositor exit (`hl.dsp.exit()`)  | `ExitWindowsEx(EWX_LOGOFF)`   | System Events `log out` (AppleScript)  |
-| Suspend   | `Manager.Suspend`                  | `SetSuspendState(FALSE, ...)` | `pmset sleepnow`                       |
+| Sleep     | what `systemctl sleep` does        | `SetSuspendState(FALSE, ...)` | `pmset sleepnow`                       |
 | Hibernate | `Manager.Hibernate`                | `SetSuspendState(TRUE, ...)`  | not offered                            |
 | Reboot    | `Manager.Reboot`                   | `ExitWindowsEx(EWX_REBOOT)`   | System Events `restart`                |
 | Power off | `Manager.PowerOff`                 | `ExitWindowsEx(EWX_POWEROFF)` | System Events `shut down`              |
 
 Windows reboot and power-off need the `SE_SHUTDOWN_NAME` privilege enabled on
 the process token first.
+
+`.menu-power` sleeps with `systemctl sleep`, not `systemctl suspend`. That verb
+(systemd 256 and later) picks suspend, hibernate or suspend-then-hibernate from
+`sleep.conf`, so lyr's Sleep must do the same rather than call
+`Manager.Suspend`. The logind method behind it is confirmed against the
+installed systemd's introspection when M5 starts, not taken from memory.
 
 ## Menus
 

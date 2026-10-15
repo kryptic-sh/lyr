@@ -69,8 +69,9 @@ lyr replaces waybar the bar looks the same.
 | Font                       | `Hack Nerd Font Propo`, 16 px, normal weight                                              |
 | Bar background             | transparent                                                                               |
 | Text                       | `#cdd6f4`                                                                                 |
-| Module box                 | background `#1a1b26` at opacity 0.8, border 2 px `#2bc5e3`, radius 8 px                   |
+| Module box                 | background `#1a1b26`, border 2 px `#2bc5e3`, radius 8 px; the whole box at opacity 0.8    |
 | Module box spacing         | padding 0 12 px, margin-top 10 px, margin-bottom 2 px, margin-left 10 px, min-width 20 px |
+| Gap between modules        | 0: waybar's config sets no `spacing`, so only the margins separate the boxes              |
 | Last module (notification) | margin-right 10 px                                                                        |
 | Workspace button           | padding 0 10 px; active or hovered text `#2bc5e3`                                         |
 | Battery warning / critical | `#fc4c02` / `#e92d4d`                                                                     |

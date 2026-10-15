@@ -44,7 +44,7 @@ format = "%Y/%m/%d %H:%M"
 
 [volume]
 format = "{icon} {volume}%"
-format_muted = " {volume}%"
+format_muted = "\uEEE8 {volume}%"
 scroll_step = 5
 on_click = "toggle_mute"
 on_click_right = { exec = "krypt menu audio" }
@@ -57,7 +57,7 @@ font = "Hack Nerd Font Propo"
 font_size = 16
 foreground = "#cdd6f4"
 module_background = "#1a1b26"
-module_opacity = 0.8
+module_opacity = 0.8  # the whole box, text included, like CSS opacity
 border = "#2bc5e3"
 border_width = 2
 radius = 8
@@ -105,6 +105,18 @@ and new configs:
 The dotfiles change in M6 ([15](15-milestones.md)):
 
 - `hyprland.lua`: `hl.exec_cmd("waybar")` becomes `hl.exec_cmd("lyr")`.
+- `.local/bin/.menu-time` restarts the bar after changing the time zone
+  (`pkill waybar` / `waybar &`). With lyr re-reading `timedate1`
+  ([07](07-modules.md#clock)) those two lines are deleted, not ported, and the
+  description in `.krypt/commands.toml` ("...and restarts waybar") changes with
+  them.
+- `.krypt/deps.toml`: `"waybar"` becomes `"lyr"` once lyr is packaged (M9).
+  Until then lyr is installed from source.
+- `.krypt/links.toml`: the `.config/waybar/**/*` link goes when
+  `.config/waybar/` does, and a `.config/lyr/` link comes in if a config file is
+  needed.
+- Comments that say "opened from waybar" (`.config/bluetui/config.toml`,
+  `.config/wiremix/wiremix.toml`) and `README.md`'s "Bar: Waybar" line.
 - `.config/waybar/` stays until lyr has run as the daily driver for a while,
   then it is removed. `swaync` stays ([09](09-notifications.md)).
 - A `.config/lyr/config.toml` is only needed for differences from the defaults.
