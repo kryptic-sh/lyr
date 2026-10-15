@@ -68,10 +68,9 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
 15. **Window title module.** It is in the draft but not in today's bar. Default:
     not in MVP (backlog).
 16. **New dependencies.** `libpulse-binding` and an rtnetlink crate are new to
-    the org and need the owner's approval before M4. `image` (PNG and JPEG) and
-    `freedesktop-icons` are new to lyr but used by pikr; they are needed for
-    tray and notification icons and images, before M6
-    ([02](02-architecture.md#dependencies-initial)).
+    the org and need the owner's approval before M4
+    ([02](02-architecture.md#dependencies-initial)). Images and icons are not on
+    this list: the owner asked crcbl for a shared asset crate (S28) instead.
 17. **Where lyr differs from waybar on purpose.** Everything else in the
     dotfiles' waybar setup is carried exactly (reviewed against `config.jsonc`
     and `style.css` on 2026-10-16). Defaults that differ: with no Bluetooth

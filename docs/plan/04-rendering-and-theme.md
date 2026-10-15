@@ -94,5 +94,5 @@ question.
 
 Module icons are Nerd Font glyphs from the configured font, exactly as in
 waybar's formats. Tray icons are images: pixmaps from StatusNotifierItem, or
-theme icons rasterised with `resvg` ([08](08-tray.md)), uploaded to an atlas
-once per size.
+theme icons rasterised by crcbl's asset crate ([08](08-tray.md)), uploaded to an
+atlas once per size.

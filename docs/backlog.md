@@ -10,15 +10,21 @@ The provisional decisions in
 implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
-  `neli`) block M4's audio and network sources. `image` (PNG and JPEG) and
-  `freedesktop-icons`, both already used by pikr, block M6's notification images
-  and icons (and the tray's theme icons in M8).
+  `neli`) block M4's audio and network sources.
 - **crcbl's release** blocks M11. The owner decided (2026-10-15) that crcbl's
   first crates.io release waits until S1 – S27 are built and the shell and UI
   are usable without the rest of the engine.
 
 ## Cross-repo work
 
+- **crcbl: an image and asset crate (S28)**, asked for on 2026-10-16 at the
+  owner's request, for lyr and pikr both, instead of each app adding `image`,
+  `resvg` and `freedesktop-icons`. It covers PNG, JPEG and SVG decoding to
+  RGBA8, the raw buffers the apps receive (SNI ARGB32, notification
+  `image-data`, Win32 BGRA DIBs), resizing, XDG icon-theme lookup with pikr's
+  caching, limits for untrusted input, and CPU-only `Send` types. lyr needs it
+  for M6 (notification images and icons) and M8 (tray). pikr's session was told
+  the same day. Not acknowledged by crcbl yet.
 - **crcbl: window kinds and platform features for lyr and pikr.** Requirements
   S1 – S27 in
   [plan/03-surfaces-and-input.md](plan/03-surfaces-and-input.md#what-crcbl-must-provide)

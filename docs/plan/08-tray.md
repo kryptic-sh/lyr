@@ -22,8 +22,10 @@ The tray is the largest single source on Linux. Three parts are needed:
 
 **Icons** come from `IconPixmap` (ARGB32, network byte order, choosing the size
 nearest 18 px × scale) when it is set. Otherwise lyr looks `IconName` up in the
-icon theme: the XDG icon-theme lookup, `IconThemePath` first, PNG and SVG. SVG
-is rasterised once per size with `resvg`, as pikr does.
+icon theme: the XDG icon-theme lookup, `IconThemePath` first, PNG and SVG. The
+lookup, decoding and rasterising come from crcbl's asset crate (S28,
+[03](03-surfaces-and-input.md#what-crcbl-must-provide)), and each size is
+rasterised once.
 
 Clicks map to `Activate(x, y)`, `SecondaryActivate` (middle button) and
 `Scroll(delta, orientation)`, with `ContextMenu` as the fallback when an item
