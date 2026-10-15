@@ -31,24 +31,32 @@ implementation follows until they are answered. The ones that block a milestone:
 - **crcbl: window-kind API review.** crcbl proposed (2026-10-15)
   `WindowDesc { role: WindowRole, transparent }` with
   `WindowRole::{Toplevel, Panel(PanelDesc), Popup(PopupDesc)}`, plus `ShellCaps`
-  and `ShellError::Unsupported`. lyr's feedback went back the same day; nothing
-  has been answered yet. The asks:
-  - Stretch a panel anchored to opposite edges, with the real size arriving as a
-    resize.
-  - Define "one edge" for the Win32 appbar so that TOP|LEFT|RIGHT counts as the
-    top edge.
-  - macOS reserve reported as a capability, not an error.
-  - A popup input mode for tooltips that never activate and pass clicks through.
-  - Resize and reposition a live popup.
-  - A uniform monitor-removed event plus close requests.
-  - An `ABN_FULLSCREENAPP` event, and `ABM_REMOVE` on a crash path.
-  - The AppKit level for `Top` above the menu bar.
-  - Hover on non-activating panels.
-  - Platform monitor names.
+  and `ShellError::Unsupported`. crcbl took all of lyr's feedback the same day.
+  The API commit was in crcbl's gate, not yet on main, when this was written.
+  Folded into the API (check against the landed code before M1 pins it):
+  - A panel anchored to opposite edges stretches on that axis; the real size is
+    the first `Resized`.
+  - `Reserve::OwnExtent` needs exactly one edge, or one plus both perpendicular
+    (`PanelDesc::reserved_edge()`). TOP|LEFT|RIGHT is `ABE_TOP` on Win32;
+    anything else is `Unsupported`.
+  - `ShellCaps::PANEL_RESERVE` reports whether the reservation is honoured. On
+    macOS the panel is created without it.
+  - `PopupInput { Passthrough, Pointer, Grab }`. lyr maps tooltips to
+    `Passthrough`, and the calendar and menus to `Grab`.
+  - `PanelDesc.namespace` (empty means app_id). `monitor: None` is the user's
+    monitor, not the primary.
+
+  Recorded in crcbl's backlog under its backend steps, not built yet:
+  - In the Wayland step (needed for M1): platform output names in `MonitorInfo`,
+    and monitor-removed plus close requests, uniform on every backend.
+  - Resizing and repositioning a live popup, with a caps flag where xdg_wm_base
+    v3 is missing.
+  - `ABN_FULLSCREENAPP` as an event, and `ABM_REMOVE` on drop and on a
+    crash-safe path.
+  - AppKit `Top` at `NSStatusWindowLevel`.
+  - `MA_NOACTIVATE`, a tracking area and `acceptsMouseMovedEvents`.
   - DirectComposition for S16 on Win32.
   - S21 on layer surfaces and popups.
-
-  Check that the API crcbl lands covers each of these before M1 pins it.
 
 - **crcbl: release pipeline.** Built and pushed by crcbl's session on 2026-10-15
   (tmxr-style: crates.io, AUR, Homebrew, Scoop, GitHub releases; no Alpine,
