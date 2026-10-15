@@ -36,10 +36,15 @@ Detected by `HYPRLAND_INSTANCE_SIGNATURE`. Both sockets live in
   (`dotfiles/.config/hypr/hyprland.lua`), and `hypridle.conf` already sends
   `hyprctl dispatch 'hl.dsp.dpms({ action = "on" })'`. So the `dispatch` request
   still exists and only its argument changed. lyr writes
-  `dispatch hl.dsp.focus({ workspace = N })` straight to `.socket.sock` and does
-  not shell out to `hyprctl` per click. Whether the socket takes that payload
-  exactly as `hyprctl` sends it is **unverified**. M2 confirms it by capturing
-  what `hyprctl dispatch` writes.
+  `/dispatch hl.dsp.focus({ workspace = N })` straight to `.socket.sock` and
+  does not shell out to `hyprctl` per click. Those are the bytes `hyprctl`
+  writes: it frames a request as `FLAGS/COMMAND ARGS`, so a flagless one starts
+  with `/`, with no newline, and then reads until the socket closes
+  (`hyprctl/src/main.cpp`, read at hyprwm/Hyprland `e2ad066c`). That Hyprland
+  accepts it under a Lua config has not been run yet; the first click on the
+  owner's machine is the check. A named workspace (non-positive id) is
+  `workspace name:NAME` in hyprlang. lyr refuses to send it in Lua until there
+  is a quoting rule, since the name would be spliced into a Lua expression.
 - **Detecting the config dialect:** a Lua config is found when
   `~/.config/hypr/hyprland.lua` exists. That check is a guess at what ironbar's
   `detect_lua_config()` does (not read). The legacy form is kept for hyprlang

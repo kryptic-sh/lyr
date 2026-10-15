@@ -11,6 +11,12 @@ implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
   `neli`) block M4's audio and network sources.
+- **`serde_json`** blocks the rest of M2's Hyprland backend. The initial state
+  (`j/workspaces`, `j/activeworkspace`, and `j/clients` to seed which window is
+  on which workspace for `urgent`) is JSON, and `serde_json` is not on the
+  dependency list in [plan/02](plan/02-architecture.md#dependencies-initial).
+  The org already uses it (buffr, hjkl, gpur, crcbl-scene). The alternative is
+  hyprctl's plain-text output, which has no stable format.
 - **crcbl's release** blocks M9. The owner decided (2026-10-15) that crcbl's
   first crates.io release waits until S1 – S27 are built and the shell and UI
   are usable without the rest of the engine.
@@ -28,25 +34,32 @@ implementation follows until they are answered. The ones that block a milestone:
   FreeBSD CI (S18); AccessKit (S14) last. crcbl's session reports each row as it
   lands on main. Until the release, lyr pins crcbl by git revision on a green
   commit. M1 needs S1, S2, S6, S7, S10 and S11.
-- **crcbl: window-kind API, backend work.** crcbl main `6483b744` (CI green) has
-  the role API plus the Wayland step: layer-shell v4 panels on a named monitor,
+- **crcbl: window-kind API, backend work.** Read against the source at crcbl
+  main `6483b744` (CI green): layer-shell v4 panels on a named monitor,
   exclusive zone, margins, keyboard modes, namespace, fractional scale on
   panels; `ShellEvent::MonitorRemoved` on every backend (through
   `monitor::queue_removed`); `wl_output.name` in `MonitorInfo`;
-  `Font::parse(impl Into<FontData>)` for runtime font bytes. That covers M1's
-  S1, S2, S6, S7, S10 and S11, so M1 can pin `6483b744`. Win32 panels and AppKit
-  NSPanels are on crcbl branches with CI green but not merged; S3 (`xdg_popup`)
-  comes after them.
+  `Font::parse(impl Into<FontData>)`. That covers M1's S1, S2, S6, S7, S10 and
+  S11.
 
-  Recorded in crcbl's backlog under its backend steps, not built yet:
-  - Resizing and repositioning a live popup, with a caps flag where xdg_wm_base
-    v3 is missing.
-  - `ABN_FULLSCREENAPP` as an event, and `ABM_REMOVE` on drop and on a
-    crash-safe path.
-  - AppKit `Top` at `NSStatusWindowLevel`.
-  - `MA_NOACTIVATE`, a tracking area and `acceptsMouseMovedEvents`.
-  - DirectComposition for S16 on Win32.
-  - S21 on layer surfaces and popups.
+  Reported by crcbl's session since then, at `72999dd7`, `531903c7` and
+  `5bbdd180`. **Not read yet**; read it before M1 relies on it:
+  - Win32 panels as tool windows, with `Reserve::OwnExtent` as a real appbar and
+    `WS_EX_NOACTIVATE` for `PanelKeyboard::None`.
+  - AppKit `NSPanel` at the status level; `PANEL_RESERVE` clear on macOS.
+  - Popups (S3) on all three backends; `PopupInput::Passthrough` as an empty
+    input region, `HTTRANSPARENT` or `ignoresMouseEvents`.
+  - `TRANSPARENT` on Wayland.
+  - `ShellEvent::FullScreenApp` for Win32 appbars.
+  - `Shell::reposition_popup` behind `ShellCaps::POPUP_REPOSITION`. The Wayland
+    path needs xdg_wm_base 3 and has not run anywhere.
+  - A CSS `cursor` property with `Ui::cursor()`; `ImageAtlas::unregister`.
+  - A D3D12/WARP fallback on Windows, and `GpuError::NoBackend` elsewhere.
+  - `ui.scrollbar(..)`: vertical only.
+
+  Still open in crcbl: Win32 per-pixel alpha (DirectComposition), no flash on
+  map, IME and compose (S9), colour emoji (S22), cold-start timing (S13),
+  FreeBSD running (S18), AccessKit (S14).
 
 - **crcbl: release pipeline.** Built and pushed by crcbl's session on 2026-10-15
   (tmxr-style: crates.io, AUR, Homebrew, Scoop, GitHub releases; no Alpine,
@@ -82,10 +95,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Known gaps in the design
 
-- **Hyprland dispatch over the socket:** that `.socket.sock` accepts
-  `dispatch hl.dsp.focus({ workspace = N })` exactly as `hyprctl dispatch` sends
-  it is unverified (M2 checks it). How ironbar's `detect_lua_config()` detects a
-  Lua config was not read; lyr's check for `hyprland.lua` is a guess.
+- **Hyprland backend, rest of M2.** `lyr-wm::hyprland` has the event parser, the
+  `State` reducer and `focus_request`, tested on lines written from the wiki's
+  formats, not lines recorded from a live Hyprland. Not built: the socket I/O,
+  the initial-state query (blocked on `serde_json`, above), dialect detection,
+  the `WorkspaceBackend` trait, click and scroll, and `lyr --stats`. A focus
+  request in the Lua dialect has never been sent to a running Hyprland; the
+  framing was read from hyprctl's source. Named workspaces get no request in Lua
+  until there is a quoting rule. How ironbar's `detect_lua_config()` detects a
+  Lua config was not read; lyr's check for `hyprland.lua` is a guess. `State`
+  places a new workspace on the focused monitor, which is where Hyprland creates
+  one, until the initial query corrects it.
 - **Nerd Font glyphs through crcbl-ui:** that Hack Nerd Font Propo's private-use
   glyphs resolve through crcbl-ui's cmap lookup is untested (M1's first test).
 - **swaync D-Bus method names** (`ToggleVisibility`, `ToggleDnd`, the subscribe
