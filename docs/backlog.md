@@ -31,8 +31,11 @@ implementation follows until they are answered. The ones that block a milestone:
   Rust, fuzzed and capped. crcbl's order: the crate with its caps and fuzzing,
   PNG, the raw conversions and resizing (lyr's M6); then the icon-theme lookup
   and SVG (lyr's M8); then JPEG. Until JPEG lands, a JPEG notification image or
-  album art is not shown. M6 also looks up notification `app_icon` names in the
-  icon theme, so it needs the theme lookup earlier than M8; crcbl was told.
+  album art is not shown. M6 also needs the theme lookup, for notification
+  `app_icon` names and the `desktop-entry` hint. crcbl confirmed the lookup
+  comes right after the M6 step and before JPEG. crcbl's SVG subset refuses an
+  SVG it cannot fully draw, so some theme icons will fail until its pass rate on
+  real themes is good. lyr falls back to a generic icon (plan 08, 09).
 - **crcbl: window kinds and platform features for lyr and pikr.** Requirements
   S1 – S27 in
   [plan/03-surfaces-and-input.md](plan/03-surfaces-and-input.md#what-crcbl-must-provide)

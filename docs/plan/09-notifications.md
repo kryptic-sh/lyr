@@ -63,7 +63,10 @@ against its text when M6 starts.
   because swaync renders markup, so lyr must too.
 - **Images:** `image-data` is raw pixels. `image-path` and `app_icon` are a file
   path, a `file://` URL or an icon name looked up in the icon theme as the tray
-  does ([08](08-tray.md)). Inline `<img>` in the body is not supported.
+  does ([08](08-tray.md)). Inline `<img>` in the body is not supported. An icon
+  that cannot be found or decoded (crcbl's SVG subset refuses what it cannot
+  draw, and JPEG comes last in crcbl's order) falls back to a generic icon. An
+  image that fails is left out, and the notification is still shown.
 
 ### Toasts
 

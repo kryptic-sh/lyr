@@ -25,7 +25,9 @@ nearest 18 px × scale) when it is set. Otherwise lyr looks `IconName` up in the
 icon theme: the XDG icon-theme lookup, `IconThemePath` first, PNG and SVG. The
 lookup, decoding and rasterising come from crcbl's asset crate (S28,
 [03](03-surfaces-and-input.md#what-crcbl-must-provide)), and each size is
-rasterised once.
+rasterised once. crcbl's SVG support is a subset that refuses an SVG it cannot
+fully draw. An icon that is refused, or not found, is drawn as a generic icon
+rather than left blank, so an item stays clickable.
 
 Clicks map to `Activate(x, y)`, `SecondaryActivate` (middle button) and
 `Scroll(delta, orientation)`, with `ContextMenu` as the fallback when an item
