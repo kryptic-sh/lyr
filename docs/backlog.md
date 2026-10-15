@@ -32,7 +32,27 @@ implementation follows until they are answered. The ones that block a milestone:
   commit. M1 needs S1, S2, S6, S7, S10 and S11. Since 2026-10-16 lyr also needs
   S9, S12, S17, S19 and S22, which were pikr's alone before: the native
   notification centre and menus need text entry, markup and images, panel focus,
-  a caret timer and emoji. crcbl's session was told the same day.
+  a caret timer and emoji. crcbl's session was told the same day and replied
+  with where each stands. **Reported, not read yet:**
+  - S9: compose and dead keys on Wayland and X11, and text-input-v3 at crcbl
+    `da20fe58`. A window gets an input method only while
+    `Shell::set_text_input_enabled(window, true)` is on (`TextPump::engage` does
+    it); `set_text_input_area` places the candidate window. Missing: pre-edit
+    during a compose sequence, surrounding text, and content types (always
+    "normal"). The Wi-Fi password field wants a password hint, so the input
+    method does not learn it; lyr asked for it before M7.
+  - S17: on-demand layer panels report `WindowState::focused = false` when
+    another window takes focus (a sway e2e test). Not tried on Hyprland.
+  - S19: `Shell::waker` / `ShellWaker`, and waits that take a deadline.
+  - S12, partial: one-line spans with their own colour, size and family, and
+    images (`Content::Image`, `Ui::set_image`). Missing: spans wrapping as one
+    paragraph, font weight (bold is a separately registered family), italic,
+    underline, and link hit areas, all of which notification markup needs (M6).
+  - S22: not started.
+
+  crcbl 0.1.0 is being published to crates.io, slowed by the new-crate rate
+  limit; crcbl's session reports when every crate is up.
+
 - **crcbl: window-kind API, backend work.** Read against the source at crcbl
   main `6483b744` (CI green): layer-shell v4 panels on a named monitor,
   exclusive zone, margins, keyboard modes, namespace, fractional scale on
@@ -57,8 +77,8 @@ implementation follows until they are answered. The ones that block a milestone:
   - `ui.scrollbar(..)`: vertical only.
 
   Still open in crcbl: Win32 per-pixel alpha (DirectComposition), no flash on
-  map, IME and compose (S9), colour emoji (S22), cold-start timing (S13),
-  FreeBSD running (S18), AccessKit (S14).
+  map, colour emoji (S22), cold-start timing (S13), FreeBSD running (S18),
+  AccessKit (S14).
 
 - **crcbl: release pipeline.** Built and pushed by crcbl's session on 2026-10-15
   (tmxr-style: crates.io, AUR, Homebrew, Scoop, GitHub releases; no Alpine,
