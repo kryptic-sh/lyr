@@ -1,4 +1,4 @@
-//! The platform-free half of the Hyprland backend.
+//! The Hyprland workspace backend.
 //!
 //! Hyprland exposes two sockets in
 //! `$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/`: `.socket2.sock`
@@ -6,12 +6,20 @@
 //! connection. [`parse_line`] turns an event line into an [`Event`],
 //! [`State::apply`] folds events into what the bar shows, and
 //! [`focus_request`] builds the bytes a click writes to the request socket.
+//! Those are platform-free. [`Hyprland`] does the socket I/O, and exists only
+//! on Unix, where Hyprland runs.
 
 mod event;
+#[cfg(unix)]
+mod ipc;
 mod request;
+#[cfg(unix)]
+mod snapshot;
 mod state;
 
 pub use event::{Event, ParseError, parse_line};
+#[cfg(unix)]
+pub use ipc::{Error, Events, Hyprland};
 pub use request::{Dialect, focus_request};
 pub use state::{State, Workspace};
 

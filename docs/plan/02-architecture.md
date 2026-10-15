@@ -123,6 +123,7 @@ before it is added.
 | `thiserror` 2                                                                      | library crates        | typed errors                                                                                           |
 | `tracing`, `tracing-subscriber`                                                    | all                   | logs to `~/.local/state/lyr/logs/`                                                                     |
 | `serde`, `toml`                                                                    | config                | config schema                                                                                          |
+| `serde_json`                                                                       | wm (Unix)             | Hyprland's `j/` replies (approved by the owner 2026-10-16)                                             |
 | `hjkl-config`, `hjkl-xdg`                                                          | config                | TOML loading and paths, as tmxr does                                                                   |
 | `tokio`                                                                            | app, sources, wm      | source runtime                                                                                         |
 | `interprocess` 2                                                                   | app                   | control socket (tmxr precedent)                                                                        |

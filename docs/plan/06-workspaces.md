@@ -45,6 +45,12 @@ Detected by `HYPRLAND_INSTANCE_SIGNATURE`. Both sockets live in
   owner's machine is the check. A named workspace (non-positive id) is
   `workspace name:NAME` in hyprlang. lyr refuses to send it in Lua until there
   is a quoting rule, since the name would be spliced into a Lua expression.
+- **The target is the released Hyprland, v0.56.2.** The event, JSON and dispatch
+  formats above were read at that tag. Hyprland's main branch (286 commits past
+  it on 2026-10-16) answers `dispatch` under a hyprlang config with "current
+  config provider doesn't support dispatch", and drops the `id` field for named
+  workspaces in `j/workspaces`. lyr has to follow both changes when the next
+  release ships them.
 - **Detecting the config dialect:** a Lua config is found when
   `~/.config/hypr/hyprland.lua` exists. That check is a guess at what ironbar's
   `detect_lua_config()` does (not read). The legacy form is kept for hyprlang

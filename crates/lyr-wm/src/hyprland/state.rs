@@ -19,9 +19,9 @@ pub struct Workspace {
 /// What the workspace module shows: every workspace in id order, which one is
 /// active, and which are urgent.
 ///
-/// Built from events alone. Hyprland emits no event for workspaces that
-/// existed before lyr subscribed, so a state built only from events is
-/// missing those until the initial-state query seeds them (not built yet).
+/// Hyprland emits no event for workspaces that existed before lyr subscribed,
+/// so a state starts from the initial-state query ([`State::seeded`]) and is
+/// kept current by events from then on.
 #[derive(Clone, Debug, Default)]
 pub struct State {
     workspaces: BTreeMap<WorkspaceId, Workspace>,
@@ -33,6 +33,28 @@ pub struct State {
 }
 
 impl State {
+    /// A state as the initial-state query found it: the workspaces, the one
+    /// active on the focused monitor, and which window is on which workspace.
+    /// Special workspaces are left out, as [`State::apply`] leaves them out.
+    #[cfg(unix)]
+    pub(super) fn seeded(
+        workspaces: impl IntoIterator<Item = Workspace>,
+        active: Option<(WorkspaceId, String)>,
+        windows: impl IntoIterator<Item = (String, WorkspaceId)>,
+    ) -> Self {
+        let (active, focused_monitor) = active.unzip();
+        Self {
+            workspaces: workspaces
+                .into_iter()
+                .filter(|workspace| !is_special(&workspace.name))
+                .map(|workspace| (workspace.id, workspace))
+                .collect(),
+            active,
+            focused_monitor,
+            windows: windows.into_iter().collect(),
+        }
+    }
+
     /// The workspaces in id order, special workspaces left out.
     pub fn workspaces(&self) -> impl Iterator<Item = &Workspace> {
         self.workspaces.values()
@@ -119,7 +141,7 @@ impl State {
     /// which is where Hyprland creates one. Special workspaces are not
     /// buttons, so they are never added.
     fn insert(&mut self, id: WorkspaceId, name: String) -> bool {
-        if name.starts_with("special:") || self.workspaces.contains_key(&id) {
+        if is_special(&name) || self.workspaces.contains_key(&id) {
             return false;
         }
         let monitor = self.focused_monitor.clone();
@@ -146,6 +168,12 @@ impl State {
             .is_some_and(|workspace| std::mem::take(&mut workspace.urgent));
         moved || cleared
     }
+}
+
+/// Special workspaces (scratchpads) are named `special:NAME` and are not
+/// buttons on the bar.
+fn is_special(name: &str) -> bool {
+    name.starts_with("special:")
 }
 
 #[cfg(test)]

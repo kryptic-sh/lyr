@@ -11,12 +11,6 @@ implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
   `neli`) block M4's audio and network sources.
-- **`serde_json`** blocks the rest of M2's Hyprland backend. The initial state
-  (`j/workspaces`, `j/activeworkspace`, and `j/clients` to seed which window is
-  on which workspace for `urgent`) is JSON, and `serde_json` is not on the
-  dependency list in [plan/02](plan/02-architecture.md#dependencies-initial).
-  The org already uses it (buffr, hjkl, gpur, crcbl-scene). The alternative is
-  hyprctl's plain-text output, which has no stable format.
 - **crcbl's release** blocks M9. The owner decided (2026-10-15) that crcbl's
   first crates.io release waits until S1 – S27 are built and the shell and UI
   are usable without the rest of the engine.
@@ -95,17 +89,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Known gaps in the design
 
-- **Hyprland backend, rest of M2.** `lyr-wm::hyprland` has the event parser, the
-  `State` reducer and `focus_request`, tested on lines written from the wiki's
-  formats, not lines recorded from a live Hyprland. Not built: the socket I/O,
-  the initial-state query (blocked on `serde_json`, above), dialect detection,
-  the `WorkspaceBackend` trait, click and scroll, and `lyr --stats`. A focus
-  request in the Lua dialect has never been sent to a running Hyprland; the
-  framing was read from hyprctl's source. Named workspaces get no request in Lua
-  until there is a quoting rule. How ironbar's `detect_lua_config()` detects a
-  Lua config was not read; lyr's check for `hyprland.lua` is a guess. `State`
-  places a new workspace on the focused monitor, which is where Hyprland creates
-  one, until the initial query corrects it.
+- **Hyprland backend, rest of M2.** `lyr-wm::hyprland` is built against Hyprland
+  v0.56.2's formats: the event parser, the `State` reducer, the JSON seed, and
+  `Hyprland` (socket I/O, `from_env`, `subscribe`, `focus`). Its tests run
+  against a fake Hyprland on Unix sockets, not a real one. Not verified on a
+  running Hyprland: the Lua focus request (the framing was read from hyprctl's
+  source), and that `hyprland.lua` existing is how Hyprland picks a Lua config
+  (ironbar's `detect_lua_config()` was not read; Hyprland also takes `--config`,
+  which lyr ignores). Named workspaces get no request in Lua until there is a
+  quoting rule. Still to build: click and scroll (scrolling has no waybar
+  precedent in the dotfiles), wiring it into the bar, and `lyr --stats`. The
+  `WorkspaceBackend` trait waits for the Windows backend (M7). Hyprland main's
+  changes for the next release are in
+  [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Nerd Font glyphs through crcbl-ui:** that Hack Nerd Font Propo's private-use
   glyphs resolve through crcbl-ui's cmap lookup is untested (M1's first test).
 - **swaync D-Bus method names** (`ToggleVisibility`, `ToggleDnd`, the subscribe
