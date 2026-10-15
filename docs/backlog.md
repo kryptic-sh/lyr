@@ -28,6 +28,28 @@ implementation follows until they are answered. The ones that block a milestone:
   FreeBSD CI (S18); AccessKit (S14) last. crcbl's session reports each row as it
   lands on main. Until the release, lyr pins crcbl by git revision on a green
   commit. M1 needs S1, S2, S6, S7, S10 and S11.
+- **crcbl: window-kind API review.** crcbl proposed (2026-10-15)
+  `WindowDesc { role: WindowRole, transparent }` with
+  `WindowRole::{Toplevel, Panel(PanelDesc), Popup(PopupDesc)}`, plus `ShellCaps`
+  and `ShellError::Unsupported`. lyr's feedback went back the same day; nothing
+  has been answered yet. The asks:
+  - Stretch a panel anchored to opposite edges, with the real size arriving as a
+    resize.
+  - Define "one edge" for the Win32 appbar so that TOP|LEFT|RIGHT counts as the
+    top edge.
+  - macOS reserve reported as a capability, not an error.
+  - A popup input mode for tooltips that never activate and pass clicks through.
+  - Resize and reposition a live popup.
+  - A uniform monitor-removed event plus close requests.
+  - An `ABN_FULLSCREENAPP` event, and `ABM_REMOVE` on a crash path.
+  - The AppKit level for `Top` above the menu bar.
+  - Hover on non-activating panels.
+  - Platform monitor names.
+  - DirectComposition for S16 on Win32.
+  - S21 on layer surfaces and popups.
+
+  Check that the API crcbl lands covers each of these before M1 pins it.
+
 - **crcbl: release pipeline.** Built and pushed by crcbl's session on 2026-10-15
   (tmxr-style: crates.io, AUR, Homebrew, Scoop, GitHub releases; no Alpine,
   because crcbl links ALSA), with the org secrets granted. It is not used until
