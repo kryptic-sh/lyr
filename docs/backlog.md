@@ -28,17 +28,17 @@ implementation follows until they are answered. The ones that block a milestone:
   FreeBSD CI (S18); AccessKit (S14) last. crcbl's session reports each row as it
   lands on main. Until the release, lyr pins crcbl by git revision on a green
   commit. M1 needs S1, S2, S6, S7, S10 and S11.
-- **crcbl: window-kind API, backend work.** The role API (`WindowRole`,
-  `PanelDesc`, `PopupDesc`, `PopupInput`, `ShellCaps::PANEL_RESERVE`) is on
-  crcbl main at `5e669fc4`, with CI green. That commit was read against lyr's
-  review. Only the headless shell builds panels and popups so far; the rest
-  return `ShellError::Unsupported` until their step lands. The order is Wayland
-  layer-shell, then Win32, then AppKit. lyr does not pin crcbl until the Wayland
-  step lands, since M1 needs it.
+- **crcbl: window-kind API, backend work.** crcbl main `6483b744` (CI green) has
+  the role API plus the Wayland step: layer-shell v4 panels on a named monitor,
+  exclusive zone, margins, keyboard modes, namespace, fractional scale on
+  panels; `ShellEvent::MonitorRemoved` on every backend (through
+  `monitor::queue_removed`); `wl_output.name` in `MonitorInfo`;
+  `Font::parse(impl Into<FontData>)` for runtime font bytes. That covers M1's
+  S1, S2, S6, S7, S10 and S11, so M1 can pin `6483b744`. Win32 panels and AppKit
+  NSPanels are on crcbl branches with CI green but not merged; S3 (`xdg_popup`)
+  comes after them.
 
   Recorded in crcbl's backlog under its backend steps, not built yet:
-  - In the Wayland step (needed for M1): platform output names in `MonitorInfo`,
-    and monitor-removed plus close requests, uniform on every backend.
   - Resizing and repositioning a live popup, with a caps flag where xdg_wm_base
     v3 is missing.
   - `ABN_FULLSCREENAPP` as an event, and `ABM_REMOVE` on drop and on a
