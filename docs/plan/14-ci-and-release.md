@@ -46,7 +46,7 @@ Also: `.github/workflows/cron.yml` (`cargo deny` on Mondays at 06:00 UTC),
 - **Headless render tests** run on the ubuntu runner only
   ([13](13-testing.md#2-integration-tests)).
 
-## Phase 2 — first release (M9)
+## Phase 2 — first release (M11)
 
 Add tmxr's release jobs, renamed for lyr:
 

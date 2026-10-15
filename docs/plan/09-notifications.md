@@ -1,61 +1,127 @@
 # 09 — Notifications
 
-## What the current bar does
+On Linux, lyr **is the notification daemon**. It owns
+`org.freedesktop.Notifications` on the session bus, draws the toasts, keeps the
+history, and shows that history in the clock panel
+([10](10-popups-and-menus.md#clock-panel)) under the calendar. swaync goes
+(decided by the owner on 2026-10-16). Windows and macOS keep their own
+notification centres, because neither lets another program replace them.
 
-The waybar `custom/notification` module runs `swaync-client -swb` for its state
-and maps its eight states onto three glyphs:
+## What swaync does today
 
-| State                                                                                      | Glyph  |
-| ------------------------------------------------------------------------------------------ | ------ |
-| `notification`, `dnd-notification`, `inhibited-notification`, `dnd-inhibited-notification` | U+F071 |
-| `none`, `inhibited-none`                                                                   | U+F0A2 |
-| `dnd-none`, `dnd-inhibited-none`                                                           | U+F1F7 |
+The baseline is `dotfiles/.config/swaync/config.json`, the waybar
+`custom/notification` module, and the three Hyprland bindings in
+`dotfiles/.config/hypr/hyprland.lua` (`mod+N` toggles the centre, `mod+shift+N`
+toggles do-not-disturb, `mod+alt+N` clears everything, each through
+`apps.notify`, which is `swaync-client`).
 
-It has no tooltip (`"tooltip": false`), and it only exists when `swaync-client`
-is installed (`"exec-if": "which swaync-client"`). Its clicks are:
+| swaync setting                                      | Value                                       | In lyr                                                                               |
+| --------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `positionX`, `positionY`                            | right, top                                  | toasts and the clock panel at the top right                                          |
+| `control-center-margin-*`                           | 16 px on every side                         | the same margins                                                                     |
+| `control-center-width`, `notification-window-width` | 500 px                                      | panel and toast width                                                                |
+| `fit-to-screen`                                     | true                                        | the panel runs the output's height, less the margins                                 |
+| `timeout`, `timeout-low`, `timeout-critical`        | 10 s, 5 s, never                            | the same, unless the app sends its own `expire_timeout`                              |
+| `notification-body-image-width`, `-height`          | 200 × 100 px                                | the largest a body image is drawn                                                    |
+| `image-visibility`                                  | `when-available`                            | an image is shown only when the notification has one                                 |
+| `transition-time`                                   | 200 ms                                      | toasts slide in and out over 200 ms; frames are drawn only during it                 |
+| `hide-on-clear`                                     | false                                       | Clear All leaves the panel open                                                      |
+| `hide-on-action`                                    | true                                        | invoking an action closes the panel                                                  |
+| `keyboard-shortcuts`                                | true                                        | the panel takes keys: `Escape` closes, arrows move, `Enter` acts, `Delete` dismisses |
+| `widgets`                                           | `title`, `dnd`, `mpris`, `notifications`    | the same widgets, in that order, below the calendar                                  |
+| `widget-config.title`                               | "Notification Center", a "Clear All" button | the same text                                                                        |
+| `widget-config.dnd`                                 | "Do Not Disturb"                            | the same text, as a switch                                                           |
+| `script-fail-notify`                                | true                                        | not carried: the config defines no scripts                                           |
 
-| Input       | Command                | Meaning                           |
-| ----------- | ---------------------- | --------------------------------- |
-| left-click  | `swaync-client -t -sw` | toggle the notification **panel** |
-| right-click | `swaync-client -d -sw` | toggle **do-not-disturb**         |
+The look comes from `dotfiles/.config/swaync/style.css`, which has not been read
+yet. M6 ports its values into the theme the way [04](04-rendering-and-theme.md)
+ported waybar's.
 
-The draft plan had these backwards ("click toggles DND, right-click dismisses
-all"), and contradicted itself with "click opens a drawer". The table above is
-the source of truth. Hyprland binds the same three actions to `mod+N` (panel),
-`mod+shift+N` (DND) and `mod+alt+N` (`-C`, clear all) in
-`dotfiles/.config/hypr/hyprland.lua`.
+`.local/bin/.swaync-test` fires seven notifications that cover normal, low and
+critical urgency, actions, an image, a long body, and an image with actions.
+That set becomes M6's manual check, and each case gets an automated test.
 
-swaync's config (`dotfiles/.config/swaync/config.json`) sets timeouts of 10 s
-normal, 5 s low and never for critical, a 500 px panel at the top right with 16
-px margins, and the widgets `title` (with Clear All), `dnd`, `mpris` and
-`notifications`.
+## The daemon
 
-## Linux — a swaync client for MVP
+The interface is the freedesktop Desktop Notifications Specification. The
+details below are from memory of version 1.2 of that spec and are confirmed
+against its text when M6 starts.
 
-Provisional default ([16](16-open-questions.md)): lyr is a **client of swaync**,
-not a notification daemon.
+- **Methods:** `Notify` (with `replaces_id`, so a repeated notification updates
+  in place), `CloseNotification`, `GetCapabilities` and `GetServerInformation`.
+- **Signals:** `NotificationClosed` with its reason (expired, dismissed, closed
+  by a call), `ActionInvoked`, and `ActivationToken` so the app that is raised
+  can take focus under Wayland.
+- **Capabilities:** `actions`, `body`, `body-markup`, `icon-static` and
+  `persistence`. Each is advertised only once it works. `body-images` is not
+  (see below).
+- **Hints:** `urgency`, `category`, `desktop-entry`, `image-data`, `image-path`,
+  `transient` (shown but not kept in the history) and `resident` (not closed by
+  an action). Sound hints are ignored and not advertised.
+- **Body markup:** the spec's subset (`<b>`, `<i>`, `<u>`, `<a>`). Anything else
+  is shown as text, never interpreted. `.menu-wifi` escapes `&`, `<` and `>`
+  because swaync renders markup, so lyr must too.
+- **Images:** `image-data` is raw pixels. `image-path` and `app_icon` are a file
+  path, a `file://` URL or an icon name looked up in the icon theme as the tray
+  does ([08](08-tray.md)). Inline `<img>` in the body is not supported.
 
-- State: swaync's D-Bus control interface (`org.erikreider.swaync.cc`). The
-  `Subscribe`/`SubscribeV2` signals push notification count, DND and inhibited
-  state, which is what `swaync-client -swb` itself listens to. No subprocess.
-- Clicks call the same interface methods that `-t` (`ToggleVisibility`) and `-d`
-  (`ToggleDnd`) do. The exact method names are confirmed against the installed
-  swaync's introspection XML when M4 starts. They are not re-derived from
-  memory.
-- When swaync is not running, the module is hidden, as waybar hides it, and it
-  appears when swaync's bus name does. It does not fail at start, because swaync
-  may start after lyr does (they are both started from
-  `hl.on("hyprland.start")`).
-- Both waybar clicks run `sleep 0.1 && swaync-client ...`. Why is not recorded.
-  The likely reason is that the panel would otherwise see the click that opened
-  it as an outside click and close at once. M4 checks whether lyr's D-Bus call
-  on button release needs the same delay, rather than copying it blind.
+### Toasts
 
-Becoming the `org.freedesktop.Notifications` daemon (as ashell does) would
-replace swaync, but it means owning **toast popups** with their stacking,
-timeouts, actions and images, the history panel, DND, inhibition and the MPRIS
-widget. That is a project the size of the rest of lyr. It is recorded as a
-post-MVP option in the backlog, not planned here.
+- One toast per notification, newest on top, in a column at the top right of the
+  **focused output** (Hyprland's, from [06](06-workspaces.md)).
+- Clicking the body invokes the `default` action when the app sent one, then
+  closes the toast. Action buttons invoke their action. The close button and a
+  middle click dismiss.
+- While the pointer is over a toast, its timeout is paused.
+- With do-not-disturb on, toasts are not shown but still go to the history.
+  Critical notifications still show (provisional, [16](16-open-questions.md)).
+
+### History, do-not-disturb and Clear All
+
+- The history lives in memory and is lost when lyr exits (provisional,
+  [16](16-open-questions.md)). It is shown in the clock panel, newest first and
+  grouped by app.
+- Do-not-disturb and Clear All are in the panel (the `dnd` and `title` widgets)
+  and on the control socket, so the bindings stay:
+  - `mod+N` runs `lyr panel clock` (toggle the clock panel);
+  - `mod+shift+N` runs `lyr dnd` (toggle do-not-disturb);
+  - `mod+alt+N` runs `lyr clear` (clear all).
+
+### Media players (the `mpris` widget)
+
+Every `org.mpris.MediaPlayer2.*` name on the session bus gets a row with its
+title, artist and art, and previous, play/pause and next buttons. State comes
+from `PropertiesChanged` on `org.mpris.MediaPlayer2.Player`, so nothing is
+polled. Art is read from `file://` URLs only. An `http(s)` art URL is not
+fetched, because lyr has no HTTP client and is not getting one for this.
+
+### When another daemon owns the name
+
+swaync, mako or dunst may already own `org.freedesktop.Notifications`, for
+example while the dotfiles still start swaync. lyr then logs the owner's name
+and PID and leaves notifications out. It does not take the name over unless
+`notifications.replace = true` is set. This keeps the switch from swaync to lyr
+a dotfiles change rather than a race at start-up.
+
+## The bell module
+
+The waybar module shows one of three glyphs:
+
+| State                               | Glyph  |
+| ----------------------------------- | ------ |
+| notifications in the history        | U+F071 |
+| no notifications                    | U+F0A2 |
+| no notifications, do-not-disturb on | U+F1F7 |
+
+These are waybar's icons for swaync's eight states, which collapse to three. The
+`inhibited-*` states come from swaync's inhibitors, which nothing in the
+dotfiles uses, so lyr has no inhibitors and no inhibited state.
+
+- No tooltip, as waybar's config has `"tooltip": false`.
+- Left click toggles the clock panel. Right click toggles do-not-disturb.
+- Waybar ran both clicks as `sleep 0.1 && swaync-client ...`, most likely so
+  that swaync did not see the click that opened its panel as an outside click.
+  lyr's panel and click are in one process, so the delay has no reason to exist.
 
 ## Windows
 

@@ -28,7 +28,10 @@ its built-in defaults:
 - [`dotfiles/.config/waybar/style.css`](https://github.com/mxaddict/dotfiles/blob/main/.config/waybar/style.css):
   font, colours, spacing.
 - [`dotfiles/.config/swaync/config.json`](https://github.com/mxaddict/dotfiles/blob/main/.config/swaync/config.json):
-  the notification panel the bar's notification module drives.
+  the notification daemon and centre, which lyr replaces.
+- `dotfiles/.local/bin/.menu-wifi`, and bluetui and wiremix as
+  `krypt menu bluetooth` and `krypt menu audio` start them: the menus the bar
+  opens, which lyr draws itself.
 
 A fresh install with no config file looks and behaves like that bar on Hyprland.
 The layout:
@@ -51,11 +54,14 @@ Windows and macOS with the modules those platforms support:
 3. **Every module in the current bar** — workspaces, power button, battery,
    power profile, network, bluetooth, tray, volume, mic, clock and notifications
    ([06](06-workspaces.md) – [09](09-notifications.md)).
-4. **Popups** — tooltips, calendar, power menu and tray menus
+4. **Popups and panels** — tooltips, the clock panel (calendar and notification
+   centre), power menu, Wi-Fi, Bluetooth and audio menus, and tray menus
    ([10](10-popups-and-menus.md)).
-5. **Config** — TOML, with the waybar setup embedded as defaults and reloaded
+5. **Notification daemon** — lyr owns `org.freedesktop.Notifications` on Linux:
+   toasts, history, do-not-disturb, media players ([09](09-notifications.md)).
+6. **Config** — TOML, with the waybar setup embedded as defaults and reloaded
    when the file changes ([05](05-layout-and-config.md)).
-6. **Idle at zero** — no polling and no wakeups while nothing changes, apart
+7. **Idle at zero** — no polling and no wakeups while nothing changes, apart
    from the clock's once-a-minute tick ([12](12-performance-and-power.md)).
 
 ## Non-goals (for now)
@@ -63,11 +69,10 @@ Windows and macOS with the modules those platforms support:
 - **Reading waybar's JSON or CSS.** Config is TOML (house style). The defaults
   are a hand-made port, and an importer is a backlog item.
 - **A general GUI toolkit.** lyr draws a fixed set of widgets: boxes, text,
-  icons, a calendar grid and menus. pikr's
+  icons, images, a calendar grid, menus, lists, switches, sliders and a text
+  field. pikr's
   [backend research](https://github.com/kryptic-sh/pikr/blob/main/docs/gui-backend-research.md)
   rejected a general toolkit for the same reason.
-- **Being the notification daemon.** lyr is a swaync client
-  ([09](09-notifications.md)).
 - **X11.** Wayland only on Linux.
 - **Compositors other than Hyprland** on Linux for MVP. The workspace backend is
   a trait ([06](06-workspaces.md)), so sway and niri are additions, not a
@@ -90,7 +95,8 @@ Windows and macOS with the modules those platforms support:
 | D-Bus            | `zbus` 5                                                                                                 | Org precedent (buffr); pure Rust                                                                                                                                             |
 | Linux audio      | PulseAudio protocol via `pipewire-pulse`                                                                 | Matches today's `pactl` behaviour and default-device tracking ([07](07-modules.md#audio-sources))                                                                            |
 | Hyprland actions | Lua dispatch form, written to `.socket.sock` directly                                                    | The bug that started lyr ([06](06-workspaces.md))                                                                                                                            |
-| Notifications    | swaync client                                                                                            | Keeps the existing daemon and config ([09](09-notifications.md))                                                                                                             |
+| Menus            | Wi-Fi, Bluetooth and audio menus drawn by lyr                                                            | The owner's decision (2026-10-16), replacing `.menu-wifi`, bluetui and wiremix ([10](10-popups-and-menus.md))                                                                |
+| Notifications    | lyr is the daemon on Linux                                                                               | The owner's decision (2026-10-16): one integrated bar, calendar and notification centre ([09](09-notifications.md))                                                          |
 | Config           | TOML, defaults embedded, hot reload                                                                      | House style ([05](05-layout-and-config.md))                                                                                                                                  |
 | Theme            | the current `style.css` values                                                                           | The bar should look the same the day it replaces waybar                                                                                                                      |
 

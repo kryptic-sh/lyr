@@ -18,8 +18,8 @@ Section numbers are document identity. Build order is
 | 06  | [06-workspaces.md](06-workspaces.md)                       | Hyprland IPC and Lua dispatch, Windows virtual desktops, macOS                                      |
 | 07  | [07-modules.md](07-modules.md)                             | Every module: behaviour, defaults, sources per platform                                             |
 | 08  | [08-tray.md](08-tray.md)                                   | StatusNotifierItem, DBusMenu, icons                                                                 |
-| 09  | [09-notifications.md](09-notifications.md)                 | swaync client, Windows and macOS                                                                    |
-| 10  | [10-popups-and-menus.md](10-popups-and-menus.md)           | Tooltips, calendar, power menu, menu actions                                                        |
+| 09  | [09-notifications.md](09-notifications.md)                 | The notification daemon, Windows and macOS                                                          |
+| 10  | [10-popups-and-menus.md](10-popups-and-menus.md)           | Popups and panels: tooltips, clock panel, power, Wi-Fi, Bluetooth and audio menus                   |
 | 11  | [11-platforms.md](11-platforms.md)                         | Per-platform windowing and module support tables                                                    |
 | 12  | [12-performance-and-power.md](12-performance-and-power.md) | Idle targets and how the design meets them                                                          |
 | 13  | [13-testing.md](13-testing.md)                             | Unit, integration with fakes, manual checklists                                                     |

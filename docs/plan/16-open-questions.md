@@ -19,14 +19,21 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
    but today's waybar does not do that. Default: off, behind
    `audio.mute_links_mic`. When it is on, unmuting output restores the mic's
    earlier state ([07](07-modules.md#mute-linkage)).
-3. **Notifications** (draft Q6). Default: a swaync client. The alternative is an
-   own `org.freedesktop.Notifications` daemon (toasts, history, DND, MPRIS),
-   which is the size of the rest of lyr ([09](09-notifications.md)).
-4. **Menus** (draft Q7). Default: power menu and calendar built in; network,
-   bluetooth and audio as `exec` actions (`krypt menu …` on Linux, Settings
-   pages on Windows and macOS). This changes the power button from
-   `krypt menu power` to the built-in menu. Say if it should stay on krypt
-   ([10](10-popups-and-menus.md#menus)).
+3. **Notifications** (draft Q6). **Decided by the owner (2026-10-16): lyr is the
+   notification daemon** ([09](09-notifications.md)). Provisional details:
+   critical notifications still show during do-not-disturb; the history is not
+   kept across restarts; when another daemon owns the name, lyr steps aside
+   unless `notifications.replace = true`; MPRIS art is read from `file://` URLs
+   only.
+4. **Menus** (draft Q7). **Decided by the owner (2026-10-16): the calendar, the
+   notification centre and the Wi-Fi, Bluetooth and audio menus are lyr's own,
+   built before the switch from waybar** ([10](10-popups-and-menus.md)). The
+   power menu was already built in. Provisional details: the Wi-Fi menu still
+   refuses enterprise and WEP networks and does not list hidden ones, as
+   `.menu-wifi` does; on Windows and macOS each menu is native where a public
+   API exists and opens Settings where not
+   ([10](10-popups-and-menus.md#windows-and-macos)); whether `wiremix` and
+   `bluetui` stay installed as standalone tools is the dotfiles' call.
 5. **Linux audio API** (draft Q8). Default: the PulseAudio protocol through
    `pipewire-pulse` with `libpulse-binding`, which is a new dependency. The
    alternative is native PipeWire with WirePlumber metadata
@@ -54,13 +61,16 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
 13. **Power profile setting on Windows.** Default: use the undocumented
     `PowerSetActiveOverlayScheme`. The alternative is read-only, like macOS
     ([07](07-modules.md#power-profile)).
-14. **Linux network daemon.** Default: NetworkManager for WiFi signal, with a 30
-    s nl80211 read as the fallback. Confirm which daemon `krypt menu wifi`
-    drives ([07](07-modules.md#network)).
+14. **Linux network daemon.** Answered by the dotfiles: `.menu-wifi` drives
+    `nmcli`, so it is NetworkManager, which the Wi-Fi menu needs too. The 30 s
+    nl80211 read stays as the signal fallback on machines without it
+    ([07](07-modules.md#network)).
 15. **Window title module.** It is in the draft but not in today's bar. Default:
     not in MVP (backlog).
 16. **New dependencies.** `libpulse-binding` and an rtnetlink crate are new to
-    the org and need the owner's approval before M4
+    the org and need the owner's approval before M4. `image` (PNG and JPEG) and
+    `freedesktop-icons` are new to lyr but used by pikr; they are needed for
+    tray and notification icons and images, before M6
     ([02](02-architecture.md#dependencies-initial)).
 17. **Where lyr differs from waybar on purpose.** Everything else in the
     dotfiles' waybar setup is carried exactly (reviewed against `config.jsonc`
@@ -68,4 +78,13 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
     controller the module is hidden (waybar shows the on icon), and the mic's
     tooltip names the source (waybar names the sink there too). Say if either
     should match waybar instead ([07](07-modules.md#bluetooth),
-    [07](07-modules.md#mic)).
+    [07](07-modules.md#mic)). The clock panel changes more, by the owner's
+    choice: see 18.
+18. **The clock panel** ([10](10-popups-and-menus.md#clock-panel)). Decided by
+    the owner (2026-10-16): the calendar and the notification centre share one
+    panel, opened by a click on the clock or the bell. Provisional details: the
+    calendar keeps waybar's year mode, three columns and colours, and the panel
+    widens if the year grid does not fit 500 px; right click and scroll act on
+    the calendar inside the panel rather than on the clock; the clock's tooltip
+    names the time zone; mic's right click opens the audio menu on input devices
+    rather than outputs.

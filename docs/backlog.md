@@ -10,8 +10,10 @@ The provisional decisions in
 implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
-  `neli`) block M4's audio and network sources.
-- **crcbl's release** blocks M9. The owner decided (2026-10-15) that crcbl's
+  `neli`) block M4's audio and network sources. `image` (PNG and JPEG) and
+  `freedesktop-icons`, both already used by pikr, block M6's notification images
+  and icons (and the tray's theme icons in M8).
+- **crcbl's release** blocks M11. The owner decided (2026-10-15) that crcbl's
   first crates.io release waits until S1 – S27 are built and the shell and UI
   are usable without the rest of the engine.
 
@@ -27,7 +29,10 @@ implementation follows until they are answered. The ones that block a milestone:
   S22); input (S9, S20); UI fit (S23, S24); start-up and failure (S13, S26);
   FreeBSD CI (S18); AccessKit (S14) last. crcbl's session reports each row as it
   lands on main. Until the release, lyr pins crcbl by git revision on a green
-  commit. M1 needs S1, S2, S6, S7, S10 and S11.
+  commit. M1 needs S1, S2, S6, S7, S10 and S11. Since 2026-10-16 lyr also needs
+  S9, S12, S17, S19 and S22, which were pikr's alone before: the native
+  notification centre and menus need text entry, markup and images, panel focus,
+  a caret timer and emoji. crcbl's session was told the same day.
 - **crcbl: window-kind API, backend work.** Read against the source at crcbl
   main `6483b744` (CI green): layer-shell v4 panels on a named monitor,
   exclusive zone, margins, keyboard modes, namespace, fractional scale on
@@ -70,9 +75,11 @@ implementation follows until they are answered. The ones that block a milestone:
 - **wayr's README still names pikr as a consumer.** That is now wrong, and no
   wayr session exists to fix it. It is a one-line change in the wayr repo, for
   the owner.
-- **dotfiles: switch from waybar to lyr** at M6 (`hyprland.lua`
-  `hl.exec_cmd("waybar")`;
-  [plan/05](plan/05-layout-and-config.md#migration-from-waybar)).
+- **dotfiles: switch from waybar, swaync and the `krypt menu` Wi-Fi, Bluetooth
+  and audio commands to lyr** at M8
+  ([plan/05](plan/05-layout-and-config.md#migration-from-waybar)). Whether
+  `wiremix` and `bluetui` stay installed as standalone tools, and whether the
+  `krypt menu` names stay as wrappers, is the owner's call then.
 
 ## The fallback stack, if crcbl declines
 
@@ -99,22 +106,33 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   which lyr ignores). Named workspaces get no request in Lua until there is a
   quoting rule. Still to build: click and scroll (scrolling has no waybar
   precedent in the dotfiles), wiring it into the bar, and `lyr --stats`. The
-  `WorkspaceBackend` trait waits for the Windows backend (M7). Hyprland main's
+  `WorkspaceBackend` trait waits for the Windows backend (M9). Hyprland main's
   changes for the next release are in
   [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Waybar parity, still to check.** The plan was reviewed against the dotfiles'
   `config.jsonc` and `style.css` (2026-10-16), with waybar's own defaults read
   in its 0.15.0 source. Open: the calendar's `<tt>` monospace look with a
-  proportional default font (`calendar_font`, M5); whether swaync needs waybar's
-  `sleep 0.1` before a click (M4); the logind method behind `systemctl sleep`
-  (M5). The defaults-parity test (M3) should read the glyphs from `config.jsonc`
-  itself, not from the plan: the plan once lost every BMP private-use glyph
-  without anyone noticing, and now writes them as code points.
+  proportional default font (`calendar_font`, M5); the logind method behind
+  `systemctl sleep` (M5). The defaults-parity test (M3) should read the glyphs
+  from `config.jsonc` itself, not from the plan: the plan once lost every BMP
+  private-use glyph without anyone noticing, and now writes them as code points.
 - **Nerd Font glyphs through crcbl-ui:** that Hack Nerd Font Propo's private-use
   glyphs resolve through crcbl-ui's cmap lookup is untested (M1's first test).
-- **swaync D-Bus method names** (`ToggleVisibility`, `ToggleDnd`, the subscribe
-  signals) are from memory. Confirm them against the installed swaync's
-  introspection before M4.
+- **Native notification centre and menus, not yet researched**
+  ([plan/09](plan/09-notifications.md), [plan/10](plan/10-popups-and-menus.md)).
+  Written from memory and the dotfiles, with each item to read when its
+  milestone starts: the Desktop Notifications Specification's exact methods,
+  hints and close reasons (M6); `dotfiles/.config/swaync/style.css`, 349 lines,
+  not read (M6); swaync's own behaviour where the plan picked a default
+  (critical notifications in DND, the history order); NetworkManager's D-Bus
+  names and failure reason codes (M7); bluetui's and wiremix's actual feature
+  sets (M7); the Windows and macOS menu APIs (M9, M10).
+- **Closing a panel on an outside click.** A panel opened from a key binding
+  cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
+  keyboard focus (S17) closes it on a click into another window, but not on a
+  click on the empty desktop. M5 records what Hyprland does and picks a fix.
+- **Does the year calendar fit the 500 px panel?** Measured in M5; the panel
+  widens if not ([plan/10](plan/10-popups-and-menus.md#clock-panel)).
 - **Undocumented Windows APIs:** virtual desktops
   (`IVirtualDesktopManagerInternal`) and setting the power mode
   (`PowerSetActiveOverlayScheme`) can break with any Windows build.
@@ -141,10 +159,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 - **Window title module** (`hyprland/window`; the draft plan listed it, but
   today's bar does not have it). Built on Hyprland's `activewindowv2` event.
-- **Own notification daemon** (replacing swaync): toasts, history, DND, the
-  MPRIS widget.
-- **Built-in network, bluetooth and audio menus**, replacing `krypt menu …` and
-  the Settings pages.
 - **`lyr import-waybar`**: convert `config.jsonc` + `style.css` to TOML.
 - **sway and niri workspace backends**, and komorebi or GlazeWM on Windows.
 

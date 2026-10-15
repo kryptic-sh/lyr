@@ -26,9 +26,13 @@ tested with no display and no GPU, on every CI runner.
   `XDG_RUNTIME_DIR`, scripts events, and asserts on the workspace state and on
   the dispatch requests lyr sends.
 - **D-Bus fakes:** a private session bus (`dbus-daemon --session` on the Linux
-  runner) with fake UPower, BlueZ, power-profiles-daemon, swaync and
-  StatusNotifierItem services, so the Linux sources run against real D-Bus
-  traffic.
+  runner) with fake UPower, BlueZ, power-profiles-daemon, NetworkManager, MPRIS
+  and StatusNotifierItem services, so the Linux sources and menus run against
+  real D-Bus traffic.
+- **Notification daemon:** test clients on the same private bus send what
+  `.swaync-test` sends (urgencies, actions, images, long bodies, `replaces_id`)
+  and assert on the history, the signals lyr emits, and the toasts in the
+  `DrawList`.
 - **Headless render:** crcbl's headless shell backend (which crcbl's own CI runs
   everything through) renders a bar to an image. Image comparisons are limited
   to the Linux runner, because GPU and software rasterisation differ per

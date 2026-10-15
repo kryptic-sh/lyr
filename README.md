@@ -18,6 +18,9 @@ on the GPU through [crcbl](https://github.com/kryptic-sh/crcbl). Part of the
 - **Modules:** power menu, battery, power profile, network, bluetooth, tray,
   volume, mic, clock with a calendar, and notifications. Each one works on every
   platform that exposes what it needs.
+- **Its own notification centre and menus:** on Linux lyr is the notification
+  daemon, and draws the calendar, notification history and the Wi-Fi, Bluetooth
+  and audio menus itself, with no helper programs.
 - **Ships an opinionated waybar setup as its defaults:** a fresh install looks
   and behaves like it, with no config file.
 - **Idle at zero:** no polling and no frame loop. The bar repaints only when

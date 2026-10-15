@@ -8,15 +8,20 @@ section.
 
 ## Window kinds
 
-lyr needs two kinds of window, on every platform:
+lyr needs three kinds of window, on every platform:
 
 - **Bar**: a thin strip along one edge of one output that reserves its space so
   maximised windows stop at it. It never takes keyboard focus. It shows on every
   workspace or Space and above normal windows.
 - **Popup**: anchored to a rectangle on a bar (the module that opened it), above
-  everything else, closed on an outside click or `Escape`. Tooltips, calendar,
-  power menu and tray menus ([10](10-popups-and-menus.md)). The calendar and
-  menus take the pointer, and menus take the keyboard while open.
+  everything else, closed on an outside click or `Escape`. Tooltips, the power
+  menu and tray menus ([10](10-popups-and-menus.md)). Menus take the pointer and
+  the keyboard while open.
+- **Panel**: a surface on an output, not parented to a bar, above everything
+  else, which can open from a key binding with no click behind it. The clock
+  panel, the Wi-Fi, Bluetooth and audio menus, and notification toasts
+  ([10](10-popups-and-menus.md#two-kinds-of-window)). Panels take the keyboard,
+  including text entry (Wi-Fi passwords, Bluetooth PINs); toasts do not.
 
 ## Linux — layer-shell
 
@@ -29,6 +34,11 @@ lyr needs two kinds of window, on every platform:
   module's rectangle. The positioner flips and slides the popup to keep it on
   screen. A menu takes an explicit grab (`xdg_popup.grab`) so that clicking
   outside closes it.
+- **Panel:** a `zwlr_layer_surface_v1` on layer `overlay`, anchored top + right
+  (top + left for a panel opened from the left zone) with the 16 px margins
+  swaync uses, exclusive zone 0, keyboard interactivity `on-demand` (`none` for
+  toasts), on the output it was opened for. That is a layer surface the bar's
+  own requirement S1 already covers.
 - Scale: `wp_fractional_scale_v1` with a viewport. crcbl-shell already has both.
 
 ## Windows — appbar
@@ -48,6 +58,8 @@ lyr needs two kinds of window, on every platform:
   coordinates computed from the bar's rectangle, clamped to the monitor's work
   area. For menus, the window activates so it can receive keys and close on
   `WM_ACTIVATE(WA_INACTIVE)`.
+- **Panel:** the same window kind as a popup, placed against the monitor's work
+  area instead of a module's rectangle.
 - Scale: per-monitor-v2 DPI awareness (crcbl-shell already sets it) and
   `WM_DPICHANGED`.
 
@@ -65,6 +77,8 @@ edge, beneath the bar. That is the same overlap SketchyBar users accept.
   `hidesOnDeactivate = false`.
 - **Popup:** a child `NSPanel`, positioned in screen coordinates (AppKit's
   origin is bottom-left, so conversion happens once in crcbl-shell).
+- **Panel:** a key-capable `NSPanel` (it has to become key for text entry) at
+  the same level as the bar.
 - Scale: `backingScaleFactor` per screen and
   `NSWindowDidChangeBackingPropertiesNotification`.
 
@@ -85,7 +99,9 @@ macOS `NSApplicationDidChangeScreenParametersNotification`.
 The bar needs pointer input only: enter, leave, motion (for hover and tooltips),
 buttons (left, middle, right) and scroll (discrete and high-resolution, with a 5
 % step per notch as today). `lyr-core` hit-tests positions in logical pixels.
-Menus need key presses for `Escape`, arrows and `Enter`.
+Menus and panels need key presses for `Escape`, arrows and `Enter`, dragging for
+the audio menu's sliders, and text entry with the user's keymap, compose and
+input method for Wi-Fi passwords.
 
 ## What crcbl must provide
 
@@ -93,7 +109,10 @@ This is the joint list for **lyr** and **pikr**, and it is the single list for
 both: the owner has decided that pikr migrates to crcbl too, dropping floem and
 its forks. S1 – S15 were sent to crcbl's development on 2026-10-15. S16 – S27
 are pikr's further needs (its P1 – P12), which pikr's session sent to crcbl the
-same day. Each row is open until crcbl confirms it. The live state is kept in
+same day. lyr took on S9, S12, S17, S19 and S22 as well on 2026-10-16, when its
+notification centre and menus became native: text entry, notification markup and
+images, panel focus, caret blink, and emoji in notification text. Each row is
+open until crcbl confirms it. The live state is kept in
 [docs/backlog.md](../backlog.md), and this table records what was asked and why.
 
 | #   | Requirement                                                                                                                                                 | lyr | pikr | crcbl today (at `1db97a5b`)                                                                                                    |
@@ -106,20 +125,20 @@ same day. Each row is open until crcbl confirms it. The live state is kept in
 | S6  | Cross-thread **wake proxy** for `wait_events` (other threads post an event and the loop wakes)                                                              | ✓   | ✓    | Not present; only the shell's own clipboard fds are polled                                                                     |
 | S7  | Output enumeration and hotplug events on every backend, with name, scale and work area                                                                      | ✓   |      | Enumeration exists on every backend; hotplug events not confirmed on all of them                                               |
 | S8  | Centred, borderless, focused, topmost toplevel on Win32 and AppKit                                                                                          |     | ✓    | Borderless only as fullscreen-on-a-monitor                                                                                     |
-| S9  | Keyboard: XKB keymaps, modifiers, repeat, compose; text-input-v3 IME preedit and commit                                                                     |     | ✓    | XKB keymaps on Wayland; IME preedit on AppKit only; no compose, no text-input-v3                                               |
+| S9  | Keyboard: XKB keymaps, modifiers, repeat, compose; text-input-v3 IME preedit and commit                                                                     | ✓   | ✓    | XKB keymaps on Wayland; IME preedit on AppKit only; no compose, no text-input-v3                                               |
 | S10 | The UI draw pass usable **without** the 3D renderer (`UiRenderer` pulls in water, sprite and shader crates today)                                           | ✓   | ✓    | `UiRenderer` lives in `crcbl-render`                                                                                           |
 | S11 | Fonts by family name from the system, or accepting font bytes the app found itself                                                                          | ✓   | ✓    | `Font::parse(&'static [u8])`; no system lookup                                                                                 |
-| S12 | Rich text spans, images, and a virtualised list in `crcbl-ui`                                                                                               |     | ✓    | Virtualised fixed-height list, caret and selection, images exist; per-span styling not confirmed                               |
+| S12 | Rich text spans, images, and a virtualised list in `crcbl-ui`                                                                                               | ✓   | ✓    | Virtualised fixed-height list, caret and selection, images exist; per-span styling not confirmed                               |
 | S13 | Cold start to the first presented frame under 500 ms                                                                                                        |     | ✓    | Not measured                                                                                                                   |
 | S14 | Accessibility (AccessKit)                                                                                                                                   |     | ✓    | Not present and not planned                                                                                                    |
 | S15 | Published to crates.io with a declared `rust-version`                                                                                                       | ✓   | ✓    | Never tagged, and no release scheduled; toolchain pinned to 1.98.1, no `rust-version`                                          |
 | S16 | Transparent, per-pixel-alpha surfaces on layer-shell, Win32 and AppKit (the bar background is transparent)                                                  | ✓   | ✓    | Not checked                                                                                                                    |
-| S17 | Focus gained / lost events on layer surfaces, and reliable first-key delivery                                                                               |     | ✓    | Not checked                                                                                                                    |
+| S17 | Focus gained / lost events on layer surfaces, and reliable first-key delivery                                                                               | ✓   | ✓    | Not checked                                                                                                                    |
 | S18 | FreeBSD Wayland build                                                                                                                                       |     | ✓    | Not checked                                                                                                                    |
-| S19 | Deadline / timer wake of `wait_events` (caret blink)                                                                                                        |     | ✓    | Not checked                                                                                                                    |
+| S19 | Deadline / timer wake of `wait_events` (caret blink)                                                                                                        | ✓   | ✓    | Not checked                                                                                                                    |
 | S20 | Pointer input for lists and modules: hover, click, cursor shape, discrete and high-resolution wheel; scrollbar handle styling                               | ✓   | ✓    | Not checked                                                                                                                    |
 | S21 | `wp_fractional_scale_v1` on **layer** surfaces, not only toplevels                                                                                          | ✓   | ✓    | Fractional scale wired for toplevels                                                                                           |
-| S22 | Colour emoji (COLR / CBDT / sbix) with per-glyph font fallback, and text measurement                                                                        |     | ✓    | Not checked                                                                                                                    |
+| S22 | Colour emoji (COLR / CBDT / sbix) with per-glyph font fallback, and text measurement                                                                        | ✓   | ✓    | Not checked                                                                                                                    |
 | S23 | The CSS subset pikr's `default.css` uses, through crcbl-ui's stylesheet or an `hjkl-css` mapping (lyr: only if [16](16-open-questions.md) item 6 picks CSS) |     | ✓    | crcbl-ui stylesheet covers selectors, colours, box model, borders, radius, fonts (per crcbl's session)                         |
 | S24 | RGBA image upload of bitmaps the app rasterised itself (tray icons, pikr's SVG icons)                                                                       | ✓   | ✓    | An image module exists in crcbl-ui; upload path not checked                                                                    |
 | S25 | A clean exit from the event loop                                                                                                                            | ✓   | ✓    | Not checked                                                                                                                    |

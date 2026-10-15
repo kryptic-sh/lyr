@@ -17,8 +17,8 @@ The tray is the largest single source on Linux. Three parts are needed:
    `NewToolTip` and `NewTitle` signals and drops items whose bus name goes away.
 3. **Menus.** Right-click uses the item's `com.canonical.dbusmenu` object
    (`GetLayout`, `Event`, `AboutToShow`, `LayoutUpdated`). The menu is drawn by
-   lyr in a popup ([10](10-popups-and-menus.md#popup-surfaces)). Steam and Teams
-   both depend on DBusMenu, so it is MVP for the tray, not a stretch.
+   lyr in a popup ([10](10-popups-and-menus.md#two-kinds-of-window)). Steam and
+   Teams both depend on DBusMenu, so it is MVP for the tray, not a stretch.
 
 **Icons** come from `IconPixmap` (ARGB32, network byte order, choosing the size
 nearest 18 px × scale) when it is set. Otherwise lyr looks `IconName` up in the

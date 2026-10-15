@@ -6,7 +6,7 @@
 //!
 //! So far it holds the Hyprland backend ([`hyprland`]). The common
 //! `WorkspaceBackend` trait the plan sketches is not written yet: it gets
-//! extracted when the second backend (Windows, milestone M7) shows what the
+//! extracted when the second backend (Windows, milestone M9) shows what the
 //! two actually share.
 
 pub mod hyprland;

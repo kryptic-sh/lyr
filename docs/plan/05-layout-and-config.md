@@ -47,10 +47,10 @@ format = "{icon} {volume}%"
 format_muted = "\uEEE8 {volume}%"
 scroll_step = 5
 on_click = "toggle_mute"
-on_click_right = { exec = "krypt menu audio" }
+on_click_right = "open_audio_menu"
 
 [network]
-on_click = { exec = "krypt menu wifi" }
+on_click = "open_wifi_menu"
 
 [theme]
 font = "Hack Nerd Font Propo"
@@ -67,19 +67,20 @@ This is a sketch of the shape, not the final schema. The schema lands with M3
 and is then documented in the README.
 
 **Actions** are either a built-in name (`toggle_mute`, `focus`, `cycle_profile`,
-`open_calendar`, `open_power_menu`) or `{ exec = "…" }`. An `exec` runs through
-the platform shell (`sh -c` on Linux and macOS, `cmd /C` on Windows) with no
-console window on Windows. Like tmxr, lyr treats a config file as code: anything
-with `exec` runs as the user (SECURITY.md).
+`open_clock_panel`, `open_power_menu`, `open_wifi_menu`, `open_bluetooth_menu`,
+`open_audio_menu`, `toggle_dnd`) or `{ exec = "…" }`. An `exec` runs through the
+platform shell (`sh -c` on Linux and macOS, `cmd /C` on Windows) with no console
+window on Windows. Like tmxr, lyr treats a config file as code: anything with
+`exec` runs as the user (SECURITY.md).
 
 ### Per-platform defaults
 
 The embedded defaults differ per platform only in the module lists and the
 `exec` actions. On Windows and macOS, modules that cannot work there are left
-out ([11](11-platforms.md)), and menu actions open the system settings pages
-([10](10-popups-and-menus.md#menus)). One defaults file holds all three, as
-`[platform.linux]`, `[platform.windows]` and `[platform.macos]` override tables
-applied before the user file.
+out ([11](11-platforms.md)), and a menu with no native version there opens the
+system settings page ([10](10-popups-and-menus.md#windows-and-macos)). One
+defaults file holds all three, as `[platform.linux]`, `[platform.windows]` and
+`[platform.macos]` override tables applied before the user file.
 
 ## Validation
 
@@ -102,23 +103,40 @@ and new configs:
 
 ## Migration from waybar
 
-The dotfiles change in M6 ([15](15-milestones.md)):
+The dotfiles change in M8 ([15](15-milestones.md)):
 
-- `hyprland.lua`: `hl.exec_cmd("waybar")` becomes `hl.exec_cmd("lyr")`.
+- `hyprland.lua`: `hl.exec_cmd("waybar")` becomes `hl.exec_cmd("lyr")`, and
+  `hl.exec_cmd("swaync")` goes.
+- `hyprland.lua` bindings: `mod+N`, `mod+shift+N` and `mod+alt+N` run
+  `lyr panel clock`, `lyr dnd` and `lyr clear` instead of `swaync-client`
+  (`apps.notify` in `apps.template.lua`). `mod+W`, `mod+A` and `mod+U` run
+  `lyr panel wifi`, `lyr panel audio` and `lyr panel bluetooth` instead of
+  `krypt menu …`.
+- `.krypt/commands.toml`: the `menu` group's `wifi`, `audio` and `bluetooth`
+  commands go, with `.local/bin/.menu-wifi`, or become thin `lyr panel …`
+  wrappers if the owner wants the `krypt menu` names kept. `swaync-test` keeps
+  its `notify-send` calls and drops its swaync restart.
+- `.krypt/deps.toml`: `swaync` goes. `wiremix` and `bluetui` go unless the owner
+  keeps them as standalone tools.
+- `.krypt/links.toml`: the `.config/swaync/**/*` link goes with
+  `.config/swaync/`, and the `bluetui` and `wiremix` links go if those tools do.
+  `.local/bin/.swaync-test`'s link is renamed if the script is.
 - `.local/bin/.menu-time` restarts the bar after changing the time zone
   (`pkill waybar` / `waybar &`). With lyr re-reading `timedate1`
   ([07](07-modules.md#clock)) those two lines are deleted, not ported, and the
   description in `.krypt/commands.toml` ("...and restarts waybar") changes with
   them.
-- `.krypt/deps.toml`: `"waybar"` becomes `"lyr"` once lyr is packaged (M9).
+- `.krypt/deps.toml`: `"waybar"` becomes `"lyr"` once lyr is packaged (M11).
   Until then lyr is installed from source.
 - `.krypt/links.toml`: the `.config/waybar/**/*` link goes when
   `.config/waybar/` does, and a `.config/lyr/` link comes in if a config file is
   needed.
 - Comments that say "opened from waybar" (`.config/bluetui/config.toml`,
-  `.config/wiremix/wiremix.toml`) and `README.md`'s "Bar: Waybar" line.
+  `.config/wiremix/wiremix.toml`), and `README.md`'s "Bar: Waybar" and
+  "Notifications: swaync" lines and its `mod+W`, `mod+A`, `mod+U` and `mod+N`
+  rows.
 - `.config/waybar/` stays until lyr has run as the daily driver for a while,
-  then it is removed. `swaync` stays ([09](09-notifications.md)).
+  then it is removed. `.config/swaync/` goes the same way.
 - A `.config/lyr/config.toml` is only needed for differences from the defaults.
   With the defaults being the waybar port, that file starts empty.
 

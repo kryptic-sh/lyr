@@ -6,4 +6,4 @@
 //! polling (`docs/plan/07-modules.md`).
 //!
 //! Empty in the scaffold: nothing is implemented yet. The Linux sources land
-//! in milestones M4 and M6 (`docs/plan/15-milestones.md`).
+//! in milestones M4 and M6 to M8 (`docs/plan/15-milestones.md`).

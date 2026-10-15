@@ -20,6 +20,10 @@ Platform sources are summarised in [11-platforms.md](11-platforms.md). The tray
 and notifications are big enough to get their own sections ([08](08-tray.md),
 [09](09-notifications.md)).
 
+Where waybar ran another program from a click (swaync, `krypt menu wifi`,
+`krypt menu bluetooth`, `krypt menu audio`), lyr opens its own panel instead
+([10](10-popups-and-menus.md)). That is the owner's decision of 2026-10-16.
+
 ## Left zone
 
 ### Power button
@@ -77,14 +81,14 @@ itself; that is not an error.
 - Tooltips: wired `{ifname} {ipaddr}/{cidr}`, wifi
   `{ifname} {ipaddr}/{cidr} {essid} ({signalStrength}%)`, disconnected
   `YOU IN THE WOODS?`. These are the current strings.
-- Click runs the network action ([10](10-popups-and-menus.md#menus)).
+- Click opens the Wi-Fi menu ([10](10-popups-and-menus.md#wi-fi-menu)), where
+  waybar ran `krypt menu wifi`.
 - Linux: link and address changes come from rtnetlink (pushed). **WiFi signal
   strength is not pushed by rtnetlink.** NetworkManager's D-Bus API pushes
-  `Strength` changes, and iwd pushes them through its signal-level agent. The
-  dotfiles' wifi menu decides which daemon is in use; until that is checked, the
-  plan assumes NetworkManager and falls back to an nl80211 read **every 30 s**
-  while connected to WiFi (the only interval in the plan). See
-  [16](16-open-questions.md).
+  `Strength` changes. The dotfiles' `.menu-wifi` drives `nmcli`, so the daemon
+  is NetworkManager, which the Wi-Fi menu needs anyway. On a machine without it,
+  lyr falls back to an nl80211 read **every 30 s** while connected to WiFi (the
+  only interval in the plan), and the Wi-Fi menu is left out.
 - Windows: `NotifyIpInterfaceChange` for links and addresses,
   `WlanRegisterNotification` (signal-quality changes) for WiFi.
 - macOS: `SCDynamicStore` notifications for links and addresses, CoreWLAN for
@@ -98,7 +102,8 @@ itself; that is not an error.
 - With no Bluetooth controller, waybar still shows the on icon. lyr hides the
   module instead, as battery does on a machine with no battery.
 - Tooltip `Bluetooth {status}`.
-- Click runs the bluetooth action ([10](10-popups-and-menus.md#menus)).
+- Click opens the Bluetooth menu ([10](10-popups-and-menus.md#bluetooth-menu)),
+  where waybar ran `krypt menu bluetooth`.
 - Linux: BlueZ over D-Bus (`org.bluez.Adapter1` `Powered`, `org.bluez.Device1`
   `Connected`, `org.bluez.Battery1` `Percentage`).
 - Windows: radio state through WinRT `Windows.Devices.Radios`, connected devices
@@ -124,15 +129,18 @@ See [08-tray.md](08-tray.md).
   U+F1B9; otherwise the ramp U+F026, U+F027, U+F028.
 - Click toggles output mute. Scroll up raises and scroll down lowers the volume
   by **5 %**, with no ceiling at 100 %, as `pactl set-sink-volume ... +5%` has
-  none. Right-click runs the audio action ([10](10-popups-and-menus.md#menus)).
+  none. Right-click opens the audio menu on its output devices
+  ([10](10-popups-and-menus.md#audio-menu)), where waybar ran
+  `krypt menu audio`.
 - Tooltip: the default sink's description, which is waybar's default when no
   `tooltip-format` is set.
 - Colour `#89b4fa` (waybar `#pulseaudio`).
 
 ### Mic
 
-- Format `U+F130 {volume}%`, muted `U+F131 {volume}%`. The same click, scroll
-  and right-click as volume, applied to the default source.
+- Format `U+F130 {volume}%`, muted `U+F131 {volume}%`. The same click and scroll
+  as volume, applied to the default source. Right-click opens the audio menu on
+  its input devices; waybar opened the same output tab from both.
 - Tooltip: the default source's description. Waybar shows the sink's here too,
   because both modules are its one `pulseaudio` module; that is not carried.
 - Colour `#cba6f7` (waybar `#pulseaudio.microphone`).
@@ -167,12 +175,11 @@ muted, and unmuting output restores that state.
   The draft plan's 1 Hz timer was 59 wasted wakeups a minute. A format with `%S`
   switches it to 1 Hz. The timer interval is derived from the format, not
   configured separately.
-- Hovering shows the calendar ([10](10-popups-and-menus.md#calendar)), as
-  waybar's `tooltip-format: "<tt><small>{calendar}</small></tt>"` does. Left and
-  right click both switch it between year and month mode (`actions`
-  `on-click: "mode"` and `calendar` `on-click-right: "mode"`). Scroll shifts it
-  by one unit of the current mode (`on-scroll: 1`, `shift_up` / `shift_down`): a
-  year in year mode, a month in month mode.
+- Click opens the clock panel ([10](10-popups-and-menus.md#clock-panel)): the
+  calendar on top and the notification centre below. Waybar showed the calendar
+  as the clock's tooltip and used clicks and scroll to change its mode and
+  range. Those now act on the calendar inside the panel.
+- Tooltip: the time zone and its offset.
 - Time zone: the system's. On Linux it is re-read on a `timedate1`
   `PropertiesChanged` signal, so `krypt menu time` changing the zone takes
   effect immediately.

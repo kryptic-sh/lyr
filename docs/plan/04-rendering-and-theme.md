@@ -77,7 +77,8 @@ lyr replaces waybar the bar looks the same.
 | Battery warning / critical | `#fc4c02` / `#e92d4d`                                                                     |
 | Volume / mic               | `#89b4fa` / `#cba6f7`                                                                     |
 | Tooltip                    | background `#1e1e2e`, text `#cdd6f4`                                                      |
-| Calendar                   | see [10](10-popups-and-menus.md#calendar)                                                 |
+| Calendar                   | see [10](10-popups-and-menus.md#clock-panel)                                              |
+| Panels and toasts          | ported from `dotfiles/.config/swaync/style.css` in M6 (not read yet)                      |
 
 The palette mixes Tokyo Night (`#1a1b26`) with Catppuccin Mocha (`#cdd6f4`,
 `#1e1e2e`, `#89b4fa`, `#cba6f7`), exactly as the current CSS does. lyr copies it

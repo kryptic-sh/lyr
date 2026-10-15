@@ -9,8 +9,9 @@ One process, no daemon split:
  ┌───────────────────────────────────┐            ┌─────────────────────────────────────────────┐
  │ platform loop (lyr-shell over     │            │ sources (lyr-sources, lyr-wm)               │
  │  crcbl-shell: Wayland / Win32 /   │  wake +    │  hyprland socket2 · zbus (UPower, BlueZ,    │
- │  AppKit)                          │◄───────────┤  PPD, SNI, swaync, logind) · libpulse ·      │
- │                                   │  Event     │  rtnetlink · WASAPI/CoreAudio callbacks ·   │
+ │  AppKit)                          │◄───────────┤  PPD, SNI, NM, MPRIS, logind; Notifications │
+ │                                   │  Event     │  server) · libpulse · rtnetlink ·           │
+ │                                   │            │  WASAPI/CoreAudio callbacks ·               │
  │ state (lyr-core)  ──► DrawList ──►│            │  clock tick · config file watcher           │
  │ renderer (lyr-render, crcbl-hal)  │  Action    │                                             │
  │ pointer input ──► hit test ──────►├───────────►│  focus workspace · set volume · toggle DND… │
@@ -38,15 +39,15 @@ One process, no daemon split:
 
 Follows the org convention of `apps/<bin>` + `crates/<bin>-*`.
 
-| Path                 | Crate         | Owns                                                                                                                                                                                    |
-| -------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/lyr`           | `lyr`         | The binary: CLI, logging, wiring config + shell + renderer + sources together, the main loop                                                                                            |
-| `crates/lyr-config`  | `lyr-config`  | TOML schema, the embedded defaults (the waybar port, per platform), loading, validation, reload diffing                                                                                 |
-| `crates/lyr-core`    | `lyr-core`    | Module state types, `Event`/`Action`, format strings and icon ramps, zone layout, `DrawList` building, hit testing, calendar maths                                                      |
-| `crates/lyr-render`  | `lyr-render`  | The crcbl-hal device, per-surface swapchains, font lookup and loading, translating `lyr-core`'s `DrawList` into crcbl's UI pass                                                         |
-| `crates/lyr-shell`   | `lyr-shell`   | Bar policy over crcbl-shell: one bar per output, space reservation, popup placement, outputs coming and going, pointer input to hit tests                                               |
-| `crates/lyr-wm`      | `lyr-wm`      | The `WorkspaceBackend` trait and its backends: Hyprland IPC (event parser, Lua dispatch), Windows virtual desktops, AeroSpace                                                           |
-| `crates/lyr-sources` | `lyr-sources` | Every other module's source, one module per source (`audio/`, `battery/`, `bluetooth/`, `network/`, `power_profile/`, `tray/`, `notify/`, `clock`), each with its per-platform backends |
+| Path                 | Crate         | Owns                                                                                                                                                                                                                                             |
+| -------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/lyr`           | `lyr`         | The binary: CLI, logging, wiring config + shell + renderer + sources together, the main loop                                                                                                                                                     |
+| `crates/lyr-config`  | `lyr-config`  | TOML schema, the embedded defaults (the waybar port, per platform), loading, validation, reload diffing                                                                                                                                          |
+| `crates/lyr-core`    | `lyr-core`    | Module state types, `Event`/`Action`, format strings and icon ramps, zone layout, `DrawList` building, hit testing, calendar maths                                                                                                               |
+| `crates/lyr-render`  | `lyr-render`  | The crcbl-hal device, per-surface swapchains, font lookup and loading, translating `lyr-core`'s `DrawList` into crcbl's UI pass                                                                                                                  |
+| `crates/lyr-shell`   | `lyr-shell`   | Bar policy over crcbl-shell: one bar per output, space reservation, popup placement, outputs coming and going, pointer input to hit tests                                                                                                        |
+| `crates/lyr-wm`      | `lyr-wm`      | The `WorkspaceBackend` trait and its backends: Hyprland IPC (event parser, Lua dispatch), Windows virtual desktops, AeroSpace                                                                                                                    |
+| `crates/lyr-sources` | `lyr-sources` | Every other module's source, one module per source (`audio/`, `battery/`, `bluetooth/`, `network/`, `power_profile/`, `tray/`, `notify/`, `mpris/`, `clock`), each with its per-platform backends. On Linux `notify/` is the notification daemon |
 
 `lyr-core` and `lyr-config` have **no platform code at all**. That rule is what
 makes the layout, formatting and calendar logic testable on every CI runner.
@@ -66,6 +67,10 @@ A small local socket (a Unix socket on Linux and macOS, a named pipe on
 Windows), modelled on tmxr's `interprocess` use. It is used by:
 
 - `lyr reload`, `lyr quit`, and `lyr toggle` (hide or show the bars);
+- `lyr panel clock|wifi|bluetooth|audio` (toggle a panel on the focused output),
+  `lyr dnd` (toggle do-not-disturb) and `lyr clear` (clear the notifications),
+  which the Hyprland bindings run ([09](09-notifications.md),
+  [10](10-popups-and-menus.md));
 - external hooks pushing events in, such as AeroSpace's
   `exec-on-workspace-change = ['lyr', 'event', 'workspace']`
   ([06](06-workspaces.md#macos--spaces));
@@ -105,7 +110,7 @@ Checked when choosing the stack (October 2026):
 crcbl is not on crates.io yet. The owner expects its first release soon, but it
 is not yet scheduled in crcbl itself, and lyr cannot publish while it depends on
 crcbl from git. Until then lyr depends on crcbl by **git revision** for
-development only, and milestone M9 (release) is blocked on crcbl's release
+development only, and milestone M11 (release) is blocked on crcbl's release
 ([15](15-milestones.md)).
 
 ## Dependencies (initial)
@@ -114,23 +119,25 @@ House-precedent versions. Each is added with `cargo add` in the milestone that
 first uses it, not at scaffold time. Anything not on this list needs a call
 before it is added.
 
-| Crate                                                                              | Used by               | Notes                                                                                                  |
-| ---------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------ |
-| `crcbl-shell`, `crcbl-hal`, `crcbl-vk`, `crcbl-mtl`, `crcbl-dx12`, crcbl's UI pass | shell, render         | Exact versions (`=0.x.y`), bumped deliberately in their own commit, because crcbl breaks every release |
-| `fontdb`                                                                           | render                | system font lookup by family name (buffr precedent)                                                    |
-| `clap` 4 (derive)                                                                  | app                   | CLI                                                                                                    |
-| `anyhow`                                                                           | app                   | binary-level errors                                                                                    |
-| `thiserror` 2                                                                      | library crates        | typed errors                                                                                           |
-| `tracing`, `tracing-subscriber`                                                    | all                   | logs to `~/.local/state/lyr/logs/`                                                                     |
-| `serde`, `toml`                                                                    | config                | config schema                                                                                          |
-| `serde_json`                                                                       | wm (Unix)             | Hyprland's `j/` replies (approved by the owner 2026-10-16)                                             |
-| `hjkl-config`, `hjkl-xdg`                                                          | config                | TOML loading and paths, as tmxr does                                                                   |
-| `tokio`                                                                            | app, sources, wm      | source runtime                                                                                         |
-| `interprocess` 2                                                                   | app                   | control socket (tmxr precedent)                                                                        |
-| `resvg`                                                                            | sources (tray icons)  | pikr precedent; SVG icons rasterised once per size                                                     |
-| `zbus` 5                                                                           | sources (Linux)       | UPower, BlueZ, PPD, SNI, DBusMenu, swaync, logind, timedate1                                           |
-| `libpulse-binding`                                                                 | sources (Linux)       | **new to the org**, needs the owner's approval                                                         |
-| `rtnetlink` or `neli`                                                              | sources (Linux)       | **new to the org**, needs the owner's approval                                                         |
-| `windows` 0.62 / `windows-sys` 0.61                                                | sources, wm (Windows) | COM (WASAPI, virtual desktops, WinRT radios) needs `windows`; plain Win32 uses `windows-sys`           |
-| `objc2` + `objc2-core-audio`, …                                                    | sources (macOS)       | crcbl precedent for `objc2`                                                                            |
-| dev: `tempfile`                                                                    | tests                 | temp config dirs                                                                                       |
+| Crate                                                                              | Used by               | Notes                                                                                                                                              |
+| ---------------------------------------------------------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `crcbl-shell`, `crcbl-hal`, `crcbl-vk`, `crcbl-mtl`, `crcbl-dx12`, crcbl's UI pass | shell, render         | Exact versions (`=0.x.y`), bumped deliberately in their own commit, because crcbl breaks every release                                             |
+| `fontdb`                                                                           | render                | system font lookup by family name (buffr precedent)                                                                                                |
+| `clap` 4 (derive)                                                                  | app                   | CLI                                                                                                                                                |
+| `anyhow`                                                                           | app                   | binary-level errors                                                                                                                                |
+| `thiserror` 2                                                                      | library crates        | typed errors                                                                                                                                       |
+| `tracing`, `tracing-subscriber`                                                    | all                   | logs to `~/.local/state/lyr/logs/`                                                                                                                 |
+| `serde`, `toml`                                                                    | config                | config schema                                                                                                                                      |
+| `serde_json`                                                                       | wm (Unix)             | Hyprland's `j/` replies (approved by the owner 2026-10-16)                                                                                         |
+| `hjkl-config`, `hjkl-xdg`                                                          | config                | TOML loading and paths, as tmxr does                                                                                                               |
+| `tokio`                                                                            | app, sources, wm      | source runtime                                                                                                                                     |
+| `interprocess` 2                                                                   | app                   | control socket (tmxr precedent)                                                                                                                    |
+| `resvg`                                                                            | sources (tray icons)  | pikr precedent; SVG icons rasterised once per size                                                                                                 |
+| `zbus` 5                                                                           | sources (Linux)       | UPower, BlueZ (and its pairing agent), PPD, SNI, DBusMenu, NetworkManager, MPRIS, logind, timedate1; serves `org.freedesktop.Notifications`        |
+| `image` 0.25 (`png`, `jpeg`)                                                       | sources               | **new to lyr** (pikr and buffr use it), needs the owner's approval: PNG theme icons for the tray and notifications, notification images, MPRIS art |
+| `freedesktop-icons`                                                                | sources (Linux)       | **new to lyr** (pikr uses it), needs the owner's approval: icon-theme lookup for tray and notification icons                                       |
+| `libpulse-binding`                                                                 | sources (Linux)       | **new to the org**, needs the owner's approval                                                                                                     |
+| `rtnetlink` or `neli`                                                              | sources (Linux)       | **new to the org**, needs the owner's approval                                                                                                     |
+| `windows` 0.62 / `windows-sys` 0.61                                                | sources, wm (Windows) | COM (WASAPI, virtual desktops, WinRT radios) needs `windows`; plain Win32 uses `windows-sys`                                                       |
+| `objc2` + `objc2-core-audio`, …                                                    | sources (macOS)       | crcbl precedent for `objc2`                                                                                                                        |
+| dev: `tempfile`                                                                    | tests                 | temp config dirs                                                                                                                                   |
