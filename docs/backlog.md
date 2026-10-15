@@ -28,23 +28,13 @@ implementation follows until they are answered. The ones that block a milestone:
   FreeBSD CI (S18); AccessKit (S14) last. crcbl's session reports each row as it
   lands on main. Until the release, lyr pins crcbl by git revision on a green
   commit. M1 needs S1, S2, S6, S7, S10 and S11.
-- **crcbl: window-kind API review.** crcbl proposed (2026-10-15)
-  `WindowDesc { role: WindowRole, transparent }` with
-  `WindowRole::{Toplevel, Panel(PanelDesc), Popup(PopupDesc)}`, plus `ShellCaps`
-  and `ShellError::Unsupported`. crcbl took all of lyr's feedback the same day.
-  The API commit was in crcbl's gate, not yet on main, when this was written.
-  Folded into the API (check against the landed code before M1 pins it):
-  - A panel anchored to opposite edges stretches on that axis; the real size is
-    the first `Resized`.
-  - `Reserve::OwnExtent` needs exactly one edge, or one plus both perpendicular
-    (`PanelDesc::reserved_edge()`). TOP|LEFT|RIGHT is `ABE_TOP` on Win32;
-    anything else is `Unsupported`.
-  - `ShellCaps::PANEL_RESERVE` reports whether the reservation is honoured. On
-    macOS the panel is created without it.
-  - `PopupInput { Passthrough, Pointer, Grab }`. lyr maps tooltips to
-    `Passthrough`, and the calendar and menus to `Grab`.
-  - `PanelDesc.namespace` (empty means app_id). `monitor: None` is the user's
-    monitor, not the primary.
+- **crcbl: window-kind API, backend work.** The role API (`WindowRole`,
+  `PanelDesc`, `PopupDesc`, `PopupInput`, `ShellCaps::PANEL_RESERVE`) is on
+  crcbl main at `5e669fc4`, with CI green. That commit was read against lyr's
+  review. Only the headless shell builds panels and popups so far; the rest
+  return `ShellError::Unsupported` until their step lands. The order is Wayland
+  layer-shell, then Win32, then AppKit. lyr does not pin crcbl until the Wayland
+  step lands, since M1 needs it.
 
   Recorded in crcbl's backlog under its backend steps, not built yet:
   - In the Wayland step (needed for M1): platform output names in `MonitorInfo`,
