@@ -14,11 +14,16 @@ implementation follows until they are answered. The ones that block a milestone:
 - **System font lookup: `fontdb` or crcbl's `crcbl-font`.** The plan finds the
   bar font with `fontdb` (buffr precedent;
   [plan/04](plan/04-rendering-and-theme.md)), a new dependency for lyr. crcbl
-  reported on 2026-10-16 that `crcbl-font` is next on its main, asked for by
-  pikr: crcbl-ui's `system-fonts` feature, `Ui::register_system_font`, and
-  `SystemFonts::fallbacks` for the emoji fallback list. Taking it would follow
-  the S28 choice (shared crcbl code over a new third-party crate) and drop
-  `fontdb` from the plan; the cost is waiting for it to land, which M1 needs.
+  built `crcbl-font` for pikr, and pushed it to main at `4c53204e` on 2026-10-17
+  with CI still running: `SystemFonts::find(&FontQuery)` returns the file and
+  face index for a family, weight and style, matched by CSS rules;
+  `SystemFonts::fallbacks` gives the system's fallback order (the emoji fallback
+  list for `Ui::set_fallback_fonts`); crcbl-ui's `system-fonts` feature adds
+  `Ui::register_system_font` and `Font::from_system`. The `crcbl` umbrella crate
+  does not forward `system-fonts` yet, so lyr would name crcbl-ui directly. It
+  is not in a release: lyr would use a git revision for development until
+  crcbl's next one. Taking it follows the S28 choice (shared crcbl code over a
+  new third-party crate) and drops `fontdb` from the plan.
 
 ## Cross-repo work
 
@@ -40,14 +45,15 @@ implementation follows until they are answered. The ones that block a milestone:
   09). It shipped as `crcbl-image` in crcbl 0.2.0 (reported 2026-10-16): PNG,
   JPEG, BMP, ICO, WebP (lossy and lossless), XPM, and SVG behind the `svg`
   feature (`svg::decode(bytes, size, scale, &limits)`, which returns an error
-  for any feature it does not support, never a partial icon; filters and
-  embedded images are still to come); `raw::convert`, with `raw::from_argb32_be`
-  (SNI pixmaps) and `raw::from_image_data` (notification `image-data`); resizing
-  (`fit_within`, `shrink_to_fit`, `nearest_size`); and the XDG theme lookup
-  (`IconThemes`). That covers M6 and M8. Not read yet. 0.2.0 also moved
-  `crcbl_ui::font::raster` to `crcbl_image::raster` (re-exported at the old
-  path), taking `raster::Point` instead of `glam::Vec2`; lyr is affected only if
-  it rasterises outlines itself.
+  for any feature it does not support, never a partial icon; filters are still
+  to come, and `<image>` landed on main at `2efab975` after the release);
+  `raw::convert`, with `raw::from_argb32_be` (SNI pixmaps) and
+  `raw::from_image_data` (notification `image-data`); resizing (`fit_within`,
+  `shrink_to_fit`, `nearest_size`); and the XDG theme lookup (`IconThemes`).
+  That covers M6 and M8. Not read yet. 0.2.0 also moved `crcbl_ui::font::raster`
+  to `crcbl_image::raster` (re-exported at the old path), taking `raster::Point`
+  instead of `glam::Vec2`; lyr is affected only if it rasterises outlines
+  itself.
 - **crcbl: window kinds and platform features for lyr and pikr.** Requirements
   S1 – S27 in
   [plan/03-surfaces-and-input.md](plan/03-surfaces-and-input.md#what-crcbl-must-provide)
