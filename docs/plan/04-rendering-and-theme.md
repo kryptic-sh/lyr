@@ -45,12 +45,18 @@ state + config + theme ──► lyr-core: layout ──► DrawList + hit regio
 
 ## Text
 
-- **Font lookup:** `fontdb` finds the configured family (`Hack Nerd Font Propo`)
-  in the system fonts. lyr reads the file and hands the bytes to crcbl-ui's
-  `Font` (skrifa parsing, crcbl's rasteriser and shelf-packed glyph atlas). If
-  the family is missing, lyr logs which family was asked for and falls back to
-  the first monospace font fontdb returns. It never draws "tofu" squares without
-  saying why.
+- **Font lookup:** crcbl's `crcbl-font` finds the configured family
+  (`Hack Nerd Font Propo`) in the system fonts (`SystemFonts::find`, matched by
+  CSS rules), and crcbl-ui's `system-fonts` feature loads it
+  (`Ui::register_system_font`) into crcbl-ui's `Font` (skrifa parsing, crcbl's
+  rasteriser and shelf-packed glyph atlas). The owner chose it over `fontdb` on
+  2026-10-17, as shared crcbl code, the way S28 replaced the image crates. If
+  the family is missing, lyr logs which family was asked for and falls back to a
+  monospace system font. It never draws "tofu" squares without saying why.
+- **Glyph fallback:** `SystemFonts::fallbacks` gives the system's fallback
+  order, which lyr passes to `Ui::set_fallback_fonts`, so a character the bar
+  font lacks (colour emoji in a notification, S22) comes from the next font that
+  has it.
 - **No shaping.** Bar text is short left-to-right labels plus Nerd Font
   private-use glyphs, and "Propo" means proportional-width icons that need no
   ligatures. crcbl-ui's unshaped, cmap-driven text is enough. Whether Hack Nerd

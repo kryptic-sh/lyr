@@ -11,22 +11,18 @@ implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
   `neli`) block M4's audio and network sources.
-- **System font lookup: `fontdb` or crcbl's `crcbl-font`.** The plan finds the
-  bar font with `fontdb` (buffr precedent;
-  [plan/04](plan/04-rendering-and-theme.md)), a new dependency for lyr. crcbl
-  built `crcbl-font` for pikr, and landed it on main at `4c53204e` on 2026-10-17
-  (CI green): `SystemFonts::find(&FontQuery)` returns the file and face index
-  for a family, weight and style, matched by CSS rules; `SystemFonts::fallbacks`
-  gives the system's fallback order (the emoji fallback list for
-  `Ui::set_fallback_fonts`); crcbl-ui's `system-fonts` feature adds
-  `Ui::register_system_font` and `Font::from_system`. The `crcbl` umbrella crate
-  does not forward `system-fonts` yet, so lyr would name crcbl-ui directly. It
-  is not in a release: lyr would use a git revision for development until
-  crcbl's next one. Taking it follows the S28 choice (shared crcbl code over a
-  new third-party crate) and drops `fontdb` from the plan.
 
 ## Cross-repo work
 
+- **crcbl: `crcbl-font` for system font lookup**, chosen by the owner over
+  `fontdb` on 2026-10-17 ([plan/04](plan/04-rendering-and-theme.md#text)). crcbl
+  built it for pikr and landed it on main at `4c53204e` (CI green), after 0.2.0,
+  so M1 pins crcbl by git revision until crcbl's next release, which lyr's
+  release (M11) needs. The `crcbl` umbrella does not forward crcbl-ui's
+  `system-fonts` feature yet, so lyr names crcbl-ui directly. API reported by
+  crcbl, not read yet: `SystemFonts::find(&FontQuery)` (file and face index for
+  a family, weight and style, matched by CSS rules), `SystemFonts::fallbacks`,
+  `Ui::register_system_font`, `Font::from_system`.
 - **crcbl: an image and asset crate (S28)**, asked for on 2026-10-16 at the
   owner's request, for lyr and pikr both, instead of each app adding `image`,
   `resvg` and `freedesktop-icons`. It covers PNG, JPEG and SVG decoding to
