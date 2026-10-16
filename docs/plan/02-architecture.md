@@ -107,13 +107,10 @@ Checked when choosing the stack (October 2026):
 | `buffr` | winit 0.30 on all three platforms                                            | wgpu 30, `fontdb` + `fontdue`         | Precedent for `fontdb` (system font lookup). winit has no layer-shell, appbar or panel API                                                                                                                                                                                                                  |
 | `pikr`  | floem on **forks** of floem and winit that add layer-shell                   | vello (wgpu)                          | Not a base. pikr is the **other consumer** of the crcbl requirements: its own research wants to leave the forks ([03](03-surfaces-and-input.md#what-crcbl-must-provide))                                                                                                                                    |
 
-crcbl 0.1.0 is on crates.io (released 2026-10-16), but it lacks parts lyr needs
-by M6: wrapped and styled paragraphs (S12), the password hint and the asset
-crate (S28) are on crcbl's main after it. lyr depends on the released crates
-where they suffice and on a **git revision** where they do not, for development
-only. lyr cannot publish while any crcbl dependency is from git, so milestone
-M11 (release) waits for a crcbl release with everything lyr uses
-([15](15-milestones.md)).
+crcbl 0.2.0 is on crates.io (released 2026-10-16) and has everything lyr asked
+of it, the asset crate (S28) included, so lyr depends on released crcbl crates
+only. A git dependency would block lyr's own release, because `cargo publish`
+rejects one ([15](15-milestones.md)).
 
 ## Dependencies (initial)
 

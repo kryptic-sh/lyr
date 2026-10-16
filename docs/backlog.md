@@ -11,6 +11,14 @@ implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
   `neli`) block M4's audio and network sources.
+- **System font lookup: `fontdb` or crcbl's `crcbl-font`.** The plan finds the
+  bar font with `fontdb` (buffr precedent;
+  [plan/04](plan/04-rendering-and-theme.md)), a new dependency for lyr. crcbl
+  reported on 2026-10-16 that `crcbl-font` is next on its main, asked for by
+  pikr: crcbl-ui's `system-fonts` feature, `Ui::register_system_font`, and
+  `SystemFonts::fallbacks` for the emoji fallback list. Taking it would follow
+  the S28 choice (shared crcbl code over a new third-party crate) and drop
+  `fontdb` from the plan; the cost is waiting for it to land, which M1 needs.
 
 ## Cross-repo work
 
@@ -29,18 +37,17 @@ implementation follows until they are answered. The ones that block a milestone:
   notification `app_icon` names and the `desktop-entry` hint. crcbl's SVG subset
   refuses an SVG it cannot fully draw, so some theme icons will fail until its
   pass rate on real themes is good. lyr falls back to a generic icon (plan 08,
-  09). crcbl reported the crate as `crcbl-image`, on crcbl main at `db30e0f7`
-  (CI green) since 2026-10-16: PNG; `raw::convert`, with `raw::from_argb32_be`
+  09). It shipped as `crcbl-image` in crcbl 0.2.0 (reported 2026-10-16): PNG,
+  JPEG, BMP, ICO, WebP (lossy and lossless), XPM, and SVG behind the `svg`
+  feature (`svg::decode(bytes, size, scale, &limits)`, which returns an error
+  for any feature it does not support, never a partial icon; filters and
+  embedded images are still to come); `raw::convert`, with `raw::from_argb32_be`
   (SNI pixmaps) and `raw::from_image_data` (notification `image-data`); resizing
-  (`fit_within`, `shrink_to_fit`, `nearest_size`); the XDG theme lookup
-  (`IconThemes`); JPEG, BMP and ICO. Since `5f1c1571` (CI green) main also has
-  SVG behind the `svg` feature (`svg::decode(bytes, size, scale, &limits)`,
-  which returns an error for any feature it does not support, never a partial
-  icon) and lossless `webp::decode`. That covers all of M6 and M8. Lossy WebP is
-  next; until then a lossy WebP image is left out. Not read yet. For crcbl's
-  next release, `crcbl_ui::font::raster` moves to `crcbl_image::raster`
-  (re-exported at the old path) and takes `raster::Point` instead of
-  `glam::Vec2`; lyr is affected only if it rasterises outlines itself.
+  (`fit_within`, `shrink_to_fit`, `nearest_size`); and the XDG theme lookup
+  (`IconThemes`). That covers M6 and M8. Not read yet. 0.2.0 also moved
+  `crcbl_ui::font::raster` to `crcbl_image::raster` (re-exported at the old
+  path), taking `raster::Point` instead of `glam::Vec2`; lyr is affected only if
+  it rasterises outlines itself.
 - **crcbl: window kinds and platform features for lyr and pikr.** Requirements
   S1 – S27 in
   [plan/03-surfaces-and-input.md](plan/03-surfaces-and-input.md#what-crcbl-must-provide)
@@ -63,7 +70,7 @@ implementation follows until they are answered. The ones that block a milestone:
     the keyboard mid-sequence, the cursor rectangle reaching the input method,
     and X11 compose through a real server. crcbl judges the Wi-Fi password field
     needs none of the missing pieces. The password hint lyr asked for is on main
-    at `db30e0f7`: `Shell::set_text_input(window, Option<TextPurpose>)` with
+    in 0.2.0: `Shell::set_text_input(window, Option<TextPurpose>)` with
     `TextPurpose::{Normal, Password, Pin}` replaces the unreleased
     `set_text_input_enabled`. On Wayland `Password` and `Pin` send
     text-input-v3's purpose with the hidden-text and sensitive-data hints; on
@@ -78,28 +85,26 @@ implementation follows until they are answered. The ones that block a milestone:
     wake-checked on Wayland (sway), X11 (Xvfb), Win32 and AppKit. Nothing is
     left for callers.
   - S12: 0.1.0 has one-line spans with their own colour, size and family, and
-    images (`Content::Image`, `Ui::set_image`). crcbl main `db30e0f7` adds what
-    notification markup needs (M6): `Ui::paragraph(sel, inline, |p| ..)` with
+    images (`Content::Image`, `Ui::set_image`). 0.2.0 adds what notification
+    markup needs (M6): `Ui::paragraph(sel, inline, |p| ..)` with
     `p.run(selector, text, ..)` and `p.run_keyed(key, selector, text, ..)`. Runs
     wrap as one paragraph and are styled by selector, so `<b>` maps to a CSS
     rule; `font-weight` and `font-style` (synthesised when no bold or italic
     face exists), `text-decoration: underline`, and link runs that report hits
     on every line fragment (`Response::clicked`, `:hover`, cursor).
-  - S22 (colour emoji): not started, the only one of lyr's rows unbuilt.
+  - S22, in 0.2.0: colour emoji (CBDT, sbix and COLR, drawn by the UI pass) with
+    per-glyph fallback through `Ui::set_fallback_fonts`.
   - S14: a `crcbl-shell` feature `accesskit`, with
     `Shell::update_accessibility`, `ShellEvent::Accessibility`,
-    `Ui::accessibility_update` and `Ui::accessibility_action`, on main at
-    `db30e0f7`. Live on Windows (UIA); AT-SPI (Linux) and AppKit are still to
-    come.
+    `Ui::accessibility_update` and `Ui::accessibility_action`, in 0.2.0. Live on
+    Windows (UIA); AT-SPI (Linux) and AppKit are still to come.
 
-  **crcbl 0.1.0 is on crates.io** (all 40 crates, and the GitHub release, tag
-  `v0.1.0`), reported 2026-10-16. lyr's crates are `crcbl-shell`, `crcbl-hal`,
-  `crcbl-ui` and `crcbl-frame`, with `crcbl-vk`, `crcbl-dx12` or `crcbl-mtl` per
-  platform, each `= "0.1.0"`. Adding them is the owner's call, when M1 starts.
-  0.1.0 still lacks S12's paragraphs, S13, S14, S18 running on FreeBSD (it
-  compiles), S22, the input-method switch on Win32 and AppKit, Win32 per-pixel
-  transparency and AppKit no-flash. M6 needs crcbl main at `db30e0f7` or later,
-  so it waits for a later crcbl release or pins a git revision.
+  **crcbl 0.2.0 is on crates.io** (all 41 library crates; tag `v0.2.0` = main
+  `d01866d1`), reported 2026-10-16. It has every row lyr needs, S28 included, so
+  lyr can depend on crates.io from the start and never needs a git pin. lyr's
+  crates are `crcbl-shell`, `crcbl-hal`, `crcbl-ui`, `crcbl-frame` and
+  `crcbl-image`, with `crcbl-vk`, `crcbl-dx12` or `crcbl-mtl` per platform.
+  Adding them is the owner's call, when M1 starts.
 
 - **crcbl: window-kind API, backend work.** Read against the source at crcbl
   main `6483b744` (CI green): layer-shell v4 panels on a named monitor,
@@ -124,9 +129,9 @@ implementation follows until they are answered. The ones that block a milestone:
   - A D3D12/WARP fallback on Windows, and `GpuError::NoBackend` elsewhere.
   - `ui.scrollbar(..)`: vertical only.
 
-  Still open in crcbl: Win32 per-pixel alpha (DirectComposition), no flash on
-  map, colour emoji (S22), cold-start timing (S13), FreeBSD running (S18),
-  AccessKit (S14).
+  Still open in crcbl, as of 0.1.0 (0.2.0's report did not restate them): Win32
+  per-pixel alpha (DirectComposition), no flash on map on AppKit, cold-start
+  timing (S13), FreeBSD running (S18), AccessKit on Linux and macOS (S14).
 
 - **crcbl: Wayland present path.** Whether crcbl presents only after a frame
   callback, or can block in FIFO `vkQueuePresentKHR` on an output that is off
