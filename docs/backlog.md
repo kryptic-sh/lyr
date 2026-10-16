@@ -11,9 +11,6 @@ implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
   `neli`) block M4's audio and network sources.
-- **crcbl's release** blocks M11. The owner decided (2026-10-15) that crcbl's
-  first crates.io release waits until S1 – S27 are built and the shell and UI
-  are usable without the rest of the engine.
 
 ## Cross-repo work
 
@@ -35,7 +32,12 @@ implementation follows until they are answered. The ones that block a milestone:
   `app_icon` names and the `desktop-entry` hint. crcbl confirmed the lookup
   comes right after the M6 step and before JPEG. crcbl's SVG subset refuses an
   SVG it cannot fully draw, so some theme icons will fail until its pass rate on
-  real themes is good. lyr falls back to a generic icon (plan 08, 09).
+  real themes is good. lyr falls back to a generic icon (plan 08, 09). On
+  2026-10-16 crcbl reported the crate as `crcbl-image`, in an integration branch
+  with CI running, not on main yet: PNG; `raw::from_argb32_be` (SNI pixmaps) and
+  `raw::from_image_data` (notification `image-data`); `fit_within`,
+  `shrink_to_fit` and `nearest_size`; the XDG theme lookup; and JPEG, BMP, ICO
+  and lossless WebP. SVG is on a branch behind it. Not read yet.
 - **crcbl: window kinds and platform features for lyr and pikr.** Requirements
   S1 – S27 in
   [plan/03-surfaces-and-input.md](plan/03-surfaces-and-input.md#what-crcbl-must-provide)
@@ -45,30 +47,42 @@ implementation follows until they are answered. The ones that block a milestone:
   S3, S17, S21); Win32 (S4, S27); AppKit (S5); outputs (S7); text (S11, S12,
   S22); input (S9, S20); UI fit (S23, S24); start-up and failure (S13, S26);
   FreeBSD CI (S18); AccessKit (S14) last. crcbl's session reports each row as it
-  lands on main. Until the release, lyr pins crcbl by git revision on a green
-  commit. M1 needs S1, S2, S6, S7, S10 and S11. Since 2026-10-16 lyr also needs
-  S9, S12, S17, S19 and S22, which were pikr's alone before: the native
+  lands on main. M1 needs S1, S2, S6, S7, S10 and S11. Since 2026-10-16 lyr also
+  needs S9, S12, S17, S19 and S22, which were pikr's alone before: the native
   notification centre and menus need text entry, markup and images, panel focus,
   a caret timer and emoji. crcbl's session was told the same day and replied
   with where each stands. **Reported, not read yet:**
   - S9: compose and dead keys on Wayland and X11, and text-input-v3 at crcbl
-    `da20fe58`. A window gets an input method only while
-    `Shell::set_text_input_enabled(window, true)` is on (`TextPump::engage` does
-    it); `set_text_input_area` places the candidate window. Missing: pre-edit
-    during a compose sequence, surrounding text, and content types (always
-    "normal"). The Wi-Fi password field wants a password hint, so the input
-    method does not learn it; lyr asked for it before M7.
+    `da20fe58`, on main since 0.1.0. `set_text_input_area` places the candidate
+    window. Missing: pre-edit during a compose sequence, surrounding text, and
+    the input-method switch on Win32 and AppKit. The password hint lyr asked for
+    is in the integration branch:
+    `Shell::set_text_input(window, Option<TextPurpose>)` replaces the unreleased
+    `set_text_input_enabled`, and `Some(Password)` sends text-input-v3's
+    password purpose with the hidden-text and sensitive-data hints. crcbl-ui's
+    masked field reports it through `Ui::text_editing_purpose()`, and
+    `TextPump::engage` passes it on.
   - S17: on-demand layer panels report `WindowState::focused = false` when
     another window takes focus (a sway e2e test). Not tried on Hyprland.
   - S19: `Shell::waker` / `ShellWaker`, and waits that take a deadline.
-  - S12, partial: one-line spans with their own colour, size and family, and
-    images (`Content::Image`, `Ui::set_image`). Missing: spans wrapping as one
-    paragraph, font weight (bold is a separately registered family), italic,
-    underline, and link hit areas, all of which notification markup needs (M6).
+  - S12: 0.1.0 has one-line spans with their own colour, size and family, and
+    images (`Content::Image`, `Ui::set_image`). The integration branch adds what
+    notification markup needs (M6): `Ui::paragraph(sel, inline, |p| ..)` with
+    `p.run(selector, text, ..)` and `p.run_keyed(key, selector, text, ..)`. Runs
+    wrap as one paragraph and are styled by selector, so `<b>` maps to a CSS
+    rule; `font-weight` and `font-style` (synthesised when no bold or italic
+    face exists), `text-decoration: underline`, and link runs that report hits
+    on every line fragment (`Response::clicked`, `:hover`, cursor).
   - S22: not started.
 
-  crcbl 0.1.0 is being published to crates.io, slowed by the new-crate rate
-  limit; crcbl's session reports when every crate is up.
+  **crcbl 0.1.0 is on crates.io** (all 40 crates, and the GitHub release, tag
+  `v0.1.0`), reported 2026-10-16. lyr's crates are `crcbl-shell`, `crcbl-hal`,
+  `crcbl-ui` and `crcbl-frame`, with `crcbl-vk`, `crcbl-dx12` or `crcbl-mtl` per
+  platform, each `= "0.1.0"`. Adding them is the owner's call, when M1 starts.
+  0.1.0 still lacks S12's paragraphs, S13, S14, S18 running on FreeBSD (it
+  compiles), S22, the input-method switch on Win32 and AppKit, Win32 per-pixel
+  transparency and AppKit no-flash. M6 needs the integration branch above, so it
+  waits for a later crcbl release or pins a git revision.
 
 - **crcbl: window-kind API, backend work.** Read against the source at crcbl
   main `6483b744` (CI green): layer-shell v4 panels on a named monitor,
@@ -97,10 +111,6 @@ implementation follows until they are answered. The ones that block a milestone:
   map, colour emoji (S22), cold-start timing (S13), FreeBSD running (S18),
   AccessKit (S14).
 
-- **crcbl: release pipeline.** Built and pushed by crcbl's session on 2026-10-15
-  (tmxr-style: crates.io, AUR, Homebrew, Scoop, GitHub releases; no Alpine,
-  because crcbl links ALSA), with the org secrets granted. It is not used until
-  the release above.
 - **crcbl: Wayland present path.** Whether crcbl presents only after a frame
   callback, or can block in FIFO `vkQueuePresentKHR` on an output that is off
   (hypridle DPMS), is unverified

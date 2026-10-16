@@ -62,10 +62,10 @@ Add tmxr's release jobs, renamed for lyr:
 
 Before the first tag:
 
-- **crcbl is on crates.io.** `publish-crates` fails on a git dependency, so this
-  is a hard block. crcbl's release pipeline exists (built 2026-10-15), but its
-  first release waits until requirements S1 – S27 are built (the owner's
-  decision).
+- **Every crcbl crate lyr uses is on crates.io**, at a release that has what lyr
+  needs. `publish-crates` fails on a git dependency, so this is a hard block.
+  crcbl 0.1.0 is out (2026-10-16), but S12's paragraphs and the asset crate
+  (S28) came after it.
 - lyr is added to the allowlists of the org secrets `AUR_SSH_KEY`,
   `BREW_SSH_KEY` and `SCOOP_SSH_KEY`, and has `CARGO_REGISTRY_TOKEN`.
 - Check that the `lyr` / `lyr-*` names are free on crates.io and the AUR.
