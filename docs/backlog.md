@@ -25,19 +25,17 @@ implementation follows until they are answered. The ones that block a milestone:
   owner chose to have crcbl write its own decoders rather than add `zune-jpeg`
   or `resvg`: PNG stays on the `png` crate crcbl already has, and JPEG, the SVG
   subset icon themes use, WebP, BMP, ICO and XPM are written in crcbl in safe
-  Rust, fuzzed and capped. crcbl's order: the crate with its caps and fuzzing,
-  PNG, the raw conversions and resizing (lyr's M6); then the icon-theme lookup
-  and SVG (lyr's M8); then JPEG. Until JPEG lands, a JPEG notification image or
-  album art is not shown. M6 also needs the theme lookup, for notification
-  `app_icon` names and the `desktop-entry` hint. crcbl confirmed the lookup
-  comes right after the M6 step and before JPEG. crcbl's SVG subset refuses an
-  SVG it cannot fully draw, so some theme icons will fail until its pass rate on
-  real themes is good. lyr falls back to a generic icon (plan 08, 09). On
-  2026-10-16 crcbl reported the crate as `crcbl-image`, in an integration branch
-  with CI running, not on main yet: PNG; `raw::from_argb32_be` (SNI pixmaps) and
-  `raw::from_image_data` (notification `image-data`); `fit_within`,
-  `shrink_to_fit` and `nearest_size`; the XDG theme lookup; and JPEG, BMP, ICO
-  and lossless WebP. SVG is on a branch behind it. Not read yet.
+  Rust, fuzzed and capped. M6 needs the theme lookup as well as decoding, for
+  notification `app_icon` names and the `desktop-entry` hint. crcbl's SVG subset
+  refuses an SVG it cannot fully draw, so some theme icons will fail until its
+  pass rate on real themes is good. lyr falls back to a generic icon (plan 08,
+  09). crcbl reported the crate as `crcbl-image`, on crcbl main at `db30e0f7`
+  (CI green) since 2026-10-16: PNG; `raw::convert`, with `raw::from_argb32_be`
+  (SNI pixmaps) and `raw::from_image_data` (notification `image-data`); resizing
+  (`fit_within`, `shrink_to_fit`, `nearest_size`); the XDG theme lookup
+  (`IconThemes`); JPEG, BMP and ICO. That covers M6. SVG and WebP follow from a
+  branch, so until then a theme icon that exists only as SVG takes the generic
+  fallback. Not read yet.
 - **crcbl: window kinds and platform features for lyr and pikr.** Requirements
   S1 – S27 in
   [plan/03-surfaces-and-input.md](plan/03-surfaces-and-input.md#what-crcbl-must-provide)
@@ -56,17 +54,18 @@ implementation follows until they are answered. The ones that block a milestone:
     `da20fe58`, on main since 0.1.0. `set_text_input_area` places the candidate
     window. Missing: pre-edit during a compose sequence, surrounding text, and
     the input-method switch on Win32 and AppKit. The password hint lyr asked for
-    is in the integration branch:
-    `Shell::set_text_input(window, Option<TextPurpose>)` replaces the unreleased
-    `set_text_input_enabled`, and `Some(Password)` sends text-input-v3's
-    password purpose with the hidden-text and sensitive-data hints. crcbl-ui's
-    masked field reports it through `Ui::text_editing_purpose()`, and
-    `TextPump::engage` passes it on.
+    is on main at `db30e0f7`:
+    `Shell::set_text_input(window, Option<TextPurpose>)` with
+    `TextPurpose::{Normal, Password, Pin}` replaces the unreleased
+    `set_text_input_enabled`. On Wayland `Password` and `Pin` send
+    text-input-v3's purpose with the hidden-text and sensitive-data hints; on
+    Win32 they turn composition off. crcbl-ui's masked field reports it through
+    `Ui::text_editing_purpose()`, and `TextPump::engage` passes it on.
   - S17: on-demand layer panels report `WindowState::focused = false` when
     another window takes focus (a sway e2e test). Not tried on Hyprland.
   - S19: `Shell::waker` / `ShellWaker`, and waits that take a deadline.
   - S12: 0.1.0 has one-line spans with their own colour, size and family, and
-    images (`Content::Image`, `Ui::set_image`). The integration branch adds what
+    images (`Content::Image`, `Ui::set_image`). crcbl main `db30e0f7` adds what
     notification markup needs (M6): `Ui::paragraph(sel, inline, |p| ..)` with
     `p.run(selector, text, ..)` and `p.run_keyed(key, selector, text, ..)`. Runs
     wrap as one paragraph and are styled by selector, so `<b>` maps to a CSS
@@ -74,6 +73,16 @@ implementation follows until they are answered. The ones that block a milestone:
     face exists), `text-decoration: underline`, and link runs that report hits
     on every line fragment (`Response::clicked`, `:hover`, cursor).
   - S22: not started.
+  - S14: a `crcbl-shell` feature `accesskit`, with
+    `Shell::update_accessibility`, `ShellEvent::Accessibility`,
+    `Ui::accessibility_update` and `Ui::accessibility_action`, on main at
+    `db30e0f7`. Live on Windows (UIA); AT-SPI (Linux) and AppKit are still to
+    come.
+
+  In the same report crcbl called S9, S17, S19 and S22 "still open", although it
+  had reported the S9, S17 and S19 parts above as in. Most likely the remainder
+  is the missing pieces listed under each, but that is not confirmed; ask crcbl
+  what is left of each before M5 and M7 rely on them.
 
   **crcbl 0.1.0 is on crates.io** (all 40 crates, and the GitHub release, tag
   `v0.1.0`), reported 2026-10-16. lyr's crates are `crcbl-shell`, `crcbl-hal`,
@@ -81,8 +90,8 @@ implementation follows until they are answered. The ones that block a milestone:
   platform, each `= "0.1.0"`. Adding them is the owner's call, when M1 starts.
   0.1.0 still lacks S12's paragraphs, S13, S14, S18 running on FreeBSD (it
   compiles), S22, the input-method switch on Win32 and AppKit, Win32 per-pixel
-  transparency and AppKit no-flash. M6 needs the integration branch above, so it
-  waits for a later crcbl release or pins a git revision.
+  transparency and AppKit no-flash. M6 needs crcbl main at `db30e0f7` or later,
+  so it waits for a later crcbl release or pins a git revision.
 
 - **crcbl: window-kind API, backend work.** Read against the source at crcbl
   main `6483b744` (CI green): layer-shell v4 panels on a named monitor,
