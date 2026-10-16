@@ -14,11 +14,11 @@ implementation follows until they are answered. The ones that block a milestone:
 - **System font lookup: `fontdb` or crcbl's `crcbl-font`.** The plan finds the
   bar font with `fontdb` (buffr precedent;
   [plan/04](plan/04-rendering-and-theme.md)), a new dependency for lyr. crcbl
-  built `crcbl-font` for pikr, and pushed it to main at `4c53204e` on 2026-10-17
-  with CI still running: `SystemFonts::find(&FontQuery)` returns the file and
-  face index for a family, weight and style, matched by CSS rules;
-  `SystemFonts::fallbacks` gives the system's fallback order (the emoji fallback
-  list for `Ui::set_fallback_fonts`); crcbl-ui's `system-fonts` feature adds
+  built `crcbl-font` for pikr, and landed it on main at `4c53204e` on 2026-10-17
+  (CI green): `SystemFonts::find(&FontQuery)` returns the file and face index
+  for a family, weight and style, matched by CSS rules; `SystemFonts::fallbacks`
+  gives the system's fallback order (the emoji fallback list for
+  `Ui::set_fallback_fonts`); crcbl-ui's `system-fonts` feature adds
   `Ui::register_system_font` and `Font::from_system`. The `crcbl` umbrella crate
   does not forward `system-fonts` yet, so lyr would name crcbl-ui directly. It
   is not in a release: lyr would use a git revision for development until
