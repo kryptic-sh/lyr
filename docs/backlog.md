@@ -33,9 +33,14 @@ implementation follows until they are answered. The ones that block a milestone:
   (CI green) since 2026-10-16: PNG; `raw::convert`, with `raw::from_argb32_be`
   (SNI pixmaps) and `raw::from_image_data` (notification `image-data`); resizing
   (`fit_within`, `shrink_to_fit`, `nearest_size`); the XDG theme lookup
-  (`IconThemes`); JPEG, BMP and ICO. That covers M6. SVG and WebP follow from a
-  branch, so until then a theme icon that exists only as SVG takes the generic
-  fallback. Not read yet.
+  (`IconThemes`); JPEG, BMP and ICO. Since `5f1c1571` (CI green) main also has
+  SVG behind the `svg` feature (`svg::decode(bytes, size, scale, &limits)`,
+  which returns an error for any feature it does not support, never a partial
+  icon) and lossless `webp::decode`. That covers all of M6 and M8. Lossy WebP is
+  next; until then a lossy WebP image is left out. Not read yet. For crcbl's
+  next release, `crcbl_ui::font::raster` moves to `crcbl_image::raster`
+  (re-exported at the old path) and takes `raster::Point` instead of
+  `glam::Vec2`; lyr is affected only if it rasterises outlines itself.
 - **crcbl: window kinds and platform features for lyr and pikr.** Requirements
   S1 – S27 in
   [plan/03-surfaces-and-input.md](plan/03-surfaces-and-input.md#what-crcbl-must-provide)
