@@ -14,15 +14,11 @@ implementation follows until they are answered. The ones that block a milestone:
 
 ## Cross-repo work
 
-- **crcbl: `crcbl-font` for system font lookup**, chosen by the owner over
-  `fontdb` on 2026-10-17 ([plan/04](plan/04-rendering-and-theme.md#text)). crcbl
-  built it for pikr and landed it on main at `4c53204e` (CI green), after 0.2.0,
-  so M1 pins crcbl by git revision until crcbl's next release, which lyr's
-  release (M11) needs. The `crcbl` umbrella does not forward crcbl-ui's
-  `system-fonts` feature yet, so lyr names crcbl-ui directly. API reported by
-  crcbl, not read yet: `SystemFonts::find(&FontQuery)` (file and face index for
-  a family, weight and style, matched by CSS rules), `SystemFonts::fallbacks`,
-  `Ui::register_system_font`, `Font::from_system`.
+- **crcbl: OpenType shaping** (GSUB and GPOS through `harfrust`) in crcbl-ui's
+  parsed-font text is next on crcbl's main, reported 2026-10-17. Until it lands,
+  a ZWJ emoji sequence or a flag in a notification is drawn as its separate
+  glyphs. The bar itself needs no shaping
+  ([plan/04](plan/04-rendering-and-theme.md#text)).
 - **crcbl: an image and asset crate (S28)**, asked for on 2026-10-16 at the
   owner's request, for lyr and pikr both, instead of each app adding `image`,
   `resvg` and `freedesktop-icons`. It covers PNG, JPEG and SVG decoding to
@@ -101,12 +97,18 @@ implementation follows until they are answered. The ones that block a milestone:
     `Ui::accessibility_update` and `Ui::accessibility_action`, in 0.2.0. Live on
     Windows (UIA); AT-SPI (Linux) and AppKit are still to come.
 
-  **crcbl 0.2.0 is on crates.io** (all 41 library crates; tag `v0.2.0` = main
-  `d01866d1`), reported 2026-10-16. It has every row lyr needs, S28 included, so
-  lyr can depend on crates.io from the start and never needs a git pin. lyr's
-  crates are `crcbl-shell`, `crcbl-hal`, `crcbl-ui`, `crcbl-frame` and
-  `crcbl-image`, with `crcbl-vk`, `crcbl-dx12` or `crcbl-mtl` per platform.
-  Adding them is the owner's call, when M1 starts.
+  **crcbl 0.2.1 is on crates.io** (all 42 crates; tag `v0.2.1` = main
+  `49eb5fa2`; every job of its release run green), reported 2026-10-17. It has
+  every row lyr needs, S28 included, and `crcbl-font`, which the owner chose
+  over `fontdb` on 2026-10-17 ([plan/04](plan/04-rendering-and-theme.md#text)).
+  So lyr depends on crates.io from the start and needs no git pin. lyr's crates
+  are `crcbl-shell`, `crcbl-hal`, `crcbl-ui`, `crcbl-frame`, `crcbl-image` and
+  `crcbl-font`, with `crcbl-vk`, `crcbl-dx12` or `crcbl-mtl` per platform. The
+  `crcbl` umbrella's `system-fonts` feature turns on `parsed-font` and
+  `crcbl-ui/system-fonts`. Adding the crates happens when M1 starts.
+  crcbl-font's API as reported, not read yet: `SystemFonts::find(&FontQuery)`
+  (file and face index for a family, weight and style, matched by CSS rules),
+  `SystemFonts::fallbacks`, `Ui::register_system_font`, `Font::from_system`.
 
 - **crcbl: window-kind API, backend work.** Read against the source at crcbl
   main `6483b744` (CI green): layer-shell v4 panels on a named monitor,
