@@ -50,20 +50,28 @@ implementation follows until they are answered. The ones that block a milestone:
   notification centre and menus need text entry, markup and images, panel focus,
   a caret timer and emoji. crcbl's session was told the same day and replied
   with where each stands. **Reported, not read yet:**
-  - S9: compose and dead keys on Wayland and X11, and text-input-v3 at crcbl
-    `da20fe58`, on main since 0.1.0. `set_text_input_area` places the candidate
-    window. Missing: pre-edit during a compose sequence, surrounding text, and
-    the input-method switch on Win32 and AppKit. The password hint lyr asked for
-    is on main at `db30e0f7`:
-    `Shell::set_text_input(window, Option<TextPurpose>)` with
+  - S9, in: XKB compose and dead keys on Wayland and X11, and text-input-v3 at
+    crcbl `da20fe58`, on main since 0.1.0. `set_text_input_area` places the
+    candidate window. Not built: a pre-edit shown during a compose sequence,
+    surrounding text (`delete_surrounding_text` is ignored), content types
+    beyond normal, password and PIN, and AppKit secure input. Not tested: losing
+    the keyboard mid-sequence, the cursor rectangle reaching the input method,
+    and X11 compose through a real server. crcbl judges the Wi-Fi password field
+    needs none of the missing pieces. The password hint lyr asked for is on main
+    at `db30e0f7`: `Shell::set_text_input(window, Option<TextPurpose>)` with
     `TextPurpose::{Normal, Password, Pin}` replaces the unreleased
     `set_text_input_enabled`. On Wayland `Password` and `Pin` send
     text-input-v3's purpose with the hidden-text and sensitive-data hints; on
     Win32 they turn composition off. crcbl-ui's masked field reports it through
     `Ui::text_editing_purpose()`, and `TextPump::engage` passes it on.
-  - S17: on-demand layer panels report `WindowState::focused = false` when
-    another window takes focus (a sway e2e test). Not tried on Hyprland.
-  - S19: `Shell::waker` / `ShellWaker`, and waits that take a deadline.
+  - S17, in: on-demand layer panels report `WindowState::focused = false` when
+    another window takes focus (a sway e2e test). Not tested on Hyprland,
+    because crcbl's CI has only sway. A click on the empty desktop is not caught
+    by focus loss; that waits on M5's Hyprland measurement
+    ([plan/10](plan/10-popups-and-menus.md#two-kinds-of-window)).
+  - S19, in: `Shell::waker` / `ShellWaker`, and waits that take a deadline,
+    wake-checked on Wayland (sway), X11 (Xvfb), Win32 and AppKit. Nothing is
+    left for callers.
   - S12: 0.1.0 has one-line spans with their own colour, size and family, and
     images (`Content::Image`, `Ui::set_image`). crcbl main `db30e0f7` adds what
     notification markup needs (M6): `Ui::paragraph(sel, inline, |p| ..)` with
@@ -72,17 +80,12 @@ implementation follows until they are answered. The ones that block a milestone:
     rule; `font-weight` and `font-style` (synthesised when no bold or italic
     face exists), `text-decoration: underline`, and link runs that report hits
     on every line fragment (`Response::clicked`, `:hover`, cursor).
-  - S22: not started.
+  - S22 (colour emoji): not started, the only one of lyr's rows unbuilt.
   - S14: a `crcbl-shell` feature `accesskit`, with
     `Shell::update_accessibility`, `ShellEvent::Accessibility`,
     `Ui::accessibility_update` and `Ui::accessibility_action`, on main at
     `db30e0f7`. Live on Windows (UIA); AT-SPI (Linux) and AppKit are still to
     come.
-
-  In the same report crcbl called S9, S17, S19 and S22 "still open", although it
-  had reported the S9, S17 and S19 parts above as in. Most likely the remainder
-  is the missing pieces listed under each, but that is not confirmed; ask crcbl
-  what is left of each before M5 and M7 rely on them.
 
   **crcbl 0.1.0 is on crates.io** (all 40 crates, and the GitHub release, tag
   `v0.1.0`), reported 2026-10-16. lyr's crates are `crcbl-shell`, `crcbl-hal`,
