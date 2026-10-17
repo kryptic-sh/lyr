@@ -358,8 +358,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   ([plan/09](plan/09-notifications.md), [plan/10](plan/10-popups-and-menus.md)).
   Written from memory and the dotfiles, with each item to read when its
   milestone starts: NetworkManager's D-Bus names and failure reason codes (M7);
-  bluetui's and wiremix's actual feature sets (M7); the Windows and macOS menu
-  APIs (M9, M10).
+  bluetui's and wiremix's source, beyond the READMEs plan 10 now follows (M7);
+  the Windows and macOS menu APIs (M9, M10).
 - **Opening a notification's link** (M6). The spec asks for `<a href>` links and
   lyr advertises `body-hyperlinks`, but a link comes from any program on the
   session bus, so how a click opens it (the system's URL handler, which schemes,
@@ -385,6 +385,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Ideas considered and declined
 
+- **wiremix's peak meters in the audio menu:** they need audio capture on every
+  node shown, which a bar menu has no use for (plan 10). Declined by lyr's
+  session on 2026-10-18, not by the owner; reopen if the owner wants them.
 - **crcbl as a git-only dependency for a release:** not possible, because
   `cargo publish` rejects git dependencies. Development can use a git revision;
   a release has to wait for crcbl on crates.io.
