@@ -24,6 +24,17 @@ implementation follows until they are answered. The ones that block a milestone:
 
 ## Cross-repo work
 
+- **crcbl: every lyr and pikr feature on every backend.** At the owner's request
+  (2026-10-17), crcbl's session was asked to make each S-row work on Wayland,
+  X11, Win32 and AppKit, and on Vulkan, D3D12 and Metal; to report a matrix of
+  which backends each row is verified on (CI or e2e) and which are untested or
+  unsupported; and to make a backend that cannot support a feature fail loudly
+  (a caps flag or an error) rather than succeed silently. Known gaps named in
+  the request: transparency (Vulkan on Windows, `GpuContext`, crcbl-mtl), S14 on
+  Linux and macOS, S9's switch on Win32 and AppKit and AppKit secure input, S17
+  on Hyprland, S18 running on FreeBSD. When the matrix arrives, it goes into
+  [plan/03](plan/03-surfaces-and-input.md#what-crcbl-must-provide). Not answered
+  yet.
 - **crcbl: OpenType shaping** (GSUB and GPOS through `harfrust` 0.14, under
   crcbl-ui's `parsed-font`) is on crcbl main at `3c023b2f` (CI green), reported
   2026-10-17, and not in a release. ZWJ emoji, skin tones, keycaps, ligatures,
