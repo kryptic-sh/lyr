@@ -23,6 +23,8 @@ pub struct Config {
     pub power_profile: PowerProfile,
     pub network: Network,
     pub bluetooth: Bluetooth,
+    pub volume: Volume,
+    pub mic: Mic,
     pub theme: Theme,
 }
 
@@ -316,6 +318,40 @@ pub struct Bluetooth {
     pub tooltip_format: Format,
     /// By state (`off`, `on`, `connected`, `disabled`).
     pub icons: NamedIcons,
+}
+
+/// The volume module (`docs/plan/07-modules.md#volume`): the default sink.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Volume {
+    /// `{icon}`, `{volume}` and `{desc}`, as every format below.
+    pub format: Format,
+    pub format_muted: Format,
+    /// Used for a Bluetooth sink instead of `format`.
+    #[serde(default)]
+    pub format_bluetooth: Option<Format>,
+    /// Used for a muted Bluetooth sink instead of `format_muted`.
+    #[serde(default)]
+    pub format_bluetooth_muted: Option<Format>,
+    /// Unset shows the sink's description, as waybar does.
+    #[serde(default)]
+    pub tooltip_format: Option<Format>,
+    /// By sink name, source name or port kind (`headphone`, `speaker`, `hdmi`,
+    /// `headset`, `hands-free`, `portable`, `car`, `hifi`, `phone`), each also
+    /// with `-muted`; `default` is usually a ramp by volume.
+    pub icons: NamedIcons,
+}
+
+/// The mic module (`docs/plan/07-modules.md#mic`): the default source.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Mic {
+    /// `{volume}` and `{desc}`, as every format below.
+    pub format: Format,
+    pub format_muted: Format,
+    /// Unset shows the source's description.
+    #[serde(default)]
+    pub tooltip_format: Option<Format>,
 }
 
 /// Colours, font and box metrics (`docs/plan/04-rendering-and-theme.md`).

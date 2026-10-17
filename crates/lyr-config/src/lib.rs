@@ -21,8 +21,8 @@ pub use colour::{Colour, InvalidColour};
 pub use format::{Format, InvalidFormat};
 pub use hjkl_config::{ConfigError, ConfigSource};
 pub use schema::{
-    Bar, Battery, Bluetooth, Clock, Config, Icon, Item, Layer, Layout, Module, NamedIcons, Network,
-    Position, PowerProfile, Theme, Workspaces,
+    Bar, Battery, Bluetooth, Clock, Config, Icon, Item, Layer, Layout, Mic, Module, NamedIcons,
+    Network, Position, PowerProfile, Theme, Volume, Workspaces,
 };
 
 /// The built-in config.
@@ -145,6 +145,8 @@ fn typed(mut merged: toml::Table) -> Result<Config, String> {
         power_profile: section(&mut merged, "power_profile")?,
         network: section(&mut merged, "network")?,
         bluetooth: section(&mut merged, "bluetooth")?,
+        volume: section(&mut merged, "volume")?,
+        mic: section(&mut merged, "mic")?,
         theme: section(&mut merged, "theme")?,
     };
     match merged.keys().next() {
@@ -276,6 +278,33 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
                     "signalStrength",
                 ],
             )?;
+        }
+    }
+    let volume = &config.volume;
+    let volume_formats = [
+        ("volume.format", Some(&volume.format)),
+        ("volume.format_muted", Some(&volume.format_muted)),
+        ("volume.format_bluetooth", volume.format_bluetooth.as_ref()),
+        (
+            "volume.format_bluetooth_muted",
+            volume.format_bluetooth_muted.as_ref(),
+        ),
+        ("volume.tooltip_format", volume.tooltip_format.as_ref()),
+    ];
+    for (key, format) in volume_formats {
+        if let Some(format) = format {
+            check_placeholders(key, format, &["icon", "volume", "desc"])?;
+        }
+    }
+    let mic = &config.mic;
+    let mic_formats = [
+        ("mic.format", Some(&mic.format)),
+        ("mic.format_muted", Some(&mic.format_muted)),
+        ("mic.tooltip_format", mic.tooltip_format.as_ref()),
+    ];
+    for (key, format) in mic_formats {
+        if let Some(format) = format {
+            check_placeholders(key, format, &["volume", "desc"])?;
         }
     }
     let bluetooth = &config.bluetooth;

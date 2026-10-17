@@ -54,6 +54,15 @@ format_connected_battery = "{icon} {device_alias} {device_battery_percentage}%"
 tooltip_format = "Bluetooth {status}"
 icons = { default = "\U000F00AF", off = "\U000F00B2", disabled = "\U000F00B2" }
 
+[volume]
+format = "{icon} {volume}%"
+format_muted = "\uEEE8 {volume}%"
+icons = { headphone = "\uF025", hands-free = "\uF025", headset = "\uF025", phone = "\uF095", portable = "\uF095", car = "\uF1B9", default = ["\uF026", "\uF027", "\uF028"] }
+
+[mic]
+format = "\uF130 {volume}%"
+format_muted = "\uF131 {volume}%"
+
 [theme]
 font = "Hack Nerd Font Propo"
 font_size = 16

@@ -300,15 +300,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   0.15.0's `ALabel::getIcon` and tested against its integer steps. Hit testing
   is `hit::Regions` (topmost region wins; boxes are half-open, so a shared edge
   belongs to one box). The battery, power-profile, network and bluetooth views
-  (`battery`, `power_profile`, `network`, `bluetooth`) follow waybar 0.15.0's
-  `battery.cpp`, `power_profiles_daemon.cpp`, `network.cpp` and `bluetooth.cpp`,
-  with their config tables; `power_profile::cycle` is the click. The defaults
-  are guarded by a test that fails on any raw private-use glyph. Not built: the
-  volume and mic views (M4), the clock view (waits on the `chrono` decision
-  above), and `DrawList` building with its snapshot tests. A format cannot drop
-  the literal text around an empty placeholder, so a battery with no power
-  reading shows `80% W Discharging`. Measuring text (the widths `layout` takes)
-  needs crcbl-ui's font atlas, so it is done by the caller in `lyr-render`.
+  (`battery`, `power_profile`, `network`, `bluetooth`) and the volume and mic
+  views (`audio::volume`, `audio::mic`) follow waybar 0.15.0's `battery.cpp`,
+  `power_profiles_daemon.cpp`, `network.cpp`, `bluetooth.cpp` and
+  `pulseaudio.cpp`, with their config tables; `power_profile::cycle` is the
+  click. The defaults are guarded by a test that fails on any raw private-use
+  glyph. Not built: the modules' actions (click, scroll; M3/M4), the clock view
+  (waits on the `chrono` decision above), and `DrawList` building with its
+  snapshot tests. A format cannot drop the literal text around an empty
+  placeholder, so a battery with no power reading shows `80% W Discharging`.
+  Measuring text (the widths `layout` takes) needs crcbl-ui's font atlas, so it
+  is done by the caller in `lyr-render`.
 - **Control socket.** Built: the requests (`lyr_core::control::Request`, one
   text line each) and the CLI commands that send them, including `lyr panel`,
   `lyr dnd` and `lyr clear`, which still report "not implemented". Not built:

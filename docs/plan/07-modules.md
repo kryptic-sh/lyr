@@ -143,6 +143,11 @@ See [08-tray.md](08-tray.md).
 - Format `{icon} {volume}%`. When muted, `U+EEE8 {volume}%`. Icons by output
   port: headphone, hands-free and headset U+F025; phone and portable U+F095; car
   U+F1B9; otherwise the ramp U+F026, U+F027, U+F028.
+- The icon is looked up as waybar's `getPulseIcon` does: the sink's name, the
+  source's name, then the first of waybar's nine port kinds the port name and
+  form factor mention (`headphone` before `headset`), each tried as `-muted`
+  first while muted. A muted Bluetooth sink with no `format_bluetooth_muted`
+  falls back to `format_muted`. The view is `lyr_core::audio::volume`.
 - Click toggles output mute. Scroll up raises and scroll down lowers the volume
   by **5 %**, with no ceiling at 100 %, as `pactl set-sink-volume ... +5%` has
   none. Right-click opens the audio menu on its output devices
@@ -158,7 +163,8 @@ See [08-tray.md](08-tray.md).
   as volume, applied to the default source. Right-click opens the audio menu on
   its input devices; waybar opened the same output tab from both.
 - Tooltip: the default source's description. Waybar shows the sink's here too,
-  because both modules are its one `pulseaudio` module; that is not carried.
+  because both modules are its one `pulseaudio` module; that is not carried. The
+  view is `lyr_core::audio::mic`.
 - Colour `#cba6f7` (waybar `#pulseaudio.microphone`).
 
 ### Mute linkage

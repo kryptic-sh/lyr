@@ -7,9 +7,11 @@
 //!
 //! So far it holds the zone layout ([`layout`]), icon ramps ([`icon`]), hit
 //! testing ([`hit`]), the control socket's requests ([`control`]) and the
-//! views of the battery, power-profile, network and bluetooth modules. The rest lands
+//! views of the battery, power-profile, network, bluetooth, volume and mic
+//! modules. The rest lands
 //! with milestones M1 and M4 (`docs/plan/15-milestones.md`).
 
+pub mod audio;
 pub mod battery;
 pub mod bluetooth;
 pub mod control;
