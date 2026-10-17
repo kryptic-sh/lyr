@@ -299,18 +299,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   and mutation-checked). Icon ramps are `icon::ramp`, transcribing waybar
   0.15.0's `ALabel::getIcon` and tested against its integer steps. Hit testing
   is `hit::Regions` (topmost region wins; boxes are half-open, so a shared edge
-  belongs to one box). The battery, power-profile and bluetooth views
-  (`battery`, `power_profile`, `bluetooth`) follow waybar 0.15.0's
-  `battery.cpp`, `power_profiles_daemon.cpp` and `bluetooth.cpp`, with their
-  config tables; `power_profile::cycle` is the click. The defaults are guarded
-  by a test that fails on any raw private-use glyph. Not built: the network,
-  volume and mic views (M4; network's states beyond wifi, wired and disconnected
-  need waybar's `network.cpp` read first), the clock view (waits on the `chrono`
-  decision above), and `DrawList` building with its snapshot tests. A format
-  cannot drop the literal text around an empty placeholder, so a battery with no
-  power reading shows `80% W Discharging`. Measuring text (the widths `layout`
-  takes) needs crcbl-ui's font atlas, so it is done by the caller in
-  `lyr-render`.
+  belongs to one box). The battery, power-profile, network and bluetooth views
+  (`battery`, `power_profile`, `network`, `bluetooth`) follow waybar 0.15.0's
+  `battery.cpp`, `power_profiles_daemon.cpp`, `network.cpp` and `bluetooth.cpp`,
+  with their config tables; `power_profile::cycle` is the click. The defaults
+  are guarded by a test that fails on any raw private-use glyph. Not built: the
+  volume and mic views (M4), the clock view (waits on the `chrono` decision
+  above), and `DrawList` building with its snapshot tests. A format cannot drop
+  the literal text around an empty placeholder, so a battery with no power
+  reading shows `80% W Discharging`. Measuring text (the widths `layout` takes)
+  needs crcbl-ui's font atlas, so it is done by the caller in `lyr-render`.
 - **Control socket.** Built: the requests (`lyr_core::control::Request`, one
   text line each) and the CLI commands that send them, including `lyr panel`,
   `lyr dnd` and `lyr clear`, which still report "not implemented". Not built:
