@@ -63,6 +63,8 @@ itself; that is not an error.
 - Icons per waybar's `power-profiles-daemon`: performance and `default` U+F04C5,
   balanced U+F24E, power-saver U+F06C. The tooltip reads
   `Profile: {profile}\nDriver: {driver}`.
+- The view is `lyr_core::power_profile::view`, and the click is
+  `power_profile::cycle`.
 - Left click cycles to the next profile, any other button to the previous one.
   That is waybar's built-in click, which applies because the config sets no
   `on-click`.
@@ -107,6 +109,9 @@ itself; that is not an error.
 - With no Bluetooth controller, waybar still shows the on icon. lyr hides the
   module instead, as battery does on a machine with no battery.
 - Tooltip `Bluetooth {status}`.
+- The view is `lyr_core::bluetooth::view`. As in waybar, a state's own format
+  (`format_off`, …) replaces `format` in that state, and
+  `format_connected_battery` wins while a connected device reports its battery.
 - Click opens the Bluetooth menu ([10](10-popups-and-menus.md#bluetooth-menu)),
   where waybar ran `krypt menu bluetooth`.
 - Linux: BlueZ over D-Bus (`org.bluez.Adapter1` `Powered`, `org.bluez.Device1`
