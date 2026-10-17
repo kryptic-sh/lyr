@@ -14,11 +14,18 @@ implementation follows until they are answered. The ones that block a milestone:
 
 ## Cross-repo work
 
-- **crcbl: OpenType shaping** (GSUB and GPOS through `harfrust`) in crcbl-ui's
-  parsed-font text is next on crcbl's main, reported 2026-10-17. Until it lands,
-  a ZWJ emoji sequence or a flag in a notification is drawn as its separate
-  glyphs. The bar itself needs no shaping
-  ([plan/04](plan/04-rendering-and-theme.md#text)).
+- **crcbl: OpenType shaping** (GSUB and GPOS through `harfrust` 0.14, under
+  crcbl-ui's `parsed-font`) is on crcbl main at `3c023b2f` (CI green), reported
+  2026-10-17, and not in a release. ZWJ emoji, skin tones, keycaps, ligatures,
+  marks and GPOS kerning join, and font fallback and caret stops work per
+  cluster. Until crcbl releases it, which it says will be 0.3.0 because of the
+  breaking changes below, lyr on 0.2.1 draws a ZWJ sequence or a flag in a
+  notification as its separate glyphs. The bar itself needs no shaping
+  ([plan/04](plan/04-rendering-and-theme.md#text)). Breaking in 0.3.0:
+  `fallback::map_char`, `map_text` and `Mapped` give way to
+  `fallback::cluster_face`, and `Font::kerning` and `kerning_pairs` are gone.
+  lyr calls none of them yet; the move to 0.3.0 is its own commit, as plan/02
+  says for every crcbl bump.
 - **crcbl: an image and asset crate (S28)**, asked for on 2026-10-16 at the
   owner's request, for lyr and pikr both, instead of each app adding `image`,
   `resvg` and `freedesktop-icons`. It covers PNG, JPEG and SVG decoding to
@@ -134,8 +141,9 @@ implementation follows until they are answered. The ones that block a milestone:
   - `ui.scrollbar(..)`: vertical only.
 
   Still open in crcbl, as of 0.1.0 (0.2.0's report did not restate them): Win32
-  per-pixel alpha (DirectComposition), no flash on map on AppKit, cold-start
-  timing (S13), FreeBSD running (S18), AccessKit on Linux and macOS (S14).
+  per-pixel alpha (DirectComposition; in progress, crcbl reported 2026-10-17),
+  no flash on map on AppKit, cold-start timing (S13), FreeBSD running (S18),
+  AccessKit on Linux and macOS (S14).
 
 - **crcbl: Wayland present path.** Whether crcbl presents only after a frame
   callback, or can block in FIFO `vkQueuePresentKHR` on an output that is off
