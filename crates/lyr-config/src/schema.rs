@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
+use crate::actions::On;
 use crate::colour::Colour;
 use crate::format::Format;
 
@@ -18,6 +19,7 @@ pub struct Config {
     pub bar: Bar,
     pub layout: Layout,
     pub workspaces: Workspaces,
+    pub power: Power,
     pub clock: Clock,
     pub battery: Battery,
     pub power_profile: PowerProfile,
@@ -25,6 +27,7 @@ pub struct Config {
     pub bluetooth: Bluetooth,
     pub volume: Volume,
     pub mic: Mic,
+    pub notifications: Notifications,
     pub theme: Theme,
 }
 
@@ -166,12 +169,37 @@ pub struct Workspaces {
     pub scroll: bool,
 }
 
+/// The power button (`docs/plan/07-modules.md#power-button`).
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Power {
+    /// No placeholders: the button is a glyph.
+    pub format: Format,
+    pub tooltip_format: Format,
+    /// What a click or a scroll does.
+    #[serde(default)]
+    pub on: On,
+}
+
+/// The notification bell (`docs/plan/09-notifications.md#the-bell-module`).
+/// Its glyphs come with the notification daemon (M6).
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Notifications {
+    /// What a click or a scroll does.
+    #[serde(default)]
+    pub on: On,
+}
+
 /// The clock module.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Clock {
     /// A strftime format.
     pub format: String,
+    /// What a click or a scroll does.
+    #[serde(default)]
+    pub on: On,
 }
 
 /// The battery module (`docs/plan/07-modules.md#battery`), with waybar's keys
@@ -198,6 +226,9 @@ pub struct Battery {
     pub warning: u8,
     /// At or below this percentage the module is in its critical state.
     pub critical: u8,
+    /// What a click or a scroll does.
+    #[serde(default)]
+    pub on: On,
 }
 
 /// Icons by name, with `default` for a name that has none: waybar's
@@ -223,6 +254,9 @@ pub struct PowerProfile {
     pub tooltip_format: Format,
     /// By profile name (`performance`, `balanced`, `power-saver`).
     pub icons: NamedIcons,
+    /// What a click or a scroll does.
+    #[serde(default)]
+    pub on: On,
 }
 
 /// The network module (`docs/plan/07-modules.md#network`). Each state's
@@ -257,6 +291,9 @@ pub struct Network {
     pub tooltip_format_disabled: Option<Format>,
     /// By state (`wifi`, `ethernet`, `linked`, `disconnected`, `disabled`).
     pub icons: NamedIcons,
+    /// What a click or a scroll does.
+    #[serde(default)]
+    pub on: On,
 }
 
 impl Network {
@@ -318,6 +355,9 @@ pub struct Bluetooth {
     pub tooltip_format: Format,
     /// By state (`off`, `on`, `connected`, `disabled`).
     pub icons: NamedIcons,
+    /// What a click or a scroll does.
+    #[serde(default)]
+    pub on: On,
 }
 
 /// The volume module (`docs/plan/07-modules.md#volume`): the default sink.
@@ -340,6 +380,11 @@ pub struct Volume {
     /// `headset`, `hands-free`, `portable`, `car`, `hifi`, `phone`), each also
     /// with `-muted`; `default` is usually a ramp by volume.
     pub icons: NamedIcons,
+    /// Percent per `volume_up` or `volume_down`, as `pactl ... +5%` steps.
+    pub scroll_step: u32,
+    /// What a click or a scroll does.
+    #[serde(default)]
+    pub on: On,
 }
 
 /// The mic module (`docs/plan/07-modules.md#mic`): the default source.
@@ -352,6 +397,11 @@ pub struct Mic {
     /// Unset shows the source's description.
     #[serde(default)]
     pub tooltip_format: Option<Format>,
+    /// Percent per `volume_up` or `volume_down`, as `pactl ... +5%` steps.
+    pub scroll_step: u32,
+    /// What a click or a scroll does.
+    #[serde(default)]
+    pub on: On,
 }
 
 /// Colours, font and box metrics (`docs/plan/04-rendering-and-theme.md`).

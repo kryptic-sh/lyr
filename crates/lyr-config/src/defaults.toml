@@ -21,11 +21,25 @@ all_outputs = true
 format = "{name}"
 scroll = false
 
+# Glyphs are written as escapes: they are private-use characters, which
+# editors and tools drop without a trace.
+[power]
+format = "\uF011"
+tooltip_format = "Power Button"
+
+[power.on]
+click = "open_power_menu"
+
 [clock]
 format = "%Y/%m/%d %H:%M"
 
-# Glyphs are written as escapes: they are private-use characters, which
-# editors and tools drop without a trace.
+[clock.on]
+click = "open_clock_panel"
+
+[notifications.on]
+click = "open_clock_panel"
+click_right = "toggle_dnd"
+
 [battery]
 format = "{icon}"
 format_charging = "{icon} \U000F140B"
@@ -40,12 +54,20 @@ format = "{icon}"
 tooltip_format = "Profile: {profile}\nDriver: {driver}"
 icons = { default = "\U000F04C5", performance = "\U000F04C5", balanced = "\uF24E", power-saver = "\uF06C" }
 
+[power_profile.on]
+click = "cycle_profile"
+click_right = "cycle_profile_back"
+click_middle = "cycle_profile_back"
+
 [network]
 format = "{icon}"
 tooltip_format = "{ifname} {ipaddr}/{cidr}"
 tooltip_format_wifi = "{ifname} {ipaddr}/{cidr} {essid} ({signalStrength}%)"
 tooltip_format_disconnected = "YOU IN THE WOODS?"
 icons = { default = "\uEF09", wifi = "\uF1EB", disconnected = "\U000F015B" }
+
+[network.on]
+click = "open_wifi_menu"
 
 [bluetooth]
 format = "{icon}"
@@ -54,14 +76,31 @@ format_connected_battery = "{icon} {device_alias} {device_battery_percentage}%"
 tooltip_format = "Bluetooth {status}"
 icons = { default = "\U000F00AF", off = "\U000F00B2", disabled = "\U000F00B2" }
 
+[bluetooth.on]
+click = "open_bluetooth_menu"
+
 [volume]
 format = "{icon} {volume}%"
 format_muted = "\uEEE8 {volume}%"
+scroll_step = 5
 icons = { headphone = "\uF025", hands-free = "\uF025", headset = "\uF025", phone = "\uF095", portable = "\uF095", car = "\uF1B9", default = ["\uF026", "\uF027", "\uF028"] }
+
+[volume.on]
+click = "toggle_mute"
+click_right = "open_audio_menu"
+scroll_up = "volume_up"
+scroll_down = "volume_down"
 
 [mic]
 format = "\uF130 {volume}%"
 format_muted = "\uF131 {volume}%"
+scroll_step = 5
+
+[mic.on]
+click = "toggle_mute"
+click_right = "open_audio_menu"
+scroll_up = "volume_up"
+scroll_down = "volume_down"
 
 [theme]
 font = "Hack Nerd Font Propo"

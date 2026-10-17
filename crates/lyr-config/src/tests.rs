@@ -205,3 +205,75 @@ fn the_defaults_write_every_glyph_as_an_escape() {
         .collect();
     assert!(raw.is_empty(), "raw glyphs in defaults.toml: {raw:?}");
 }
+
+#[test]
+fn the_defaults_bind_waybars_clicks() {
+    use super::{Binding, Builtin};
+    let config = from_sources(None, Platform::Linux).expect("defaults");
+    let builtin = |binding: &Option<Binding>| match binding {
+        Some(Binding::Builtin(builtin)) => Some(*builtin),
+        _ => None,
+    };
+    assert_eq!(
+        builtin(&config.power.on.click),
+        Some(Builtin::OpenPowerMenu)
+    );
+    assert_eq!(builtin(&config.volume.on.click), Some(Builtin::ToggleMute));
+    assert_eq!(
+        builtin(&config.volume.on.click_right),
+        Some(Builtin::OpenAudioMenu)
+    );
+    assert_eq!(builtin(&config.mic.on.scroll_up), Some(Builtin::VolumeUp));
+    assert_eq!(
+        builtin(&config.notifications.on.click_right),
+        Some(Builtin::ToggleDnd)
+    );
+    assert_eq!(config.volume.scroll_step, 5);
+    assert_eq!(builtin(&config.battery.on.click), None, "battery has none");
+}
+
+#[test]
+fn a_binding_can_run_a_command() {
+    use super::Binding;
+    let config = user(
+        "[clock.on]\nclick = { exec = \"gnome-calendar\" }\n",
+        Platform::Linux,
+    )
+    .expect("valid");
+    assert_eq!(
+        config.clock.on.click,
+        Some(Binding::Exec {
+            exec: "gnome-calendar".to_owned()
+        })
+    );
+    assert_eq!(
+        config.clock.on.click_right, None,
+        "the user table replaces only the keys it names, and adds none"
+    );
+}
+
+#[test]
+fn a_builtin_that_does_nothing_on_its_module_is_an_error() {
+    let message = invalid(user(
+        "[clock.on]\nscroll_up = \"volume_up\"\n",
+        Platform::Linux,
+    ));
+    assert_eq!(
+        message,
+        "clock.on.scroll_up: `volume_up` does nothing on the clock module"
+    );
+}
+
+#[test]
+fn an_empty_command_and_an_unknown_action_are_errors() {
+    let message = invalid(user(
+        "[clock.on]\nclick = { exec = \" \" }\n",
+        Platform::Linux,
+    ));
+    assert_eq!(message, "clock.on.click: `exec` is empty");
+    let message = invalid(user(
+        "[clock.on]\nclick = \"open_calendar\"\n",
+        Platform::Linux,
+    ));
+    assert!(message.starts_with("clock: "), "{message}");
+}

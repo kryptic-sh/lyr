@@ -11,12 +11,14 @@
 //! other modules' tables, reload and its diff come with the rest of milestone
 //! M3 and with M4 (`docs/plan/15-milestones.md`).
 
+mod actions;
 mod colour;
 mod format;
 mod schema;
 
 use std::path::{Path, PathBuf};
 
+pub use actions::{Binding, Builtin, On};
 pub use colour::{Colour, InvalidColour};
 pub use format::{Format, InvalidFormat};
 pub use hjkl_config::{ConfigError, ConfigSource};
@@ -140,6 +142,7 @@ fn typed(mut merged: toml::Table) -> Result<Config, String> {
         bar: section(&mut merged, "bar")?,
         layout: section(&mut merged, "layout")?,
         workspaces: section(&mut merged, "workspaces")?,
+        power: section(&mut merged, "power")?,
         clock: section(&mut merged, "clock")?,
         battery: section(&mut merged, "battery")?,
         power_profile: section(&mut merged, "power_profile")?,
@@ -147,6 +150,7 @@ fn typed(mut merged: toml::Table) -> Result<Config, String> {
         bluetooth: section(&mut merged, "bluetooth")?,
         volume: section(&mut merged, "volume")?,
         mic: section(&mut merged, "mic")?,
+        notifications: section(&mut merged, "notifications")?,
         theme: section(&mut merged, "theme")?,
     };
     match merged.keys().next() {
@@ -280,6 +284,35 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
             )?;
         }
     }
+    let bound = [
+        ("power", &config.power.on),
+        ("battery", &config.battery.on),
+        ("power_profile", &config.power_profile.on),
+        ("network", &config.network.on),
+        ("bluetooth", &config.bluetooth.on),
+        ("volume", &config.volume.on),
+        ("mic", &config.mic.on),
+        ("clock", &config.clock.on),
+        ("notifications", &config.notifications.on),
+    ];
+    for (module, on) in bound {
+        for (key, binding) in on.bindings(module) {
+            match binding {
+                Binding::Builtin(builtin) if !builtin.fits(module) => {
+                    return Err(format!(
+                        "{key}: `{}` does nothing on the {module} module",
+                        builtin.name()
+                    ));
+                }
+                Binding::Exec { exec } if exec.trim().is_empty() => {
+                    return Err(format!("{key}: `exec` is empty"));
+                }
+                Binding::Builtin(_) | Binding::Exec { .. } => {}
+            }
+        }
+    }
+    check_placeholders("power.format", &config.power.format, &[])?;
+    check_placeholders("power.tooltip_format", &config.power.tooltip_format, &[])?;
     let volume = &config.volume;
     let volume_formats = [
         ("volume.format", Some(&volume.format)),

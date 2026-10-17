@@ -77,12 +77,19 @@ theme's box metrics and colours as separate keys (`bar_background`,
 entry is a module name, `"separator"` or `{ spacer = 20 }`. The other modules'
 tables come with M4, and the schema is documented in the README when M3 ends.
 
-**Actions** are either a built-in name (`toggle_mute`, `focus`, `cycle_profile`,
-`open_clock_panel`, `open_power_menu`, `open_wifi_menu`, `open_bluetooth_menu`,
-`open_audio_menu`, `toggle_dnd`) or `{ exec = "…" }`. An `exec` runs through the
-platform shell (`sh -c` on Linux and macOS, `cmd /C` on Windows) with no console
-window on Windows. Like tmxr, lyr treats a config file as code: anything with
-`exec` runs as the user (SECURITY.md).
+**Actions** are bound in a module's `[<module>.on]` table, by pointer action
+(`click`, `click_right`, `click_middle`, `scroll_up`, `scroll_down`). Each is
+either a built-in name (`toggle_mute`, `volume_up`, `volume_down`,
+`cycle_profile`, `cycle_profile_back`, `open_clock_panel`, `open_power_menu`,
+`open_wifi_menu`, `open_bluetooth_menu`, `open_audio_menu`, `toggle_dnd`) or
+`{ exec = "…" }`. A built-in acts on the module it is bound in, so `toggle_mute`
+on the mic mutes the microphone, and one that means nothing there (`volume_up`
+on the clock) is a config error. `volume_up` and `volume_down` step by the
+module's `scroll_step`. A workspace button always focuses its workspace, and
+`workspaces.scroll` turns scrolling on. An `exec` runs through the platform
+shell (`sh -c` on Linux and macOS, `cmd /C` on Windows) with no console window
+on Windows. Like tmxr, lyr treats a config file as code: anything with `exec`
+runs as the user (SECURITY.md).
 
 ### Per-platform defaults
 
