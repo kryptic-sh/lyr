@@ -11,6 +11,16 @@ implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
   `neli`) block M4's audio and network sources.
+- **The GPU backend on Windows** (blocks M9). The plan prefers Vulkan on Windows
+  with D3D12 as the fallback ([plan/04](plan/04-rendering-and-theme.md)), as the
+  draft asked. crcbl reported on 2026-10-17 that per-pixel transparency on Win32
+  works only on D3D12, through DirectComposition, and that Vulkan on Windows
+  refuses a transparent window. lyr's bar background is transparent and its
+  module boxes are drawn at opacity 0.8 (plan/04's theme table). Options:
+  - D3D12 first on Windows, Vulkan nowhere there (recommended): the bar looks as
+    it does on Linux, and crcbl's transparency path is the D3D12 one.
+  - Keep Vulkan first: the Windows bar is opaque, with the module boxes drawn on
+    a solid background.
 
 ## Cross-repo work
 
@@ -140,9 +150,20 @@ implementation follows until they are answered. The ones that block a milestone:
   - A D3D12/WARP fallback on Windows, and `GpuError::NoBackend` elsewhere.
   - `ui.scrollbar(..)`: vertical only.
 
-  Still open in crcbl, as of 0.1.0 (0.2.0's report did not restate them): Win32
-  per-pixel alpha (DirectComposition; in progress, crcbl reported 2026-10-17),
-  no flash on map on AppKit, cold-start timing (S13), FreeBSD running (S18),
+  Win32 per-pixel transparency is on crcbl main at `4d48eaf4` (CI green),
+  reported 2026-10-17, not released: on D3D12, `ShellCaps::TRANSPARENT` is set
+  and `WindowDesc::transparent` works for toplevels, panels and popups, through
+  DirectComposition, with no DWM border or rounded corners on frameless windows.
+  Vulkan on Windows refuses a transparent window by name. `SurfaceTarget::Win32`
+  gains a `transparent` field (breaking, for 0.3.0). Caveat: `GpuContext` still
+  asks for opaque composite alpha, so a transparent window drawn through it is
+  opaque for now; crcbl is fixing that (each `SurfaceTarget` carries the flag
+  and `GpuContext` picks premultiplied), with a Metal fix alongside, because
+  crcbl-mtl forced its layer opaque, which would have made lyr's macOS bar
+  opaque. crcbl reports when that is green.
+
+  Still open in crcbl, as of 0.1.0 (0.2.0's report did not restate them): no
+  flash on map on AppKit, cold-start timing (S13), FreeBSD running (S18),
   AccessKit on Linux and macOS (S14).
 
 - **crcbl: Wayland present path.** Whether crcbl presents only after a frame
