@@ -33,8 +33,19 @@ implementation follows until they are answered. The ones that block a milestone:
   the request: transparency (Vulkan on Windows, `GpuContext`, crcbl-mtl), S14 on
   Linux and macOS, S9's switch on Win32 and AppKit and AppKit secure input, S17
   on Hyprland, S18 running on FreeBSD. When the matrix arrives, it goes into
-  [plan/03](plan/03-surfaces-and-input.md#what-crcbl-must-provide). Not answered
-  yet.
+  [plan/03](plan/03-surfaces-and-input.md#what-crcbl-must-provide). crcbl
+  acknowledged it the same day. Its order: build the matrix from the code and CI
+  jobs, each cell marked verified by CI e2e, verified by unit tests only,
+  implemented but untested, refused loudly, missing silently, or not applicable,
+  with every "missing silently" cell fixed first as a bug; then the `GpuContext`
+  and Metal opacity fixes (in flight), AT-SPI and AppKit accessibility, the S9
+  switch on Win32 and AppKit with secure input, S17 on Hyprland, and FreeBSD
+  running. Each lands on main only with tests and CI on the backends it claims.
+  A transparent window on Vulkan on Windows needs D3D12 interop (render in
+  Vulkan, present through a shared D3D12 composition swapchain), which crcbl
+  calls large; it stays a loud refusal until then, and its cost goes in the
+  matrix notes for the owner. It bears on the Windows GPU backend decision
+  above. Matrix not received yet.
 - **crcbl: OpenType shaping** (GSUB and GPOS through `harfrust` 0.14, under
   crcbl-ui's `parsed-font`) is on crcbl main at `3c023b2f` (CI green), reported
   2026-10-17, and not in a release. ZWJ emoji, skin tones, keycaps, ligatures,
