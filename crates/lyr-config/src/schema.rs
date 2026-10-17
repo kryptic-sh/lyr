@@ -6,10 +6,12 @@
 use serde::Deserialize;
 
 use crate::colour::Colour;
+use crate::format::Format;
 
-/// The whole config, after the user file is layered over the defaults.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields)]
+/// The whole config, after the user file is layered over the defaults. It is
+/// built a table at a time (`typed` in the crate root), so that an error names
+/// its table.
+#[derive(Clone, Debug, PartialEq)]
 pub struct Config {
     pub bar: Bar,
     pub layout: Layout,
@@ -151,7 +153,7 @@ pub struct Workspaces {
     /// Every bar shows every workspace, rather than its own output's.
     pub all_outputs: bool,
     /// A button's label. `{name}` is the workspace's name.
-    pub format: String,
+    pub format: Format,
     /// Scrolling over the module steps to the next or previous workspace.
     pub scroll: bool,
 }

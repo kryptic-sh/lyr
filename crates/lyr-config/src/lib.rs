@@ -12,11 +12,13 @@
 //! M3 and with M4 (`docs/plan/15-milestones.md`).
 
 mod colour;
+mod format;
 mod schema;
 
 use std::path::{Path, PathBuf};
 
 pub use colour::{Colour, InvalidColour};
+pub use format::{Format, InvalidFormat};
 pub use hjkl_config::{ConfigError, ConfigSource};
 pub use schema::{Bar, Clock, Config, Item, Layer, Layout, Module, Position, Theme, Workspaces};
 
@@ -123,11 +125,38 @@ pub fn from_sources(
         path: path.clone(),
         message,
     };
-    let config: Config = toml::Value::Table(merged)
-        .try_into()
-        .map_err(|error: toml::de::Error| invalid(error.message().to_owned()))?;
+    let config = typed(merged).map_err(invalid)?;
     validate(&config, platform).map_err(invalid)?;
     Ok(config)
+}
+
+/// Turns the merged table into a [`Config`] one table at a time, so an error
+/// from inside a table names it.
+fn typed(mut merged: toml::Table) -> Result<Config, String> {
+    let config = Config {
+        bar: section(&mut merged, "bar")?,
+        layout: section(&mut merged, "layout")?,
+        workspaces: section(&mut merged, "workspaces")?,
+        clock: section(&mut merged, "clock")?,
+        theme: section(&mut merged, "theme")?,
+    };
+    match merged.keys().next() {
+        Some(key) => Err(format!("{key}: unknown table")),
+        None => Ok(config),
+    }
+}
+
+/// Takes the table `key` out of `merged` and deserializes it.
+fn section<T: serde::de::DeserializeOwned>(
+    merged: &mut toml::Table,
+    key: &str,
+) -> Result<T, String> {
+    let value = merged
+        .remove(key)
+        .ok_or_else(|| format!("{key}: missing"))?;
+    value
+        .try_into()
+        .map_err(|error: toml::de::Error| format!("{key}: {}", error.message()))
 }
 
 /// Parses TOML text into a table. A syntax error's message is toml's own,
@@ -203,32 +232,16 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
     check_placeholders("workspaces.format", &config.workspaces.format, &["name"])
 }
 
-/// Checks that every `{…}` in `format` names one of `allowed` and that every
-/// brace is closed.
-fn check_placeholders(key: &str, format: &str, allowed: &[&str]) -> Result<(), String> {
-    let mut rest = format;
-    while let Some(open) = rest.find(['{', '}']) {
-        if rest[open..].starts_with('}') {
-            return Err(format!("{key}: `}}` with no `{{` before it"));
-        }
-        let after = &rest[open + 1..];
-        let Some(close) = after.find('}') else {
-            return Err(format!("{key}: `{{` is never closed"));
-        };
-        let name = &after[..close];
-        if !allowed.contains(&name) {
-            return Err(format!(
-                "{key}: unknown placeholder `{{{name}}}` (expected {})",
-                allowed
-                    .iter()
-                    .map(|name| format!("`{{{name}}}`"))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ));
-        }
-        rest = &after[close + 1..];
-    }
-    Ok(())
+/// Checks that every placeholder in `format` is one of `allowed`.
+fn check_placeholders(key: &str, format: &Format, allowed: &[&str]) -> Result<(), String> {
+    let Some(name) = format.placeholders().find(|name| !allowed.contains(name)) else {
+        return Ok(());
+    };
+    let expected: Vec<String> = allowed.iter().map(|name| format!("`{{{name}}}`")).collect();
+    Err(format!(
+        "{key}: unknown placeholder `{{{name}}}` (expected {})",
+        expected.join(", ")
+    ))
 }
 
 #[cfg(test)]

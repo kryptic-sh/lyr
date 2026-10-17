@@ -129,6 +129,28 @@ fn a_module_the_platform_cannot_run_is_an_error() {
 }
 
 #[test]
+fn an_unknown_table_is_an_error() {
+    let message = invalid(user(
+        "[clocks]
+format = \"%H\"
+",
+        Platform::Linux,
+    ));
+    assert_eq!(message, "clocks: unknown table");
+}
+
+#[test]
+fn an_error_inside_a_table_names_the_table() {
+    let message = invalid(user(
+        "[theme]
+border = \"teal\"
+",
+        Platform::Linux,
+    ));
+    assert!(message.starts_with("theme: "), "{message}");
+}
+
+#[test]
 fn an_unknown_key_is_an_error() {
     let message = invalid(user("[bar]\nhieght = 30\n", Platform::Linux));
     assert!(message.contains("hieght"), "{message}");
@@ -160,10 +182,7 @@ fn workspace_format_placeholders_are_checked() {
             &format!("[workspaces]\nformat = \"{format}\"\n"),
             Platform::Linux,
         ));
-        assert!(
-            message.starts_with("workspaces.format"),
-            "{format:?}: {message}"
-        );
+        assert!(message.starts_with("workspaces"), "{format:?}: {message}");
     }
 }
 

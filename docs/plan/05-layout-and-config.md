@@ -98,8 +98,10 @@ defaults file holds all three, as `[platform.linux]`, `[platform.windows]` and
 The config is parsed fully before anything is applied. An unknown key, an
 unknown module name, a module that is unsupported on this platform, or a bad
 colour or format string is an error that names the file, the key path and the
-reason. At start-up an invalid config is fatal. On reload it is logged and the
-running config is kept.
+reason. Today an error found inside a table by serde (a bad colour or format)
+names only the table; the full path waits on a dependency decision (backlog). At
+start-up an invalid config is fatal. On reload it is logged and the running
+config is kept.
 
 ## Reload
 

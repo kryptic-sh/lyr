@@ -11,6 +11,13 @@ implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
   `neli`) block M4's audio and network sources.
+- **`serde_path_to_error` for config errors** (M3). Plan 05 wants every config
+  error to name its key path. An error serde raises while deserializing a table
+  (a bad colour, a bad format string, a wrong type) carries no path in `toml`
+  1.1, so lyr names only the table (`theme: …`). `serde_path_to_error` (dtolnay)
+  wraps the deserializer and reports `theme.border`; it is new to lyr. Options:
+  add it (recommended: one small, widely used crate, and it fixes every such
+  error at once), or keep table-level errors.
 - **The GPU backend on Windows** (blocks M9). The plan prefers Vulkan on Windows
   with D3D12 as the fallback ([plan/04](plan/04-rendering-and-theme.md)), as the
   draft asked. Per-pixel transparency on Win32 works only on D3D12, through
@@ -263,10 +270,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   for the Windows backend (M9). Hyprland main's changes for the next release are
   in [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Core, rest of M1.** `lyr-core` has the zone layout (`layout::layout`, tested
-  and mutation-checked). Not built: module state, format strings and icon ramps,
-  `DrawList` building with its snapshot tests, and hit testing. Measuring text
-  (the widths `layout` takes) needs crcbl-ui's font atlas, so it is done by the
-  caller in `lyr-render`.
+  and mutation-checked). Icon ramps are `icon::ramp`, transcribing waybar
+  0.15.0's `ALabel::getIcon` and tested against its integer steps. Not built:
+  module state, `DrawList` building with its snapshot tests, and hit testing.
+  Measuring text (the widths `layout` takes) needs crcbl-ui's font atlas, so it
+  is done by the caller in `lyr-render`.
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]` and `[theme]`, the embedded defaults,
   `[platform.*]` layering on both the defaults and the user file, and validation
@@ -275,11 +283,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   broken and seen to fail. Not built: the other modules' tables and actions
   (with M4), checking the clock's strftime format, reload (the file watcher,
   `lyr reload`, the old-and-new diff), the control socket, the README's schema
-  docs, and the defaults-parity test against `config.jsonc` (the dotfiles are
-  not checked out next to lyr on this machine, so where the test reads them from
-  is open). `lyr-config` keeps its own copy of the table merge, because
-  `hjkl_config`'s `deep_merge` and `locate` are private in 0.42.2; if hjkl
-  exports them, lyr drops the copy.
+  docs, and the defaults-parity test against `config.jsonc`. The dotfiles are at
+  `~/Projects/mxaddict/dotfiles` on the owner's Windows machine, not next to
+  lyr, and not on CI, so the test needs either a path from the environment or a
+  copy of `config.jsonc` checked into lyr as a fixture; that is open. Format
+  strings are one `Format` type (`lyr-config`'s `format.rs`), parsed when the
+  config loads and rendered with `Format::render`, so validation and drawing
+  will share one parser. Errors name the key where lyr's own checks find them
+  (`layout.right[0]: …`), but an error serde raises inside a table names only
+  the table (`theme: ...`); see the `serde_path_to_error` decision above.
+  `lyr-config` keeps its own copy of the table merge, because `hjkl_config`'s
+  `deep_merge` and `locate` are private in 0.42.2; if hjkl exports them, lyr
+  drops the copy.
 - **Waybar parity, still to check.** The plan was reviewed against the dotfiles'
   `config.jsonc` and `style.css` (2026-10-16), with waybar's own defaults read
   in its 0.15.0 source. Open: the calendar's `<tt>` monospace look with a
