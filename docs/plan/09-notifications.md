@@ -33,9 +33,39 @@ toggles do-not-disturb, `mod+alt+N` clears everything, each through
 | `widget-config.dnd`                                 | "Do Not Disturb"                            | the same text, as a switch                                                           |
 | `script-fail-notify`                                | true                                        | not carried: the config defines no scripts                                           |
 
-The look comes from `dotfiles/.config/swaync/style.css`, which has not been read
-yet. M6 ports its values into the theme the way [04](04-rendering-and-theme.md)
-ported waybar's.
+The look comes from `dotfiles/.config/swaync/style.css` (349 lines, read on
+2026-10-18). M6 ports these values into the theme the way
+[04](04-rendering-and-theme.md) ported waybar's. The palette is Tokyo Night:
+background `#1a1b26`, light background `#24283b`, text `#c0caf5`, comment
+`#565f89`, red `#f7768e`, orange `#ff9e64`, teal `#73daca`, cyan `#7dcfff`, blue
+`#7aa2f7`, hover `#2a2c3e`; every radius is 8 px, and every transition is 200
+ms.
+
+| Element                        | Values                                                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Text                           | 14 px                                                                                                                                      |
+| Panel (`.control-center`)      | background `#1a1b26`, text `#c0caf5`, padding 16 px, border 2 px `#73daca`                                                                 |
+| Toast and history entry        | background `#24283b`, text `#c0caf5`, padding 8 px, border 2 px `#73daca`; `#f7768e` when critical, `#7aa2f7` when low                     |
+| Spacing                        | a toast has an 18 px margin; a history entry 4 px above and below; groups 8 px apart; content inset 7 px                                   |
+| Summary, body, time            | `#c0caf5`, `#c0caf5`, `#565f89`                                                                                                            |
+| Action button                  | background `#24283b` (hover `#2a2c3e`, pressed `#565f89`), border 2 px `#73daca`, padding 8 px, margin 4 px                                |
+| Close button                   | background `#f7768e` (pressed `#ff9e64`), glyph `#1a1b26`, padding 2 px; in the panel 10 px from the top and 6 px from the right           |
+| Title (`widget-title`)         | label `#7dcfff` at 2 rem; Clear All button background `#24283b` (hover `#2a2c3e`, pressed `#565f89`), border 2 px `#73daca`, padding 4 × 8 |
+| Do Not Disturb (`widget-dnd`)  | label at 2 rem, 16 px above; switch `#24283b`, `#ff9e64` when on, `#f7768e` on hover, border 2 px `#73daca`; knob `#73daca` inset 4 px     |
+| Media player (`widget-mpris`)  | background `#24283b`, border 2 px `#73daca`, 16 px above; art 100 px; title 1.2 rem `#c0caf5`, artist 1 rem `#565f89`; buttons 5 px apart  |
+| Progress (a notification hint) | `#f7768e` when critical, `#7aa2f7` otherwise                                                                                               |
+| Sliders (`scale`)              | trough `#24283b`, 8 px tall, at least 70 px wide; filled part `#c0caf5`; knob `#7aa2f7` with a 1 px `#565f89` border (`#7aa2f7` on hover)  |
+
+Two of its values look like slips, and M6 asks the owner before copying them:
+
+- `font-family: 'Hadk Nerd Font'` names no installed font, so swaync draws in a
+  fallback today. lyr uses the bar's font (`Hack Nerd Font Propo`) unless told
+  otherwise.
+- Action buttons have `font-size: 0.2rem`, which is about 3 px.
+
+The rules for widgets the config does not enable (`widget-menubar`,
+`widget-buttons-grid`, `widget-volume`, `widget-backlight`, `widget-label`) are
+not carried.
 
 `.local/bin/.swaync-test` fires seven notifications that cover normal, low and
 critical urgency, actions, an image, a long body, and an image with actions.

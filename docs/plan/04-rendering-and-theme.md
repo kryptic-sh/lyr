@@ -71,21 +71,21 @@ state + config + theme ──► lyr-core: layout ──► DrawList + hit regio
 The defaults are the values in `dotfiles/.config/waybar/style.css`, so the day
 lyr replaces waybar the bar looks the same.
 
-| Element                    | Value                                                                                     |
-| -------------------------- | ----------------------------------------------------------------------------------------- |
-| Font                       | `Hack Nerd Font Propo`, 16 px, normal weight                                              |
-| Bar background             | transparent                                                                               |
-| Text                       | `#cdd6f4`                                                                                 |
-| Module box                 | background `#1a1b26`, border 2 px `#2bc5e3`, radius 8 px; the whole box at opacity 0.8    |
-| Module box spacing         | padding 0 12 px, margin-top 10 px, margin-bottom 2 px, margin-left 10 px, min-width 20 px |
-| Gap between modules        | 0: waybar's config sets no `spacing`, so only the margins separate the boxes              |
-| Last module (notification) | margin-right 10 px                                                                        |
-| Workspace button           | padding 0 10 px; active or hovered text `#2bc5e3`                                         |
-| Battery warning / critical | `#fc4c02` / `#e92d4d`                                                                     |
-| Volume / mic               | `#89b4fa` / `#cba6f7`                                                                     |
-| Tooltip                    | background `#1e1e2e`, text `#cdd6f4`                                                      |
-| Calendar                   | see [10](10-popups-and-menus.md#clock-panel)                                              |
-| Panels and toasts          | ported from `dotfiles/.config/swaync/style.css` in M6 (not read yet)                      |
+| Element                    | Value                                                                                                |
+| -------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Font                       | `Hack Nerd Font Propo`, 16 px, normal weight                                                         |
+| Bar background             | transparent                                                                                          |
+| Text                       | `#cdd6f4`                                                                                            |
+| Module box                 | background `#1a1b26`, border 2 px `#2bc5e3`, radius 8 px; the whole box at opacity 0.8               |
+| Module box spacing         | padding 0 12 px, margin-top 10 px, margin-bottom 2 px, margin-left 10 px, min-width 20 px            |
+| Gap between modules        | 0: waybar's config sets no `spacing`, so only the margins separate the boxes                         |
+| Last module (notification) | margin-right 10 px                                                                                   |
+| Workspace button           | padding 0 10 px; active or hovered text `#2bc5e3`                                                    |
+| Battery warning / critical | `#fc4c02` / `#e92d4d`                                                                                |
+| Volume / mic               | `#89b4fa` / `#cba6f7`                                                                                |
+| Tooltip                    | background `#1e1e2e`, text `#cdd6f4`                                                                 |
+| Calendar                   | see [10](10-popups-and-menus.md#clock-panel)                                                         |
+| Panels and toasts          | from `dotfiles/.config/swaync/style.css`, listed in [09](09-notifications.md#what-swaync-does-today) |
 
 The palette mixes Tokyo Night (`#1a1b26`) with Catppuccin Mocha (`#cdd6f4`,
 `#1e1e2e`, `#89b4fa`, `#cba6f7`), exactly as the current CSS does. lyr copies it

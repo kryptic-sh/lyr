@@ -358,11 +358,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   ([plan/09](plan/09-notifications.md), [plan/10](plan/10-popups-and-menus.md)).
   Written from memory and the dotfiles, with each item to read when its
   milestone starts: the Desktop Notifications Specification's exact methods,
-  hints and close reasons (M6); `dotfiles/.config/swaync/style.css`, 349 lines,
-  not read (M6); swaync's own behaviour where the plan picked a default
-  (critical notifications in DND, the history order); NetworkManager's D-Bus
-  names and failure reason codes (M7); bluetui's and wiremix's actual feature
-  sets (M7); the Windows and macOS menu APIs (M9, M10).
+  hints and close reasons (M6); swaync's own behaviour where the plan picked a
+  default (critical notifications in DND, the history order); NetworkManager's
+  D-Bus names and failure reason codes (M7); bluetui's and wiremix's actual
+  feature sets (M7); the Windows and macOS menu APIs (M9, M10).
+- **Two swaync style values that look like slips** (M6, the owner's call):
+  `font-family: 'Hadk Nerd Font'` names no font, so swaync falls back today (lyr
+  defaults to the bar's font), and action buttons are `0.2rem`, about 3 px
+  ([plan/09](plan/09-notifications.md#what-swaync-does-today)).
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a
