@@ -19,7 +19,9 @@ implementation follows until they are answered. The ones that block a milestone:
   D3D12 is always there. lyr's bar background is transparent and its module
   boxes are drawn at opacity 0.8 (plan/04's theme table). crcbl plans for a
   transparent Win32 window made through `GpuContext` to fall through to D3D12,
-  so with Vulkan first the bar would be drawn on D3D12 anyway. Options:
+  so with Vulkan first the bar would be drawn on D3D12 anyway. That fall-through
+  ("backend fall-through on a refused surface") is on crcbl main at `81085253`,
+  after 0.3.0. Options:
   - D3D12 first on Windows (recommended): the plan says what will actually run,
     and every lyr window there takes the same path.
   - Keep Vulkan first: lyr's transparent windows still end up on D3D12 once
@@ -40,27 +42,19 @@ implementation follows until they are answered. The ones that block a milestone:
      validation; `Exclusive` panel focus kept or documented as it behaves, and
      `FocusRefused` on AppKit.
   2. A transparent Win32 window through `GpuContext` falls through to D3D12.
-  3. AT-SPI (through `accesskit_unix`, which pulls in `zbus`; crcbl is
-     confirming that dependency with the owner) and AppKit accessibility; X11
-     panels, popups and transparency.
-  4. Tests for the untested cells, including a Hyprland job and a FreeBSD VM
-     job.
 
-  Also in flight: the `GpuContext` and Metal opacity fixes. crcbl reports each
-  as it lands; the matrix in plan/03 is updated then.
+  On crcbl main at `81085253`, after 0.3.0, reported 2026-10-18: `TEXT_COMPOSE`
+  split from `TEXT_IME`, which now means a real input method (on Wayland, set
+  only when `zwp_text_input_manager_v3` is bound); a `PANEL_EXCLUSIVE_KEYBOARD`
+  cap; the backend fall-through; Vulkan refusing a composite alpha the surface
+  lacks. Not yet: cursor-shape-v1 on Wayland (next), and a test for S21. 3.
+  AT-SPI (through `accesskit_unix`, which pulls in `zbus`; crcbl is confirming
+  that dependency with the owner) and AppKit accessibility; X11 panels, popups
+  and transparency. 4. Tests for the untested cells, including a Hyprland job
+  and a FreeBSD VM job.
 
-- **crcbl: OpenType shaping** (GSUB and GPOS through `harfrust` 0.14, under
-  crcbl-ui's `parsed-font`) is on crcbl main at `3c023b2f` (CI green), reported
-  2026-10-17, and not in a release. ZWJ emoji, skin tones, keycaps, ligatures,
-  marks and GPOS kerning join, and font fallback and caret stops work per
-  cluster. Until crcbl releases it, which it says will be 0.3.0 because of the
-  breaking changes below, lyr on 0.2.1 draws a ZWJ sequence or a flag in a
-  notification as its separate glyphs. The bar itself needs no shaping
-  ([plan/04](plan/04-rendering-and-theme.md#text)). Breaking in 0.3.0:
-  `fallback::map_char`, `map_text` and `Mapped` give way to
-  `fallback::cluster_face`, and `Font::kerning` and `kerning_pairs` are gone.
-  lyr calls none of them yet; the move to 0.3.0 is its own commit, as plan/02
-  says for every crcbl bump.
+  crcbl reports each as it lands; the matrix in plan/03 is updated then.
+
 - **crcbl: an image and asset crate (S28)**, asked for on 2026-10-16 at the
   owner's request, for lyr and pikr both, instead of each app adding `image`,
   `resvg` and `freedesktop-icons`. It covers PNG, JPEG and SVG decoding to
@@ -139,18 +133,23 @@ implementation follows until they are answered. The ones that block a milestone:
     `Ui::accessibility_update` and `Ui::accessibility_action`, in 0.2.0. Live on
     Windows (UIA); AT-SPI (Linux) and AppKit are still to come.
 
-  **crcbl 0.2.1 is on crates.io** (all 42 crates; tag `v0.2.1` = main
-  `49eb5fa2`; every job of its release run green), reported 2026-10-17. It has
-  every row lyr needs, S28 included, and `crcbl-font`, which the owner chose
-  over `fontdb` on 2026-10-17 ([plan/04](plan/04-rendering-and-theme.md#text)).
-  So lyr depends on crates.io from the start and needs no git pin. lyr's crates
-  are `crcbl-shell`, `crcbl-hal`, `crcbl-ui`, `crcbl-frame`, `crcbl-image` and
+  **crcbl 0.3.0 is on crates.io** (all 42 crates; tag `v0.3.0` on `2399de10`;
+  every publish job green), reported 2026-10-18. It has every row lyr needs, S28
+  included, OpenType shaping (`harfrust`, so ZWJ emoji, flags and ligatures
+  join), the opacity fixes below, and `crcbl-font`, which the owner chose over
+  `fontdb` on 2026-10-17 ([plan/04](plan/04-rendering-and-theme.md#text)). So
+  lyr depends on crates.io from the start and needs no git pin. lyr's crates are
+  `crcbl-shell`, `crcbl-hal`, `crcbl-ui`, `crcbl-frame`, `crcbl-image` and
   `crcbl-font`, with `crcbl-vk`, `crcbl-dx12` or `crcbl-mtl` per platform. The
   `crcbl` umbrella's `system-fonts` feature turns on `parsed-font` and
   `crcbl-ui/system-fonts`. Adding the crates happens when M1 starts.
   crcbl-font's API as reported, not read yet: `SystemFonts::find(&FontQuery)`
   (file and face index for a family, weight and style, matched by CSS rules),
   `SystemFonts::fallbacks`, `Ui::register_system_font`, `Font::from_system`.
+  Breaking in 0.3.0, neither of which lyr calls yet: `Font::kerning`,
+  `Font::kerning_pairs`, `fallback::map_char`, `map_text` and `Mapped` are gone
+  (use `font::shape::shape` and `fallback::cluster_face`), and every windowed
+  `SurfaceTarget` variant gained `transparent: bool`.
 
 - **crcbl: window-kind API, backend work.** Read against the source at crcbl
   main `6483b744` (CI green): layer-shell v4 panels on a named monitor,
@@ -175,17 +174,14 @@ implementation follows until they are answered. The ones that block a milestone:
   - A D3D12/WARP fallback on Windows, and `GpuError::NoBackend` elsewhere.
   - `ui.scrollbar(..)`: vertical only.
 
-  Win32 per-pixel transparency is on crcbl main at `4d48eaf4` (CI green),
-  reported 2026-10-17, not released: on D3D12, `ShellCaps::TRANSPARENT` is set
-  and `WindowDesc::transparent` works for toplevels, panels and popups, through
-  DirectComposition, with no DWM border or rounded corners on frameless windows.
-  Vulkan on Windows refuses a transparent window by name. `SurfaceTarget::Win32`
-  gains a `transparent` field (breaking, for 0.3.0). Caveat: `GpuContext` still
-  asks for opaque composite alpha, so a transparent window drawn through it is
-  opaque for now; crcbl is fixing that (each `SurfaceTarget` carries the flag
-  and `GpuContext` picks premultiplied), with a Metal fix alongside, because
-  crcbl-mtl forced its layer opaque, which would have made lyr's macOS bar
-  opaque. crcbl reports when that is green.
+  Win32 per-pixel transparency is in 0.3.0: on D3D12, `ShellCaps::TRANSPARENT`
+  is set and `WindowDesc::transparent` works for toplevels, panels and popups,
+  through DirectComposition, with no DWM border or rounded corners on frameless
+  windows. Vulkan on Windows refuses a transparent window by name.
+  `SurfaceTarget::Win32` gained a `transparent` field. `GpuContext` asks for
+  premultiplied alpha for a transparent window and fails with
+  `GpuError::Unusable` when no adapter can do it, and crcbl-mtl no longer forces
+  `CAMetalLayer.opaque`.
 
   Still open in crcbl, as of 0.1.0 (0.2.0's report did not restate them): no
   flash on map on AppKit, cold-start timing (S13), FreeBSD running (S18),

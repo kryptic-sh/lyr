@@ -64,7 +64,7 @@ Before the first tag:
 
 - **Every crcbl crate lyr uses is on crates.io**, at a release that has what lyr
   needs. `publish-crates` fails on a git dependency, so this is a hard block.
-  crcbl 0.2.1 (2026-10-17) has all of it, so this holds while lyr avoids git
+  crcbl 0.3.0 (2026-10-18) has all of it, so this holds while lyr avoids git
   pins.
 - lyr is added to the allowlists of the org secrets `AUR_SSH_KEY`,
   `BREW_SSH_KEY` and `SCOOP_SSH_KEY`, and has `CARGO_REGISTRY_TOKEN`.
