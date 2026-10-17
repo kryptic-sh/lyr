@@ -357,11 +357,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 - **Native notification centre and menus, not yet researched**
   ([plan/09](plan/09-notifications.md), [plan/10](plan/10-popups-and-menus.md)).
   Written from memory and the dotfiles, with each item to read when its
-  milestone starts: the Desktop Notifications Specification's exact methods,
-  hints and close reasons (M6); swaync's own behaviour where the plan picked a
-  default (critical notifications in DND, the history order); NetworkManager's
-  D-Bus names and failure reason codes (M7); bluetui's and wiremix's actual
-  feature sets (M7); the Windows and macOS menu APIs (M9, M10).
+  milestone starts: swaync's own behaviour where the plan picked a default
+  (critical notifications in DND, the history order); NetworkManager's D-Bus
+  names and failure reason codes (M7); bluetui's and wiremix's actual feature
+  sets (M7); the Windows and macOS menu APIs (M9, M10).
+- **Opening a notification's link** (M6). The spec asks for `<a href>` links and
+  lyr advertises `body-hyperlinks`, but a link comes from any program on the
+  session bus, so how a click opens it (the system's URL handler, which schemes,
+  a confirmation) is a security choice to make in M6, not a default.
 - **Two swaync style values that look like slips** (M6, the owner's call):
   `font-family: 'Hadk Nerd Font'` names no font, so swaync falls back today (lyr
   defaults to the bar's font), and action buttons are `0.2rem`, about 3 px

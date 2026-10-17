@@ -73,29 +73,50 @@ That set becomes M6's manual check, and each case gets an automated test.
 
 ## The daemon
 
-The interface is the freedesktop Desktop Notifications Specification. The
-details below are from memory of version 1.2 of that spec and are confirmed
-against its text when M6 starts.
+The interface is the freedesktop Desktop Notifications Specification, version
+1.3 (published 18 August 2024; read on 2026-10-18 at
+`specifications.freedesktop.org/notification-spec/latest/`).
 
-- **Methods:** `Notify` (with `replaces_id`, so a repeated notification updates
-  in place), `CloseNotification`, `GetCapabilities` and `GetServerInformation`.
-- **Signals:** `NotificationClosed` with its reason (expired, dismissed, closed
-  by a call), `ActionInvoked`, and `ActivationToken` so the app that is raised
-  can take focus under Wayland.
-- **Capabilities:** `actions`, `body`, `body-markup`, `icon-static` and
-  `persistence`. Each is advertised only once it works. `body-images` is not
-  (see below).
-- **Hints:** `urgency`, `category`, `desktop-entry`, `image-data`, `image-path`,
-  `transient` (shown but not kept in the history) and `resident` (not closed by
-  an action). Sound hints are ignored and not advertised.
-- **Body markup:** the spec's subset (`<b>`, `<i>`, `<u>`, `<a>`). Anything else
-  is shown as text, never interpreted. `.menu-wifi` escapes `&`, `<` and `>`
-  because swaync renders markup, so lyr must too.
-- **Images:** `image-data` is raw pixels. `image-path` and `app_icon` are a file
-  path, a `file://` URL or an icon name looked up in the icon theme as the tray
-  does ([08](08-tray.md)). Inline `<img>` in the body is not supported. An icon
-  that cannot be found or decoded (crcbl's SVG subset refuses what it cannot
-  draw) falls back to a generic icon. An image that fails is left out, and the
+- **Methods:**
+  `Notify(app_name, replaces_id, app_icon, summary, body, actions, hints, expire_timeout) -> id`,
+  `CloseNotification(id)`, `GetCapabilities()` and
+  `GetServerInformation() -> (name, vendor, version, spec_version)`, with
+  `spec_version` "1.3". An id is never 0 and is not reused. A non-zero
+  `replaces_id` replaces that notification in place, with no flicker, and is
+  returned as the id. `expire_timeout` is milliseconds: -1 means lyr's own
+  timeouts (swaync's, above), and 0 never expires. `actions` is a flat list of
+  id and label pairs. `CloseNotification` on an id that no longer exists answers
+  with an empty D-Bus error.
+- **Signals:** `NotificationClosed(id, reason)`, with reason 1 expired, 2
+  dismissed by the user, 3 closed by `CloseNotification`, 4 anything else; the
+  id is dead from then on. `ActionInvoked(id, action_key)`, which a click on the
+  body sends with the `default` action. `ActivationToken(id, token)`, sent just
+  before `ActionInvoked`, carries an xdg-activation token so the app raised can
+  take focus under Wayland.
+- **Capabilities:** `actions`, `body`, `body-markup`, `body-hyperlinks`,
+  `icon-static` and `persistence`, each advertised only once it works.
+  `body-images`, `action-icons`, `icon-multi` and `sound` are not.
+- **Hints:** `urgency` (a byte: 0 low, 1 normal, 2 critical), `category`,
+  `desktop-entry`, `image-data`, `image-path`, `transient` (shown but not kept
+  in the history) and `resident` (not closed when an action is invoked). The
+  deprecated `image_data`, `image_path` and `icon_data` are read as fallbacks,
+  since the spec still lists them. `x`, `y`, `action-icons` and the sound hints
+  are ignored.
+- **Body markup:** the spec's tags are `<b>`, `<i>`, `<u>`, `<a href>` and
+  `<img>`. lyr draws the first four (links in the spec's "standard blue
+  underline"; how a click opens one is settled in M6) and leaves `<img>` out,
+  which is why `body-images` is not advertised. Anything else is shown as text,
+  never interpreted. `.menu-wifi` escapes `&`, `<` and `>` because swaync
+  renders markup, so lyr must too.
+- **Images:** lyr shows an icon and an image, so, as the spec orders it, the
+  icon is `app_icon` and the image is the first of `image-data`, `image-path`
+  and `icon_data`. `image-data` is `(iiibiiay)`: width, height, row stride, has
+  alpha, 8 bits per sample, 3 or 4 channels, RGB(A) bytes. `app_icon` and
+  `image-path` are a `file://` URI (the only scheme the spec allows) or a name
+  in the icon theme, looked up as the tray does ([08](08-tray.md)); a plain
+  absolute path is accepted too, though the spec does not name it. An icon that
+  cannot be found or decoded (crcbl's SVG subset refuses what it cannot draw)
+  falls back to a generic icon. An image that fails is left out, and the
   notification is still shown.
 
 ### Toasts
