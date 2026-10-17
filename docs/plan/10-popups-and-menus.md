@@ -92,10 +92,10 @@ action.
 | --------- | ---------------------------------- | ----------------------------- | -------------------------------------- |
 | Lock      | `loginctl lock-session` (hyprlock) | `LockWorkStation`             | `pmset displaysleepnow` (lock on wake) |
 | Log out   | compositor exit (`hl.dsp.exit()`)  | `ExitWindowsEx(EWX_LOGOFF)`   | System Events `log out` (AppleScript)  |
-| Sleep     | what `systemctl sleep` does        | `SetSuspendState(FALSE, ...)` | `pmset sleepnow`                       |
-| Hibernate | `Manager.Hibernate`                | `SetSuspendState(TRUE, ...)`  | not offered                            |
-| Reboot    | `Manager.Reboot`                   | `ExitWindowsEx(EWX_REBOOT)`   | System Events `restart`                |
-| Power off | `Manager.PowerOff`                 | `ExitWindowsEx(EWX_POWEROFF)` | System Events `shut down`              |
+| Sleep     | `Manager.Sleep(0)`                 | `SetSuspendState(FALSE, ...)` | `pmset sleepnow`                       |
+| Hibernate | `Manager.HibernateWithFlags(0)`    | `SetSuspendState(TRUE, ...)`  | not offered                            |
+| Reboot    | `Manager.RebootWithFlags(0)`       | `ExitWindowsEx(EWX_REBOOT)`   | System Events `restart`                |
+| Power off | `Manager.PowerOffWithFlags(0)`     | `ExitWindowsEx(EWX_POWEROFF)` | System Events `shut down`              |
 
 Windows reboot and power-off need the `SE_SHUTDOWN_NAME` privilege enabled on
 the process token first.
@@ -103,8 +103,17 @@ the process token first.
 `.menu-power` sleeps with `systemctl sleep`, not `systemctl suspend`. That verb
 (systemd 256 and later) picks suspend, hibernate or suspend-then-hibernate from
 `sleep.conf`, so lyr's Sleep must do the same rather than call
-`Manager.Suspend`. The logind method behind it is confirmed against the
-installed systemd's introspection when M5 starts, not taken from memory.
+`Manager.Suspend`. The calls are the ones systemctl makes, read in systemd
+v262.1's `src/systemctl/systemctl-logind.c` (`logind_reboot`) on 2026-10-18:
+
+- Sleep is `org.freedesktop.login1.Manager.Sleep(t flags)`. systemctl has no
+  fallback for it, so on a logind without the method lyr reports that Sleep
+  needs systemd 256 or later.
+- The others are `<Method>WithFlags(t flags)`. On an older logind that answers
+  `UnknownMethod`, systemctl calls `<Method>(b interactive)` instead, and lyr
+  does the same.
+- `flags` is 0: systemctl's default (`--check-inhibitors=auto`) sets neither the
+  check nor the skip flag, so logind applies its own inhibitor policy.
 
 ## Wi-Fi menu
 

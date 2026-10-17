@@ -348,10 +348,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 - **Waybar parity, still to check.** The plan was reviewed against the dotfiles'
   `config.jsonc` and `style.css` (2026-10-16), with waybar's own defaults read
   in its 0.15.0 source. Open: the calendar's `<tt>` monospace look with a
-  proportional default font (`calendar_font`, M5); the logind method behind
-  `systemctl sleep` (M5). The defaults-parity test (M3) should read the glyphs
-  from `config.jsonc` itself, not from the plan: the plan once lost every BMP
-  private-use glyph without anyone noticing, and now writes them as code points.
+  proportional default font (`calendar_font`, M5). The logind calls behind
+  `systemctl sleep` and the other power entries are in plan 10, read from
+  systemd v262.1; the owner's installed systemd is not checked. The
+  defaults-parity test (M3) should read the glyphs from `config.jsonc` itself,
+  not from the plan: the plan once lost every BMP private-use glyph without
+  anyone noticing, and now writes them as code points.
 - **Nerd Font glyphs through crcbl-ui:** that Hack Nerd Font Propo's private-use
   glyphs resolve through crcbl-ui's cmap lookup is untested (M1's first test).
 - **Native notification centre and menus, not yet researched**
