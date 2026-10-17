@@ -6,7 +6,7 @@
 
 use lyr_config::{Bluetooth as Config, Format};
 
-use crate::icon::named;
+use crate::icon::pick;
 
 /// The controller's state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,7 +71,7 @@ pub fn view(reading: &Reading, config: &Config) -> View {
     } else {
         "enabled"
     };
-    let icon = named(&config.icons, &[state.name(), blocked]);
+    let icon = pick(&config.icons, &[state.name(), blocked], 0);
     let state_format = match state {
         State::Disabled => config.format_disabled.as_ref(),
         State::Off => config.format_off.as_ref(),
@@ -79,9 +79,9 @@ pub fn view(reading: &Reading, config: &Config) -> View {
         State::Connected => config.format_connected.as_ref(),
     };
     let (format, label_icon) = match (battery, &config.format_connected_battery) {
-        // With a battery waybar takes the icon from the ramp at the battery's
-        // level; `icons` is named rather than a ramp, so that is `default`.
-        (Some(_), Some(format)) => (format, named(&config.icons, &[])),
+        // With a battery waybar takes `default` at the battery's level, which
+        // matters when `default` is a ramp.
+        (Some(level), Some(format)) => (format, pick(&config.icons, &[], u32::from(level))),
         _ => (state_format.unwrap_or(&config.format), icon),
     };
 

@@ -200,7 +200,16 @@ pub struct Battery {
 
 /// Icons by name, with `default` for a name that has none: waybar's
 /// `format-icons` object.
-pub type NamedIcons = BTreeMap<String, String>;
+pub type NamedIcons = BTreeMap<String, Icon>;
+
+/// One entry of [`NamedIcons`]: a single icon, or a ramp chosen by a
+/// percentage (the volume's `default`).
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum Icon {
+    One(String),
+    Ramp(Vec<String>),
+}
 
 /// The power-profile module (`docs/plan/07-modules.md#power-profile`).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]

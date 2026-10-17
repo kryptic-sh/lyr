@@ -3,7 +3,7 @@
 
 use lyr_config::{Format, PowerProfile as Config};
 
-use crate::icon::named;
+use crate::icon::pick;
 
 /// The active profile, as power-profiles-daemon names it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -24,7 +24,7 @@ pub struct View {
 /// The view of `profile` under `config`.
 #[must_use]
 pub fn view(profile: &Profile, config: &Config) -> View {
-    let icon = named(&config.icons, &[profile.name.as_str()]);
+    let icon = pick(&config.icons, &[profile.name.as_str()], 0);
     let fill = |format: &Format| {
         format.render(|name| match name {
             "icon" => Some(icon),

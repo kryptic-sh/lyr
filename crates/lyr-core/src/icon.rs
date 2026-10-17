@@ -1,18 +1,22 @@
 //! Choosing an icon: from a ramp by a percentage, or from named icons by
 //! state.
 
-use lyr_config::NamedIcons;
+use lyr_config::{Icon, NamedIcons};
 
 /// The icon for the first of `names` that `icons` has, else its `default`,
-/// else none. This is waybar's `getIcon` with a `format-icons` object and a
-/// list of alternatives.
+/// else none. A ramp is indexed by `value` out of 100. This is waybar's
+/// `getIcon` with a `format-icons` object and a list of alternatives.
 #[must_use]
-pub fn named<'a>(icons: &'a NamedIcons, names: &[&str]) -> &'a str {
-    names
+pub fn pick<'a>(icons: &'a NamedIcons, names: &[&str], value: u32) -> &'a str {
+    match names
         .iter()
         .find_map(|name| icons.get(*name))
         .or_else(|| icons.get("default"))
-        .map_or("", String::as_str)
+    {
+        Some(Icon::One(icon)) => icon,
+        Some(Icon::Ramp(icons)) => ramp(icons, value, 100).map_or("", String::as_str),
+        None => "",
+    }
 }
 
 /// The icon for `value` out of `max` from `icons`, ordered low to high.
@@ -35,20 +39,37 @@ pub fn ramp<T>(icons: &[T], value: u32, max: u32) -> Option<&T> {
 
 #[cfg(test)]
 mod tests {
-    use lyr_config::NamedIcons;
+    use lyr_config::{Icon, NamedIcons};
 
-    use super::{named, ramp};
+    use super::{pick, ramp};
+
+    fn icons(entries: &[(&str, Icon)]) -> NamedIcons {
+        entries
+            .iter()
+            .map(|(name, icon)| ((*name).to_owned(), icon.clone()))
+            .collect()
+    }
+
+    fn one(icon: &str) -> Icon {
+        Icon::One(icon.to_owned())
+    }
 
     #[test]
     fn a_named_icon_takes_the_first_name_present_then_the_default() {
-        let icons: NamedIcons = [("default", "d"), ("off", "o"), ("wifi", "w")]
-            .into_iter()
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
-            .collect();
-        assert_eq!(named(&icons, &["off"]), "o");
-        assert_eq!(named(&icons, &["connected", "wifi"]), "w");
-        assert_eq!(named(&icons, &["connected"]), "d");
-        assert_eq!(named(&NamedIcons::new(), &["off"]), "");
+        let icons = icons(&[("default", one("d")), ("off", one("o")), ("wifi", one("w"))]);
+        assert_eq!(pick(&icons, &["off"], 0), "o");
+        assert_eq!(pick(&icons, &["connected", "wifi"], 0), "w");
+        assert_eq!(pick(&icons, &["connected"], 0), "d");
+        assert_eq!(pick(&NamedIcons::new(), &["off"], 0), "");
+    }
+
+    #[test]
+    fn a_named_ramp_is_indexed_by_the_value() {
+        let ramp = Icon::Ramp(["l", "m", "h"].map(str::to_owned).to_vec());
+        let icons = icons(&[("default", ramp), ("headphone", one("p"))]);
+        assert_eq!(pick(&icons, &["speaker"], 10), "l");
+        assert_eq!(pick(&icons, &["speaker"], 90), "h");
+        assert_eq!(pick(&icons, &["headphone"], 90), "p");
     }
 
     const BATTERY: [char; 5] = ['0', '1', '2', '3', '4'];

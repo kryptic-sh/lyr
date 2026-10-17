@@ -21,7 +21,7 @@ pub use colour::{Colour, InvalidColour};
 pub use format::{Format, InvalidFormat};
 pub use hjkl_config::{ConfigError, ConfigSource};
 pub use schema::{
-    Bar, Battery, Bluetooth, Clock, Config, Item, Layer, Layout, Module, NamedIcons, Network,
+    Bar, Battery, Bluetooth, Clock, Config, Icon, Item, Layer, Layout, Module, NamedIcons, Network,
     Position, PowerProfile, Theme, Workspaces,
 };
 

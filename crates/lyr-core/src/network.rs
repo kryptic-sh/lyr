@@ -3,7 +3,7 @@
 
 use lyr_config::{Format, Network as Config};
 
-use crate::icon::named;
+use crate::icon::pick;
 
 /// The link's state, decided as waybar's `getNetworkState` does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,7 +68,11 @@ pub fn view(state: State, link: &Link, config: &Config) -> View {
         ),
         State::Disabled => (&config.format_disabled, &config.tooltip_format_disabled),
     };
-    let icon = named(&config.icons, &[state.name()]);
+    let icon = pick(
+        &config.icons,
+        &[state.name()],
+        u32::from(link.signal_strength),
+    );
     let signal = link.signal_strength.to_string();
     let fill = |format: &Format| {
         format.render(|name| match name {
