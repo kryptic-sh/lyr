@@ -16,6 +16,15 @@ pub struct Workspace {
     pub urgent: bool,
 }
 
+/// Which way a scroll over the workspace module moves.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Step {
+    /// To the next workspace in id order.
+    Next,
+    /// To the previous workspace in id order.
+    Previous,
+}
+
 /// What the workspace module shows: every workspace in id order, which one is
 /// active, and which are urgent.
 ///
@@ -64,6 +73,31 @@ impl State {
     #[must_use]
     pub const fn active(&self) -> Option<WorkspaceId> {
         self.active
+    }
+
+    /// The workspace a scroll over the module moves to: the button after (or
+    /// before) the active one, wrapping at the ends.
+    ///
+    /// `monitor` is the bar's output when it shows only that output's
+    /// workspaces, and `None` when every bar shows every workspace. `None`
+    /// is returned when the active workspace is not among those buttons
+    /// (it is on another output), since there is no button to step from.
+    #[must_use]
+    pub fn step(&self, step: Step, monitor: Option<&str>) -> Option<&Workspace> {
+        let buttons: Vec<&Workspace> = self
+            .workspaces()
+            .filter(|workspace| monitor.is_none_or(|m| workspace.monitor.as_deref() == Some(m)))
+            .collect();
+        let active = self.active?;
+        let at = buttons
+            .iter()
+            .position(|workspace| workspace.id == active)?;
+        let len = buttons.len();
+        let to = match step {
+            Step::Next => (at + 1) % len,
+            Step::Previous => (at + len - 1) % len,
+        };
+        Some(buttons[to])
     }
 
     /// Applies one event and returns whether anything the bar draws changed,
@@ -178,7 +212,7 @@ fn is_special(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::State;
+    use super::{State, Step, Workspace};
     use crate::hyprland::parse_line;
 
     /// Applies event lines in order and returns what each `apply` reported.
@@ -284,6 +318,62 @@ mod tests {
 
         assert_eq!(feed(&mut state, &["focusedmonv2>>DP-2,2"]), [true]);
         assert!(urgent(&state).is_empty());
+    }
+
+    #[test]
+    fn scrolling_steps_through_the_buttons_and_wraps() {
+        let mut state = State::default();
+        feed(
+            &mut state,
+            &[
+                "focusedmonv2>>DP-1,1",
+                "createworkspacev2>>1,1",
+                "createworkspacev2>>2,2",
+                "createworkspacev2>>5,5",
+                "workspacev2>>2,2",
+            ],
+        );
+        let id = |workspace: Option<&Workspace>| workspace.map(|workspace| workspace.id);
+
+        assert_eq!(id(state.step(Step::Next, None)), Some(5));
+        assert_eq!(id(state.step(Step::Previous, None)), Some(1));
+
+        feed(&mut state, &["workspacev2>>5,5"]);
+        assert_eq!(id(state.step(Step::Next, None)), Some(1), "wraps forward");
+        feed(&mut state, &["workspacev2>>1,1"]);
+        assert_eq!(id(state.step(Step::Previous, None)), Some(5), "wraps back");
+    }
+
+    #[test]
+    fn a_per_output_bar_steps_only_through_its_own_workspaces() {
+        let mut state = State::default();
+        feed(
+            &mut state,
+            &[
+                "focusedmonv2>>DP-1,1",
+                "createworkspacev2>>1,1",
+                "createworkspacev2>>3,3",
+                "focusedmonv2>>HDMI-A-1,2",
+                "createworkspacev2>>2,2",
+                "focusedmonv2>>DP-1,1",
+            ],
+        );
+        let id = |workspace: Option<&Workspace>| workspace.map(|workspace| workspace.id);
+
+        assert_eq!(id(state.step(Step::Next, Some("DP-1"))), Some(3));
+        assert_eq!(id(state.step(Step::Next, None)), Some(2));
+        assert_eq!(
+            id(state.step(Step::Next, Some("HDMI-A-1"))),
+            None,
+            "the active workspace is on another output"
+        );
+    }
+
+    #[test]
+    fn nothing_to_step_from_before_a_workspace_is_active() {
+        let mut state = State::default();
+        feed(&mut state, &["createworkspacev2>>1,1"]);
+        assert_eq!(state.step(Step::Next, None), None);
     }
 
     #[test]

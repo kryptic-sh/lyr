@@ -21,7 +21,7 @@ pub use event::{Event, ParseError, parse_line};
 #[cfg(unix)]
 pub use ipc::{Error, Events, Hyprland};
 pub use request::{Dialect, focus_request};
-pub use state::{State, Workspace};
+pub use state::{State, Step, Workspace};
 
 /// A Hyprland workspace id. Numbered workspaces are positive; named and
 /// special workspaces get negative ids, so the sign says nothing about

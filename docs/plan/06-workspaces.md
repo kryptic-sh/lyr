@@ -9,7 +9,10 @@ Two things waybar's setup does not do are off by default. Urgent workspaces are
 tracked (waybar adds an `urgent` class), but `style.css` gives that class no
 style, so they look like any other until `theme.workspace_urgent` sets a colour.
 Scrolling to cycle workspaces is not in the config, and waybar has no built-in
-scroll for this module, so it waits for `workspaces.scroll = true`.
+scroll for this module, so it waits for `workspaces.scroll = true`. When on, a
+scroll moves to the next or previous button in id order, wrapping at the ends
+(`State::step`). A bar showing only its own output's workspaces steps through
+those, and does nothing while the active workspace is on another output.
 
 What a "workspace" is differs per platform, so the module talks to a
 `WorkspaceBackend` trait in `lyr-wm`. Each platform has one implementation
