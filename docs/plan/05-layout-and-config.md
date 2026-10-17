@@ -6,7 +6,10 @@ Three zones per bar: **left**, **centre**, **right**. The centre zone is centred
 on the bar regardless of how wide the side zones are (waybar's
 `modules-center`). If the zones would overlap, the centre zone wins and the side
 zones are clipped at their inner edge, with the clipped module dropping its text
-before its icon.
+before its icon. Once one module does not fit, the ones after it (nearer the
+centre) are dropped too, so a zone never has a gap. With an empty centre zone,
+the inner edge is the bar's middle. This is `lyr_core::layout::layout`, which
+takes each module's full and icon-only widths.
 
 Within a zone, modules sit in config order. Each one is a box with the theme's
 padding, border and margins ([04](04-rendering-and-theme.md#theme)). A `spacer`

@@ -262,6 +262,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `workspaces.scroll`), and `lyr --stats`. The `WorkspaceBackend` trait waits
   for the Windows backend (M9). Hyprland main's changes for the next release are
   in [plan/06](plan/06-workspaces.md#linux--hyprland).
+- **Core, rest of M1.** `lyr-core` has the zone layout (`layout::layout`, tested
+  and mutation-checked). Not built: module state, format strings and icon ramps,
+  `DrawList` building with its snapshot tests, and hit testing. Measuring text
+  (the widths `layout` takes) needs crcbl-ui's font atlas, so it is done by the
+  caller in `lyr-render`.
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]` and `[theme]`, the embedded defaults,
   `[platform.*]` layering on both the defaults and the user file, and validation
