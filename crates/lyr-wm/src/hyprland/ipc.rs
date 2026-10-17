@@ -17,6 +17,9 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 /// A Hyprland reply that means the request was carried out.
 const OK_REPLY: &str = "ok";
 
+/// Hyprland's reply to a request it has no command for (`HyprCtl.cpp`).
+const UNKNOWN_REPLY: &str = "unknown request";
+
 /// What went wrong talking to Hyprland.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -39,6 +42,8 @@ pub enum Error {
     },
     #[error("Hyprland refused `{request}`: {reply}")]
     Refused { request: String, reply: String },
+    #[error("Hyprland reports config provider {provider:?}, which lyr does not know")]
+    UnknownConfigProvider { provider: String },
     #[error("lyr cannot name workspace {name:?} in a Lua dispatch")]
     Unaddressable { name: String },
     #[error(transparent)]
@@ -53,27 +58,47 @@ pub struct Hyprland {
 }
 
 impl Hyprland {
-    /// Finds the Hyprland this process runs under, from its environment.
-    pub fn from_env() -> Result<Self, Error> {
-        Self::from_vars(|name| std::env::var_os(name))
+    /// Finds the Hyprland this process runs under, from its environment, and
+    /// asks it which config dialect it runs.
+    pub async fn from_env() -> Result<Self, Error> {
+        Self::at(socket_dir(|name| std::env::var_os(name))?).await
     }
 
-    /// [`Hyprland::from_env`] with the environment passed in.
-    ///
-    /// The sockets are in `$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE`.
-    /// The config is Lua when `hypr/hyprland.lua` exists in
-    /// `$XDG_CONFIG_HOME`, or in `$HOME/.config` when that is unset.
-    fn from_vars(var: impl Fn(&str) -> Option<OsString>) -> Result<Self, Error> {
-        let signature = var("HYPRLAND_INSTANCE_SIGNATURE").ok_or(Error::NotRunning)?;
-        let runtime = var("XDG_RUNTIME_DIR").ok_or(Error::NoRuntimeDir)?;
-        let config = var("XDG_CONFIG_HOME")
-            .map(PathBuf::from)
-            .or_else(|| var("HOME").map(|home| Path::new(&home).join(".config")));
-        let lua = config.is_some_and(|config| config.join("hypr/hyprland.lua").is_file());
-        Ok(Self {
-            socket_dir: Path::new(&runtime).join("hypr").join(signature),
-            dialect: if lua { Dialect::Lua } else { Dialect::Hyprlang },
-        })
+    /// Connects to the Hyprland whose sockets are in `socket_dir`.
+    async fn at(socket_dir: PathBuf) -> Result<Self, Error> {
+        let mut hyprland = Self {
+            socket_dir,
+            dialect: Dialect::Hyprlang,
+        };
+        hyprland.dialect = hyprland.config_dialect().await?;
+        Ok(hyprland)
+    }
+
+    /// The config dialect, from `j/status`'s `configProvider` (`lua` or
+    /// `hyprlang`), as ironbar's `detect_lua_config` reads it. A Hyprland
+    /// with no `status` command predates Lua configs, so it is hyprlang.
+    async fn config_dialect(&self) -> Result<Dialect, Error> {
+        #[derive(serde::Deserialize)]
+        struct Status {
+            #[serde(rename = "configProvider")]
+            config_provider: String,
+        }
+        let request = "j/status";
+        let reply = self.request(request).await?;
+        if reply.trim() == UNKNOWN_REPLY {
+            return Ok(Dialect::Hyprlang);
+        }
+        let status: Status = serde_json::from_str(&reply).map_err(|source| Error::Json {
+            request: request.to_owned(),
+            source,
+        })?;
+        match status.config_provider.as_str() {
+            "lua" => Ok(Dialect::Lua),
+            "hyprlang" => Ok(Dialect::Hyprlang),
+            _ => Err(Error::UnknownConfigProvider {
+                provider: status.config_provider,
+            }),
+        }
     }
 
     /// The dispatcher syntax requests are written in.
@@ -150,6 +175,13 @@ impl Hyprland {
     }
 }
 
+/// Where Hyprland's sockets are: `$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE`.
+fn socket_dir(var: impl Fn(&str) -> Option<OsString>) -> Result<PathBuf, Error> {
+    let signature = var("HYPRLAND_INSTANCE_SIGNATURE").ok_or(Error::NotRunning)?;
+    let runtime = var("XDG_RUNTIME_DIR").ok_or(Error::NoRuntimeDir)?;
+    Ok(Path::new(&runtime).join("hypr").join(signature))
+}
+
 /// The event stream from `.socket2.sock`.
 #[derive(Debug)]
 pub struct Events {
@@ -185,7 +217,7 @@ mod tests {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::UnixListener;
 
-    use super::{Error, Hyprland};
+    use super::{Error, Hyprland, socket_dir};
     use crate::hyprland::{Dialect, Event};
 
     fn vars<'a>(pairs: &'a [(&'a str, &'a Path)]) -> impl Fn(&str) -> Option<OsString> + 'a {
@@ -198,38 +230,52 @@ mod tests {
     }
 
     #[test]
-    fn the_environment_names_the_sockets_and_the_dialect() {
-        let config = tempfile::tempdir().expect("tempdir");
+    fn the_environment_names_the_sockets() {
         let runtime = Path::new("/run/user/1000");
         let signature = Path::new("abc_123");
         let env = [
             ("HYPRLAND_INSTANCE_SIGNATURE", signature),
             ("XDG_RUNTIME_DIR", runtime),
-            ("XDG_CONFIG_HOME", config.path()),
         ];
-
-        let hyprlang = Hyprland::from_vars(vars(&env)).expect("found");
         assert_eq!(
-            hyprlang.socket_dir,
+            socket_dir(vars(&env)).expect("found"),
             Path::new("/run/user/1000/hypr/abc_123")
         );
-        assert_eq!(hyprlang.dialect(), Dialect::Hyprlang);
-
-        std::fs::create_dir(config.path().join("hypr")).expect("mkdir");
-        std::fs::write(config.path().join("hypr/hyprland.lua"), "").expect("write");
-        assert_eq!(
-            Hyprland::from_vars(vars(&env)).expect("found").dialect(),
-            Dialect::Lua
-        );
-
         assert!(matches!(
-            Hyprland::from_vars(vars(&env[1..])),
+            socket_dir(vars(&env[1..])),
             Err(Error::NotRunning)
         ));
         assert!(matches!(
-            Hyprland::from_vars(vars(&env[..1])),
+            socket_dir(vars(&env[..1])),
             Err(Error::NoRuntimeDir)
         ));
+    }
+
+    #[tokio::test]
+    async fn the_dialect_is_what_hyprland_reports() {
+        let dialect = |reply: fn(&str) -> &'static str| async move {
+            let dir = tempfile::tempdir().expect("tempdir");
+            let _requests = fake_hyprland(dir.path(), reply, "").await;
+            Hyprland::at(dir.path().to_owned())
+                .await
+                .map(|h| h.dialect())
+        };
+        let lua = |_: &str| r#"{"configProvider": "lua", "backend": "drm"}"#;
+        let hyprlang = |_: &str| r#"{"configProvider": "hyprlang", "backend": "drm"}"#;
+        let old = |_: &str| "unknown request";
+        let odd = |_: &str| r#"{"configProvider": "yaml"}"#;
+        let garbage = |_: &str| "not json";
+        assert_eq!(dialect(lua).await.expect("lua"), Dialect::Lua);
+        assert_eq!(
+            dialect(hyprlang).await.expect("hyprlang"),
+            Dialect::Hyprlang
+        );
+        assert_eq!(dialect(old).await.expect("old"), Dialect::Hyprlang);
+        assert!(matches!(
+            dialect(odd).await,
+            Err(Error::UnknownConfigProvider { provider }) if provider == "yaml"
+        ));
+        assert!(matches!(dialect(garbage).await, Err(Error::Json { .. })));
     }
 
     /// A stand-in Hyprland: answers each request on `.socket.sock` from

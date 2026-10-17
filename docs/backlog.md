@@ -279,11 +279,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `Hyprland` (socket I/O, `from_env`, `subscribe`, `focus`). Its tests run
   against a fake Hyprland on Unix sockets, not a real one. Not verified on a
   running Hyprland: the Lua focus request (the framing was read from hyprctl's
-  source), and that `hyprland.lua` existing is how Hyprland picks a Lua config
-  (ironbar's `detect_lua_config()` was not read; Hyprland also takes `--config`,
-  which lyr ignores). Named workspaces get no request in Lua until there is a
-  quoting rule. Click is `focus_request` and scroll is `State::step`, both pure
-  and tested; still to build: wiring them into the bar (M1's window and M3's
+  source). The dialect comes from Hyprland itself (`j/status`'s
+  `configProvider`, as ironbar reads it), tested against the fake on Linux under
+  WSL. Named workspaces get no request in Lua until there is a quoting rule.
+  Click is `focus_request` and scroll is `State::step`, both pure and tested;
+  still to build: wiring them into the bar (M1's window and M3's
   `workspaces.scroll`), and `lyr --stats`. The `WorkspaceBackend` trait waits
   for the Windows backend (M9). Hyprland main's changes for the next release are
   in [plan/06](plan/06-workspaces.md#linux--hyprland).

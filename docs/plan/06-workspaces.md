@@ -60,10 +60,15 @@ Detected by `HYPRLAND_INSTANCE_SIGNATURE`. Both sockets live in
   config provider doesn't support dispatch", and drops the `id` field for named
   workspaces in `j/workspaces`. lyr has to follow both changes when the next
   release ships them.
-- **Detecting the config dialect:** a Lua config is found when
-  `~/.config/hypr/hyprland.lua` exists. That check is a guess at what ironbar's
-  `detect_lua_config()` does (not read). The legacy form is kept for hyprlang
-  configs so lyr also works for people who have not migrated.
+- **Detecting the config dialect:** lyr asks Hyprland. `j/status` answers
+  `{"configProvider": "lua" | "hyprlang", "backend": …}` at v0.56.2
+  (`Helpers::SystemInfo::getStatus`, `Config::typeToString`), and ironbar's
+  `detect_lua_config()` reads the same field (read 2026-10-18 at ironbar
+  `149c0d0d`). A Hyprland that answers `unknown request` has no `status`
+  command, which means it predates Lua configs, so it is hyprlang. This replaces
+  an earlier guess from `~/.config/hypr/hyprland.lua` existing, which missed
+  `hyprland --config`. The legacy form is kept for hyprlang configs so lyr also
+  works for people who have not migrated.
 - **Window title** (waybar's `hyprland/window`) is **not** in the current bar
   and is not planned for MVP. The `activewindowv2` event makes it cheap to add
   later; see the backlog.
