@@ -21,8 +21,8 @@ pub use colour::{Colour, InvalidColour};
 pub use format::{Format, InvalidFormat};
 pub use hjkl_config::{ConfigError, ConfigSource};
 pub use schema::{
-    Bar, Battery, Bluetooth, Clock, Config, Item, Layer, Layout, Module, NamedIcons, Position,
-    PowerProfile, Theme, Workspaces,
+    Bar, Battery, Bluetooth, Clock, Config, Item, Layer, Layout, Module, NamedIcons, Network,
+    Position, PowerProfile, Theme, Workspaces,
 };
 
 /// The built-in config.
@@ -143,6 +143,7 @@ fn typed(mut merged: toml::Table) -> Result<Config, String> {
         clock: section(&mut merged, "clock")?,
         battery: section(&mut merged, "battery")?,
         power_profile: section(&mut merged, "power_profile")?,
+        network: section(&mut merged, "network")?,
         bluetooth: section(&mut merged, "bluetooth")?,
         theme: section(&mut merged, "theme")?,
     };
@@ -259,6 +260,23 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
         ("power_profile.tooltip_format", &profile.tooltip_format),
     ] {
         check_placeholders(key, format, &["icon", "profile", "driver"])?;
+    }
+    for (key, format) in config.network.formats() {
+        if let Some(format) = format {
+            check_placeholders(
+                key,
+                format,
+                &[
+                    "icon",
+                    "ifname",
+                    "ipaddr",
+                    "cidr",
+                    "gwaddr",
+                    "essid",
+                    "signalStrength",
+                ],
+            )?;
+        }
     }
     let bluetooth = &config.bluetooth;
     let bluetooth_formats = [

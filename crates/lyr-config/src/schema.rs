@@ -21,6 +21,7 @@ pub struct Config {
     pub clock: Clock,
     pub battery: Battery,
     pub power_profile: PowerProfile,
+    pub network: Network,
     pub bluetooth: Bluetooth,
     pub theme: Theme,
 }
@@ -211,6 +212,78 @@ pub struct PowerProfile {
     pub tooltip_format: Format,
     /// By profile name (`performance`, `balanced`, `power-saver`).
     pub icons: NamedIcons,
+}
+
+/// The network module (`docs/plan/07-modules.md#network`). Each state's
+/// format, when set, replaces the plain one in that state, as waybar's
+/// `format-<state>` does.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Network {
+    /// `{icon}`, `{ifname}`, `{ipaddr}`, `{cidr}`, `{gwaddr}`, `{essid}` and
+    /// `{signalStrength}`, as every format below.
+    pub format: Format,
+    #[serde(default)]
+    pub format_wifi: Option<Format>,
+    #[serde(default)]
+    pub format_ethernet: Option<Format>,
+    #[serde(default)]
+    pub format_linked: Option<Format>,
+    #[serde(default)]
+    pub format_disconnected: Option<Format>,
+    #[serde(default)]
+    pub format_disabled: Option<Format>,
+    pub tooltip_format: Format,
+    #[serde(default)]
+    pub tooltip_format_wifi: Option<Format>,
+    #[serde(default)]
+    pub tooltip_format_ethernet: Option<Format>,
+    #[serde(default)]
+    pub tooltip_format_linked: Option<Format>,
+    #[serde(default)]
+    pub tooltip_format_disconnected: Option<Format>,
+    #[serde(default)]
+    pub tooltip_format_disabled: Option<Format>,
+    /// By state (`wifi`, `ethernet`, `linked`, `disconnected`, `disabled`).
+    pub icons: NamedIcons,
+}
+
+impl Network {
+    /// Every format with its key, for validation.
+    pub(crate) fn formats(&self) -> [(&'static str, Option<&Format>); 12] {
+        [
+            ("network.format", Some(&self.format)),
+            ("network.format_wifi", self.format_wifi.as_ref()),
+            ("network.format_ethernet", self.format_ethernet.as_ref()),
+            ("network.format_linked", self.format_linked.as_ref()),
+            (
+                "network.format_disconnected",
+                self.format_disconnected.as_ref(),
+            ),
+            ("network.format_disabled", self.format_disabled.as_ref()),
+            ("network.tooltip_format", Some(&self.tooltip_format)),
+            (
+                "network.tooltip_format_wifi",
+                self.tooltip_format_wifi.as_ref(),
+            ),
+            (
+                "network.tooltip_format_ethernet",
+                self.tooltip_format_ethernet.as_ref(),
+            ),
+            (
+                "network.tooltip_format_linked",
+                self.tooltip_format_linked.as_ref(),
+            ),
+            (
+                "network.tooltip_format_disconnected",
+                self.tooltip_format_disconnected.as_ref(),
+            ),
+            (
+                "network.tooltip_format_disabled",
+                self.tooltip_format_disabled.as_ref(),
+            ),
+        ]
+    }
 }
 
 /// The bluetooth module (`docs/plan/07-modules.md#bluetooth`).

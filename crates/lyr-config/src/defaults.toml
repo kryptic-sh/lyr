@@ -40,6 +40,13 @@ format = "{icon}"
 tooltip_format = "Profile: {profile}\nDriver: {driver}"
 icons = { default = "\U000F04C5", performance = "\U000F04C5", balanced = "\uF24E", power-saver = "\uF06C" }
 
+[network]
+format = "{icon}"
+tooltip_format = "{ifname} {ipaddr}/{cidr}"
+tooltip_format_wifi = "{ifname} {ipaddr}/{cidr} {essid} ({signalStrength}%)"
+tooltip_format_disconnected = "YOU IN THE WOODS?"
+icons = { default = "\uEF09", wifi = "\uF1EB", disconnected = "\U000F015B" }
+
 [bluetooth]
 format = "{icon}"
 format_on = "{icon}"

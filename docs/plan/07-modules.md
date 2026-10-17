@@ -88,6 +88,12 @@ itself; that is not an error.
 - Tooltips: wired `{ifname} {ipaddr}/{cidr}`, wifi
   `{ifname} {ipaddr}/{cidr} {essid} ({signalStrength}%)`, disconnected
   `YOU IN THE WOODS?`. These are the current strings.
+- States, as waybar's `getNetworkState` decides them: `disconnected` (or
+  `disabled` while rfkill blocks the radio), `linked` (a carrier but no
+  address), `ethernet` (an address and no SSID) and `wifi`. Each takes its own
+  `format_<state>` and `tooltip_format_<state>` when set. The icons have no
+  `linked` or `disabled` entry, so those show the wired icon, as waybar does.
+  The view is `lyr_core::network::view`.
 - Click opens the Wi-Fi menu ([10](10-popups-and-menus.md#wi-fi-menu)), where
   waybar ran `krypt menu wifi`.
 - Linux: link and address changes come from rtnetlink (pushed). **WiFi signal
