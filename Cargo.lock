@@ -421,6 +421,9 @@ dependencies = [
 [[package]]
 name = "lyr-sources"
 version = "0.1.0"
+dependencies = [
+ "lyr-core",
+]
 
 [[package]]
 name = "lyr-wm"

@@ -11,6 +11,7 @@ authors.workspace = true
 readme.workspace = true
 
 [dependencies]
+lyr-core.workspace = true
 
 [lints]
 workspace = true

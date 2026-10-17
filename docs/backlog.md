@@ -317,6 +317,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   text around an empty placeholder, so a battery with no power reading shows
   `80% W Discharging`. Measuring text (the widths `layout` takes) needs
   crcbl-ui's font atlas, so it is done by the caller in `lyr-render`.
+- **Sources, M4.** Built: the UPower display device's properties turned into the
+  battery view's reading (`lyr_sources::battery::upower::Device`), tested and
+  mutation-checked. Not built: the D-Bus connection that fills it (zbus, Linux
+  only; testable under WSL against a fake UPower on a private bus), and every
+  other source. Network and audio wait on the new-dependency decision above.
 - **Control socket.** Built: the requests (`lyr_core::control::Request`, one
   text line each) and the CLI commands that send them, including `lyr panel`,
   `lyr dnd` and `lyr clear`, which still report "not implemented". Not built:
