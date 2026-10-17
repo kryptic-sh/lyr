@@ -162,14 +162,17 @@ It replaces bluetui in a floating terminal, over BlueZ's D-Bus API
 - The adapter's power, pairable and discoverable switches, and a scan toggle.
 - Paired devices first, then new ones found by the scan, each with its battery
   where `Battery1` reports one.
-- Connect, disconnect, pair, trust, forget and rename.
+- Connect, disconnect, pair, trust, forget and rename, and mark a device as a
+  favourite, as bluetui does.
 - Pairing registers an `org.bluez.Agent1` from lyr, so passkey confirmation and
   PIN entry happen in the menu.
 - `Escape` closes it, as the dotfiles set bluetui's `esc_quit` to make every
   menu close the same way.
 
-bluetui's feature set is read from its source when M7 starts. The list above is
-the provisional scope until then.
+The list matches bluetui 0.8.2's documented actions (its README and default key
+bindings, read 2026-10-18): adapter power, pairing and discovery, a scan toggle,
+and for paired devices unpair, trust, favourite and rename. Its source was not
+read; what a favourite does there (it most likely sorts first) is checked in M7.
 
 ## Audio menu
 
@@ -177,17 +180,23 @@ Opened by a right click on volume or mic, or by `lyr panel audio` (`mod+A`). It
 replaces wiremix in a floating terminal, over the same PulseAudio protocol
 connection as the volume module ([07](07-modules.md#audio-sources)).
 
-- Tabs: output devices, input devices, playback streams, recording streams.
-  Right click on volume opens on output devices, as `wiremix --tab output` does.
-  Right click on mic opens on input devices, which is new.
+- Tabs: playback streams, recording streams, output devices, input devices and
+  card configuration, wiremix's five. Right click on volume opens on output
+  devices, as `wiremix --tab output` does. Right click on mic opens on input
+  devices, which is new.
 - Each device row has a volume slider, mute, and "make default". Each stream row
   has a volume slider, mute, and the device it plays to or records from, which
   can be changed.
-- A card's profile and port are chosen from its device row.
+- A card's profile and its devices' ports are chosen on the configuration tab.
+- Sliders go to 150 %, wiremix's default `max_volume_percent`; the bar's own
+  scroll has no ceiling, as before.
+- wiremix's peak meters are not carried: they need audio capture on every shown
+  node, and a bar menu has no use for them.
 - `Escape` closes it, as the dotfiles' `wiremix.toml` binds it.
 
-wiremix's views are read from its source when M7 starts. The list above is the
-provisional scope until then.
+This matches wiremix 0.11.0's documented features (its README, read 2026-10-18):
+volume, mute, set default, routing a stream through a dropdown, ports and
+profiles, and the five tabs. Its source was not read.
 
 ## Windows and macOS
 
