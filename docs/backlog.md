@@ -11,6 +11,14 @@ implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
   `neli`) block M4's audio and network sources.
+- **A date and time crate** (blocks M1's clock and M5's calendar). The clock
+  formats `%Y/%m/%d %H:%M` in the system time zone, names the zone in its
+  tooltip, and the calendar needs month grids and ISO week numbers. Date
+  arithmetic and time zones are not something to hand-roll. `chrono` is the
+  house precedent (buffr, hodl, hrdr, infr and sqeel use 0.4, mostly with
+  `default-features = false, features = ["clock"]`); naming the IANA zone would
+  also need `iana-time-zone`, which chrono's `clock` feature already pulls in.
+  Recommended: `chrono` with `clock`, as the other repos have it.
 - **`serde_path_to_error` for config errors** (M3). Plan 05 wants every config
   error to name its key path. An error serde raises while deserializing a table
   (a bad colour, a bad format string, a wrong type) carries no path in `toml`
@@ -271,8 +279,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   in [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Core, rest of M1.** `lyr-core` has the zone layout (`layout::layout`, tested
   and mutation-checked). Icon ramps are `icon::ramp`, transcribing waybar
-  0.15.0's `ALabel::getIcon` and tested against its integer steps. Not built:
-  module state, `DrawList` building with its snapshot tests, and hit testing.
+  0.15.0's `ALabel::getIcon` and tested against its integer steps. Hit testing
+  is `hit::Regions` (topmost region wins; boxes are half-open, so a shared edge
+  belongs to one box). Not built: module state, the clock view (waits on the
+  `chrono` decision above), and `DrawList` building with its snapshot tests.
   Measuring text (the widths `layout` takes) needs crcbl-ui's font atlas, so it
   is done by the caller in `lyr-render`.
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
