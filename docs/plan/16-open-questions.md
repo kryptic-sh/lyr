@@ -20,11 +20,11 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
    `audio.mute_links_mic`. When it is on, unmuting output restores the mic's
    earlier state ([07](07-modules.md#mute-linkage)).
 3. **Notifications** (draft Q6). **Decided by the owner (2026-10-16): lyr is the
-   notification daemon** ([09](09-notifications.md)). Provisional details:
-   critical notifications still show during do-not-disturb; the history is not
-   kept across restarts; when another daemon owns the name, lyr steps aside
-   unless `notifications.replace = true`; MPRIS art is read from `file://` URLs
-   only.
+   notification daemon** ([09](09-notifications.md)). Critical notifications
+   still show during do-not-disturb, as swaync's do (read in its source).
+   Provisional details: the history is not kept across restarts; when another
+   daemon owns the name, lyr steps aside unless `notifications.replace = true`;
+   MPRIS art is read from `file://` URLs only.
 4. **Menus** (draft Q7). **Decided by the owner (2026-10-16): the calendar, the
    notification centre and the Wi-Fi, Bluetooth and audio menus are lyr's own,
    built before the switch from waybar** ([10](10-popups-and-menus.md)). The

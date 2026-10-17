@@ -128,13 +128,19 @@ The interface is the freedesktop Desktop Notifications Specification, version
   middle click dismiss.
 - While the pointer is over a toast, its timeout is paused.
 - With do-not-disturb on, toasts are not shown but still go to the history.
-  Critical notifications still show (provisional, [16](16-open-questions.md)).
+  Critical notifications still show, as swaync's do (`notiDaemon.vala` at
+  v0.12.6: `bypass_dnd` is set for critical urgency).
+- While the clock panel is open no toasts are shown, since the panel lists them
+  already; swaync does the same for its control centre.
 
 ### History, do-not-disturb and Clear All
 
 - The history lives in memory and is lost when lyr exits (provisional,
-  [16](16-open-questions.md)). It is shown in the clock panel, newest first and
-  grouped by app.
+  [16](16-open-questions.md)). It is shown in the clock panel grouped by app
+  (the `desktop-entry` hint, else `app_name`), with groups holding a critical
+  notification first and the rest newest first: swaync's order
+  (`notifications.vala`'s `list_box_sort_func` at v0.12.6) for a panel at the
+  top.
 - Do-not-disturb and Clear All are in the panel (the `dnd` and `title` widgets)
   and on the control socket, so the bindings stay:
   - `mod+N` runs `lyr panel clock` (toggle the clock panel);
