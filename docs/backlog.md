@@ -285,6 +285,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `chrono` decision above), and `DrawList` building with its snapshot tests.
   Measuring text (the widths `layout` takes) needs crcbl-ui's font atlas, so it
   is done by the caller in `lyr-render`.
+- **Control socket.** Built: the requests (`lyr_core::control::Request`, one
+  text line each) and the CLI commands that send them, including `lyr panel`,
+  `lyr dnd` and `lyr clear`, which still report "not implemented". Not built:
+  the socket itself (`interprocess`, a Unix socket or a named pipe), the reply
+  line, single-instance detection, and `lyr event workspace` for AeroSpace
+  (M10). The socket needs the bar's main loop to hand requests to (M1).
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]` and `[theme]`, the embedded defaults,
   `[platform.*]` layering on both the defaults and the user file, and validation
@@ -292,19 +298,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   colours, ranges, workspace format placeholders), with tests that were each
   broken and seen to fail. Not built: the other modules' tables and actions
   (with M4), checking the clock's strftime format, reload (the file watcher,
-  `lyr reload`, the old-and-new diff), the control socket, the README's schema
-  docs, and the defaults-parity test against `config.jsonc`. The dotfiles are at
-  `~/Projects/mxaddict/dotfiles` on the owner's Windows machine, not next to
-  lyr, and not on CI, so the test needs either a path from the environment or a
-  copy of `config.jsonc` checked into lyr as a fixture; that is open. Format
-  strings are one `Format` type (`lyr-config`'s `format.rs`), parsed when the
-  config loads and rendered with `Format::render`, so validation and drawing
-  will share one parser. Errors name the key where lyr's own checks find them
-  (`layout.right[0]: …`), but an error serde raises inside a table names only
-  the table (`theme: ...`); see the `serde_path_to_error` decision above.
-  `lyr-config` keeps its own copy of the table merge, because `hjkl_config`'s
-  `deep_merge` and `locate` are private in 0.42.2; if hjkl exports them, lyr
-  drops the copy.
+  `lyr reload`, the old-and-new diff), the control socket (its own entry above),
+  the README's schema docs, and the defaults-parity test against `config.jsonc`.
+  The dotfiles are at `~/Projects/mxaddict/dotfiles` on the owner's Windows
+  machine, not next to lyr, and not on CI, so the test needs either a path from
+  the environment or a copy of `config.jsonc` checked into lyr as a fixture;
+  that is open. Format strings are one `Format` type (`lyr-config`'s
+  `format.rs`), parsed when the config loads and rendered with `Format::render`,
+  so validation and drawing will share one parser. Errors name the key where
+  lyr's own checks find them (`layout.right[0]: …`), but an error serde raises
+  inside a table names only the table (`theme: ...`); see the
+  `serde_path_to_error` decision above. `lyr-config` keeps its own copy of the
+  table merge, because `hjkl_config`'s `deep_merge` and `locate` are private in
+  0.42.2; if hjkl exports them, lyr drops the copy.
 - **Waybar parity, still to check.** The plan was reviewed against the dotfiles'
   `config.jsonc` and `style.css` (2026-10-16), with waybar's own defaults read
   in its 0.15.0 source. Open: the calendar's `<tt>` monospace look with a

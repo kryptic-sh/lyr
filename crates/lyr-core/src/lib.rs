@@ -5,10 +5,11 @@
 //! (`docs/plan/02-architecture.md`). It must never contain platform code, so
 //! that all of it is testable on every CI runner without a display.
 //!
-//! So far it holds the zone layout ([`layout`]), icon ramps ([`icon`]) and
-//! hit testing ([`hit`]). The rest lands with milestone M1
-//! (`docs/plan/15-milestones.md`).
+//! So far it holds the zone layout ([`layout`]), icon ramps ([`icon`]), hit
+//! testing ([`hit`]) and the control socket's requests ([`control`]). The rest
+//! lands with milestone M1 (`docs/plan/15-milestones.md`).
 
+pub mod control;
 pub mod hit;
 pub mod icon;
 pub mod layout;

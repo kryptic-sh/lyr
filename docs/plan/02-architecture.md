@@ -77,6 +77,10 @@ Windows), modelled on tmxr's `interprocess` use. It is used by:
 - single-instance detection: a second `lyr` exits with a message rather than
   drawing a second set of bars.
 
+A request is one line of text (`panel wifi`), so the socket can be driven by
+hand. The requests and their wire form are `lyr_core::control::Request`, and the
+command line maps each command to one.
+
 ## Data flow of a click
 
 1. The pointer is pressed on bar `DP-1` at (912, 24). The platform shell reports

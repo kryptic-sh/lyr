@@ -7,7 +7,8 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+use lyr_core::control::{Panel, Request};
 
 /// Command-line interface: `lyr [-c config] [command]`.
 #[derive(Debug, Parser)]
@@ -35,16 +36,57 @@ enum Command {
     Toggle,
     /// Stop the running bar.
     Quit,
+    /// Open a panel on the focused output, or close it if it is open.
+    Panel {
+        #[arg(value_enum)]
+        panel: PanelArg,
+    },
+    /// Turn do-not-disturb on or off.
+    Dnd,
+    /// Clear the notification history.
+    Clear,
+}
+
+impl Command {
+    /// The request this command sends to the running bar.
+    const fn request(&self) -> Request {
+        match self {
+            Self::Reload => Request::Reload,
+            Self::Toggle => Request::Toggle,
+            Self::Quit => Request::Quit,
+            Self::Panel { panel } => Request::Panel(panel.panel()),
+            Self::Dnd => Request::Dnd,
+            Self::Clear => Request::Clear,
+        }
+    }
+}
+
+/// The panels `lyr panel` takes, as command-line values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+enum PanelArg {
+    Clock,
+    Wifi,
+    Bluetooth,
+    Audio,
+}
+
+impl PanelArg {
+    const fn panel(self) -> Panel {
+        match self {
+            Self::Clock => Panel::Clock,
+            Self::Wifi => Panel::Wifi,
+            Self::Bluetooth => Panel::Bluetooth,
+            Self::Audio => Panel::Audio,
+        }
+    }
 }
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let what = match cli.command {
-        None => "the bar",
-        Some(Command::Reload) => "reload",
-        Some(Command::Toggle) => "toggle",
-        Some(Command::Quit) => "quit",
-    };
+    let what = cli.command.map_or_else(
+        || "the bar".to_owned(),
+        |command| command.request().to_string(),
+    );
     eprintln!("lyr: {what}: not implemented yet (the bar lands in milestone M1)");
     ExitCode::FAILURE
 }
@@ -70,6 +112,34 @@ mod cli_tests {
     fn control_commands_parse() {
         let cli = Cli::parse_from(["lyr", "reload"]);
         assert_eq!(cli.command, Some(Command::Reload));
+    }
+
+    #[test]
+    fn each_command_sends_its_request() {
+        let request = |args: &[&str]| {
+            Cli::parse_from(args)
+                .command
+                .map(|command| command.request().to_string())
+        };
+        assert_eq!(
+            request(&["lyr", "panel", "wifi"]).as_deref(),
+            Some("panel wifi")
+        );
+        assert_eq!(request(&["lyr", "dnd"]).as_deref(), Some("dnd"));
+        assert_eq!(request(&["lyr", "clear"]).as_deref(), Some("clear"));
+        assert_eq!(request(&["lyr", "quit"]).as_deref(), Some("quit"));
+    }
+
+    #[test]
+    fn every_panel_can_be_named_on_the_command_line() {
+        for panel in Panel::ALL {
+            let cli = Cli::parse_from(["lyr", "panel", panel.name()]);
+            assert_eq!(
+                cli.command.map(|c| c.request()),
+                Some(Request::Panel(panel))
+            );
+        }
+        assert!(Cli::try_parse_from(["lyr", "panel", "tray"]).is_err());
     }
 
     #[test]

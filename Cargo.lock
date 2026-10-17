@@ -345,6 +345,7 @@ name = "lyr"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "lyr-core",
 ]
 
 [[package]]
