@@ -78,10 +78,10 @@ implementation follows until they are answered. The ones that block a milestone:
   `raw::convert`, with `raw::from_argb32_be` (SNI pixmaps) and
   `raw::from_image_data` (notification `image-data`); resizing (`fit_within`,
   `shrink_to_fit`, `nearest_size`); and the XDG theme lookup (`IconThemes`).
-  That covers M6 and M8. Not read yet. 0.2.0 also moved `crcbl_ui::font::raster`
-  to `crcbl_image::raster` (re-exported at the old path), taking `raster::Point`
-  instead of `glam::Vec2`; lyr is affected only if it rasterises outlines
-  itself.
+  That covers M6 and M8. The entry points were read at v0.3.0 (below). 0.2.0
+  also moved `crcbl_ui::font::raster` to `crcbl_image::raster` (re-exported at
+  the old path), taking `raster::Point` instead of `glam::Vec2`; lyr is affected
+  only if it rasterises outlines itself.
 - **crcbl: window kinds and platform features for lyr and pikr.** Requirements
   S1 – S27 in
   [plan/03-surfaces-and-input.md](plan/03-surfaces-and-input.md#what-crcbl-must-provide)
@@ -95,7 +95,8 @@ implementation follows until they are answered. The ones that block a milestone:
   needs S9, S12, S17, S19 and S22, which were pikr's alone before: the native
   notification centre and menus need text entry, markup and images, panel focus,
   a caret timer and emoji. crcbl's session was told the same day and replied
-  with where each stands. **Reported, not read yet:**
+  with where each stands. The APIs named below were read at v0.3.0 (below); the
+  test and behaviour claims are crcbl's report:
   - S9, in: XKB compose and dead keys on Wayland and X11, and text-input-v3 at
     crcbl `da20fe58`, on main since 0.1.0. `set_text_input_area` places the
     candidate window. Not built: a pre-edit shown during a compose sequence,
@@ -143,12 +144,12 @@ implementation follows until they are answered. The ones that block a milestone:
   `crcbl-font`, with `crcbl-vk`, `crcbl-dx12` or `crcbl-mtl` per platform. The
   `crcbl` umbrella's `system-fonts` feature turns on `parsed-font` and
   `crcbl-ui/system-fonts`. Adding the crates happens when M1 starts.
-  crcbl-font's API as reported, not read yet: `SystemFonts::find(&FontQuery)`
-  (file and face index for a family, weight and style, matched by CSS rules),
-  `SystemFonts::fallbacks`, `Ui::register_system_font`, `Font::from_system`.
-  Breaking in 0.3.0, neither of which lyr calls yet: `Font::kerning`,
-  `Font::kerning_pairs`, `fallback::map_char`, `map_text` and `Mapped` are gone
-  (use `font::shape::shape` and `fallback::cluster_face`), and every windowed
+  crcbl-font's API: `SystemFonts::find(&FontQuery)` (file and face index for a
+  family, weight and style, matched by CSS rules), `SystemFonts::fallbacks`,
+  `Ui::register_system_font`, `Font::from_system`. Breaking in 0.3.0, neither of
+  which lyr calls yet: `Font::kerning`, `Font::kerning_pairs`,
+  `fallback::map_char`, `map_text` and `Mapped` are gone (use
+  `font::shape::shape` and `fallback::cluster_face`), and every windowed
   `SurfaceTarget` variant gained `transparent: bool`.
 
 - **crcbl: window-kind API, backend work.** Read against the source at crcbl
@@ -160,7 +161,7 @@ implementation follows until they are answered. The ones that block a milestone:
   S11.
 
   Reported by crcbl's session since then, at `72999dd7`, `531903c7` and
-  `5bbdd180`. **Not read yet**; read it before M1 relies on it:
+  `5bbdd180`, read at v0.3.0 (below):
   - Win32 panels as tool windows, with `Reserve::OwnExtent` as a real appbar and
     `WS_EX_NOACTIVATE` for `PanelKeyboard::None`.
   - AppKit `NSPanel` at the status level; `PANEL_RESERVE` clear on macOS.
@@ -173,6 +174,35 @@ implementation follows until they are answered. The ones that block a milestone:
   - A CSS `cursor` property with `Ui::cursor()`; `ImageAtlas::unregister`.
   - A D3D12/WARP fallback on Windows, and `GpuError::NoBackend` elsewhere.
   - `ui.scrollbar(..)`: vertical only.
+
+  **Read at crcbl v0.3.0 on 2026-10-18** (`git show v0.3.0:…`; the panel, popup,
+  waker, focus, text-input, paragraph, font, image and GPU APIs named in this
+  file). Confirmed as reported, except:
+  - No deadline wait. The only wait is
+    `Shell::wait_events(&mut self, timeout: Option<Duration>)`, advisory and
+    behind `ShellCaps::EVENT_WAIT`, followed by `pump`. lyr computes the time to
+    its next tick (clock, caret) and passes that.
+  - A panel targets `PanelDesc::monitor: Option<MonitorId>`, not an output name.
+    lyr maps its configured output names through `MonitorInfo::name`.
+  - Exclusive zones are `Reserve::{None, OwnExtent, IgnoreOthers}` (0, the
+    panel's extent, -1); there is no separate zone field.
+  - A link run's click is the field `Response.clicked`, not a method.
+  - `reposition_popup(popup, anchor, size)` defaults to `Unsupported` and needs
+    `ShellCaps::POPUP_REPOSITION`.
+  - crcbl's workspace sets `rust-version = "1.98"`; lyr's is 1.95, so M1 raises
+    lyr's to 1.98 when it adds crcbl.
+
+  The GPU path M1 follows (no UI-on-shell-window example exists in crcbl):
+  `crcbl::shell::open`, `crcbl::engine::open_window`, `wait_for_configure` for
+  the extent, `crcbl::engine::GpuContext::open(shell, window, extent, &desc)`,
+  and `crcbl_frame::ui_pass::UiRenderer::new(device, queue, format)`. Each
+  frame: `Ui::begin_frame`, build, `Ui::layout`, `Ui::emit` into a `DrawList`;
+  `GpuContext::acquire`, `UiRenderer::begin_frame`, a `RenderGraph` with the
+  swapchain imported and `UiRenderer::add_passes`, then
+  `GpuContext::submit_and_present`. Steps 1 – 4 are in crcbl's `apps/bare`, the
+  frame in `PageBundle::frame` (`crates/crcbl/src/engine/page.rs`). Read by a
+  sub-agent and spot-checked: `rust-version`, `wait_events`,
+  `PanelDesc::monitor` and `Response.clicked`.
 
   Win32 per-pixel transparency is in 0.3.0: on D3D12, `ShellCaps::TRANSPARENT`
   is set and `WindowDesc::transparent` works for toplevels, panels and popups,
