@@ -50,8 +50,13 @@ itself; that is not an error.
   Windows: `GetSystemPowerStatus` plus `RegisterPowerSettingNotification` for
   percentage and AC/DC changes. macOS: `IOPSNotificationCreateRunLoopSource`.
   The power draw in watts is read when the platform reports it (UPower
-  `EnergyRate`, IOKit `AppleSmartBattery`), otherwise it is left out of the
-  tooltip.
+  `EnergyRate`, IOKit `AppleSmartBattery`), otherwise `{power}` is empty. The
+  format's own `W` stays, since a format cannot yet drop the text around an
+  empty placeholder (backlog).
+- The view is `lyr_core::battery::view`, with waybar's choices transcribed:
+  `format_charging`, `format_plugged` and `format_full` fall back to `format`;
+  `{timeTo}` is `Empty in {H} h {M} min`, `Full in …` or the status name, and
+  the minutes are truncated, as waybar does.
 
 ### Power profile
 

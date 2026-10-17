@@ -20,7 +20,9 @@ use std::path::{Path, PathBuf};
 pub use colour::{Colour, InvalidColour};
 pub use format::{Format, InvalidFormat};
 pub use hjkl_config::{ConfigError, ConfigSource};
-pub use schema::{Bar, Clock, Config, Item, Layer, Layout, Module, Position, Theme, Workspaces};
+pub use schema::{
+    Bar, Battery, Clock, Config, Item, Layer, Layout, Module, Position, Theme, Workspaces,
+};
 
 /// The built-in config.
 const DEFAULTS: &str = include_str!("defaults.toml");
@@ -138,6 +140,7 @@ fn typed(mut merged: toml::Table) -> Result<Config, String> {
         layout: section(&mut merged, "layout")?,
         workspaces: section(&mut merged, "workspaces")?,
         clock: section(&mut merged, "clock")?,
+        battery: section(&mut merged, "battery")?,
         theme: section(&mut merged, "theme")?,
     };
     match merged.keys().next() {
@@ -229,7 +232,24 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
             config.theme.module_opacity
         ));
     }
-    check_placeholders("workspaces.format", &config.workspaces.format, &["name"])
+    check_placeholders("workspaces.format", &config.workspaces.format, &["name"])?;
+    let battery = &config.battery;
+    let bar_formats = [
+        ("battery.format", Some(&battery.format)),
+        ("battery.format_charging", battery.format_charging.as_ref()),
+        ("battery.format_plugged", battery.format_plugged.as_ref()),
+        ("battery.format_full", battery.format_full.as_ref()),
+    ];
+    for (key, format) in bar_formats {
+        if let Some(format) = format {
+            check_placeholders(key, format, &["icon", "capacity", "power", "time"])?;
+        }
+    }
+    check_placeholders(
+        "battery.tooltip_format",
+        &battery.tooltip_format,
+        &["timeTo", "capacity", "power", "time"],
+    )
 }
 
 /// Checks that every placeholder in `format` is one of `allowed`.

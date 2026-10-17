@@ -17,6 +17,7 @@ pub struct Config {
     pub layout: Layout,
     pub workspaces: Workspaces,
     pub clock: Clock,
+    pub battery: Battery,
     pub theme: Theme,
 }
 
@@ -164,6 +165,32 @@ pub struct Workspaces {
 pub struct Clock {
     /// A strftime format.
     pub format: String,
+}
+
+/// The battery module (`docs/plan/07-modules.md#battery`), with waybar's keys
+/// in lyr's spelling.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Battery {
+    /// `{icon}`, `{capacity}`, `{power}` and `{time}`.
+    pub format: Format,
+    /// Used while charging instead of `format`.
+    #[serde(default)]
+    pub format_charging: Option<Format>,
+    /// Used while on mains power but not charging (held at a charge limit).
+    #[serde(default)]
+    pub format_plugged: Option<Format>,
+    /// Used at 100 % instead of `format`.
+    #[serde(default)]
+    pub format_full: Option<Format>,
+    /// The icon ramp, emptiest first.
+    pub icons: Vec<String>,
+    /// `{timeTo}`, `{capacity}`, `{power}` and `{time}`.
+    pub tooltip_format: Format,
+    /// At or below this percentage the module is in its warning state.
+    pub warning: u8,
+    /// At or below this percentage the module is in its critical state.
+    pub critical: u8,
 }
 
 /// Colours, font and box metrics (`docs/plan/04-rendering-and-theme.md`).

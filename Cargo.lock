@@ -402,6 +402,9 @@ dependencies = [
 [[package]]
 name = "lyr-core"
 version = "0.1.0"
+dependencies = [
+ "lyr-config",
+]
 
 [[package]]
 name = "lyr-render"

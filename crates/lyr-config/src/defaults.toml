@@ -24,6 +24,17 @@ scroll = false
 [clock]
 format = "%Y/%m/%d %H:%M"
 
+# Glyphs are written as escapes: they are private-use characters, which
+# editors and tools drop without a trace.
+[battery]
+format = "{icon}"
+format_charging = "{icon} \U000F140B"
+format_plugged = "\uEE9E"
+icons = ["\uF244", "\uF243", "\uF242", "\uF241", "\uF240"]
+tooltip_format = "{capacity}% {power}W {timeTo}"
+warning = 30
+critical = 10
+
 [theme]
 font = "Hack Nerd Font Propo"
 font_size = 16

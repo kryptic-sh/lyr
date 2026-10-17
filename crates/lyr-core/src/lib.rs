@@ -6,9 +6,11 @@
 //! that all of it is testable on every CI runner without a display.
 //!
 //! So far it holds the zone layout ([`layout`]), icon ramps ([`icon`]), hit
-//! testing ([`hit`]) and the control socket's requests ([`control`]). The rest
-//! lands with milestone M1 (`docs/plan/15-milestones.md`).
+//! testing ([`hit`]), the control socket's requests ([`control`]) and the
+//! battery module's view ([`battery`]). The rest lands with milestones M1 and
+//! M4 (`docs/plan/15-milestones.md`).
 
+pub mod battery;
 pub mod control;
 pub mod hit;
 pub mod icon;
