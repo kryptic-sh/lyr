@@ -305,12 +305,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `power_profiles_daemon.cpp`, `network.cpp`, `bluetooth.cpp` and
   `pulseaudio.cpp`, with their config tables; `power_profile::cycle` is the
   click. The defaults are guarded by a test that fails on any raw private-use
-  glyph. Not built: the modules' actions (click, scroll; M3/M4), the clock view
-  (waits on the `chrono` decision above), and `DrawList` building with its
-  snapshot tests. A format cannot drop the literal text around an empty
-  placeholder, so a battery with no power reading shows `80% W Discharging`.
-  Measuring text (the widths `layout` takes) needs crcbl-ui's font atlas, so it
-  is done by the caller in `lyr-render`.
+  glyph. The bar's draw list is `draw::build`: lyr's own `DrawList` (boxes,
+  text, and a group per module faded as one, like CSS `opacity`) and the input
+  regions, sized by the CSS box model `style.css` is written for (`min-width`
+  bounds the content; padding and the 2 px border sit outside it). That GTK3
+  sizes waybar's boxes exactly so, and centres a label in a box held open by
+  `min-width`, is from the CSS model and GTK's label default, not checked
+  against a running waybar. Not built: the modules' actions (click, scroll;
+  M3/M4), the clock view (waits on the `chrono` decision above), images (tray,
+  M8), and clipping text that overflows a box. A format cannot drop the literal
+  text around an empty placeholder, so a battery with no power reading shows
+  `80% W Discharging`. Measuring text (the widths `layout` takes) needs
+  crcbl-ui's font atlas, so it is done by the caller in `lyr-render`.
 - **Control socket.** Built: the requests (`lyr_core::control::Request`, one
   text line each) and the CLI commands that send them, including `lyr panel`,
   `lyr dnd` and `lyr clear`, which still report "not implemented". Not built:

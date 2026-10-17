@@ -5,7 +5,8 @@
 //! (`docs/plan/02-architecture.md`). It must never contain platform code, so
 //! that all of it is testable on every CI runner without a display.
 //!
-//! So far it holds the zone layout ([`layout`]), icon ramps ([`icon`]), hit
+//! So far it holds the zone layout ([`layout`]), the draw list ([`draw`]), icon
+//! ramps ([`icon`]), hit
 //! testing ([`hit`]), the control socket's requests ([`control`]) and the
 //! views of the battery, power-profile, network, bluetooth, volume and mic
 //! modules. The rest lands
@@ -15,6 +16,7 @@ pub mod audio;
 pub mod battery;
 pub mod bluetooth;
 pub mod control;
+pub mod draw;
 pub mod hit;
 pub mod icon;
 pub mod layout;

@@ -14,12 +14,13 @@ state + config + theme ──► lyr-core: layout ──► DrawList + hit regio
                     crcbl-hal: Vulkan (Linux, Windows) · D3D12 (Windows fallback) · Metal (macOS)
 ```
 
-- `lyr-core` builds lyr's **own** `DrawList` (`Rect`,
-  `RoundedRect { radius, border }`, `Glyphs { run, colour }`, `Image { id }`,
-  `Clip`). Tests can assert on it without a GPU. `lyr-render` translates it into
-  crcbl's UI draw commands (`DrawCommand::RoundedRect`, `Glyphs`, `Image`, …),
-  which have the same shape. Keeping lyr's own type means a crcbl API break
-  touches one translation function, not the layout code.
+- `lyr-core` builds lyr's **own** `DrawList` (`lyr_core::draw`): `Box` (a
+  rounded rectangle with an inner border), `Text`, and `Group { opacity }`,
+  which fades a module's box and text as one, as CSS `opacity` does. `Image`
+  comes with the tray (M8). Tests can assert on it without a GPU. `lyr-render`
+  translates it into crcbl's UI draw commands (`DrawCommand::RoundedRect`,
+  `Glyphs`, `Image`, …), which have the same shape. Keeping lyr's own type means
+  a crcbl API break touches one translation function, not the layout code.
 - **One device, many surfaces.** A single crcbl-hal device is shared by every
   bar and popup, with one swapchain per window.
 - **Backend choice:** crcbl's runtime selection. lyr prefers Vulkan on Linux and
