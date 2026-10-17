@@ -112,8 +112,7 @@ Opened by a click on the network module or by `lyr panel wifi` (`mod+W`). It
 replaces `.local/bin/.menu-wifi` and its pikr picker, and carries what that
 script learned, through NetworkManager's D-Bus API rather than `nmcli`. The
 script drives `nmcli`, which settles that the daemon is NetworkManager. The NM
-method, property and reason-code names are read from the installed
-NetworkManager's introspection when M7 starts.
+names it uses are [below](#over-networkmanagers-d-bus-api).
 
 - **A header switch** turns the Wi-Fi radio on and off. That is new: today the
   script only reports that the radio is off.
@@ -152,6 +151,24 @@ NetworkManager's introspection when M7 starts.
 - **A click within the double-click interval** of the menu opening is ignored,
   so a double click does not open and close it again. The script needed the same
   guard.
+
+### Over NetworkManager's D-Bus API
+
+Read from NetworkManager's API reference (`networkmanager.dev/docs/api/latest`)
+on 2026-10-18. M7 still checks each name against the installed NetworkManager's
+introspection.
+
+| What the menu does         | D-Bus                                                                                                                                                                                                                             |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The radio switch           | `org.freedesktop.NetworkManager.WirelessEnabled` (read-write); `WirelessHardwareEnabled` false means a hardware block the switch cannot lift                                                                                      |
+| Find the Wi-Fi device      | `GetDevices`, then the device whose `DeviceType` is 2 (`NM_DEVICE_TYPE_WIFI`)                                                                                                                                                     |
+| "Cannot scan"              | device `State` 10 (unmanaged) or 20 (unavailable), the states the script checks                                                                                                                                                   |
+| Scan, and know it finished | `Device.Wireless.RequestScan({})`; `LastScan` (CLOCK_BOOTTIME milliseconds, -1 never) changes through `PropertiesChanged` when a scan ends. The 30 s freshness test compares it with CLOCK_BOOTTIME now                           |
+| List networks              | `GetAllAccessPoints`, each with `Ssid` (bytes), `Strength` (a byte, percent), `Flags`, `WpaFlags`, `RsnFlags`. An empty `Ssid` is a hidden network, which is left out                                                             |
+| Security from the scan     | key-management bits in `WpaFlags` / `RsnFlags`: PSK `0x100`, 802.1X `0x200`, SAE `0x400`, OWE `0x800`, OWE transition `0x1000`; `Flags` privacy (`0x1`) with no WPA or RSN bits is WEP                                            |
+| Join a saved network       | `ActivateConnection(profile, device, access point)`                                                                                                                                                                               |
+| Join a new one             | `AddAndActivateConnection(settings, device, access point)`                                                                                                                                                                        |
+| Why a join failed          | the device's `StateChanged` reason: 7 no secrets (a wrong password, and also an association timeout, which is why the script treats both alike), 11 supplicant timeout, 53 SSID not found, 5 no IP configuration (a DHCP timeout) |
 
 ## Bluetooth menu
 
