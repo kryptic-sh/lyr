@@ -38,8 +38,8 @@ CI runs the same on Linux, macOS and Windows, plus `cargo nextest`,
 `#[cfg(target_os = "linux")]`) is only compiled on its platform, so a green
 local run does not cover the others. CI does.
 
-MSRV is **Rust 1.95** (`rust-version` in the workspace `Cargo.toml`). The
-workspace is `edition = "2024"`, `resolver = "3"`.
+MSRV is **Rust 1.98** (`rust-version` in the workspace `Cargo.toml`), crcbl's.
+The workspace is `edition = "2024"`, `resolver = "3"`.
 
 ## Repo layout
 

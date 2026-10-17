@@ -44,6 +44,16 @@ implementation follows until they are answered. The ones that block a milestone:
 
 ## Cross-repo work
 
+- **crcbl: `crcbl-app`, a window-plus-device crate** (asked 2026-10-18, accepted
+  the same day). At v0.3.0, `GpuContext`, `GpuContextDesc`, `open_window`,
+  `wait_for_configure` and `TextPump` live only in the `crcbl` umbrella, which
+  depends on the whole engine, including crcbl-audio's `cpal` (ALSA on Linux),
+  physics and networking. crcbl is moving them, with the backend fall-through
+  and the adapter pin, into a new leaf crate `crcbl-app` (core, hal, shell, ui
+  and the GPU backends only), re-exported from the umbrella. It lands in crcbl
+  0.4.0, which is breaking anyway (`TEXT_IME`'s meaning changed), after the
+  null-alpha fix and D3D12 start-up work. Drawing the bars (M1's render half)
+  waits on it; crcbl reports when it is on main and when 0.4.0 is out.
 - **crcbl: every lyr and pikr feature on every backend.** At the owner's request
   (2026-10-17), crcbl's session was asked to make each S-row work on Wayland,
   X11, Win32 and AppKit, and on Vulkan, D3D12 and Metal; to report which
@@ -204,8 +214,8 @@ implementation follows until they are answered. The ones that block a milestone:
   - A link run's click is the field `Response.clicked`, not a method.
   - `reposition_popup(popup, anchor, size)` defaults to `Unsupported` and needs
     `ShellCaps::POPUP_REPOSITION`.
-  - crcbl's workspace sets `rust-version = "1.98"`; lyr's is 1.95, so M1 raises
-    lyr's to 1.98 when it adds crcbl.
+  - crcbl's workspace sets `rust-version = "1.98"`; lyr's moved to 1.98 with
+    `crcbl-shell`.
 
   The GPU path M1 follows (no UI-on-shell-window example exists in crcbl):
   `crcbl::shell::open`, `crcbl::engine::open_window`, `wait_for_configure` for
@@ -277,6 +287,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `workspaces.scroll`), and `lyr --stats`. The `WorkspaceBackend` trait waits
   for the Windows backend (M9). Hyprland main's changes for the next release are
   in [plan/06](plan/06-workspaces.md#linux--hyprland).
+- **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
+  transparent layer panel per output (or per named output), stretched along the
+  configured edge and reserving its height, created and destroyed as monitors
+  come and go and as the config changes, tested against crcbl-shell's
+  `HeadlessShell` and mutation-checked. Not built: drawing into them (waits on
+  `crcbl-app`), scale changes, pointer input to hit tests, and a run on a real
+  compositor (the owner's Hyprland is the M1 check; this machine is Windows,
+  where the same panels are Win32 appbars).
 - **Core, rest of M1.** `lyr-core` has the zone layout (`layout::layout`, tested
   and mutation-checked). Icon ramps are `icon::ramp`, transcribing waybar
   0.15.0's `ALabel::getIcon` and tested against its integer steps. Hit testing

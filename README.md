@@ -39,7 +39,8 @@ build order in [docs/plan/15-milestones.md](docs/plan/15-milestones.md).
 cargo build --release
 ```
 
-The workspace MSRV is **Rust 1.95** (`rust-version` in `Cargo.toml`).
+The workspace MSRV is **Rust 1.98** (`rust-version` in `Cargo.toml`), which is
+crcbl's.
 
 ## Layout
 

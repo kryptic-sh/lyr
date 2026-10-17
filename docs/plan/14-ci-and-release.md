@@ -36,8 +36,8 @@ Also: `.github/workflows/cron.yml` (`cargo deny` on Mondays at 06:00 UTC),
 - **Git dependency:** `deny.toml` gains `allow-git` for
   `https://github.com/kryptic-sh/crcbl` until crcbl is on crates.io, as tmxr did
   for its crossterm fork. The entry is removed when crcbl publishes.
-- **Toolchain:** crcbl pins Rust 1.98.1. lyr's `rust-version` (1.95 today) is
-  raised to whatever crcbl declares when the dependency lands.
+- **Toolchain:** lyr's `rust-version` follows crcbl's (1.98 since lyr took on
+  `crcbl-shell` 0.3.0), and is raised with each crcbl bump that raises it.
 - **Linux system packages:** crcbl `dlopen`s libwayland and the Vulkan loader at
   runtime, so they are not needed to build. Whether the Linux runner needs any
   `-dev` packages (crcbl's own docs mention `libasound2-dev` for its audio

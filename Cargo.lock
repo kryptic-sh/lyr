@@ -136,6 +136,42 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 
 [[package]]
+name = "crcbl-console"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f46008a1c8828f84193ed73635987e60e5db434cea32e4eaa35c95e59982eac3"
+
+[[package]]
+name = "crcbl-core"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6780430be25196b3cd0f8b6f396e3ba919ecb20a33c87629fe317d2e78853fb8"
+dependencies = [
+ "bitflags",
+ "crcbl-console",
+ "glam",
+ "log",
+]
+
+[[package]]
+name = "crcbl-shell"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b08ca5f8a3f78769fb936e86907c75e4045c61833fc0626dcbea1e5fbebe190e"
+dependencies = [
+ "bitflags",
+ "crcbl-core",
+ "crcbl-wl-scanner",
+ "thiserror",
+]
+
+[[package]]
+name = "crcbl-wl-scanner"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5ae1751182156519cc7d6330ac9db0d2a716961dc01f86687b3ef53a05a6e10"
+
+[[package]]
 name = "crossbeam-deque"
 version = "0.8.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -213,6 +249,12 @@ dependencies = [
  "libc",
  "r-efi",
 ]
+
+[[package]]
+name = "glam"
+version = "0.34.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc148d4ddd3930c52f9e5ae79b89805c6f07e9ff417e7b083e0348cea60a5aba"
 
 [[package]]
 name = "globset"
@@ -368,6 +410,10 @@ version = "0.1.0"
 [[package]]
 name = "lyr-shell"
 version = "0.1.0"
+dependencies = [
+ "crcbl-shell",
+ "lyr-config",
+]
 
 [[package]]
 name = "lyr-sources"
