@@ -13,39 +13,42 @@ implementation follows until they are answered. The ones that block a milestone:
   `neli`) block M4's audio and network sources.
 - **The GPU backend on Windows** (blocks M9). The plan prefers Vulkan on Windows
   with D3D12 as the fallback ([plan/04](plan/04-rendering-and-theme.md)), as the
-  draft asked. crcbl reported on 2026-10-17 that per-pixel transparency on Win32
-  works only on D3D12, through DirectComposition, and that Vulkan on Windows
-  refuses a transparent window. lyr's bar background is transparent and its
-  module boxes are drawn at opacity 0.8 (plan/04's theme table). Options:
-  - D3D12 first on Windows, Vulkan nowhere there (recommended): the bar looks as
-    it does on Linux, and crcbl's transparency path is the D3D12 one.
-  - Keep Vulkan first: the Windows bar is opaque, with the module boxes drawn on
-    a solid background.
+  draft asked. Per-pixel transparency on Win32 works only on D3D12, through
+  DirectComposition; Vulkan on Windows refuses a transparent window, and crcbl
+  declined to build Vulkan presenting through DirectComposition, as large when
+  D3D12 is always there. lyr's bar background is transparent and its module
+  boxes are drawn at opacity 0.8 (plan/04's theme table). crcbl plans for a
+  transparent Win32 window made through `GpuContext` to fall through to D3D12,
+  so with Vulkan first the bar would be drawn on D3D12 anyway. Options:
+  - D3D12 first on Windows (recommended): the plan says what will actually run,
+    and every lyr window there takes the same path.
+  - Keep Vulkan first: lyr's transparent windows still end up on D3D12 once
+    crcbl's fall-through lands, and any opaque one on Vulkan.
 
 ## Cross-repo work
 
 - **crcbl: every lyr and pikr feature on every backend.** At the owner's request
   (2026-10-17), crcbl's session was asked to make each S-row work on Wayland,
-  X11, Win32 and AppKit, and on Vulkan, D3D12 and Metal; to report a matrix of
-  which backends each row is verified on (CI or e2e) and which are untested or
-  unsupported; and to make a backend that cannot support a feature fail loudly
-  (a caps flag or an error) rather than succeed silently. Known gaps named in
-  the request: transparency (Vulkan on Windows, `GpuContext`, crcbl-mtl), S14 on
-  Linux and macOS, S9's switch on Win32 and AppKit and AppKit secure input, S17
-  on Hyprland, S18 running on FreeBSD. When the matrix arrives, it goes into
-  [plan/03](plan/03-surfaces-and-input.md#what-crcbl-must-provide). crcbl
-  acknowledged it the same day. Its order: build the matrix from the code and CI
-  jobs, each cell marked verified by CI e2e, verified by unit tests only,
-  implemented but untested, refused loudly, missing silently, or not applicable,
-  with every "missing silently" cell fixed first as a bug; then the `GpuContext`
-  and Metal opacity fixes (in flight), AT-SPI and AppKit accessibility, the S9
-  switch on Win32 and AppKit with secure input, S17 on Hyprland, and FreeBSD
-  running. Each lands on main only with tests and CI on the backends it claims.
-  A transparent window on Vulkan on Windows needs D3D12 interop (render in
-  Vulkan, present through a shared D3D12 composition swapchain), which crcbl
-  calls large; it stays a loud refusal until then, and its cost goes in the
-  matrix notes for the owner. It bears on the Windows GPU backend decision
-  above. Matrix not received yet.
+  X11, Win32 and AppKit, and on Vulkan, D3D12 and Metal; to report which
+  backends each row is verified on; and to make a backend that cannot support a
+  feature fail loudly rather than succeed silently. crcbl's matrix, at main
+  `4d48eaf4`, is in [plan/03](plan/03-surfaces-and-input.md#backend-matrix),
+  with the cells that matter to lyr's milestones. crcbl's order of work from it:
+  1. The silent gaps: cursor-shape-v1 on Wayland and libxcb-cursor on X11;
+     AppKit IME on/off, secure input, pre-edit and candidate rectangle; an
+     honest `TEXT_IME` cap (split, and cleared on X11); Vulkan composite-alpha
+     validation; `Exclusive` panel focus kept or documented as it behaves, and
+     `FocusRefused` on AppKit.
+  2. A transparent Win32 window through `GpuContext` falls through to D3D12.
+  3. AT-SPI (through `accesskit_unix`, which pulls in `zbus`; crcbl is
+     confirming that dependency with the owner) and AppKit accessibility; X11
+     panels, popups and transparency.
+  4. Tests for the untested cells, including a Hyprland job and a FreeBSD VM
+     job.
+
+  Also in flight: the `GpuContext` and Metal opacity fixes. crcbl reports each
+  as it lands; the matrix in plan/03 is updated then.
+
 - **crcbl: OpenType shaping** (GSUB and GPOS through `harfrust` 0.14, under
   crcbl-ui's `parsed-font`) is on crcbl main at `3c023b2f` (CI green), reported
   2026-10-17, and not in a release. ZWJ emoji, skin tones, keycaps, ligatures,
