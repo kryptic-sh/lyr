@@ -21,7 +21,8 @@ pub use colour::{Colour, InvalidColour};
 pub use format::{Format, InvalidFormat};
 pub use hjkl_config::{ConfigError, ConfigSource};
 pub use schema::{
-    Bar, Battery, Clock, Config, Item, Layer, Layout, Module, Position, Theme, Workspaces,
+    Bar, Battery, Bluetooth, Clock, Config, Item, Layer, Layout, Module, NamedIcons, Position,
+    PowerProfile, Theme, Workspaces,
 };
 
 /// The built-in config.
@@ -141,6 +142,8 @@ fn typed(mut merged: toml::Table) -> Result<Config, String> {
         workspaces: section(&mut merged, "workspaces")?,
         clock: section(&mut merged, "clock")?,
         battery: section(&mut merged, "battery")?,
+        power_profile: section(&mut merged, "power_profile")?,
+        bluetooth: section(&mut merged, "bluetooth")?,
         theme: section(&mut merged, "theme")?,
     };
     match merged.keys().next() {
@@ -249,7 +252,49 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
         "battery.tooltip_format",
         &battery.tooltip_format,
         &["timeTo", "capacity", "power", "time"],
-    )
+    )?;
+    let profile = &config.power_profile;
+    for (key, format) in [
+        ("power_profile.format", &profile.format),
+        ("power_profile.tooltip_format", &profile.tooltip_format),
+    ] {
+        check_placeholders(key, format, &["icon", "profile", "driver"])?;
+    }
+    let bluetooth = &config.bluetooth;
+    let bluetooth_formats = [
+        ("bluetooth.format", Some(&bluetooth.format)),
+        ("bluetooth.format_on", bluetooth.format_on.as_ref()),
+        ("bluetooth.format_off", bluetooth.format_off.as_ref()),
+        (
+            "bluetooth.format_disabled",
+            bluetooth.format_disabled.as_ref(),
+        ),
+        (
+            "bluetooth.format_connected",
+            bluetooth.format_connected.as_ref(),
+        ),
+        (
+            "bluetooth.format_connected_battery",
+            bluetooth.format_connected_battery.as_ref(),
+        ),
+        ("bluetooth.tooltip_format", Some(&bluetooth.tooltip_format)),
+    ];
+    for (key, format) in bluetooth_formats {
+        if let Some(format) = format {
+            check_placeholders(
+                key,
+                format,
+                &[
+                    "icon",
+                    "status",
+                    "num_connections",
+                    "device_alias",
+                    "device_battery_percentage",
+                ],
+            )?;
+        }
+    }
+    Ok(())
 }
 
 /// Checks that every placeholder in `format` is one of `allowed`.

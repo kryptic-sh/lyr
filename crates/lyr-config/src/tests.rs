@@ -191,3 +191,17 @@ fn a_syntax_error_names_its_line_and_column() {
     let message = invalid(user("[bar]\nheight = = 3\n", Platform::Linux));
     assert!(message.contains("line 2, column 10"), "{message}");
 }
+
+#[test]
+fn the_defaults_write_every_glyph_as_an_escape() {
+    // Private-use glyphs are invisible in most editors and are dropped by
+    // tools without a trace, so the defaults spell them `\uXXXX`.
+    let private_use = |c: char| matches!(u32::from(c), 0xE000..=0xF8FF | 0xF_0000..=0x10_FFFF);
+    let raw: Vec<(usize, &str)> = super::DEFAULTS
+        .lines()
+        .enumerate()
+        .filter(|(_, line)| line.chars().any(private_use))
+        .map(|(i, line)| (i + 1, line))
+        .collect();
+    assert!(raw.is_empty(), "raw glyphs in defaults.toml: {raw:?}");
+}

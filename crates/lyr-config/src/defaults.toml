@@ -35,6 +35,18 @@ tooltip_format = "{capacity}% {power}W {timeTo}"
 warning = 30
 critical = 10
 
+[power_profile]
+format = "{icon}"
+tooltip_format = "Profile: {profile}\nDriver: {driver}"
+icons = { default = "\U000F04C5", performance = "\U000F04C5", balanced = "\uF24E", power-saver = "\uF06C" }
+
+[bluetooth]
+format = "{icon}"
+format_on = "{icon}"
+format_connected_battery = "{icon} {device_alias} {device_battery_percentage}%"
+tooltip_format = "Bluetooth {status}"
+icons = { default = "\U000F00AF", off = "\U000F00B2", disabled = "\U000F00B2" }
+
 [theme]
 font = "Hack Nerd Font Propo"
 font_size = 16

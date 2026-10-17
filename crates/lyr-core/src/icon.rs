@@ -1,4 +1,19 @@
-//! Choosing an icon from a ramp by a percentage.
+//! Choosing an icon: from a ramp by a percentage, or from named icons by
+//! state.
+
+use lyr_config::NamedIcons;
+
+/// The icon for the first of `names` that `icons` has, else its `default`,
+/// else none. This is waybar's `getIcon` with a `format-icons` object and a
+/// list of alternatives.
+#[must_use]
+pub fn named<'a>(icons: &'a NamedIcons, names: &[&str]) -> &'a str {
+    names
+        .iter()
+        .find_map(|name| icons.get(*name))
+        .or_else(|| icons.get("default"))
+        .map_or("", String::as_str)
+}
 
 /// The icon for `value` out of `max` from `icons`, ordered low to high.
 ///
@@ -20,7 +35,21 @@ pub fn ramp<T>(icons: &[T], value: u32, max: u32) -> Option<&T> {
 
 #[cfg(test)]
 mod tests {
-    use super::ramp;
+    use lyr_config::NamedIcons;
+
+    use super::{named, ramp};
+
+    #[test]
+    fn a_named_icon_takes_the_first_name_present_then_the_default() {
+        let icons: NamedIcons = [("default", "d"), ("off", "o"), ("wifi", "w")]
+            .into_iter()
+            .map(|(k, v)| (k.to_owned(), v.to_owned()))
+            .collect();
+        assert_eq!(named(&icons, &["off"]), "o");
+        assert_eq!(named(&icons, &["connected", "wifi"]), "w");
+        assert_eq!(named(&icons, &["connected"]), "d");
+        assert_eq!(named(&NamedIcons::new(), &["off"]), "");
+    }
 
     const BATTERY: [char; 5] = ['0', '1', '2', '3', '4'];
     const VOLUME: [char; 3] = ['l', 'm', 'h'];

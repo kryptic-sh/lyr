@@ -3,6 +3,8 @@
 //! Every table refuses unknown keys, so a misspelt key is an error rather than
 //! a setting that silently does nothing.
 
+use std::collections::BTreeMap;
+
 use serde::Deserialize;
 
 use crate::colour::Colour;
@@ -18,6 +20,8 @@ pub struct Config {
     pub workspaces: Workspaces,
     pub clock: Clock,
     pub battery: Battery,
+    pub power_profile: PowerProfile,
+    pub bluetooth: Bluetooth,
     pub theme: Theme,
 }
 
@@ -191,6 +195,45 @@ pub struct Battery {
     pub warning: u8,
     /// At or below this percentage the module is in its critical state.
     pub critical: u8,
+}
+
+/// Icons by name, with `default` for a name that has none: waybar's
+/// `format-icons` object.
+pub type NamedIcons = BTreeMap<String, String>;
+
+/// The power-profile module (`docs/plan/07-modules.md#power-profile`).
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PowerProfile {
+    /// `{icon}`, `{profile}` and `{driver}`.
+    pub format: Format,
+    /// The same placeholders as `format`.
+    pub tooltip_format: Format,
+    /// By profile name (`performance`, `balanced`, `power-saver`).
+    pub icons: NamedIcons,
+}
+
+/// The bluetooth module (`docs/plan/07-modules.md#bluetooth`).
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Bluetooth {
+    /// `{icon}`, `{status}`, `{num_connections}`, `{device_alias}` and
+    /// `{device_battery_percentage}`, as every format below.
+    pub format: Format,
+    #[serde(default)]
+    pub format_on: Option<Format>,
+    #[serde(default)]
+    pub format_off: Option<Format>,
+    #[serde(default)]
+    pub format_disabled: Option<Format>,
+    #[serde(default)]
+    pub format_connected: Option<Format>,
+    /// Used while a connected device reports its battery.
+    #[serde(default)]
+    pub format_connected_battery: Option<Format>,
+    pub tooltip_format: Format,
+    /// By state (`off`, `on`, `connected`, `disabled`).
+    pub icons: NamedIcons,
 }
 
 /// Colours, font and box metrics (`docs/plan/04-rendering-and-theme.md`).
