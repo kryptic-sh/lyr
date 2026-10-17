@@ -1,0 +1,58 @@
+# lyr's built-in config: a port of the waybar setup lyr replaces
+# (dotfiles/.config/waybar/config.jsonc and style.css). A user file is layered
+# over it: a table merges key by key, and a list replaces the whole list.
+#
+# [platform.linux], [platform.windows] and [platform.macos] are applied over
+# the rest of this file on that platform, before the user file.
+
+[bar]
+position = "top"
+height = 50
+output = []
+layer = "top"
+
+[layout]
+left = ["power", "battery", "power_profile", "network", "bluetooth"]
+center = ["workspaces"]
+right = ["tray", "volume", "mic", "clock", "notifications"]
+
+[workspaces]
+all_outputs = true
+format = "{name}"
+scroll = false
+
+[clock]
+format = "%Y/%m/%d %H:%M"
+
+[theme]
+font = "Hack Nerd Font Propo"
+font_size = 16
+foreground = "#cdd6f4"
+bar_background = "#00000000"
+module_background = "#1a1b26"
+module_opacity = 0.8
+border = "#2bc5e3"
+border_width = 2
+radius = 8
+module_padding_x = 12
+module_margin_top = 10
+module_margin_bottom = 2
+module_margin_left = 10
+module_min_width = 20
+last_module_margin_right = 10
+workspace_padding_x = 10
+workspace_active = "#2bc5e3"
+battery_warning = "#fc4c02"
+battery_critical = "#e92d4d"
+volume = "#89b4fa"
+mic = "#cba6f7"
+tooltip_background = "#1e1e2e"
+tooltip_foreground = "#cdd6f4"
+
+# The tray belongs to Explorer on Windows and to the menu bar on macOS, and
+# macOS has no notification API, so those modules are left out there.
+[platform.windows.layout]
+right = ["volume", "mic", "clock", "notifications"]
+
+[platform.macos.layout]
+right = ["volume", "mic", "clock"]

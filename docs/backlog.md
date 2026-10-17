@@ -262,6 +262,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `workspaces.scroll`), and `lyr --stats`. The `WorkspaceBackend` trait waits
   for the Windows backend (M9). Hyprland main's changes for the next release are
   in [plan/06](plan/06-workspaces.md#linux--hyprland).
+- **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
+  `[layout]`, `[workspaces]`, `[clock]` and `[theme]`, the embedded defaults,
+  `[platform.*]` layering on both the defaults and the user file, and validation
+  that names the key (unknown keys and modules, modules the platform cannot run,
+  colours, ranges, workspace format placeholders), with tests that were each
+  broken and seen to fail. Not built: the other modules' tables and actions
+  (with M4), checking the clock's strftime format, reload (the file watcher,
+  `lyr reload`, the old-and-new diff), the control socket, the README's schema
+  docs, and the defaults-parity test against `config.jsonc` (the dotfiles are
+  not checked out next to lyr on this machine, so where the test reads them from
+  is open). `lyr-config` keeps its own copy of the table merge, because
+  `hjkl_config`'s `deep_merge` and `locate` are private in 0.42.2; if hjkl
+  exports them, lyr drops the copy.
 - **Waybar parity, still to check.** The plan was reviewed against the dotfiles'
   `config.jsonc` and `style.css` (2026-10-16), with waybar's own defaults read
   in its 0.15.0 source. Open: the calendar's `<tt>` monospace look with a

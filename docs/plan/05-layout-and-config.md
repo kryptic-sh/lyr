@@ -19,9 +19,13 @@ TOML, loaded with `hjkl-config` from `~/.config/lyr/config.toml` (paths via
 `hjkl-xdg`, the same on every platform, [01](01-overview.md#naming)).
 `lyr -c <file>` overrides the path.
 
-The **embedded defaults** are the waybar port. A user file is layered over them:
-a table in the user file replaces the matching default table's keys, and a list
-replaces the whole list. A missing user file means pure defaults.
+The **embedded defaults** are the waybar port
+(`crates/lyr-config/src/defaults.toml`). A user file is layered over them: a
+table in the user file replaces the matching default table's keys, and a list
+replaces the whole list. A missing user file means pure defaults. The order is:
+the defaults, the defaults' `[platform.<os>]` table, the user file, then the
+user file's own `[platform.<os>]` table, so one user file can serve every
+machine.
 
 ```toml
 [bar]
@@ -63,8 +67,12 @@ border_width = 2
 radius = 8
 ```
 
-This is a sketch of the shape, not the final schema. The schema lands with M3
-and is then documented in the README.
+This is a sketch of the shape. The `[bar]`, `[layout]`, `[workspaces]`,
+`[clock]` and `[theme]` tables are built (`lyr-config`'s `schema.rs`), with the
+theme's box metrics and colours as separate keys (`bar_background`,
+`module_padding_x`, `workspace_active`, …) holding plan 04's values. A zone
+entry is a module name, `"separator"` or `{ spacer = 20 }`. The other modules'
+tables come with M4, and the schema is documented in the README when M3 ends.
 
 **Actions** are either a built-in name (`toggle_mute`, `focus`, `cycle_profile`,
 `open_clock_panel`, `open_power_menu`, `open_wifi_menu`, `open_bluetooth_menu`,
