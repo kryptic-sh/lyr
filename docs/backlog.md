@@ -11,6 +11,16 @@ implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
   `neli`) block M4's audio and network sources.
+- **A stream crate for D-Bus signals** (blocks every zbus source in M4, M6 and
+  M7). zbus 6 (what `cargo add` resolves today; plan 02's precedent is 5) hands
+  property changes and signals over as `Stream`s, and lyr has no crate to poll
+  one: zbus re-exports `futures_core` only in a hidden macro-support module, and
+  tokio has no `Stream` trait. Options: `futures-util` (the usual
+  `StreamExt::next`; zbus's own tests use it), or `futures-core` alone (the
+  trait, polled with `std::future::poll_fn`; already in the tree through zbus).
+  Recommended: `futures-util`, since every source would otherwise carry its own
+  polling glue. Found 2026-10-18 while wiring the UPower source, which stops at
+  the pure property mapping until this is decided.
 - **A date and time crate** (blocks M1's clock and M5's calendar). The clock
   formats `%Y/%m/%d %H:%M` in the system time zone, names the zone in its
   tooltip, and the calendar needs month grids and ISO week numbers. Date
@@ -320,8 +330,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 - **Sources, M4.** Built: the UPower display device's properties turned into the
   battery view's reading (`lyr_sources::battery::upower::Device`), tested and
   mutation-checked. Not built: the D-Bus connection that fills it (zbus, Linux
-  only; testable under WSL against a fake UPower on a private bus), and every
-  other source. Network and audio wait on the new-dependency decision above.
+  only; testable under WSL against a fake UPower on zbus's peer-to-peer
+  connection, which needs no bus daemon), waiting on the stream-crate decision
+  above, and every other source. Network and audio wait on the new-dependency
+  decision above.
 - **Control socket.** Built: the requests (`lyr_core::control::Request`, one
   text line each) and the CLI commands that send them, including `lyr panel`,
   `lyr dnd` and `lyr clear`, which still report "not implemented". Not built:
