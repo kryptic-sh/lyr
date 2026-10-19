@@ -195,9 +195,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   by urgency unless the app set its own, the do-not-disturb rule (critical still
   shows; nothing while the panel is open), and the history's order (transient
   left out, grouped by `desktop-entry` or app, critical groups first, then
-  newest first), tested and mutation-checked. Not built: the D-Bus server for
-  `org.freedesktop.Notifications` (zbus), the check for another daemon owning
-  the name, toasts (M5's panels), markup, images, MPRIS and the bell module.
+  newest first), tested and mutation-checked. The D-Bus server too
+  (`lyr_sources::notifications::linux::Daemon`): `Notify` with its hints,
+  `CloseNotification` with its signal and the spec's empty error,
+  `GetServerInformation` (spec 1.3), and no capabilities until each works,
+  tested against an application on a peer-to-peer connection. The bar does not
+  serve it yet: until it draws toasts, taking the name would swallow every
+  notification on a desktop with no other daemon. Not built: claiming the name
+  and the check for another daemon owning it, toasts (M5's panels), markup,
+  images, MPRIS and the bell module.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading
