@@ -225,11 +225,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   bar at once. The clock's text takes the new zone because chrono 0.4.45's
   `Local` re-reads `/etc/localtime` when its mtime changes, checking at most
   once a second (`src/offset/local/unix.rs`); a change within a second of the
-  last draw shows on the next tick instead. Not built: images (tray, M8), and
-  clipping text that overflows a box. A format cannot drop the literal text
-  around an empty placeholder, so a battery with no power reading shows
-  `80% W Discharging`. Measuring text (the widths `layout` takes) needs
-  crcbl-ui's font atlas, so it is done by the caller in `lyr-render`.
+  last draw shows on the next tick instead. Text is cut at its rect's edges
+  (`lyr_render::translate` clips each text item), so a label wider than its box
+  no longer runs over its neighbours. Not built: images (tray, M8). A format
+  cannot drop the literal text around an empty placeholder, so a battery with no
+  power reading shows `80% W Discharging`. Measuring text (the widths `layout`
+  takes) needs crcbl-ui's font atlas, so it is done by the caller in
+  `lyr-render`.
 - **Notification daemon, M6.** Built: the store (`lyr_core::notifications`): ids
   from 1 that skip 0 and held ids, `replaces_id` kept as the id and replacing in
   place (even for an id lyr does not hold, as the spec says), swaync's timeouts
@@ -264,12 +266,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   real run. The bell is drawn from the store while lyr is the daemon. A toast
   shows when it arrived as swaync words it ("Now", "2 mins ago", from
   `get_relative_time` at v0.12.6), redrawn as the words change; a summary long
-  enough to reach the time runs under it, since swaync's ellipsis is not
-  carried. Not built: a toast's close button, action buttons and images, markup,
-  MPRIS, do-not-disturb and Clear All in the panel (`lyr dnd` and `lyr clear`
-  work; on Windows they answer that lyr is not the daemon, run there). A
-  transient notification, kept in no history, closes as expired when its toast
-  times out.
+  enough to reach the time is cut short of it (`toast::TIME_GAP`), where swaync
+  ellipsizes. Not built: a toast's close button, action buttons and images,
+  markup, MPRIS, do-not-disturb and Clear All in the panel (`lyr dnd` and
+  `lyr clear` work; on Windows they answer that lyr is not the daemon, run
+  there). A transient notification, kept in no history, closes as expired when
+  its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading
