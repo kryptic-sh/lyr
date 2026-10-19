@@ -277,9 +277,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   swaync words it ("Now", "2 mins ago", from `get_relative_time` at v0.12.6),
   redrawn as the words change; a summary long enough to reach the time is cut
   short of it (`toast::TIME_GAP`), where swaync ellipsizes. Not built: a toast's
-  close button, action buttons and images, markup, MPRIS, do-not-disturb and
-  Clear All in the panel (`lyr dnd` and `lyr clear` work; on Windows they answer
-  that lyr is not the daemon, run there). A transient notification, kept in no
+  close button, action buttons and images, markup, MPRIS (the panel's Clear All
+  and switch work; `lyr dnd` and `lyr clear` work; on Windows they answer that
+  lyr is not the daemon, run there). A transient notification, kept in no
   history, closes as expired when its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
@@ -448,11 +448,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   there). It takes the keyboard; Escape, losing focus and the same click or
   binding again close it; a right click switches year and month mode and
   scrolling moves by one of either. Opening it takes the toasts down, and no
-  toast shows while it is open. Run on Windows: year, month and Escape seen. Not
-  built: the notification centre below the calendar (title, Clear All,
-  do-not-disturb, MPRIS, history), reading the first weekday and names from the
-  locale, the smaller monospace `calendar_font`, redrawing at midnight, and
-  checking what Hyprland does with a click on the bare desktop while it is open.
+  toast shows while it is open. Run on Windows: year, month and Escape seen.
+  While lyr is the notification daemon the notification centre is below the
+  calendar (`lyr_core::centre`): the title with Clear All, the do-not-disturb
+  switch and the history in swaync's order, each entry drawn as a toast; Clear
+  All and the switch act as `lyr clear` and `lyr dnd`, an entry as a toast does,
+  and the panel redraws on every change (lyr's own closures now report a change
+  as an application's do). The title and switch label are at the bar's text
+  size, not swaync's 2rem. Not built: MPRIS, scrolling a history taller than the
+  panel, reading the first weekday and names from the locale, the smaller
+  monospace `calendar_font`, redrawing at midnight, and checking what Hyprland
+  does with a click on the bare desktop while it is open.
 - **Undocumented Windows APIs:** virtual desktops
   (`IVirtualDesktopManagerInternal`) and setting the power mode
   (`PowerSetActiveOverlayScheme`) can break with any Windows build.
