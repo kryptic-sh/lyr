@@ -33,6 +33,21 @@ fn an_item_stands_in_with_its_first_letter() {
 }
 
 #[test]
+fn an_item_s_tooltip_falls_back_to_its_title() {
+    let item = |tooltip: &str, title: &str| Item {
+        tooltip: tooltip.to_owned(),
+        title: title.to_owned(),
+        ..Item::default()
+    };
+    assert_eq!(
+        item("Steam - 2 updates", "Steam").tooltip_text(),
+        Some("Steam - 2 updates")
+    );
+    assert_eq!(item("", "Steam").tooltip_text(), Some("Steam"));
+    assert_eq!(item("", "").tooltip_text(), None);
+}
+
+#[test]
 fn clicks_follow_waybar() {
     assert_eq!(click(Press::Left, false), Some(Click::Activate));
     assert_eq!(click(Press::Left, true), Some(Click::Menu));

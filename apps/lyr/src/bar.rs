@@ -438,7 +438,7 @@ impl App {
                 shell,
                 &anchor,
                 &look,
-                |module| modules::tooltip(module, config, data, &now),
+                |target| modules::tooltip(target, config, data, &now),
                 Instant::now(),
             )?;
             window.tooltips.draw(text)?;

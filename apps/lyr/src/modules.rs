@@ -295,14 +295,25 @@ fn content(
     }
 }
 
-/// The tooltip `module` shows now, or `None` when it has none or no data.
-/// The workspaces have none, as in waybar.
+/// The tooltip `target` shows now, or `None` when it has none or no data:
+/// a module's, or a tray item's. The workspaces have none, as in waybar.
 pub fn tooltip(
-    module: Module,
+    target: &Target<Module>,
     config: &Config,
     data: &Data,
     now: &DateTime<FixedOffset>,
 ) -> Option<String> {
+    let module = match target {
+        Target::Module(module) => *module,
+        Target::Button(Module::Tray, index) => {
+            return data
+                .tray_shown()
+                .nth(*index)?
+                .tooltip_text()
+                .map(str::to_owned);
+        }
+        Target::Button(..) => return None,
+    };
     match module {
         Module::Power => Some(config.power.tooltip_format.render(|_| None)),
         Module::Clock => {
@@ -380,7 +391,8 @@ pub fn shown_workspaces<'a>(
 mod tests {
     use chrono::DateTime;
     use lyr_config::{Module, Platform, from_sources};
-    use lyr_core::draw::Content;
+    use lyr_core::draw::{Content, Target};
+    use lyr_core::tray::{Item, Status};
 
     use super::{Data, content, tooltip, zone_name};
 
@@ -399,8 +411,37 @@ mod tests {
             })
         );
         assert_eq!(
-            tooltip(Module::Power, &config, &data, &now).as_deref(),
+            tooltip(&Target::Module(Module::Power), &config, &data, &now).as_deref(),
             Some("Power Button")
+        );
+    }
+
+    #[test]
+    fn a_tray_button_s_tooltip_is_its_shown_item_s() {
+        let config = from_sources(None, Platform::current()).expect("the defaults");
+        let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+        let item = |title: &str, status| Item {
+            title: title.to_owned(),
+            status,
+            ..Item::default()
+        };
+        let data = Data {
+            tray: vec![
+                item("Hidden", Status::Passive),
+                item("Steam", Status::Active),
+            ],
+            ..Data::default()
+        };
+        let tip = |index| tooltip(&Target::Button(Module::Tray, index), &config, &data, &now);
+        assert_eq!(
+            tip(0).as_deref(),
+            Some("Steam"),
+            "the passive one is not shown"
+        );
+        assert_eq!(tip(1), None);
+        assert_eq!(
+            tooltip(&Target::Button(Module::Workspaces, 0), &config, &data, &now),
+            None
         );
     }
 

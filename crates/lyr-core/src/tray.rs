@@ -60,6 +60,16 @@ impl Item {
         self.status != Status::Passive
     }
 
+    /// Its tooltip: the `ToolTip`'s title, else its `Title`, as waybar's
+    /// `Item::setProperty` falls back; `None` when both are empty.
+    #[must_use]
+    pub fn tooltip_text(&self) -> Option<&str> {
+        [&self.tooltip, &self.title]
+            .into_iter()
+            .find(|text| !text.is_empty())
+            .map(String::as_str)
+    }
+
     /// What stands in for its icon until lyr draws images: the first letter
     /// of its title, else of its id, upper-cased.
     #[must_use]

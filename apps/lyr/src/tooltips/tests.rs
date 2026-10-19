@@ -75,7 +75,7 @@ impl Setup {
                     line_height: 20.0,
                     calendar_line_height: 20.0,
                 },
-                |_| text.map(str::to_owned),
+                |_: &Target<Module>| text.map(str::to_owned),
                 now,
             )
             .expect("synced");
@@ -145,6 +145,12 @@ fn nothing_opens_without_text_a_box_or_a_module() {
     let mut tooltips = Tooltips::default();
     tooltips.hover(Some(&Target::Button(Module::Workspaces, 0)), start);
     assert_eq!(tooltips.next_wake(), None, "a workspace button has none");
+    tooltips.hover(Some(&Target::Button(Module::Tray, 0)), start);
+    assert_eq!(
+        tooltips.next_wake(),
+        Some(start + HOVER_DELAY),
+        "a tray button has one"
+    );
 }
 
 #[test]

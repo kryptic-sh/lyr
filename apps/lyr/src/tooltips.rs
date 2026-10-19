@@ -1,6 +1,7 @@
 //! A bar's tooltip (`docs/plan/10-popups-and-menus.md#tooltips`): when it
 //! shows ([`lyr_core::tooltip`]) and the popup window that shows it, anchored
-//! to the module's box and taking no input, so the pointer stays on the bar.
+//! to the module's box, or a tray item's button, and taking no input, so the
+//! pointer stays on the bar.
 
 use std::time::Instant;
 
@@ -20,10 +21,11 @@ use lyr_shell::bars::NAMESPACE;
 /// The popup showing a tooltip.
 struct Popup {
     window: WindowId,
-    module: Module,
+    /// The module or tray button it is for.
+    target: Target<Module>,
     text: String,
     list: DrawList,
-    /// The module box it was placed against, and its own size.
+    /// The box it was placed against, and its own size.
     anchor: Rect,
     size: Size,
     /// Opened on the window's first resize.
@@ -55,18 +57,19 @@ pub struct Look<'a> {
 /// One bar's tooltip.
 #[derive(Default)]
 pub struct Tooltips {
-    timer: Tooltip<Module>,
+    timer: Tooltip<Target<Module>>,
     popup: Option<Popup>,
 }
 
 impl Tooltips {
-    /// The pointer is over `target`; workspace buttons have no tooltip.
+    /// The pointer is over `target`. A module has a tooltip, and so does a
+    /// tray item's button; workspace buttons have none, as in waybar.
     pub fn hover(&mut self, target: Option<&Target<Module>>, now: Instant) {
-        let module = match target {
-            Some(Target::Module(module)) => Some(*module),
-            _ => None,
-        };
-        self.timer.hover(module, now);
+        let target = target.filter(|target| match target {
+            Target::Module(_) | Target::Button(Module::Tray, _) => true,
+            Target::Button(..) => false,
+        });
+        self.timer.hover(target.cloned(), now);
     }
 
     /// A click, which hides the tooltip.
@@ -92,38 +95,38 @@ impl Tooltips {
     }
 
     /// Opens, closes or replaces the popup so it shows what should show now:
-    /// the hovered module's tooltip (`tooltip_of`) once its delay is up,
-    /// anchored to the module's box on the bar.
+    /// the hovered target's tooltip (`tooltip_of`) once its delay is up,
+    /// anchored to its box on the bar.
     pub fn sync(
         &mut self,
         shell: &mut dyn Shell,
         anchor: &Anchor<'_>,
         look: &Look<'_>,
-        tooltip_of: impl Fn(Module) -> Option<String>,
+        tooltip_of: impl Fn(&Target<Module>) -> Option<String>,
         now: Instant,
     ) -> anyhow::Result<()> {
         self.timer.tick(now);
         let wanted = self
             .timer
             .shown()
-            .and_then(|&module| Some((module, tooltip_of(module)?)));
+            .and_then(|target| Some((target.clone(), tooltip_of(target)?)));
         let current = self
             .popup
             .as_ref()
-            .map(|popup| (popup.module, popup.text.as_str()));
+            .map(|popup| (&popup.target, popup.text.as_str()));
         if current
             == wanted
                 .as_ref()
-                .map(|(module, text)| (*module, text.as_str()))
+                .map(|(target, text)| (target, text.as_str()))
             && !self.moved(shell, anchor.regions)?
         {
             return Ok(());
         }
         self.close(shell)?;
-        let Some((module, text)) = wanted else {
+        let Some((target, text)) = wanted else {
             return Ok(());
         };
-        let Some(rect) = anchor.regions.rect(&Target::Module(module)) else {
+        let Some(rect) = anchor.regions.rect(&target) else {
             return Ok(());
         };
         let (list, size) = draw::tooltip(&text, look.measure, look.line_height, look.theme);
@@ -145,7 +148,7 @@ impl Tooltips {
         })?;
         self.popup = Some(Popup {
             window,
-            module,
+            target,
             text,
             list,
             anchor: rect,
@@ -156,7 +159,7 @@ impl Tooltips {
         Ok(())
     }
 
-    /// Whether the open popup's module box has moved and the popup cannot
+    /// Whether the open popup's box has moved and the popup cannot
     /// follow it, so it is to be opened again. It follows by being
     /// repositioned where the window system can.
     fn moved(
@@ -167,7 +170,7 @@ impl Tooltips {
         let Some(popup) = &mut self.popup else {
             return Ok(false);
         };
-        let Some(rect) = regions.rect(&Target::Module(popup.module)) else {
+        let Some(rect) = regions.rect(&popup.target) else {
             return Ok(false);
         };
         if rect == popup.anchor {

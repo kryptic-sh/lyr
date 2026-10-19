@@ -584,10 +584,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked; the glue joining source and bar is untested, and none of it
   has met a real item. Wayland gives a window no place on the screen, so
   `Activate` and `ContextMenu` get the point under the button on the bar, not on
-  the screen. No tooltip per item yet (a module's tooltip is one per module),
-  though the source reads each item's `ToolTip` title. Icons wait on images (the
-  decision above); until then an item is drawn as its title's first letter
-  (`Item::letter`), where plan 08 asks for a generic icon.
+  the screen. Each item's button has its tooltip, its `ToolTip` title or else
+  its `Title` (`Item::tooltip_text`, as waybar falls back), through the bar's
+  tooltips, now keyed by the hovered target rather than the module. Icons wait
+  on images (the decision above); until then an item is drawn as its title's
+  first letter (`Item::letter`), where plan 08 asks for a generic icon.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a
