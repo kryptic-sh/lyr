@@ -44,6 +44,7 @@ pub enum Update {
 enum NotificationRequest {
     Close(u32, lyr_core::notifications::CloseReason),
     Invoke(u32, String),
+    Clear,
 }
 
 /// Where the bar sends what it asks of a source. A source that has stopped
@@ -82,6 +83,11 @@ impl Commands {
         let _stopped = self
             .notifications
             .send(NotificationRequest::Close(id, reason));
+    }
+
+    /// Closes every notification, as Clear All does.
+    pub fn clear_notifications(&self) {
+        let _stopped = self.notifications.send(NotificationRequest::Clear);
     }
 
     /// Invokes the action `key` of the notification `id`.
@@ -428,6 +434,7 @@ mod linux {
                         served.close(id, reason).await.map(|_held| ())
                     }
                     NotificationRequest::Invoke(id, key) => served.invoke(id, &key).await,
+                    NotificationRequest::Clear => served.clear().await.map(|_cleared| ()),
                 };
                 if let Err(error) = done {
                     tracing::warn!("notifications: {error}");

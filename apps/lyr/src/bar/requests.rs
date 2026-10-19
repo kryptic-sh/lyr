@@ -1,5 +1,8 @@
 //! What the running bar does with a control request (`lyr reload`, …).
 
+#[cfg(target_os = "linux")]
+use std::sync::PoisonError;
+
 use anyhow::Context as _;
 use crcbl_shell::Shell;
 use lyr_config::Platform;
@@ -33,6 +36,10 @@ impl App {
                 }
                 self.hidden = !self.hidden;
                 incoming.reply(control::OK);
+            }
+            request @ (Request::Dnd | Request::Clear) => {
+                let reply = self.notifications(request);
+                incoming.reply(reply);
             }
             other => {
                 incoming.reply(format!("error: `{other}` is not implemented yet"));
@@ -80,5 +87,30 @@ impl App {
             }
         }
         Ok(())
+    }
+
+    /// `lyr dnd` and `lyr clear`, which need lyr to be the notification
+    /// daemon. Returns the reply.
+    #[cfg(target_os = "linux")]
+    fn notifications(&mut self, request: Request) -> String {
+        let Some(store) = &self.data.notifications else {
+            return "error: lyr is not the notification daemon".to_owned();
+        };
+        if request == Request::Dnd {
+            let mut store = store.lock().unwrap_or_else(PoisonError::into_inner);
+            store.dnd = !store.dnd;
+            tracing::info!("do-not-disturb {}", if store.dnd { "on" } else { "off" });
+        } else {
+            self.commands.clear_notifications();
+            self.toasts.clear();
+        }
+        self.redraw_all();
+        control::OK.to_owned()
+    }
+
+    /// Windows and macOS keep their own notification centres.
+    #[cfg(not(target_os = "linux"))]
+    fn notifications(&mut self, _request: Request) -> String {
+        "error: lyr is not the notification daemon on this platform".to_owned()
     }
 }

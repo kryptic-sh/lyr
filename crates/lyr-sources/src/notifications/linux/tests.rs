@@ -273,3 +273,34 @@ async fn invoking_an_action_signals_it_and_closes_unless_resident() {
         "resident"
     );
 }
+
+#[tokio::test]
+async fn clear_all_dismisses_every_notification() {
+    let (served, client, _server) = served().await;
+    let mut closed = client
+        .receive_notification_closed()
+        .await
+        .expect("subscribed");
+    let mut ids = Vec::new();
+    for summary in ["one", "two"] {
+        ids.push(
+            client
+                .notify("app", 0, "", summary, "", &[], HashMap::new(), -1)
+                .await
+                .expect("notified"),
+        );
+    }
+    let mut cleared = served.clear().await.expect("cleared");
+    cleared.sort_unstable();
+    assert_eq!(cleared, ids);
+    for _ in &ids {
+        let signal = tokio::time::timeout(Duration::from_secs(5), closed.next())
+            .await
+            .expect("a signal within 5 s")
+            .expect("open");
+        let args = signal.args().expect("arguments");
+        assert!(ids.contains(&args.id));
+        assert_eq!(args.reason, CloseReason::Dismissed as u32);
+    }
+    assert!(served.clear().await.expect("cleared").is_empty());
+}

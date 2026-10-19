@@ -90,6 +90,13 @@ impl Toasts {
         self.changed = true;
     }
 
+    /// Every notification closed, as Clear All does.
+    #[cfg(target_os = "linux")]
+    pub fn clear(&mut self) {
+        self.stack = lyr_core::toast::stack::Stack::default();
+        self.changed = true;
+    }
+
     /// When the toasts next have something to do.
     pub fn next_wake(&self) -> Option<Instant> {
         self.stack.next_wake()

@@ -254,6 +254,25 @@ impl Served {
         Ok(held)
     }
 
+    /// Closes every notification, as Clear All does, signalling each as
+    /// dismissed. Returns their ids.
+    ///
+    /// # Errors
+    ///
+    /// When a signal cannot be sent.
+    pub async fn clear(&self) -> zbus::Result<Vec<u32>> {
+        let ids = self
+            .store
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
+        for &id in &ids {
+            Daemon::notification_closed(&self.emitter()?, id, CloseReason::Dismissed as u32)
+                .await?;
+        }
+        Ok(ids)
+    }
+
     /// Invokes the action `key` of `id`, as a click does, then closes it
     /// unless it is `resident`, as the spec's hint asks.
     ///

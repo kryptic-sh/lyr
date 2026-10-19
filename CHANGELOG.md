@@ -22,8 +22,9 @@ and this project adheres to
   built-ins, only `cycle_profile` and `cycle_profile_back` work yet.
 - `lyr quit` stops the running bar, and `lyr reload` reloads its config, keeping
   the running one when the new one is invalid, and `lyr toggle` hides and shows
-  the bars. `lyr panel`, `lyr dnd` and `lyr clear` reach it over its control
-  socket and report that they are not implemented yet. A second `lyr` exits when
+  the bars. On Linux, while lyr is the notification daemon, `lyr dnd` turns
+  do-not-disturb on or off and `lyr clear` dismisses every notification.
+  `lyr panel` reports that it is not implemented yet. A second `lyr` exits when
   one is already running.
 - On Linux lyr is the notification daemon when no other daemon (such as swaync)
   holds the name; `notifications.replace = true` takes it over. Notifications

@@ -261,7 +261,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   has no daemon and WSL has no compositor, so the owner's Hyprland is the first
   real run. The bell is drawn from the store while lyr is the daemon. Not built:
   a toast's arrival time, close button, action buttons and images, markup,
-  MPRIS, do-not-disturb and Clear All from the control socket and the panel, and
+  MPRIS, do-not-disturb and Clear All in the panel (`lyr dnd` and `lyr clear`
+  work; on Windows they answer that lyr is not the daemon, run there), and
   closing a transient notification when its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
@@ -320,8 +321,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   refused with the bar still running). `lyr toggle` hides the bars by closing
   them, so their space is given back on every platform, and shows them by
   creating them again (run on Windows: the work area grew by 50 px and shrank
-  back). The other requests answer "not implemented yet": `panel` (M5), `dnd`
-  and `clear` (M6). Not built: `lyr event workspace` for AeroSpace (M10).
+  back). `lyr dnd` and `lyr clear` act on the notification daemon on Linux and
+  answer that lyr is not the daemon elsewhere. `panel` answers "not implemented
+  yet" (M5). Not built: `lyr event workspace` for AeroSpace (M10).
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]`, `[theme]` and every module's table, the
   embedded defaults, `[platform.*]` layering on both the defaults and the user
