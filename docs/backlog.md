@@ -316,12 +316,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   copy of `config.jsonc` checked into lyr as a fixture; that is open. Format
   strings are one `Format` type (`lyr-config`'s `format.rs`), parsed when the
   config loads and rendered with `Format::render`, so validation and drawing
-  will share one parser. Errors name the key where lyr's own checks find them
-  (`layout.right[0]: …`), but an error serde raises inside a table names only
-  the table (`theme: ...`) until `serde_path_to_error` (approved 2026-10-18) is
-  wired in. `lyr-config` keeps its own copy of the table merge, because
-  `hjkl_config`'s `deep_merge` and `locate` are private in 0.42.2; if hjkl
-  exports them, lyr drops the copy.
+  will share one parser. Every error names its full key (`layout.right[0]: …`,
+  `theme.border: …`, the latter through `serde_path_to_error`). `lyr-config`
+  keeps its own copy of the table merge, because `hjkl_config`'s `deep_merge`
+  and `locate` are private in 0.42.2; if hjkl exports them, lyr drops the copy.
 - **Waybar parity, still to check.** The plan was reviewed against the dotfiles'
   `config.jsonc` and `style.css` (2026-10-16), with waybar's own defaults read
   in its 0.15.0 source. Open: the calendar's `<tt>` monospace look with a

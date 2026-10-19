@@ -130,30 +130,32 @@ fn a_module_the_platform_cannot_run_is_an_error() {
 
 #[test]
 fn an_unknown_table_is_an_error() {
-    let message = invalid(user(
-        "[clocks]
-format = \"%H\"
-",
-        Platform::Linux,
-    ));
+    let message = invalid(user("[clocks]\nformat = \"%H\"\n", Platform::Linux));
     assert_eq!(message, "clocks: unknown table");
 }
 
 #[test]
-fn an_error_inside_a_table_names_the_table() {
-    let message = invalid(user(
-        "[theme]
-border = \"teal\"
-",
-        Platform::Linux,
-    ));
-    assert!(message.starts_with("theme: "), "{message}");
+fn an_error_inside_a_table_names_its_key() {
+    let message = invalid(user("[theme]\nborder = \"teal\"\n", Platform::Linux));
+    assert!(
+        message.starts_with("theme.border: `teal` is not a colour"),
+        "{message}"
+    );
+    let message = invalid(user("[layout]\nleft = [\"power\", 3]\n", Platform::Linux));
+    assert!(message.starts_with("layout.left[1]: "), "{message}");
+    let message = invalid(user("[bar]\nheight = \"tall\"\n", Platform::Linux));
+    assert!(message.starts_with("bar.height: "), "{message}");
 }
 
 #[test]
 fn an_unknown_key_is_an_error() {
     let message = invalid(user("[bar]\nhieght = 30\n", Platform::Linux));
-    assert!(message.contains("hieght"), "{message}");
+    assert!(
+        message.starts_with("bar.hieght: unknown field `hieght`"),
+        "{message}"
+    );
+    let message = invalid(user("bar = 3\n", Platform::Linux));
+    assert!(message.starts_with("bar: invalid type"), "{message}");
 }
 
 #[test]
@@ -182,7 +184,10 @@ fn workspace_format_placeholders_are_checked() {
             &format!("[workspaces]\nformat = \"{format}\"\n"),
             Platform::Linux,
         ));
-        assert!(message.starts_with("workspaces"), "{format:?}: {message}");
+        assert!(
+            message.starts_with("workspaces.format: "),
+            "{format:?}: {message}"
+        );
     }
 }
 
@@ -275,5 +280,5 @@ fn an_empty_command_and_an_unknown_action_are_errors() {
         "[clock.on]\nclick = \"open_calendar\"\n",
         Platform::Linux,
     ));
-    assert!(message.starts_with("clock: "), "{message}");
+    assert!(message.starts_with("clock.on.click: "), "{message}");
 }

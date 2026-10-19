@@ -105,10 +105,10 @@ defaults file holds all three, as `[platform.linux]`, `[platform.windows]` and
 The config is parsed fully before anything is applied. An unknown key, an
 unknown module name, a module that is unsupported on this platform, or a bad
 colour or format string is an error that names the file, the key path and the
-reason. Today an error found inside a table by serde (a bad colour or format)
-names only the table, until `serde_path_to_error` (approved) is wired in. At
-start-up an invalid config is fatal. On reload it is logged and the running
-config is kept.
+reason, such as ``theme.border: `teal` is not a colour`` or
+``layout.right[0]: the `tray` module is not supported on windows``. Errors serde
+raises get their key from `serde_path_to_error`. At start-up an invalid config
+is fatal. On reload it is logged and the running config is kept.
 
 ## Reload
 

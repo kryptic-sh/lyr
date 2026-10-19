@@ -167,9 +167,17 @@ fn section<T: serde::de::DeserializeOwned>(
     let value = merged
         .remove(key)
         .ok_or_else(|| format!("{key}: missing"))?;
-    value
-        .try_into()
-        .map_err(|error: toml::de::Error| format!("{key}: {}", error.message()))
+    serde_path_to_error::deserialize(value).map_err(|error| {
+        // The path inside the table, such as `border`, `left[1]` or an unknown
+        // key's name; `.` when the table itself is the wrong type.
+        let inner = error.path().to_string();
+        let path = if inner == "." {
+            key.to_owned()
+        } else {
+            format!("{key}.{inner}")
+        };
+        format!("{path}: {}", error.inner().message())
+    })
 }
 
 /// Parses TOML text into a table. A syntax error's message is toml's own,
