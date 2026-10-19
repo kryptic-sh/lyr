@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use crcbl_font::{FontQuery, SystemFonts};
+use crcbl_font::{BOLD_WEIGHT, FontQuery, FontStyle, NORMAL_WEIGHT, SystemFonts};
 use crcbl_ui::font::Font;
 
 /// The family lyr falls back to when the configured one is not installed.
@@ -15,10 +15,14 @@ pub struct Loaded {
     /// The font, carrying the system's fallback faces for characters it lacks
     /// (emoji in a notification).
     pub font: Font,
+    /// The family's bold, italic and bold italic faces the system has apart
+    /// from [`Self::font`], each carrying the same fallbacks.
+    pub faces: Vec<Font>,
     /// The configured family, when it was not found and [`FALLBACK_FAMILY`]
     /// was used instead.
     pub missing: Option<String>,
-    /// Fallback faces that were found but could not be read or parsed, and why.
+    /// Fallback faces, and the family's other faces, that were found but
+    /// could not be read or parsed, and why.
     pub unreadable: Vec<(PathBuf, String)>,
 }
 
@@ -59,8 +63,30 @@ pub fn load(family: &str) -> Result<Loaded, Error> {
             Err(error) => unreadable.push((face.path, error.to_string())),
         }
     }
+    // The family's other faces, each once: the nearest the system has to
+    // each may be the regular face again.
+    let mut found = vec![face];
+    let mut faces = Vec::new();
+    for (weight, style) in [
+        (BOLD_WEIGHT, FontStyle::Normal),
+        (NORMAL_WEIGHT, FontStyle::Italic),
+        (BOLD_WEIGHT, FontStyle::Italic),
+    ] {
+        let Some(face) = system.find(&query.clone().weight(weight).style(style)) else {
+            continue;
+        };
+        if found.contains(&face) {
+            continue;
+        }
+        match Font::from_system(&face) {
+            Ok(font) => faces.push(font.with_fallback(&fallbacks)),
+            Err(error) => unreadable.push((face.path.clone(), error.to_string())),
+        }
+        found.push(face);
+    }
     Ok(Loaded {
         font: font.with_fallback(&fallbacks),
+        faces,
         missing,
         unreadable,
     })

@@ -5,7 +5,7 @@
 
 use lyr_config::{Colour, Theme};
 
-use crate::draw::{DrawList, Item, Size, switch};
+use crate::draw::{DrawList, Item, Size, TextStyle, switch};
 use crate::hit::{Rect, Regions};
 
 /// The adapter's properties the module uses (`org.bluez.Adapter1`).
@@ -298,6 +298,7 @@ pub fn draw(
         },
         text,
         colour,
+        style: TextStyle::PLAIN,
     };
     let mut y = PADDING;
     // The header first, where it cannot be missed.

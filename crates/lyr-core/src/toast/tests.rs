@@ -148,7 +148,9 @@ fn the_time_sits_at_the_right_of_the_summary() {
         .items
         .iter()
         .find_map(|item| match item {
-            Item::Text { text, rect, colour } if text == "2 mins ago" => Some((*rect, *colour)),
+            Item::Text {
+                text, rect, colour, ..
+            } if text == "2 mins ago" => Some((*rect, *colour)),
             _ => None,
         })
         .expect("the time");

@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use lyr_config::Theme;
 
-use crate::draw::{DrawList, Item, Size};
+use crate::draw::{DrawList, Item, Size, TextStyle};
 use crate::hit::Rect;
 use crate::notifications::{Incoming, Urgency};
 
@@ -109,6 +109,7 @@ pub fn close_button(
             },
             text: CLOSE.to_owned(),
             colour: theme.toast_close_foreground,
+            style: TextStyle::PLAIN,
         },
     ];
     (items, rect)
@@ -198,6 +199,7 @@ pub fn draw(
         },
         text: time,
         colour: theme.toast_time,
+        style: TextStyle::PLAIN,
     });
     for (index, text) in lines.into_iter().enumerate() {
         let width = if index == 0 {
@@ -214,6 +216,7 @@ pub fn draw(
             },
             text,
             colour: theme.toast_foreground,
+            style: TextStyle::PLAIN,
         });
     }
     let mut buttons = Vec::new();
@@ -244,6 +247,7 @@ pub fn draw(
                 },
                 text: label.to_owned(),
                 colour: theme.toast_foreground,
+                style: TextStyle::PLAIN,
             });
             buttons.push((index, rect));
         }

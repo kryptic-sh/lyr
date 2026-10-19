@@ -46,6 +46,7 @@ fn push(list: &mut DrawList, item: &Item, opacity: f32, text: &Text) {
             rect,
             text: string,
             colour,
+            style,
         } => {
             // Text that runs past its rect is cut there, not over its
             // neighbours.
@@ -53,7 +54,7 @@ fn push(list: &mut DrawList, item: &Item, opacity: f32, text: &Text) {
                 Vec2::new(rect.x, rect.y),
                 Vec2::new(rect.x + rect.width, rect.y + rect.height),
             );
-            text.draw(list, *rect, string, linear(*colour, opacity));
+            text.draw(list, *rect, string, *style, linear(*colour, opacity));
             list.pop_clip().expect("the clip pushed just above");
         }
         Item::Group {
@@ -82,7 +83,7 @@ mod tests {
     use crcbl_ui::draw_list::{ClipRect, DrawCommand};
     use crcbl_ui::font::Font;
     use lyr_config::Colour;
-    use lyr_core::draw::{DrawList as Bar, Item};
+    use lyr_core::draw::{DrawList as Bar, Item, TextStyle};
     use lyr_core::hit::Rect;
 
     use super::translate;
@@ -146,6 +147,7 @@ mod tests {
                             rect: RECT,
                             text: "a".to_owned(),
                             colour: colour("#ffffff"),
+                            style: TextStyle::PLAIN,
                         }],
                     },
                 ],
@@ -173,6 +175,7 @@ mod tests {
                     rect: RECT,
                     text: "a long line of text".to_owned(),
                     colour: colour("#ffffff"),
+                    style: TextStyle::PLAIN,
                 },
                 Item::Box {
                     rect: RECT,
@@ -227,5 +230,33 @@ mod tests {
             (clip.min.x, clip.min.y, clip.max.x, clip.max.y),
             (10.0, 10.0, 60.0, 40.0)
         );
+    }
+
+    #[test]
+    fn text_draws_in_its_style() {
+        let item = |style| Item::Text {
+            rect: RECT,
+            text: "a".to_owned(),
+            colour: colour("#ffffff"),
+            style,
+        };
+        let bold = TextStyle {
+            bold: true,
+            ..TextStyle::PLAIN
+        };
+        let bar = Bar {
+            items: vec![item(TextStyle::PLAIN), item(bold)],
+        };
+        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0));
+        let fonts: Vec<_> = list
+            .commands()
+            .iter()
+            .filter_map(|command| match command {
+                crcbl_ui::draw_list::DrawCommand::Glyphs { font, .. } => Some(font.synthesis()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(fonts.len(), 2);
+        assert!(!fonts[0].bold && fonts[1].bold, "{fonts:?}");
     }
 }

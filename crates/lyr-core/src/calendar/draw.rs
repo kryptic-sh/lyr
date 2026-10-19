@@ -11,7 +11,7 @@ use chrono::{Datelike, NaiveDate, Weekday};
 use lyr_config::{Colour, Theme};
 
 use super::{Mode, Week, month, weekdays};
-use crate::draw::{DrawList, Item, Size};
+use crate::draw::{DrawList, Item, Size, TextStyle};
 use crate::hit::Rect;
 
 /// Months across in year mode: waybar's `mode-mon-col` in the dotfiles.
@@ -82,6 +82,7 @@ impl Grid<'_> {
             },
             text: text.to_owned(),
             colour,
+            style: TextStyle::PLAIN,
         }
     }
 }
@@ -173,6 +174,7 @@ fn block(
         },
         text: title,
         colour: theme.calendar_months,
+        style: TextStyle::PLAIN,
     });
     for (column, day) in weekdays(first).into_iter().enumerate() {
         items.push(grid.cell_text(x, y + lh, column, short(day), theme.calendar_weekdays));
@@ -213,6 +215,7 @@ fn block(
             },
             text: number,
             colour: theme.calendar_weeks,
+            style: TextStyle::PLAIN,
         });
     }
 }

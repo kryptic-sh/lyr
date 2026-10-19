@@ -1,6 +1,6 @@
 use lyr_config::{Colour, Platform, Theme, from_sources};
 
-use super::{Bar, Button, Content, DrawList, Item, Module, Target, build};
+use super::{Bar, Button, Content, DrawList, Item, Module, Target, TextStyle, build};
 use crate::hit::Rect;
 
 /// Every character is 10 px wide.
@@ -226,6 +226,7 @@ fn a_tooltip_pads_its_text_on_its_own_background() {
                 },
                 text: "Power Button".to_owned(),
                 colour: theme.tooltip_foreground,
+                style: TextStyle::PLAIN,
             },
         ]
     );
@@ -275,6 +276,7 @@ fn an_offset_moves_every_item_a_group_holds() {
                 rect,
                 text: "a".to_owned(),
                 colour: theme.foreground,
+                style: TextStyle::PLAIN,
             },
         ],
     };
@@ -293,6 +295,7 @@ fn an_offset_moves_every_item_a_group_holds() {
                     rect: moved,
                     text: "a".to_owned(),
                     colour: theme.foreground,
+                    style: TextStyle::PLAIN,
                 },
             ],
         }

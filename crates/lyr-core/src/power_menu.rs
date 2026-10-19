@@ -8,7 +8,7 @@
 
 use lyr_config::{Platform, Theme};
 
-use crate::draw::{DrawList, Item, Size};
+use crate::draw::{DrawList, Item, Size, TextStyle};
 use crate::hit::{Rect, Regions};
 
 /// One power action.
@@ -159,6 +159,7 @@ impl Menu {
                 } else {
                     theme.foreground
                 },
+                style: TextStyle::PLAIN,
             });
             regions.push(rect, entry);
         }

@@ -76,9 +76,9 @@ fn load_text(config: &Config) -> anyhow::Result<Text> {
         tracing::warn!("font `{family}` is not installed; using a monospace font");
     }
     for (path, reason) in &font.unreadable {
-        tracing::warn!("fallback font {} skipped: {reason}", path.display());
+        tracing::warn!("font {} skipped: {reason}", path.display());
     }
-    Ok(Text::new(font.font, config.theme.font_size as f32))
+    Ok(Text::new(font.font, config.theme.font_size as f32).with_faces(font.faces))
 }
 
 /// When the clock's text next changes under `tick`.

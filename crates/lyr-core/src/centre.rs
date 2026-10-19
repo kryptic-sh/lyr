@@ -10,7 +10,7 @@ use std::time::Instant;
 
 use lyr_config::Theme;
 
-use crate::draw::{self, DrawList, Item, Size};
+use crate::draw::{self, DrawList, Item, Size, TextStyle};
 use crate::hit::{Rect, Regions};
 use crate::media::{Control, Player, Status};
 use crate::notifications::Store;
@@ -109,6 +109,7 @@ pub fn draw(
         },
         text: text.to_owned(),
         colour,
+        style: TextStyle::PLAIN,
     };
 
     // The title and Clear All.
@@ -202,6 +203,7 @@ pub fn draw(
                 },
                 text: text.to_owned(),
                 colour,
+                style: TextStyle::PLAIN,
             });
         }
         bottom = card.y + card.height;

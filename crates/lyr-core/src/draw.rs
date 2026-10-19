@@ -12,6 +12,23 @@ use lyr_config::{Colour, Theme};
 use crate::hit::{Rect, Regions};
 use crate::layout::{Form, Slot, layout};
 
+/// How text is drawn: which of the font's faces, and whether underlined.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TextStyle {
+    pub bold: bool,
+    pub italic: bool,
+    pub underline: bool,
+}
+
+impl TextStyle {
+    /// Upright, regular and not underlined.
+    pub const PLAIN: Self = Self {
+        bold: false,
+        italic: false,
+        underline: false,
+    };
+}
+
 /// Something to draw.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Item {
@@ -29,6 +46,7 @@ pub enum Item {
         rect: Rect,
         text: String,
         colour: Colour,
+        style: TextStyle,
     },
     /// Items drawn together and then faded as one, like CSS `opacity`, so a
     /// box's text does not show its background through itself.
@@ -59,10 +77,16 @@ impl Item {
                 fill,
                 border,
             },
-            Self::Text { rect, text, colour } => Self::Text {
+            Self::Text {
+                rect,
+                text,
+                colour,
+                style,
+            } => Self::Text {
                 rect: moved(rect),
                 text,
                 colour,
+                style,
             },
             Self::Group { opacity, items } => Self::Group {
                 opacity,
@@ -265,6 +289,7 @@ pub fn build<T: Clone>(
                         },
                         text: text.clone(),
                         colour: *colour,
+                        style: TextStyle::PLAIN,
                     });
                 }
                 Content::Buttons(buttons) => {
@@ -280,6 +305,7 @@ pub fn build<T: Clone>(
                             },
                             text: button.text.clone(),
                             colour: button.colour,
+                            style: TextStyle::PLAIN,
                         });
                         regions.push(button_rect, Target::Button(module.target.clone(), i));
                         x += width;
@@ -339,6 +365,7 @@ pub fn tooltip(
                 },
                 text: line.to_owned(),
                 colour: theme.tooltip_foreground,
+                style: TextStyle::PLAIN,
             }),
     );
     (DrawList { items }, size)
