@@ -558,15 +558,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   unless the last scan is under 30 s old; a password typed with text input
   `Password`, spaces kept; `recovery` applied to a failure by the source task; a
   second click on the module within GTK's default double-click time leaves it
-  open. Tested on crcbl's headless shell and mutation-checked. Not built: a
-  failure while the menu is closed is only logged, where plan 10 asks for a
-  notification with the SSID escaped for markup. Two equally strong access
-  points of one SSID: the first listed is joined, which either would do. The
-  header's buttons take the arrow keys from the right (No before Yes), as in the
-  Bluetooth menu. The Bluetooth menu keeps the outline where it was when a
-  question appears, so Enter there presses the outlined button rather than
-  answering; the Wi-Fi menu drops the outline instead (`MenuPanel::unfocus`).
-  Whether the Bluetooth menu should do the same is open.
+  open. Tested on crcbl's headless shell and mutation-checked. A failure while
+  the menu is closed is a notice from lyr
+  (`notifications::linux::notify_session`, to whichever daemon holds the name,
+  lyr's own included), its text escaped for markup (`lyr_core::markup::escape`);
+  the call is tested against lyr's daemon on a peer-to-peer connection, the glue
+  that sends it is not. Two equally strong access points of one SSID: the first
+  listed is joined, which either would do. The header's buttons take the arrow
+  keys from the right (No before Yes), as in the Bluetooth menu. The Bluetooth
+  menu keeps the outline where it was when a question appears, so Enter there
+  presses the outlined button rather than answering; the Wi-Fi menu drops the
+  outline instead (`MenuPanel::unfocus`). Whether the Bluetooth menu should do
+  the same is open.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

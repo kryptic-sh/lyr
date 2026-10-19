@@ -1,4 +1,4 @@
-use super::{Span, Style, parse, plain};
+use super::{Span, Style, escape, parse, plain};
 
 const BOLD: Style = Style {
     bold: true,
@@ -139,4 +139,14 @@ fn an_image_is_left_out_and_a_link_takes_either_quote() {
             }
         )]
     );
+}
+
+#[test]
+fn escaped_text_reads_back_as_itself() {
+    for text in ["<b>Caf\u{e9} & bar</b>", "&amp; <a href=\"x\">", "plain"] {
+        let spans = parse(&escape(text));
+        assert_eq!(plain(&spans), text);
+        assert!(spans.iter().all(|span| span.style == Style::default()));
+    }
+    assert_eq!(escape("a<b>&c"), "a&lt;b&gt;&amp;c");
 }

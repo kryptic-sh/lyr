@@ -9,35 +9,7 @@ use tokio::sync::mpsc;
 use zbus::connection::Builder;
 use zbus::{Connection, Guid, OwnedVariant};
 
-use super::{Change, Daemon, PATH, Served};
-
-/// How an application sees the daemon.
-#[zbus::proxy(
-    interface = "org.freedesktop.Notifications",
-    default_service = "org.freedesktop.Notifications",
-    default_path = "/org/freedesktop/Notifications"
-)]
-trait Notifications {
-    #[allow(clippy::too_many_arguments)]
-    fn notify(
-        &self,
-        app_name: &str,
-        replaces_id: u32,
-        app_icon: &str,
-        summary: &str,
-        body: &str,
-        actions: &[&str],
-        hints: HashMap<&str, OwnedVariant>,
-        expire_timeout: i32,
-    ) -> zbus::Result<u32>;
-    fn close_notification(&self, id: u32) -> zbus::Result<()>;
-    fn get_capabilities(&self) -> zbus::Result<Vec<String>>;
-    fn get_server_information(&self) -> zbus::Result<(String, String, String, String)>;
-    #[zbus(signal)]
-    fn notification_closed(&self, id: u32, reason: u32) -> zbus::Result<()>;
-    #[zbus(signal)]
-    fn action_invoked(&self, id: u32, action_key: String) -> zbus::Result<()>;
-}
+use super::{Change, Daemon, NotificationsProxy, PATH, Served, notify};
 
 struct Running {
     store: Arc<Mutex<Store>>,
@@ -317,4 +289,17 @@ async fn clear_all_dismisses_every_notification() {
         assert_eq!(args.reason, CloseReason::Dismissed as u32);
     }
     assert!(served.clear().await.expect("cleared").is_empty());
+}
+
+#[tokio::test]
+async fn lyr_s_own_notice_reaches_the_daemon() {
+    let running = daemon().await;
+    let id = notify(running.client.inner().connection(), "Wi-Fi", "a &amp; b")
+        .await
+        .expect("notified");
+    let store = running.store.lock().expect("a store");
+    let held = store.get(id).expect("held");
+    assert_eq!(held.content.app_name, "lyr");
+    assert_eq!(held.content.summary, "Wi-Fi");
+    assert_eq!(held.content.body, "a &amp; b");
 }

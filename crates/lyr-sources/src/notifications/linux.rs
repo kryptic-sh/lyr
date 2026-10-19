@@ -311,5 +311,59 @@ impl Served {
     }
 }
 
+/// How an application sees the daemon, as lyr does to send its own
+/// notices ([`notify`]).
+#[zbus::proxy(
+    interface = "org.freedesktop.Notifications",
+    default_service = "org.freedesktop.Notifications",
+    default_path = "/org/freedesktop/Notifications"
+)]
+trait Notifications {
+    #[allow(clippy::too_many_arguments)]
+    fn notify(
+        &self,
+        app_name: &str,
+        replaces_id: u32,
+        app_icon: &str,
+        summary: &str,
+        body: &str,
+        actions: &[&str],
+        hints: HashMap<&str, OwnedVariant>,
+        expire_timeout: i32,
+    ) -> zbus::Result<u32>;
+    fn close_notification(&self, id: u32) -> zbus::Result<()>;
+    fn get_capabilities(&self) -> zbus::Result<Vec<String>>;
+    fn get_server_information(&self) -> zbus::Result<(String, String, String, String)>;
+    #[zbus(signal)]
+    fn notification_closed(&self, id: u32, reason: u32) -> zbus::Result<()>;
+    #[zbus(signal)]
+    fn action_invoked(&self, id: u32, action_key: String) -> zbus::Result<()>;
+}
+
+/// Sends a notice from lyr itself to whichever daemon holds the name on
+/// `connection`, lyr's own included: `summary`, and `body` in the spec's
+/// markup, so text in it from elsewhere is to be escaped
+/// ([`lyr_core::markup::escape`]).
+///
+/// # Errors
+///
+/// When no daemon answers.
+pub async fn notify(connection: &Connection, summary: &str, body: &str) -> zbus::Result<u32> {
+    NotificationsProxy::new(connection)
+        .await?
+        .notify("lyr", 0, "", summary, body, &[], HashMap::new(), -1)
+        .await
+}
+
+/// [`notify`] on the session bus, through a connection of its own: lyr's
+/// notices are rare.
+///
+/// # Errors
+///
+/// When the session bus cannot be reached or no daemon answers.
+pub async fn notify_session(summary: &str, body: &str) -> zbus::Result<u32> {
+    notify(&Connection::session().await?, summary, body).await
+}
+
 #[cfg(test)]
 mod tests;

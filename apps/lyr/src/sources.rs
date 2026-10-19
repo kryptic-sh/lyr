@@ -125,6 +125,8 @@ pub struct Commands {
     bluetooth: tokio::sync::mpsc::UnboundedSender<BluetoothRequest>,
     #[cfg(target_os = "linux")]
     wifi: tokio::sync::mpsc::UnboundedSender<WifiRequest>,
+    #[cfg(target_os = "linux")]
+    notices: tokio::sync::mpsc::UnboundedSender<(String, String)>,
 }
 
 #[cfg(target_os = "linux")]
@@ -149,6 +151,11 @@ impl Commands {
         let _stopped = self
             .notifications
             .send(NotificationRequest::Close(id, reason));
+    }
+
+    /// Sends a notice from lyr itself: `summary`, and `body` in markup.
+    pub fn notify(&self, summary: String, body: String) {
+        let _stopped = self.notices.send((summary, body));
     }
 
     /// Asks NetworkManager what the Wi-Fi menu wants.
@@ -217,6 +224,7 @@ pub fn start(
         let (media, media_requests) = tokio::sync::mpsc::unbounded_channel();
         let (bluetooth, bluetooth_requests) = tokio::sync::mpsc::unbounded_channel();
         let (wifi, wifi_requests) = tokio::sync::mpsc::unbounded_channel();
+        let (notices, notice_requests) = tokio::sync::mpsc::unbounded_channel();
         linux::start(
             sender,
             linux::Requests {
@@ -227,6 +235,7 @@ pub fn start(
                 media: media_requests,
                 bluetooth: bluetooth_requests,
                 wifi: wifi_requests,
+                notices: notice_requests,
             },
             replace_notifications,
             waker,
@@ -241,6 +250,7 @@ pub fn start(
                 media,
                 bluetooth,
                 wifi,
+                notices,
             },
         ))
     }
@@ -299,6 +309,7 @@ mod linux {
         pub(super) media: UnboundedReceiver<(String, Control)>,
         pub(super) bluetooth: UnboundedReceiver<BluetoothRequest>,
         pub(super) wifi: UnboundedReceiver<WifiRequest>,
+        pub(super) notices: UnboundedReceiver<(String, String)>,
     }
 
     pub(super) fn start(
@@ -315,6 +326,7 @@ mod linux {
             media,
             bluetooth: bluetooth_requests,
             wifi,
+            notices: notice_requests,
         } = requests;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -338,6 +350,7 @@ mod linux {
                         ),
                         workspaces(sender, focus, waker),
                         power_menu(power),
+                        notices(notice_requests),
                     );
                 });
             })?;
@@ -428,6 +441,16 @@ mod linux {
         for watched in [watched, watched_wifi] {
             if let Err(error) = watched {
                 tracing::warn!("network: NetworkManager stopped answering: {error}");
+            }
+        }
+    }
+
+    /// Sends lyr's own notices to whichever notification daemon is running.
+    async fn notices(mut requests: UnboundedReceiver<(String, String)>) {
+        while let Some((summary, body)) = requests.recv().await {
+            let sent = lyr_sources::notifications::linux::notify_session(&summary, &body).await;
+            if let Err(error) = sent {
+                tracing::warn!("notice `{summary}` not sent: {error}");
             }
         }
     }

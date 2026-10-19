@@ -79,8 +79,8 @@ impl App {
         menu.next_wake(self.data.wifi.as_ref()?, Instant::now())
     }
 
-    /// Shows how a join ended in the menu; with the menu closed, it is
-    /// logged.
+    /// Shows how a join ended in the menu; with the menu closed, a failure
+    /// is a notice.
     #[cfg(target_os = "linux")]
     pub(super) fn wifi_joined(&mut self, joined: crate::wifi_menu::Joined) {
         match &mut self.wifi_menu {
@@ -88,6 +88,9 @@ impl App {
             None => {
                 if let crate::wifi_menu::Joined::Failed(why) = joined {
                     tracing::warn!("wi-fi: {why}");
+                    // It names the network, which is anyone's text.
+                    self.commands
+                        .notify("Wi-Fi".to_owned(), lyr_core::markup::escape(&why));
                 }
             }
         }

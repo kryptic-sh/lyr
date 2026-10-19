@@ -81,6 +81,22 @@ pub fn plain(spans: &[Span]) -> String {
     spans.iter().map(|span| span.text.as_str()).collect()
 }
 
+/// `text` written so markup shows it as it is: `&`, `<` and `>` as XML's
+/// entities.
+#[must_use]
+pub fn escape(text: &str) -> String {
+    let mut escaped = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            _ => escaped.push(c),
+        }
+    }
+    escaped
+}
+
 /// A tag the spec lists.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Tag {

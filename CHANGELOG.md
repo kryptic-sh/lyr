@@ -58,7 +58,8 @@ and this project adheres to
   asks for a new one's password in a masked field, and Forget, after a
   confirmation. WEP and enterprise networks are refused with a message. A saved
   network whose password fails is offered a new one; a new profile that fails on
-  its password, or an open one that fails, is deleted.
+  its password, or an open one that fails, is deleted. A failure after the menu
+  closed comes as a notification.
 - On Linux, the Bluetooth menu, opened by a click on the Bluetooth module or
   `lyr panel bluetooth`: the adapter's power, discoverable and pairable
   switches, a scan toggle, and each device with connect or disconnect, pair,
