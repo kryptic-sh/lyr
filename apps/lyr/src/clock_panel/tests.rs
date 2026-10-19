@@ -81,6 +81,7 @@ impl Setup {
                     &Contents {
                         today: today(),
                         store: self.store.as_ref(),
+                        players: &[],
                         now: Instant::now(),
                     },
                 )
@@ -190,6 +191,7 @@ impl Setup {
             &Contents {
                 today: today(),
                 store: self.store.as_ref(),
+                players: &[],
                 now: Instant::now(),
             },
         );

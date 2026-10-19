@@ -38,6 +38,7 @@ fn the_title_row_has_clear_all_at_the_right() {
     let theme = theme();
     let (list, _, regions) = draw(
         &Store::default(),
+        &[],
         WIDTH,
         Instant::now(),
         &measure,
@@ -60,7 +61,7 @@ fn the_title_row_has_clear_all_at_the_right() {
 fn the_switch_shows_do_not_disturb() {
     let theme = theme();
     let knob = |store: &Store| {
-        let (list, _, regions) = draw(store, WIDTH, Instant::now(), &measure, LINE, &theme);
+        let (list, _, regions) = draw(store, &[], WIDTH, Instant::now(), &measure, LINE, &theme);
         // Below the 32 px title row and a gap.
         let switch_y = 32.0 + GAP;
         assert_eq!(regions.hit(WIDTH - 1.0, switch_y), Some(&Target::Dnd));
@@ -91,7 +92,7 @@ fn the_history_follows_the_switch_newest_first() {
     let mut store = Store::default();
     let older = notify(&mut store, "mail", Urgency::Normal, now);
     let newer = notify(&mut store, "chat", Urgency::Normal, now);
-    let (_, size, regions) = draw(&store, WIDTH, now, &measure, LINE, &theme);
+    let (_, size, regions) = draw(&store, &[], WIDTH, now, &measure, LINE, &theme);
     let first = 32.0 + GAP + LINE + GAP;
     let entry = 2.0 * (BORDER + INSET) + LINE;
     assert_eq!(regions.hit(1.0, first), Some(&Target::Notification(newer)));
@@ -106,6 +107,7 @@ fn the_history_follows_the_switch_newest_first() {
 fn an_empty_history_ends_at_the_switch() {
     let (_, size, _) = draw(
         &Store::default(),
+        &[],
         WIDTH,
         Instant::now(),
         &measure,
@@ -122,7 +124,7 @@ fn entries_of_one_app_sit_closer_than_groups() {
     let mut store = Store::default();
     let first = notify(&mut store, "mail", Urgency::Normal, now);
     let second = notify(&mut store, "mail", Urgency::Normal, now);
-    let (_, _, regions) = draw(&store, WIDTH, now, &measure, LINE, &theme);
+    let (_, _, regions) = draw(&store, &[], WIDTH, now, &measure, LINE, &theme);
     let top = 32.0 + GAP + LINE + GAP;
     let entry = 2.0 * (BORDER + INSET) + LINE;
     assert_eq!(regions.hit(1.0, top), Some(&Target::Notification(second)));
@@ -145,7 +147,7 @@ fn an_entry_s_action_button_is_its_own_target() {
         },
         now,
     );
-    let (_, _, regions) = draw(&store, WIDTH, now, &measure, LINE, &theme);
+    let (_, _, regions) = draw(&store, &[], WIDTH, now, &measure, LINE, &theme);
     let entry = 32.0 + GAP + LINE + GAP;
     let button_y = entry + BORDER + INSET + LINE + 4.0 + 1.0;
     assert_eq!(
@@ -153,4 +155,53 @@ fn an_entry_s_action_button_is_its_own_target() {
         Some(&Target::Action(id, 0))
     );
     assert_eq!(regions.hit(1.0, entry), Some(&Target::Notification(id)));
+}
+
+#[test]
+fn a_media_player_is_a_card_with_its_controls_before_the_history() {
+    use crate::media::{Control, Player, Status};
+    let theme = theme();
+    let now = Instant::now();
+    let mut store = Store::default();
+    let id = notify(&mut store, "mail", Urgency::Normal, now);
+    let players = [Player {
+        bus_name: "org.mpris.MediaPlayer2.test".to_owned(),
+        title: "A Song".to_owned(),
+        artist: "Someone".to_owned(),
+        status: Status::Playing,
+    }];
+    let (list, _, regions) = draw(&store, &players, WIDTH, now, &measure, LINE, &theme);
+    let card_top = 32.0 + GAP + LINE + GAP;
+    // Two lines inside an 8 px padding and a 2 px border.
+    let card = 2.0 * (2.0 + 8.0 + LINE);
+    let middle = card_top + (card - LINE) / 2.0 + 1.0;
+    // Each symbol is one character, 10 px; right to left, 5 px apart, inside
+    // the card's padding and border.
+    let next = WIDTH - 10.0 - 5.0;
+    assert_eq!(
+        regions.hit(next, middle),
+        Some(&Target::Media(0, Control::Next))
+    );
+    assert_eq!(
+        regions.hit(next - 15.0, middle),
+        Some(&Target::Media(0, Control::PlayPause))
+    );
+    assert_eq!(
+        regions.hit(next - 30.0, middle),
+        Some(&Target::Media(0, Control::Previous))
+    );
+    let history = card_top + card + GAP;
+    assert_eq!(regions.hit(1.0, history), Some(&Target::Notification(id)));
+    let artist = list.items.iter().find_map(|item| match item {
+        Item::Text { text, colour, .. } if text == "Someone" => Some(*colour),
+        _ => None,
+    });
+    assert_eq!(artist, Some(theme.media_artist));
+    let pause = char::from_u32(0x23F8).expect("a char").to_string();
+    assert!(
+        list.items
+            .iter()
+            .any(|item| matches!(item, Item::Text { text, .. } if *text == pause)),
+        "a playing player offers pause"
+    );
 }

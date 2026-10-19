@@ -1,10 +1,10 @@
 //! The notification centre under the clock panel's calendar
-//! (`docs/plan/09-notifications.md`): swaync's `title`, `dnd` and
+//! (`docs/plan/09-notifications.md`): swaync's `title`, `dnd`, `mpris` and
 //! `notifications` widgets in its order, in the dotfiles' style.
 //!
 //! The title and the do-not-disturb label are drawn at the bar's text size,
-//! not swaync's 2rem: lyr draws one size of text so far. Media players (the
-//! `mpris` widget) are not drawn.
+//! not swaync's 2rem: lyr draws one size of text so far. A media player's art
+//! is not drawn: lyr draws no images yet.
 
 use std::time::Instant;
 
@@ -12,6 +12,7 @@ use lyr_config::Theme;
 
 use crate::draw::{DrawList, Item, Size};
 use crate::hit::{Rect, Regions};
+use crate::media::{Control, Player, Status};
 use crate::notifications::Store;
 use crate::toast;
 
@@ -24,6 +25,8 @@ pub enum Target {
     /// An action button, by the action's index in the notification's
     /// actions.
     Action(u32, usize),
+    /// A media player's control, by the player's index in the list drawn.
+    Media(usize, Control),
 }
 
 /// Above the do-not-disturb row and the history: swaync's `widget-dnd`
@@ -41,13 +44,28 @@ const KNOB_INSET: f32 = 4.0;
 const ENTRY_GAP: f32 = 8.0;
 /// Between two of the history's groups, besides the entries' own gap.
 const GROUP_GAP: f32 = 8.0;
+/// Inside a media player's card.
+const CARD_PADDING: f32 = 8.0;
+/// Between a media player's control buttons: swaync's 5 px.
+const CONTROL_GAP: f32 = 5.0;
 
-/// The centre for `store` at `now`, `width` wide: its draw list, its size,
-/// and what each click lands on, its text measured by `measure` in lines
-/// `line_height` tall.
+/// A control's symbol: the standard media symbols, which most fonts carry.
+const fn symbol(control: Control, status: Status) -> &'static str {
+    match (control, status) {
+        (Control::Previous, _) => "\u{23EE}",
+        (Control::PlayPause, Status::Playing) => "\u{23F8}",
+        (Control::PlayPause, _) => "\u{25B6}",
+        (Control::Next, _) => "\u{23ED}",
+    }
+}
+
+/// The centre for `store` and the media `players` at `now`, `width` wide:
+/// its draw list, its size, and what each click lands on, its text measured
+/// by `measure` in lines `line_height` tall.
 #[must_use]
 pub fn draw(
     store: &Store,
+    players: &[Player],
     width: f32,
     now: Instant,
     measure: &dyn Fn(&str) -> f32,
@@ -135,6 +153,59 @@ pub fn draw(
     // The bottom of the last thing drawn.
     let mut bottom = switch.y + switch.height;
     y = bottom + GAP;
+
+    // The media players, a card each.
+    for (index, player) in players.iter().enumerate() {
+        let card = Rect {
+            x: 0.0,
+            y,
+            width,
+            height: 2.0 * (BORDER + CARD_PADDING + line_height),
+        };
+        items.push(Item::Box {
+            rect: card,
+            radius: RADIUS,
+            fill: theme.toast_background,
+            border: Some((BORDER, theme.panel_border)),
+        });
+        let inner = BORDER + CARD_PADDING;
+        let mut right = card.x + card.width - inner;
+        // The controls, right to left, centred on the card's height.
+        let middle = card.y + (card.height - line_height) / 2.0;
+        for control in [Control::Next, Control::PlayPause, Control::Previous] {
+            let text = symbol(control, player.status);
+            let button = Rect {
+                x: right - measure(text),
+                y: middle,
+                width: measure(text),
+                height: line_height,
+            };
+            items.push(label(text, button.x, button.y, theme.panel_foreground));
+            regions.push(button, Target::Media(index, control));
+            right = button.x - CONTROL_GAP;
+        }
+        let text_width = (right - CONTROL_GAP - (card.x + inner)).max(0.0);
+        for (line, (text, colour)) in [
+            (player.title.as_str(), theme.panel_foreground),
+            (player.artist.as_str(), theme.media_artist),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            items.push(Item::Text {
+                rect: Rect {
+                    x: card.x + inner,
+                    y: card.y + inner + line_height * line as f32,
+                    width: text_width,
+                    height: line_height,
+                },
+                text: text.to_owned(),
+                colour,
+            });
+        }
+        bottom = card.y + card.height;
+        y = bottom + GAP;
+    }
 
     // The history, swaync's order, each entry drawn as a toast.
     for (index, (_, members)) in store.history().into_iter().enumerate() {

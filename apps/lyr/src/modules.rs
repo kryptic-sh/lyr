@@ -31,6 +31,9 @@ pub struct Data {
     /// The notification store, while lyr is the notification daemon.
     #[cfg(target_os = "linux")]
     pub notifications: Option<Arc<Mutex<lyr_core::notifications::Store>>>,
+    /// The media players, for the clock panel. Empty where there is no
+    /// source for them.
+    pub players: Vec<lyr_core::media::Player>,
 }
 
 impl Data {
@@ -56,6 +59,8 @@ impl Data {
             Update::Zone(zone) => self.zone = zone,
             #[cfg(target_os = "linux")]
             Update::Notifications(store) => self.notifications = Some(store),
+            #[cfg(target_os = "linux")]
+            Update::Players(players) => self.players = players,
             // The toasts follow each change; the bell reads the store.
             #[cfg(target_os = "linux")]
             Update::Notification(_) => {}

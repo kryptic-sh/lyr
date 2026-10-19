@@ -239,6 +239,7 @@ impl App {
         let contents = Contents {
             today: chrono::Local::now().date_naive(),
             store: store.as_deref(),
+            players: &self.data.players,
             now: Instant::now(),
         };
         let outcome = panel.event(shell, event, &look, &contents)?;
@@ -264,6 +265,12 @@ impl App {
             (Target::Dnd, Press::Left) => self.notifications(Request::Dnd),
             (Target::Notification(id), Press::Left) => {
                 self.toast_clicked(Some(Clicked::Invoke(id)));
+                return;
+            }
+            (Target::Media(index, control), Press::Left) => {
+                if let Some(player) = self.data.players.get(index) {
+                    self.commands.media(player.bus_name.clone(), control);
+                }
                 return;
             }
             (Target::Action(id, index), Press::Left) => {

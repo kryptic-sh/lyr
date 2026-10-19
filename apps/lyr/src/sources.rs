@@ -36,6 +36,9 @@ pub enum Update {
     /// A notification arrived or an application closed one.
     #[cfg(target_os = "linux")]
     Notification(lyr_sources::notifications::linux::Change),
+    /// The media players on the session bus.
+    #[cfg(target_os = "linux")]
+    Players(Vec<lyr_core::media::Player>),
 }
 
 /// What the bar asks of the notification daemon.
@@ -59,6 +62,8 @@ pub struct Commands {
     power: tokio::sync::mpsc::UnboundedSender<lyr_core::power_menu::Entry>,
     #[cfg(target_os = "linux")]
     notifications: tokio::sync::mpsc::UnboundedSender<NotificationRequest>,
+    #[cfg(target_os = "linux")]
+    media: tokio::sync::mpsc::UnboundedSender<(String, lyr_core::media::Control)>,
 }
 
 #[cfg(target_os = "linux")]
@@ -85,6 +90,11 @@ impl Commands {
             .send(NotificationRequest::Close(id, reason));
     }
 
+    /// Presses `control` on the media player at `bus_name`.
+    pub fn media(&self, bus_name: String, control: lyr_core::media::Control) {
+        let _stopped = self.media.send((bus_name, control));
+    }
+
     /// Closes every notification, as Clear All does.
     pub fn clear_notifications(&self) {
         let _stopped = self.notifications.send(NotificationRequest::Clear);
@@ -108,6 +118,10 @@ impl Commands {
         );
     }
 
+    /// Windows and macOS: no media players are read there yet, so there is
+    /// none to control.
+    pub fn media(&self, _bus_name: String, _control: lyr_core::media::Control) {}
+
     /// Windows and macOS: lyr is not the notification daemon there, so it
     /// holds no notification to close.
     pub fn close_notification(&self, _id: u32, _reason: lyr_core::notifications::CloseReason) {}
@@ -129,6 +143,7 @@ pub fn start(
         let (profile, profile_requests) = tokio::sync::mpsc::unbounded_channel();
         let (power, power_requests) = tokio::sync::mpsc::unbounded_channel();
         let (notifications, notification_requests) = tokio::sync::mpsc::unbounded_channel();
+        let (media, media_requests) = tokio::sync::mpsc::unbounded_channel();
         linux::start(
             sender,
             linux::Requests {
@@ -136,6 +151,7 @@ pub fn start(
                 profile: profile_requests,
                 power: power_requests,
                 notifications: notification_requests,
+                media: media_requests,
             },
             replace_notifications,
             waker,
@@ -147,6 +163,7 @@ pub fn start(
                 profile,
                 power,
                 notifications,
+                media,
             },
         ))
     }
@@ -162,10 +179,12 @@ mod linux {
     use std::sync::mpsc;
 
     use crcbl_shell::ShellWaker;
+    use lyr_core::media::Control;
     use lyr_core::power_menu::Entry;
     use lyr_sources::battery::linux::UPower;
     use lyr_sources::bluetooth::linux::BlueZ;
     use lyr_sources::clock::linux::TimeDate;
+    use lyr_sources::mpris::linux::Players;
     use lyr_sources::power::linux::Logind;
     use lyr_sources::power_profile::linux::PowerProfiles;
     use lyr_wm::hyprland::{Hyprland, Workspace};
@@ -195,6 +214,7 @@ mod linux {
         pub(super) profile: UnboundedReceiver<String>,
         pub(super) power: UnboundedReceiver<Entry>,
         pub(super) notifications: UnboundedReceiver<NotificationRequest>,
+        pub(super) media: UnboundedReceiver<(String, Control)>,
     }
 
     pub(super) fn start(
@@ -208,6 +228,7 @@ mod linux {
             profile,
             power,
             notifications: notification_requests,
+            media,
         } = requests;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -221,6 +242,7 @@ mod linux {
                         power_profile(sender.clone(), profile, waker.clone()),
                         bluetooth(sender.clone(), waker.clone()),
                         clock(sender.clone(), waker.clone()),
+                        players(sender.clone(), media, waker.clone()),
                         notifications(
                             sender.clone(),
                             notification_requests,
@@ -301,6 +323,42 @@ mod linux {
         let (watched, ()) = tokio::join!(timedate.watch(&zones), forward);
         if let Err(error) = watched {
             tracing::warn!("clock: timedate1 stopped answering: {error}");
+        }
+    }
+
+    /// The media players, and what the clock panel asks of them.
+    async fn players(
+        sender: mpsc::Sender<Update>,
+        mut requests: UnboundedReceiver<(String, Control)>,
+        waker: Option<ShellWaker>,
+    ) {
+        let players = match Players::session().await {
+            Ok(players) => players,
+            Err(error) => {
+                tracing::warn!("media: the session bus is not reachable: {error}");
+                return;
+            }
+        };
+        let (lists, mut changed) = watch::channel(Vec::new());
+        let forward = async {
+            while changed.changed().await.is_ok() {
+                let list = changed.borrow_and_update().clone();
+                if !deliver(&sender, waker.as_ref(), Update::Players(list)) {
+                    break;
+                }
+            }
+        };
+        let press = async {
+            while let Some((bus_name, control)) = requests.recv().await {
+                // The player's new state comes back as a change.
+                if let Err(error) = players.control(&bus_name, control).await {
+                    tracing::warn!("media: {bus_name}: {error}");
+                }
+            }
+        };
+        let (watched, (), ()) = tokio::join!(players.watch(&lists), forward, press);
+        if let Err(error) = watched {
+            tracing::warn!("media: the session bus stopped answering: {error}");
         }
     }
 

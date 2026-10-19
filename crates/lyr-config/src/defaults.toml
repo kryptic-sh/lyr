@@ -143,6 +143,7 @@ panel_foreground = "#c0caf5"
 panel_border = "#73daca"
 centre_title = "#7dcfff"
 switch_on = "#ff9e64"
+media_artist = "#565f89"
 # waybar's clock calendar format in the dotfiles.
 calendar_months = "#ffead3"
 calendar_days = "#ecc6d9"

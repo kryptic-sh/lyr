@@ -467,11 +467,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   on the session bus, its title, artists and playback status, re-read on
   `NameOwnerChanged` or any player's `PropertiesChanged`, and Previous,
   PlayPause and Next; reading and the controls tested against a fake player and
-  mutation-checked, finding players by name not (it needs a bus). Not built: the
-  MPRIS widget in the panel, scrolling a history taller than the panel, reading
-  the first weekday and names from the locale, the smaller monospace
-  `calendar_font`, redrawing at midnight, and checking what Hyprland does with a
-  click on the bare desktop while it is open.
+  mutation-checked, finding players by name not (it needs a bus). The panel
+  shows them too, between the switch and the history (swaync's order): a card
+  per player with its title, artist and previous, play/pause and next, the
+  standard media symbols since Nerd Font codepoints were not checked; a click
+  presses the control. Not built: a player's art (lyr draws no images),
+  scrolling a history taller than the panel, reading the first weekday and names
+  from the locale, the smaller monospace `calendar_font`, redrawing at midnight,
+  and checking what Hyprland does with a click on the bare desktop while it is
+  open.
 - **Undocumented Windows APIs:** virtual desktops
   (`IVirtualDesktopManagerInternal`) and setting the power mode
   (`PowerSetActiveOverlayScheme`) can break with any Windows build.

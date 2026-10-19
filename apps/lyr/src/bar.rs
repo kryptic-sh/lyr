@@ -218,6 +218,7 @@ impl App {
         let contents = Contents {
             today: Local::now().date_naive(),
             store: store.as_deref(),
+            players: &self.data.players,
             now: Instant::now(),
         };
         panel.refresh(&look, &contents);

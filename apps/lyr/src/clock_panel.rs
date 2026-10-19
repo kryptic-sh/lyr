@@ -22,6 +22,7 @@ use lyr_core::centre::{self, Target};
 use lyr_core::draw::{DrawList, Item, Size};
 use lyr_core::hit::Rect;
 use lyr_core::hit::Regions;
+use lyr_core::media::Player;
 use lyr_core::notifications::Store;
 use lyr_core::pointer::Press;
 use lyr_render::surface::Surface;
@@ -81,6 +82,8 @@ pub enum Outcome {
 pub struct Contents<'a> {
     pub today: NaiveDate,
     pub store: Option<&'a Store>,
+    /// The media players, drawn in the centre.
+    pub players: &'a [Player],
     pub now: Instant,
 }
 
@@ -266,6 +269,7 @@ impl ClockPanel {
             let top = self.calendar_bottom + centre::GAP;
             let (list, _, regions) = centre::draw(
                 store,
+                contents.players,
                 self.size.width - 2.0 * inset,
                 contents.now,
                 look.measure,

@@ -49,7 +49,8 @@ and this project adheres to
   right click switches to the month, scrolling moves through years or months,
   Escape closes it. Weeks start on Monday for now. On Linux, while lyr is the
   notification daemon, the notification centre sits below the calendar: Clear
-  All, the do-not-disturb switch and the history, grouped by app.
+  All, the do-not-disturb switch, the media players playing (title, artist,
+  previous, play/pause, next) and the history, grouped by app.
 - `lyr --stats` logs the bar's main-loop wake-ups, the events it applied and the
   frames it presented on each output, once a minute, to check that an idle bar
   stays idle.

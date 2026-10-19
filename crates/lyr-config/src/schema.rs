@@ -468,6 +468,8 @@ pub struct Theme {
     pub centre_title: Colour,
     /// The do-not-disturb switch while on.
     pub switch_on: Colour,
+    /// A media player's artist, under its title.
+    pub media_artist: Colour,
     /// The clock panel's calendar: waybar's calendar format in the dotfiles.
     pub calendar_months: Colour,
     pub calendar_days: Colour,
