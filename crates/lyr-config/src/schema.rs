@@ -462,7 +462,12 @@ pub struct Theme {
     pub toast_time: Colour,
     /// The clock panel: swaync's `.control-center` in the dotfiles.
     pub panel_background: Colour,
+    pub panel_foreground: Colour,
     pub panel_border: Colour,
+    /// The notification centre's title.
+    pub centre_title: Colour,
+    /// The do-not-disturb switch while on.
+    pub switch_on: Colour,
     /// The clock panel's calendar: waybar's calendar format in the dotfiles.
     pub calendar_months: Colour,
     pub calendar_days: Colour,

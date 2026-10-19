@@ -64,7 +64,7 @@ fn a_toast_stacks_its_summary_over_its_body() {
         body: "file.zip".to_owned(),
         ..Incoming::default()
     };
-    let (list, size) = draw(&content, Duration::ZERO, measure, 20.0, &theme);
+    let (list, size) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
     let top = BORDER + INSET;
     assert_eq!((size.width, size.height), (WIDTH, 2.0 * top + 40.0));
     assert_eq!(
@@ -79,7 +79,7 @@ fn a_toast_stacks_its_summary_over_its_body() {
         summary: "Ping".to_owned(),
         ..Incoming::default()
     };
-    let (list, size) = draw(&no_body, Duration::ZERO, measure, 20.0, &theme);
+    let (list, size) = draw(&no_body, Duration::ZERO, WIDTH, measure, 20.0, &theme);
     assert_eq!(texts(&list.items), [("Now", top), ("Ping", top)]);
     assert_eq!(size.height, 2.0 * top + 20.0);
 }
@@ -93,7 +93,7 @@ fn the_border_follows_the_urgency() {
             urgency,
             ..Incoming::default()
         };
-        match draw(&content, Duration::ZERO, measure, 20.0, &theme)
+        match draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme)
             .0
             .items[0]
         {
@@ -136,7 +136,14 @@ fn the_time_sits_at_the_right_of_the_summary() {
         summary: "hello".to_owned(),
         ..Incoming::default()
     };
-    let (list, _) = draw(&content, Duration::from_secs(120), measure, 20.0, &theme);
+    let (list, _) = draw(
+        &content,
+        Duration::from_secs(120),
+        WIDTH,
+        measure,
+        20.0,
+        &theme,
+    );
     let time = list
         .items
         .iter()
@@ -158,7 +165,7 @@ fn the_summary_stops_short_of_the_time() {
         body: "a body that may use the whole width".to_owned(),
         ..Incoming::default()
     };
-    let (list, _) = draw(&content, Duration::ZERO, measure, 20.0, &theme);
+    let (list, _) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
     let width = |wanted: &str| {
         list.items
             .iter()

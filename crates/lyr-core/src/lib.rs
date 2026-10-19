@@ -18,6 +18,7 @@ pub mod battery;
 pub mod bell;
 pub mod bluetooth;
 pub mod calendar;
+pub mod centre;
 pub mod clock;
 pub mod control;
 pub mod draw;

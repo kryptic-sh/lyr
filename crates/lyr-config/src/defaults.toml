@@ -139,7 +139,10 @@ toast_border_critical = "#f7768e"
 toast_time = "#565f89"
 # swaync's .control-center in the dotfiles.
 panel_background = "#1a1b26"
+panel_foreground = "#c0caf5"
 panel_border = "#73daca"
+centre_title = "#7dcfff"
+switch_on = "#ff9e64"
 # waybar's clock calendar format in the dotfiles.
 calendar_months = "#ffead3"
 calendar_days = "#ecc6d9"

@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use lyr_config::Theme;
 
-use super::{MARGIN, draw};
+use super::{MARGIN, WIDTH, draw};
 use crate::draw::{DrawList, Size};
 use crate::hit::{Rect, Regions};
 use crate::notifications::Store;
@@ -132,8 +132,14 @@ impl Stack {
         };
         for notification in self.ids().filter_map(|id| store.get(id)) {
             let elapsed = now.saturating_duration_since(notification.received);
-            let (toast, toast_size) =
-                draw(&notification.content, elapsed, &measure, line_height, theme);
+            let (toast, toast_size) = draw(
+                &notification.content,
+                elapsed,
+                WIDTH,
+                &measure,
+                line_height,
+                theme,
+            );
             let top = if size.height > 0.0 {
                 size.height + MARGIN
             } else {

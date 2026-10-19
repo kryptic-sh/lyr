@@ -73,21 +73,24 @@ pub fn relative_time(elapsed: Duration) -> String {
     format!("{count} {unit}{plural} ago")
 }
 
-/// The toast for `content`, which arrived `elapsed` ago: its draw list and
-/// its size, its text measured by `measure` in lines `line_height` tall.
+/// The toast for `content`, which arrived `elapsed` ago, `width` wide (a
+/// toast is [`WIDTH`]; the clock panel's history is as wide as the panel):
+/// its draw list and its size, its text measured by `measure` in lines
+/// `line_height` tall.
 #[must_use]
 pub fn draw(
     content: &Incoming,
     elapsed: Duration,
+    width: f32,
     measure: impl Fn(&str) -> f32,
     line_height: f32,
     theme: &Theme,
 ) -> (DrawList, Size) {
-    let text_width = WIDTH - 2.0 * (BORDER + INSET);
+    let text_width = width - 2.0 * (BORDER + INSET);
     let mut lines = vec![content.summary.clone()];
     lines.extend(wrap(&content.body, text_width, &measure));
     let size = Size {
-        width: WIDTH,
+        width,
         height: 2.0 * (BORDER + INSET) + line_height * lines.len() as f32,
     };
     let border = match content.urgency {
@@ -111,7 +114,7 @@ pub fn draw(
     let time_width = measure(&time);
     items.push(Item::Text {
         rect: Rect {
-            x: WIDTH - BORDER - INSET - time_width,
+            x: width - BORDER - INSET - time_width,
             y: BORDER + INSET,
             width: time_width,
             height: line_height,
