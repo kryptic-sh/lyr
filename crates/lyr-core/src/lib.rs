@@ -36,3 +36,4 @@ pub mod power_menu;
 pub mod power_profile;
 pub mod toast;
 pub mod tooltip;
+pub mod wifi_menu;

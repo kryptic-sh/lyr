@@ -531,6 +531,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   question takes the top over from it. Tested on the headless shell and against
   a recording device on a peer-to-peer connection, mutation-checked; not run
   against a real BlueZ.
+- **Wi-Fi menu, M7.** Built: the menu's model and drawing
+  (`lyr_core::wifi_menu`): an access point's security from its `Flags`,
+  `WpaFlags` and `RsnFlags` (`Security::of`; WEP and 802.1X refused with a
+  message), one row per SSID with the strongest signal and the most demanding
+  security, hidden networks left out, the password rule NetworkManager applies
+  (`password_fits`: 8 – 63 bytes or 64 hex digits for PSK, anything but empty
+  for SAE), the radio switch (no click while a hardware switch blocks it), the
+  scan's state in place of the list, a masked password field, Forget's
+  confirmation, an error until OK, and no clicks on the rows while joining.
+  Tested and mutation-checked. Not built: reading the device, access points and
+  saved profiles from NetworkManager, scanning, joining and forgetting, the
+  panel itself, and the double-click guard. Two equally strong access points of
+  one SSID: the first listed is joined, which either would do.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a
