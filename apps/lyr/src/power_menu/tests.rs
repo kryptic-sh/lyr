@@ -114,7 +114,11 @@ fn the_arrow_keys_move_and_enter_chooses() {
     setup.key(KeyCode::ArrowDown);
     setup.key(KeyCode::ArrowUp);
     assert_eq!(setup.key(KeyCode::Enter), Outcome::Chosen(Entry::Sleep));
-    assert_eq!(setup.key(KeyCode::Escape), Outcome::Cancelled);
+    assert_eq!(
+        setup.key(KeyCode::Escape),
+        Outcome::Dismissed,
+        "crcbl's grab closes on Escape"
+    );
 }
 
 #[test]

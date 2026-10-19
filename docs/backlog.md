@@ -37,15 +37,15 @@ implementation follows until they are answered. The ones that block a milestone:
 
 ## Cross-repo work
 
-- **crcbl: what lyr uses, and at which release.** lyr pins `crcbl-shell` at
-  `=0.5.0` (crcbl's `rust-version` is 1.98, and lyr's follows). crcbl 0.4.0
-  (2026-10-18) brought `crcbl-app`, the window-plus-device crate lyr asked for
-  so that it links no engine, audio (cpal, ALSA) or physics; 0.5.0's only
-  breaking change is in crcbl-phys. M1 adds `crcbl-app`, `crcbl-hal`, `crcbl-ui`
-  (with `system-fonts`), `crcbl-frame`, `crcbl-font` and the backend per
-  platform (Vulkan on Linux, D3D12 on Windows, Metal on macOS), each pinned
-  exactly, and `crcbl-image` with M6. The GPU path, as crcbl reported it (not
-  read yet at 0.4.0 or later; read before M1 relies on it):
+- **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
+  `=0.6.0` (published 2026-10-20; crcbl's `rust-version` is 1.98, and lyr's
+  follows). crcbl 0.4.0 (2026-10-18) brought `crcbl-app`, the window-plus-device
+  crate lyr asked for so that it links no engine, audio (cpal, ALSA) or physics;
+  0.5.0's only breaking change is in crcbl-phys. M1 adds `crcbl-app`,
+  `crcbl-hal`, `crcbl-ui` (with `system-fonts`), `crcbl-frame`, `crcbl-font` and
+  the backend per platform (Vulkan on Linux, D3D12 on Windows, Metal on macOS),
+  each pinned exactly, and `crcbl-image` with M6. The GPU path, as crcbl
+  reported it (not read yet at 0.4.0 or later; read before M1 relies on it):
   `crcbl_app::window::open_window(shell, elapsed, desc)`, `wait_for_configure`
   for the extent, then
   `crcbl_app::present::Presenter::open(&shell, window, extent, &PresenterDesc)`
@@ -113,13 +113,12 @@ implementation follows until they are answered. The ones that block a milestone:
   `ShellCaps::FRAME_CALLBACK` set where the compositor really paces (Wayland,
   and AppKit if it has a real signal); elsewhere `FrameReady` comes at the next
   pump, so lyr has one code path. A window destroyed with a frame pending gets
-  no `FrameReady`. It is queued after opacity groups, the sRGB helper and AppKit
-  IME, which make 0.6.0; it ships in 0.6.0 if it is done before that is cut,
-  otherwise in 0.7.0, and crcbl will say which. lyr's loop then becomes: on a
-  change mark the bar dirty; with no frame pending, present and request one; on
-  `FrameReady`, present again if still dirty
-  ([plan/04](plan/04-rendering-and-theme.md#repaint-on-change-only)). crcbl
-  declined a finite acquire timeout, which would turn the hang into a busy
+  no `FrameReady`. It is not in 0.6.0: crcbl reports it built for the next
+  release, with crcbl-app's own loop waiting for `FrameReady` as a follow-up.
+  lyr's loop then becomes: on a change mark the bar dirty; with no frame
+  pending, present and request one; on `FrameReady`, present again if still
+  dirty ([plan/04](plan/04-rendering-and-theme.md#repaint-on-change-only)).
+  crcbl declined a finite acquire timeout, which would turn the hang into a busy
   retry.
 - **crcbl: changing a panel in place.** crcbl-shell 0.5.0 sets a panel's size
   and margins only when it is created, so lyr's toast stack, whose height
@@ -475,15 +474,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   or a second click on the module closes it. Tested on crcbl's headless shell
   and mutation-checked; run on Windows with injected input (open, Down, Escape,
   reopen, a click on the bar outside it), where the entries log that they are
-  not built. crcbl 0.5.0's Win32 grab delivers Escape as a key instead of the
-  close request its docs promise, so lyr closes on the key itself; reported to
-  crcbl, whose fix is on its main (`2bf8c3b0`, unreleased, for 0.6.0): Escape on
-  a grab popup queues `CloseRequested` after the key on Win32, Wayland, AppKit
-  and headless, and on Wayland a grabbing popup gets the keys even when the
-  compositor keeps focus on the parent. Win32 keys injected with scancode 0 get
-  a key code from their virtual key there too. Once lyr takes 0.6.0, its own
-  close on Escape can go. Keys injected with `SendKeys` arrive with no scancode,
-  so crcbl names no key for them; `keybd_event` with scancodes works.
+  not built. Escape closes it through crcbl 0.6.0's grab, which queues
+  `CloseRequested` after the key on every backend (lyr closed on the key itself
+  under 0.5.0, whose Win32 grab did not); on Wayland a grabbing popup gets the
+  keys even when the compositor keeps focus on the parent, and Win32 keys
+  injected with scancode 0 get a key code from their virtual key. Not run again
+  on Windows since the change. Keys injected with `SendKeys` arrive with no
+  scancode, so crcbl names no key for them; `keybd_event` with scancodes works.
   `[power.menu]` sets an entry to a command (`{ exec = … }`), which runs instead
   of lyr's action. Not built: the Windows and macOS actions (plan 10 names Win32
   APIs that need `windows-sys`, new to lyr), and checking what Hyprland does

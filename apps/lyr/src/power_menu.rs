@@ -2,8 +2,7 @@
 //! anchored to the module that opened it, taking the pointer and the
 //! keyboard while open. Arrow keys and the pointer move the selection; Enter
 //! or a click carries the entry out and closes the menu, and `Escape` or a
-//! click outside it closes it (the click reported by crcbl as a close
-//! request).
+//! click outside it closes it (both reported by crcbl as a close request).
 
 use crcbl_shell::{
     ButtonState, CloseReply, KeyCode, LogicalPoint, LogicalRect, LogicalSize, PopupDesc,
@@ -57,10 +56,9 @@ pub enum Outcome {
     Kept,
     /// An entry was chosen; the menu is to close and carry it out.
     Chosen(Entry),
-    /// The window system is closing the menu's window, with nothing chosen.
+    /// The window system is closing the menu's window, with nothing chosen:
+    /// `Escape`, or a click outside it.
     Dismissed,
-    /// `Escape`: the menu is to close with nothing chosen.
-    Cancelled,
 }
 
 impl PowerMenu {
@@ -171,9 +169,8 @@ impl PowerMenu {
                 KeyCode::Enter | KeyCode::NumpadEnter => {
                     return Ok(Outcome::Chosen(self.menu.selected()));
                 }
-                // crcbl's grab is documented to turn `Escape` into a close
-                // request, but its Win32 backend in 0.5.0 delivers the key.
-                KeyCode::Escape => return Ok(Outcome::Cancelled),
+                // `Escape` comes back as a close request: crcbl's grab
+                // queues one after the key (0.6.0, every backend).
                 _ => {}
             },
             _ => {

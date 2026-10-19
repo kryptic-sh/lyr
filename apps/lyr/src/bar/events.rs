@@ -470,11 +470,6 @@ impl App {
                     None => self.commands.power(entry),
                 }
             }
-            Outcome::Cancelled => {
-                if let Some(menu) = self.power_menu.take() {
-                    menu.close(shell, false)?;
-                }
-            }
             Outcome::Dismissed => {
                 if let Some(menu) = self.power_menu.take() {
                     menu.close(shell, true)?;
