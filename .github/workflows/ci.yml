@@ -110,6 +110,55 @@ jobs:
           --no-tests=warn
       - run: cargo test --workspace --doc --all-features --locked
 
+  # tmxr's guard: the suite again with $HOME and the XDG directories pointed
+  # at an empty sentinel, failing if a test writes there or into lyr's real
+  # directories.
+  leak-guard:
+    name: no test writes real user state ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+          cache: false
+      - run: rustup update --no-self-update stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      - shell: bash
+        run: |
+          set -euo pipefail
+          sentinel=$(mktemp -d)
+          marker=$(mktemp)
+          if command -v cygpath >/dev/null; then sentinel=$(cygpath -m "$sentinel"); fi
+          # cargo and rustup find their own homes through $HOME: pin the real ones.
+          export CARGO_HOME=${CARGO_HOME:-$HOME/.cargo} RUSTUP_HOME=${RUSTUP_HOME:-$HOME/.rustup}
+          real_home=$HOME
+          HOME=$sentinel USERPROFILE=$sentinel \
+            XDG_CONFIG_HOME=$sentinel/config XDG_DATA_HOME=$sentinel/data \
+            XDG_STATE_HOME=$sentinel/state XDG_CACHE_HOME=$sentinel/cache \
+            cargo nextest run --workspace --all-features --locked --no-fail-fast \
+            --no-tests=warn \
+            && tests=0 || tests=$?
+          leaked=""
+          for d in config data state cache .config .local .cache; do
+            if [ -e "$sentinel/$d" ]; then leaked+=$(find "$sentinel/$d"); fi
+          done
+          for d in .config/lyr .local/share/lyr .local/state/lyr .cache/lyr; do
+            if [ -e "$real_home/$d" ]; then leaked+=$(find "$real_home/$d" -newer "$marker"); fi
+          done
+          if [ -n "$leaked" ]; then
+            echo "tests wrote outside their own directories:" >&2
+            echo "$leaked" >&2
+            exit 1
+          fi
+          echo "leak guard: nothing written to the sentinel home or lyr's real dirs"
+          exit "$tests"
+
   smoke:
     name: build + smoke ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
