@@ -111,6 +111,14 @@ implementation follows until they are answered. The ones that block a milestone:
   monitor change in place, every backend), after pikr's work and frame pacing,
   likely in 0.7.0. lyr's bar would use it too, to change height on reload
   without recreating.
+- **crcbl: render on the GPU driving the window's display** (the owner's rule,
+  relayed by pikr on 2026-10-19, shared with pikr): the adapter that drives the
+  output a bar is on, else the low-power one, `CRCBL_ADAPTER` still overriding.
+  lyr takes crcbl's own adapter order today (`Surface::open`, with
+  `crcbl_app::adapter::pin` for the override), so it follows the rule without
+  code of its own once crcbl's order or a per-surface query applies it; pikr has
+  asked crcbl for that. On this Windows machine lyr drew on the discrete RX 7900
+  XTX. Check which adapter each bar gets once crcbl ships it.
 - **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
   the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
   S8 – S27. pikr's session tracks the move in pikr's own backlog and
