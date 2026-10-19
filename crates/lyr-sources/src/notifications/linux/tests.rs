@@ -143,7 +143,7 @@ async fn closing_signals_the_reason_and_an_unknown_id_is_an_error() {
 }
 
 #[tokio::test]
-async fn the_server_says_what_it_is_and_claims_no_capabilities_yet() {
+async fn the_server_says_what_it_is_and_what_it_can_do() {
     let running = daemon().await;
     let (name, _, _, spec) = running
         .client
@@ -151,13 +151,10 @@ async fn the_server_says_what_it_is_and_claims_no_capabilities_yet() {
         .await
         .expect("answered");
     assert_eq!((name.as_str(), spec.as_str()), ("lyr", "1.3"));
-    assert!(
-        running
-            .client
-            .get_capabilities()
-            .await
-            .expect("answered")
-            .is_empty()
+    assert_eq!(
+        running.client.get_capabilities().await.expect("answered"),
+        ["actions", "body", "persistence"],
+        "not markup, hyperlinks or icons, which lyr does not draw yet"
     );
 }
 

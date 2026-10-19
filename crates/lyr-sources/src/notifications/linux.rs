@@ -21,6 +21,8 @@ use zbus::{Connection, OwnedVariant};
 pub const PATH: &str = "/org/freedesktop/Notifications";
 /// The bus name the spec gives the daemon.
 pub const NAME: &str = "org.freedesktop.Notifications";
+/// What `GetCapabilities` answers.
+pub const CAPABILITIES: [&str; 3] = ["actions", "body", "persistence"];
 
 /// What changed in the store, for the bar to redraw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -117,10 +119,12 @@ impl Daemon {
         Ok(())
     }
 
-    /// Each capability is advertised only once it works; lyr draws nothing
-    /// yet, so it advertises none.
+    /// Each capability is advertised only once it works: the body is drawn,
+    /// actions get buttons and are invoked, and the history keeps a
+    /// notification until it is dismissed or cleared. Not yet: markup,
+    /// hyperlinks and icons.
     fn get_capabilities(&self) -> Vec<String> {
-        Vec::new()
+        CAPABILITIES.iter().map(|&name| name.to_owned()).collect()
     }
 
     fn get_server_information(&self) -> (String, String, String, String) {
