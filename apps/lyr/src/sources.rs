@@ -216,7 +216,7 @@ mod linux {
     use lyr_sources::battery::linux::UPower;
     use lyr_sources::bluetooth::Snapshot;
     use lyr_sources::bluetooth::linux::BlueZ;
-    use lyr_sources::bluetooth::linux::agent::Asked;
+    use lyr_sources::bluetooth::linux::agent::{Asked, Questions};
     use lyr_sources::clock::linux::TimeDate;
     use lyr_sources::mpris::linux::Players;
     use lyr_sources::power::linux::Logind;
@@ -337,23 +337,20 @@ mod linux {
                 }
             }
         };
-        // The agent's questions waiting for an answer, by id.
-        let pending = std::cell::RefCell::new(std::collections::HashMap::new());
+        let questions = std::cell::RefCell::new(Questions::default());
         let (prompts, mut asked) = tokio::sync::mpsc::unbounded_channel();
         if let Err(error) = bluez.register_agent(prompts).await {
             tracing::warn!("bluetooth: BlueZ refused lyr's pairing agent: {error}");
         }
         let ask = async {
-            let mut next = 0;
             while let Some(asked) = asked.recv().await {
                 let update = match asked {
                     Asked::Prompt(prompt) => {
-                        next += 1;
-                        pending.borrow_mut().insert(next, prompt.answer);
-                        Update::BluetoothAsk(next, prompt.device, prompt.question)
+                        let id = questions.borrow_mut().ask(prompt.answer);
+                        Update::BluetoothAsk(id, prompt.device, prompt.question)
                     }
                     Asked::Cancel => {
-                        pending.borrow_mut().clear();
+                        questions.borrow_mut().cancel();
                         Update::BluetoothCancel
                     }
                 };
@@ -365,9 +362,10 @@ mod linux {
         let act = async {
             while let Some(request) = requests.recv().await {
                 if let BluetoothRequest::Answer(id, reply) = request {
-                    // BlueZ has given up on a question it no longer waits on.
-                    if let Some(answer) = pending.borrow_mut().remove(&id) {
-                        let _gone = answer.send(reply);
+                    if !questions.borrow_mut().answer(id, reply) {
+                        tracing::debug!(
+                            "bluetooth: question {id} was answered after BlueZ gave up"
+                        );
                     }
                     continue;
                 }

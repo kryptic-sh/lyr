@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use zbus::connection::Builder;
 use zbus::{Connection, Guid, ObjectPath};
 
-use super::{Agent, Asked, PATH, Prompt, Question, Reply};
+use super::{Agent, Asked, PATH, Prompt, Question, Questions, Reply};
 
 const DEVICE: &str = "/org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF";
 
@@ -142,4 +142,32 @@ async fn bluez_giving_up_is_passed_on() {
         .await
         .expect("passed on in time");
     assert!(matches!(passed, Some(Asked::Cancel)));
+}
+
+#[tokio::test]
+async fn an_answer_reaches_bluez_by_its_question_s_id() {
+    let (bluez, mut asked, _server) = agent().await;
+    let device = ObjectPath::try_from(DEVICE).expect("a path");
+    let mut questions = Questions::default();
+    let answer = async {
+        let first = questions.ask(prompt(&mut asked).await.answer);
+        assert!(!questions.answer(first + 1, Reply::Yes), "no such question");
+        assert!(questions.answer(first, Reply::Yes));
+        assert!(!questions.answer(first, Reply::Yes), "answered once");
+        let second = questions.ask(prompt(&mut asked).await.answer);
+        assert_ne!(second, first);
+        questions.cancel();
+        assert!(!questions.answer(second, Reply::Yes), "BlueZ gave up on it");
+    };
+    let confirm = async {
+        let first = bluez.request_confirmation(&device, 1).await;
+        let second = bluez.request_authorization(&device).await;
+        (first, second)
+    };
+    let ((first, second), ()) = tokio::join!(confirm, answer);
+    first.expect("confirmed");
+    assert_eq!(
+        error_name(&second.expect_err("canceled")).as_deref(),
+        Some("org.bluez.Error.Canceled")
+    );
 }

@@ -11,6 +11,8 @@
 //! [`Prompt`], and the D-Bus call waits for the answer, or for BlueZ to give
 //! up on it ([`Asked::Cancel`]).
 
+use std::collections::HashMap;
+
 pub use lyr_core::bluetooth_menu::{Question, Reply};
 use tokio::sync::{mpsc, oneshot};
 use zbus::{Connection, ObjectPath, OwnedObjectPath};
@@ -37,6 +39,36 @@ pub enum Asked {
     /// and cancels before asking again (`agent_cancel` in its
     /// `src/agent.c`), so this is always that one.
     Cancel,
+}
+
+/// The questions waiting for an answer, by the id the bar knows each by.
+#[derive(Debug, Default)]
+pub struct Questions {
+    last: u64,
+    pending: HashMap<u64, oneshot::Sender<Reply>>,
+}
+
+impl Questions {
+    /// Keeps a question's `answer` until it is answered, returning the id
+    /// to answer it by.
+    pub fn ask(&mut self, answer: oneshot::Sender<Reply>) -> u64 {
+        self.last += 1;
+        self.pending.insert(self.last, answer);
+        self.last
+    }
+
+    /// Drops every question waiting: BlueZ gave up on them.
+    pub fn cancel(&mut self) {
+        self.pending.clear();
+    }
+
+    /// Answers question `id` with `reply`: `false` when nothing waits on
+    /// it any more.
+    pub fn answer(&mut self, id: u64, reply: Reply) -> bool {
+        self.pending
+            .remove(&id)
+            .is_some_and(|answer| answer.send(reply).is_ok())
+    }
 }
 
 /// The agent's errors, as BlueZ names them.

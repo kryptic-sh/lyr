@@ -469,15 +469,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   since lyr claims no keyboard. The agent is tested against BlueZ's side on a
   peer-to-peer connection, the menu on crcbl's headless shell, both
   mutation-checked. A question BlueZ gives up on (the agent's `Cancel`) leaves
-  the menu. Not built: the source task's side, which keeps each question's
-  answer by id, is not tested end to end; the PIN field has never had a real
-  input method behind it; favourites (below); and the Windows and macOS menus.
-  Rename is built: a paired device's Rename button puts a field for its name at
-  the top of the menu (text input `Normal`, the end of a long name in sight), OK
-  or Enter sets `Device1.Alias` (empty gives back the device's own name), and
-  Cancel or Escape drops it; the agent's question takes the top over from it.
-  Tested on the headless shell and against a recording device on a peer-to-peer
-  connection, mutation-checked; not run against a real BlueZ.
+  the menu. Each question's answer is kept by id (`agent::Questions`), tested
+  with the agent on the peer-to-peer connection; the loop in
+  `apps/lyr/src/sources.rs` that joins it to the bar is untested glue. Not done:
+  the PIN field has never had a real input method behind it; favourites (below);
+  and the Windows and macOS menus. Rename is built: a paired device's Rename
+  button puts a field for its name at the top of the menu (text input `Normal`,
+  the end of a long name in sight), OK or Enter sets `Device1.Alias` (empty
+  gives back the device's own name), and Cancel or Escape drops it; the agent's
+  question takes the top over from it. Tested on the headless shell and against
+  a recording device on a peer-to-peer connection, mutation-checked; not run
+  against a real BlueZ.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a
