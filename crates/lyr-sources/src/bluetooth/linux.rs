@@ -7,6 +7,8 @@
 //! `InterfacesRemoved`). BlueZ has few objects, so a whole read per change
 //! costs little and cannot drift from BlueZ's own state.
 
+pub mod agent;
+
 use futures_util::StreamExt;
 use futures_util::stream::select;
 use tokio::sync::watch;

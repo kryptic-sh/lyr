@@ -446,9 +446,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   BlueZ, and drawn again as BlueZ changes (recreated when its size changes).
   Tested on crcbl's headless shell and mutation-checked; never run against a
   real BlueZ, and on Windows `lyr panel bluetooth` answers that there is no
-  adapter. Not built: keyboard navigation in it, the pairing agent
-  (`org.bluez.Agent1`, for passkeys and PINs), rename, favourites, and the
-  Windows and macOS menus.
+  adapter. Not built: keyboard navigation in it, the pairing agent's prompts in
+  the menu and its registration at start (the agent itself is built:
+  `bluetooth::linux::agent`, `DisplayYesNo`, a passkey confirmation or an
+  authorization asked as a yes or no and answered `Rejected` or `Canceled`
+  otherwise, a PIN or typed passkey always `Rejected` since lyr has no text
+  input; tested against BlueZ's side on a peer-to-peer connection and
+  mutation-checked), rename, favourites, and the Windows and macOS menus.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a
