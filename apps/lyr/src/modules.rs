@@ -49,6 +49,9 @@ pub struct Data {
     /// The tray's items, in the watcher's order. Empty where there is no
     /// tray to host.
     pub tray: Vec<lyr_core::tray::Item>,
+    /// The default output and input, where there is a source for them.
+    pub sink: Option<lyr_core::audio::Sink>,
+    pub source: Option<lyr_core::audio::Source>,
 }
 
 impl Data {
@@ -117,6 +120,11 @@ impl Data {
             Update::Players(players) => self.players = players,
             #[cfg(target_os = "linux")]
             Update::Tray(items) => self.tray = items,
+            #[cfg(windows)]
+            Update::Audio(sink, source) => {
+                self.sink = sink;
+                self.source = source;
+            }
             // The bar opens it.
             #[cfg(target_os = "linux")]
             Update::TrayMenu(_) => {}
@@ -250,6 +258,14 @@ fn content(
             let shown = lyr_core::window::view(class, title, &config.window)?;
             Some(label(shown.text, theme.foreground))
         }
+        Module::Volume => {
+            let shown = lyr_core::audio::volume(data.sink.as_ref()?, &config.volume);
+            Some(label(shown.text, theme.volume))
+        }
+        Module::Mic => {
+            let shown = lyr_core::audio::mic(data.source.as_ref()?, &config.mic);
+            Some(label(shown.text, theme.mic))
+        }
         Module::Tray => {
             // A letter stands in for each icon until lyr draws images.
             let buttons: Vec<draw::Button> = data
@@ -297,6 +313,8 @@ fn content(
                 .collect();
             Some(Content::Buttons(buttons))
         }
+        // Every module has an arm on Linux; elsewhere some are not built yet.
+        #[cfg(not(target_os = "linux"))]
         _ => None,
     }
 }
@@ -341,6 +359,10 @@ pub fn tooltip(
             let (class, title) = data.workspaces.as_ref()?.active_window()?;
             Some(lyr_core::window::view(class, title, &config.window)?.tooltip)
         }
+        Module::Volume => {
+            Some(lyr_core::audio::volume(data.sink.as_ref()?, &config.volume).tooltip)
+        }
+        Module::Mic => Some(lyr_core::audio::mic(data.source.as_ref()?, &config.mic).tooltip),
         #[cfg(target_os = "linux")]
         Module::Bluetooth => {
             Some(lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth).tooltip)

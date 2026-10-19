@@ -13,6 +13,7 @@
 //! module's source but sit with the other system-bus clients. Audio waits on
 //! a dependency decision (`docs/backlog.md`).
 
+pub mod audio;
 pub mod battery;
 pub mod bluetooth;
 pub mod clock;

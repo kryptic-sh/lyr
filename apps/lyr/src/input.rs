@@ -146,6 +146,27 @@ pub fn act(
         ) => {
             return Some(builtin);
         }
+        #[cfg(windows)]
+        Action::Builtin(
+            builtin @ (Builtin::ToggleMute | Builtin::VolumeUp | Builtin::VolumeDown),
+        ) => {
+            // The mic's bindings act on the input, the volume's on the output.
+            let input = matches!(
+                target,
+                Target::Module(Module::Mic) | Target::Button(Module::Mic, _)
+            );
+            let step = if input {
+                config.mic.scroll_step
+            } else {
+                config.volume.scroll_step
+            };
+            let step = i32::try_from(step).unwrap_or(i32::MAX);
+            match builtin {
+                Builtin::ToggleMute => commands.toggle_mute(input),
+                Builtin::VolumeUp => commands.step_volume(input, step),
+                _ => commands.step_volume(input, -step),
+            }
+        }
         Action::Builtin(builtin) => {
             tracing::warn!("`{}` is not implemented yet", builtin.name());
         }

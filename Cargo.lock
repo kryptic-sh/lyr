@@ -952,6 +952,8 @@ dependencies = [
  "lyr-core",
  "thiserror",
  "tokio",
+ "windows",
+ "windows-core",
  "windows-sys",
  "zbus",
 ]

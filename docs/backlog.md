@@ -427,8 +427,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   tooltip's driver (`power_profile::win32`); run on Windows (2026-10-20), its
   tooltip read "Profile: balanced / Driver: Balanced". Switching it, which the
   clicks do on Linux, is undocumented on Windows (plan 16's question 13) and not
-  built: a click there logs that `cycle_profile` is not implemented. Not built:
-  the other Windows sources (Bluetooth, volume, workspaces) and menus.
+  built: a click there logs that `cycle_profile` is not implemented. Volume and
+  mic too (`lyr_sources::audio::windows`, through `windows`, which plan 02 lists
+  and which was already in the build through `crcbl-dx12`, with `windows-core`
+  for its `implement` macro): the default output and input (`eConsole`), each
+  one's scalar volume and mute from `IAudioEndpointVolume`, friendly name as the
+  tooltip's description, and the output's form factor as waybar's port kind for
+  the icon (`audio::win32`); changes from `IMMNotificationClient` and
+  `IAudioEndpointVolumeCallback` wake a COM thread of lyr's own, which also
+  carries out `toggle_mute`, `volume_up` and `volume_down` (by `scroll_step`,
+  held to 100 %, since Windows' endpoint volume has no boost). Run on Windows
+  (2026-10-20): the bar showed the output at 40 % and the input at 100 %. The
+  mute and volume clicks have not been run (they change this machine's real
+  volume), and a Bluetooth endpoint is not told apart (`Sink::bluetooth` is
+  false). Not built: the other Windows sources (Bluetooth, workspaces) and
+  menus.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace

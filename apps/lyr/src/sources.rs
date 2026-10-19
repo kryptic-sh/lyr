@@ -18,6 +18,12 @@ pub enum Update {
     /// The battery, or `None` when there is none to show.
     #[cfg(any(target_os = "linux", windows))]
     Battery(Option<lyr_core::battery::Reading>),
+    /// The default output and input, or `None` where there is none.
+    #[cfg(windows)]
+    Audio(
+        Option<lyr_core::audio::Sink>,
+        Option<lyr_core::audio::Source>,
+    ),
     /// The power profiles, or `None` when there is none to show.
     #[cfg(any(target_os = "linux", windows))]
     PowerProfile(Option<lyr_sources::power_profile::Profiles>),
@@ -158,6 +164,8 @@ pub struct Commands {
     _network: Option<lyr_sources::network::windows::Watch>,
     #[cfg(windows)]
     _power_profile: Option<lyr_sources::power_profile::windows::Watch>,
+    #[cfg(windows)]
+    audio: std::sync::mpsc::Sender<windows::AudioRequest>,
     #[cfg(target_os = "linux")]
     focus: tokio::sync::mpsc::UnboundedSender<lyr_wm::hyprland::Workspace>,
     #[cfg(target_os = "linux")]
@@ -258,6 +266,19 @@ impl Commands {
         }
     }
 
+    /// Windows: mutes or unmutes the default output (`input` false) or input.
+    #[cfg(windows)]
+    pub fn toggle_mute(&self, input: bool) {
+        let _stopped = self.audio.send(windows::AudioRequest::ToggleMute(input));
+    }
+
+    /// Windows: moves the default output's or input's volume by `delta`
+    /// percent.
+    #[cfg(windows)]
+    pub fn step_volume(&self, input: bool, delta: i32) {
+        let _stopped = self.audio.send(windows::AudioRequest::Step(input, delta));
+    }
+
     /// macOS: the power menu's actions are not built yet (M10).
     #[cfg(target_os = "macos")]
     pub fn power(&self, entry: lyr_core::power_menu::Entry) {
@@ -332,6 +353,7 @@ pub fn start(
     {
         let network = windows::network(sender.clone(), waker.clone())?;
         let power_profile = windows::power_profile(sender.clone(), waker.clone());
+        let audio = windows::audio(sender.clone(), waker.clone())?;
         let battery = windows::battery(sender, waker);
         Ok((
             receiver,
@@ -339,6 +361,7 @@ pub fn start(
                 _battery: battery,
                 _network: network,
                 _power_profile: power_profile,
+                audio,
             },
         ))
     }
@@ -349,8 +372,8 @@ pub fn start(
     }
 }
 
-/// The sources Windows has so far: the battery, the network and the power
-/// profile.
+/// The sources Windows has so far: the battery, the network, the power
+/// profile and the audio endpoints.
 #[cfg(windows)]
 mod windows {
     use std::sync::mpsc;
@@ -400,6 +423,101 @@ mod windows {
         })
         .inspect_err(|error| tracing::warn!("network: changes will not show: {error}"))
         .ok())
+    }
+
+    /// What the bar asks of the audio endpoints: `true` is the input.
+    #[derive(Debug)]
+    pub(super) enum AudioRequest {
+        Changed,
+        ToggleMute(bool),
+        Step(bool, i32),
+    }
+
+    /// Hands the default output and input to the main loop now and after
+    /// every change, and carries out what the bar asks of them, on a thread
+    /// in COM's multithreaded apartment. A machine whose audio cannot be read
+    /// logs why, and the modules stay out.
+    ///
+    /// # Errors
+    ///
+    /// When the thread cannot start.
+    pub(super) fn audio(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+    ) -> std::io::Result<mpsc::Sender<AudioRequest>> {
+        use lyr_sources::audio::windows::{Audio, Flow, Watch, init};
+        let (requests, incoming) = mpsc::channel();
+        let changes = requests.clone();
+        std::thread::Builder::new()
+            .name("lyr audio".to_owned())
+            .spawn(move || {
+                let audio = match init().and_then(|()| Audio::new()) {
+                    Ok(audio) => audio,
+                    Err(error) => {
+                        tracing::warn!("audio: {error}");
+                        return;
+                    }
+                };
+                let watch = Watch::new(&audio, move || {
+                    // The thread has gone when this fails: nothing to tell.
+                    let _gone = changes.send(AudioRequest::Changed);
+                });
+                let mut watch = match watch {
+                    Ok(watch) => Some(watch),
+                    Err(error) => {
+                        tracing::warn!("audio: changes will not show: {error}");
+                        None
+                    }
+                };
+                let flow = |input| if input { Flow::Input } else { Flow::Output };
+                // The endpoints the callbacks are on, to move them when a
+                // default changes.
+                let mut followed = None;
+                loop {
+                    let sink = audio
+                        .sink()
+                        .inspect_err(|error| tracing::warn!("audio: the output: {error}"))
+                        .ok()
+                        .flatten();
+                    let source = audio
+                        .source()
+                        .inspect_err(|error| tracing::warn!("audio: the input: {error}"))
+                        .ok()
+                        .flatten();
+                    let endpoints = sink
+                        .as_ref()
+                        .map(|sink| (sink.name.clone(), sink.source_name.clone()));
+                    if endpoints != followed
+                        && let Some(watch) = &mut watch
+                        && let Err(error) = watch.follow(&audio)
+                    {
+                        tracing::warn!("audio: following the new endpoint: {error}");
+                    }
+                    followed = endpoints;
+                    if sender.send(Update::Audio(sink, source)).is_err() {
+                        break;
+                    }
+                    if let Some(waker) = &waker {
+                        waker.wake();
+                    }
+                    // A request changes the volume, which comes back as a
+                    // change; a run of changes reads once.
+                    let Ok(request) = incoming.recv() else {
+                        break;
+                    };
+                    for request in std::iter::once(request).chain(incoming.try_iter()) {
+                        let done = match request {
+                            AudioRequest::Changed => Ok(()),
+                            AudioRequest::ToggleMute(input) => audio.toggle_mute(flow(input)),
+                            AudioRequest::Step(input, delta) => audio.step(flow(input), delta),
+                        };
+                        if let Err(error) = done {
+                            tracing::warn!("audio: {error}");
+                        }
+                    }
+                }
+            })?;
+        Ok(requests)
     }
 
     /// Hands the effective power mode to the main loop when registered and at
