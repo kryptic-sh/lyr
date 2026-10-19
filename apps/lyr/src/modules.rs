@@ -1,6 +1,9 @@
 //! What each module shows, from the sources' latest data, and drawing a bar
 //! from them.
 
+#[cfg(target_os = "linux")]
+use std::sync::{Arc, Mutex, PoisonError};
+
 use chrono::{DateTime, FixedOffset};
 use lyr_config::{Config, Item, Module};
 use lyr_core::battery::{self, Level, Reading};
@@ -24,6 +27,9 @@ pub struct Data {
     /// The system time zone's name, from timedate1.
     #[cfg(target_os = "linux")]
     pub zone: Option<String>,
+    /// The notification store, while lyr is the notification daemon.
+    #[cfg(target_os = "linux")]
+    pub notifications: Option<Arc<Mutex<lyr_core::notifications::Store>>>,
 }
 
 impl Data {
@@ -39,6 +45,11 @@ impl Data {
             Update::Workspaces(state) => self.workspaces = Some(state),
             #[cfg(target_os = "linux")]
             Update::Zone(zone) => self.zone = zone,
+            #[cfg(target_os = "linux")]
+            Update::Notifications(store) => self.notifications = Some(store),
+            // The toasts follow each change; the bell reads the store.
+            #[cfg(target_os = "linux")]
+            Update::Notification(_) => {}
         }
     }
 }
@@ -154,6 +165,15 @@ fn content(
         Module::Bluetooth => {
             let shown = lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth);
             Some(label(shown.text, theme.foreground))
+        }
+        #[cfg(target_os = "linux")]
+        Module::Notifications => {
+            let store = data.notifications.as_ref()?;
+            let store = store.lock().unwrap_or_else(PoisonError::into_inner);
+            Some(label(
+                lyr_core::bell::view(&store, &config.notifications),
+                theme.foreground,
+            ))
         }
         #[cfg(target_os = "linux")]
         Module::Workspaces => {

@@ -30,6 +30,20 @@ pub enum Update {
     /// The system time zone's name, or `None` when none is set.
     #[cfg(target_os = "linux")]
     Zone(Option<String>),
+    /// lyr is the notification daemon, with this store.
+    #[cfg(target_os = "linux")]
+    Notifications(std::sync::Arc<std::sync::Mutex<lyr_core::notifications::Store>>),
+    /// A notification arrived or an application closed one.
+    #[cfg(target_os = "linux")]
+    Notification(lyr_sources::notifications::linux::Change),
+}
+
+/// What the bar asks of the notification daemon.
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+enum NotificationRequest {
+    Close(u32, lyr_core::notifications::CloseReason),
+    Invoke(u32, String),
 }
 
 /// Where the bar sends what it asks of a source. A source that has stopped
@@ -42,6 +56,8 @@ pub struct Commands {
     profile: tokio::sync::mpsc::UnboundedSender<String>,
     #[cfg(target_os = "linux")]
     power: tokio::sync::mpsc::UnboundedSender<lyr_core::power_menu::Entry>,
+    #[cfg(target_os = "linux")]
+    notifications: tokio::sync::mpsc::UnboundedSender<NotificationRequest>,
 }
 
 #[cfg(target_os = "linux")]
@@ -60,6 +76,20 @@ impl Commands {
     pub fn power(&self, entry: lyr_core::power_menu::Entry) {
         let _stopped = self.power.send(entry);
     }
+
+    /// Closes the notification `id` for `reason`.
+    pub fn close_notification(&self, id: u32, reason: lyr_core::notifications::CloseReason) {
+        let _stopped = self
+            .notifications
+            .send(NotificationRequest::Close(id, reason));
+    }
+
+    /// Invokes the action `key` of the notification `id`.
+    pub fn invoke(&self, id: u32, key: String) {
+        let _stopped = self
+            .notifications
+            .send(NotificationRequest::Invoke(id, key));
+    }
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -74,19 +104,30 @@ impl Commands {
 }
 
 /// Starts every source this platform has. A source that cannot start, or
-/// stops, logs why and its module stays out of the bar.
-pub fn start(waker: Option<ShellWaker>) -> std::io::Result<(mpsc::Receiver<Update>, Commands)> {
+/// stops, logs why and its module stays out of the bar. With
+/// `replace_notifications`, lyr takes the notification daemon's name from
+/// whoever has it.
+#[cfg_attr(not(target_os = "linux"), allow(unused_variables))]
+pub fn start(
+    waker: Option<ShellWaker>,
+    replace_notifications: bool,
+) -> std::io::Result<(mpsc::Receiver<Update>, Commands)> {
     let (sender, receiver) = mpsc::channel();
     #[cfg(target_os = "linux")]
     {
         let (focus, focus_requests) = tokio::sync::mpsc::unbounded_channel();
         let (profile, profile_requests) = tokio::sync::mpsc::unbounded_channel();
         let (power, power_requests) = tokio::sync::mpsc::unbounded_channel();
+        let (notifications, notification_requests) = tokio::sync::mpsc::unbounded_channel();
         linux::start(
             sender,
-            focus_requests,
-            profile_requests,
-            power_requests,
+            linux::Requests {
+                focus: focus_requests,
+                profile: profile_requests,
+                power: power_requests,
+                notifications: notification_requests,
+            },
+            replace_notifications,
             waker,
         )?;
         Ok((
@@ -95,6 +136,7 @@ pub fn start(waker: Option<ShellWaker>) -> std::io::Result<(mpsc::Receiver<Updat
                 focus,
                 profile,
                 power,
+                notifications,
             },
         ))
     }
@@ -120,7 +162,12 @@ mod linux {
     use tokio::sync::mpsc::UnboundedReceiver;
     use tokio::sync::watch;
 
-    use super::Update;
+    use std::sync::{Arc, Mutex};
+
+    use lyr_core::notifications::Store;
+    use lyr_sources::notifications::linux::{Daemon, serve_session};
+
+    use super::{NotificationRequest, Update};
 
     /// Hands `update` to the main loop and wakes it. `false` once the main
     /// loop has gone.
@@ -132,13 +179,26 @@ mod linux {
         delivered
     }
 
+    /// Where each task reads what the bar asks of it.
+    pub(super) struct Requests {
+        pub(super) focus: UnboundedReceiver<Workspace>,
+        pub(super) profile: UnboundedReceiver<String>,
+        pub(super) power: UnboundedReceiver<Entry>,
+        pub(super) notifications: UnboundedReceiver<NotificationRequest>,
+    }
+
     pub(super) fn start(
         sender: mpsc::Sender<Update>,
-        focus: UnboundedReceiver<Workspace>,
-        profile: UnboundedReceiver<String>,
-        power: UnboundedReceiver<Entry>,
+        requests: Requests,
+        replace_notifications: bool,
         waker: Option<ShellWaker>,
     ) -> std::io::Result<()> {
+        let Requests {
+            focus,
+            profile,
+            power,
+            notifications: notification_requests,
+        } = requests;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?;
@@ -151,6 +211,12 @@ mod linux {
                         power_profile(sender.clone(), profile, waker.clone()),
                         bluetooth(sender.clone(), waker.clone()),
                         clock(sender.clone(), waker.clone()),
+                        notifications(
+                            sender.clone(),
+                            notification_requests,
+                            replace_notifications,
+                            waker.clone(),
+                        ),
                         workspaces(sender, focus, waker),
                         power_menu(power),
                     );
@@ -321,5 +387,53 @@ mod linux {
             Entry::Logout => Hyprland::from_env().await?.exit().await?,
         }
         Ok(())
+    }
+
+    /// Serves the notification daemon on the session bus, unless another
+    /// daemon has the name, and carries out what the bar asks of it.
+    async fn notifications(
+        sender: mpsc::Sender<Update>,
+        mut requests: UnboundedReceiver<NotificationRequest>,
+        replace: bool,
+        waker: Option<ShellWaker>,
+    ) {
+        let store = Arc::new(Mutex::new(Store::default()));
+        let (changes, mut changed) = tokio::sync::mpsc::unbounded_channel();
+        let daemon = Daemon {
+            store: store.clone(),
+            changes,
+        };
+        let served = match serve_session(daemon, replace).await {
+            Ok(served) => served,
+            Err(error) => {
+                tracing::info!("notifications: {error}");
+                return;
+            }
+        };
+        tracing::info!("notifications: lyr is the notification daemon");
+        if !deliver(&sender, waker.as_ref(), Update::Notifications(store)) {
+            return;
+        }
+        let forward = async {
+            while let Some(change) = changed.recv().await {
+                if !deliver(&sender, waker.as_ref(), Update::Notification(change)) {
+                    break;
+                }
+            }
+        };
+        let act = async {
+            while let Some(request) = requests.recv().await {
+                let done = match request {
+                    NotificationRequest::Close(id, reason) => {
+                        served.close(id, reason).await.map(|_held| ())
+                    }
+                    NotificationRequest::Invoke(id, key) => served.invoke(id, &key).await,
+                };
+                if let Err(error) = done {
+                    tracing::warn!("notifications: {error}");
+                }
+            }
+        };
+        tokio::join!(forward, act);
     }
 }

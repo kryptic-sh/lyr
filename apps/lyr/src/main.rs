@@ -13,6 +13,7 @@ mod modules;
 mod power_menu;
 mod sources;
 mod stats;
+mod toasts;
 mod tooltips;
 
 use std::path::PathBuf;

@@ -199,6 +199,15 @@ pub async fn serve(
     }
 }
 
+/// [`serve`] on the session bus.
+///
+/// # Errors
+///
+/// As [`serve`], and when the session bus cannot be reached.
+pub async fn serve_session(daemon: Daemon, replace: bool) -> Result<Served, ServeError> {
+    serve(&Connection::session().await?, daemon, replace).await
+}
+
 /// The daemon as served: what lyr's side does to a notification, with the
 /// signals the spec asks for.
 #[derive(Clone, Debug)]

@@ -298,3 +298,11 @@ fn a_bad_clock_format_is_an_error() {
     assert_eq!(message, "clock.format: `%H:%Q` is not a strftime format");
     assert!(user("[clock]\nformat = \"%H:%M:%S\"\n", Platform::Linux).is_ok());
 }
+
+#[test]
+fn lyr_leaves_notifications_to_another_daemon_unless_told() {
+    let defaults = from_sources(None, Platform::Linux).expect("the defaults");
+    assert!(!defaults.notifications.replace);
+    let replacing = user("[notifications]\nreplace = true\n", Platform::Linux).expect("valid");
+    assert!(replacing.notifications.replace);
+}

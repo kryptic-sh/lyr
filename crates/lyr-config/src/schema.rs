@@ -181,10 +181,15 @@ pub struct Power {
     pub on: On,
 }
 
-/// The notification bell (`docs/plan/09-notifications.md#the-bell-module`).
+/// The notification bell (`docs/plan/09-notifications.md#the-bell-module`)
+/// and the daemon behind it.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Notifications {
+    /// Take `org.freedesktop.Notifications` from a daemon that already has
+    /// it, such as swaync. Off, lyr leaves notifications to that daemon.
+    #[serde(default)]
+    pub replace: bool,
     /// `{icon}`.
     pub format: Format,
     /// By state: `notification` and `none`, and their `dnd-` forms while

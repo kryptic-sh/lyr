@@ -249,14 +249,20 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `lyr_core::toast::stack::Stack` (newest on top, timeouts paused under the
   pointer) and a toast's draw list `lyr_core::toast` (swaync's look with the
   `toast_*` theme keys, its body wrapped at spaces), both tested and
-  mutation-checked. The bar does not serve the daemon yet: until toasts are on
-  screen, taking the name would swallow every notification on a desktop with no
-  other daemon. Not built: the toast windows, `notifications.replace`, a toast's
-  arrival time, close button, action buttons and images, markup, and MPRIS. The
-  bell's view is built (`lyr_core::bell`, with `notifications.format` and
-  `notifications.icons`, the dotfiles' three glyphs) but not drawn: with the
-  daemon not served there is no history to show, and a module with no data is
-  left out.
+  mutation-checked. The bar serves it on Linux (`apps/lyr/src/sources.rs`) and
+  leaves notifications to another daemon that has the name, logging which,
+  unless `notifications.replace = true` (read at start; a reload does not hand
+  the name over). Toasts are on screen (`apps/lyr/src/toasts.rs`): one Overlay
+  panel at the top right of the output the user is on, 16 px from the edges and
+  clear of the bar, recreated whenever the stack's size changes (crcbl 0.5.0
+  cannot resize a panel); a click invokes the `default` action when there is one
+  and takes the toast down, a middle click dismisses the notification. Tested on
+  crcbl's headless shell and mutation-checked; **never seen on screen**: Windows
+  has no daemon and WSL has no compositor, so the owner's Hyprland is the first
+  real run. The bell is drawn from the store while lyr is the daemon. Not built:
+  a toast's arrival time, close button, action buttons and images, markup,
+  MPRIS, do-not-disturb and Clear All from the control socket and the panel, and
+  closing a transient notification when its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading

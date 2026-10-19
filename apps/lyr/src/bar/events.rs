@@ -15,6 +15,7 @@ use super::App;
 use super::window::Window;
 use crate::input::{self, Pointer};
 use crate::power_menu::{Outcome, PowerMenu};
+use crate::toasts::Clicked;
 use crate::tooltips::{Look, Tooltips};
 
 impl App {
@@ -29,6 +30,14 @@ impl App {
             self.bars
                 .handle(shell, &self.config.bar, event)
                 .context("keeping a bar on every output")?;
+        }
+        if event
+            .window()
+            .is_some_and(|window| self.toasts.owns(window))
+        {
+            let clicked = self.toasts.event(shell, event, instant)?;
+            self.toast_clicked(clicked);
+            return Ok(());
         }
         if self
             .power_menu
@@ -217,4 +226,36 @@ impl App {
         }
         Ok(())
     }
+
+    /// Carries out a click on a toast: its `default` action when it has one,
+    /// or dismissing it.
+    #[cfg(target_os = "linux")]
+    fn toast_clicked(&self, clicked: Option<Clicked>) {
+        use lyr_core::notifications::CloseReason;
+        match clicked {
+            Some(Clicked::Invoke(id)) => {
+                let has_default = self.toasts.store().is_some_and(|store| {
+                    store
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner)
+                        .get(id)
+                        .is_some_and(|held| {
+                            held.content.actions.iter().any(|(key, _)| key == "default")
+                        })
+                });
+                if has_default {
+                    self.commands.invoke(id, "default".to_owned());
+                }
+            }
+            Some(Clicked::Dismiss(id)) => {
+                self.commands.close_notification(id, CloseReason::Dismissed);
+            }
+            None => {}
+        }
+    }
+
+    /// Windows and macOS have no toasts: lyr is not their notification
+    /// daemon.
+    #[cfg(not(target_os = "linux"))]
+    fn toast_clicked(&self, _clicked: Option<Clicked>) {}
 }

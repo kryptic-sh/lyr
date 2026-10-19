@@ -30,8 +30,9 @@ use lyr_shell::bars::Bars;
 use crate::control;
 use crate::modules::{self, Data};
 use crate::power_menu::PowerMenu;
-use crate::sources::{self, Commands};
+use crate::sources::{self, Commands, Update};
 use crate::stats::Stats;
+use crate::toasts::Toasts;
 use crate::tooltips::{Anchor, Look};
 use window::Window;
 
@@ -47,6 +48,7 @@ struct App {
     windows: HashMap<WindowId, Window>,
     data: Data,
     commands: Commands,
+    toasts: Toasts,
     /// The power menu, while it is open.
     power_menu: Option<PowerMenu>,
     /// The event batch that last dismissed the power menu: a click outside it
@@ -92,7 +94,9 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
     let mut bars = Bars::default();
     bars.sync(shell.as_mut(), &config.bar)
         .context("creating the bars")?;
-    let (updates, commands) = sources::start(shell.waker()).context("starting the sources")?;
+    // Read once: a reload does not hand the daemon's name over.
+    let (updates, commands) = sources::start(shell.waker(), config.notifications.replace)
+        .context("starting the sources")?;
     let mut app = App {
         config_path: config_path.map(Path::to_path_buf),
         config,
@@ -103,6 +107,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         windows: HashMap::new(),
         data: Data::default(),
         commands,
+        toasts: Toasts::default(),
         power_menu: None,
         menu_dismissed_at: None,
         hidden: false,
@@ -124,10 +129,11 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             quit |= app.request(shell.as_mut(), incoming)?;
         }
         if quit {
+            app.toasts.close(shell.as_mut())?;
             return app.close_all(shell.as_mut());
         }
         while let Ok(update) = updates.try_recv() {
-            app.data.apply(update);
+            app.update(update, Instant::now());
             app.stats.events += 1;
             app.redraw_all();
         }
@@ -152,6 +158,7 @@ impl App {
             .values()
             .any(|window| window.dirty || window.tooltips.dirty())
             || self.power_menu.as_ref().is_some_and(PowerMenu::dirty)
+            || self.toasts.dirty()
         {
             return Duration::ZERO;
         }
@@ -159,8 +166,26 @@ impl App {
             .windows
             .values()
             .filter_map(|window| window.tooltips.next_wake())
+            .chain(self.toasts.next_wake())
             .fold(self.next_tick, Instant::min);
         wake.saturating_duration_since(Instant::now())
+    }
+
+    /// Applies a source's update.
+    fn update(&mut self, update: Update, now: Instant) {
+        #[cfg(target_os = "linux")]
+        {
+            use lyr_sources::notifications::linux::Change;
+            match &update {
+                Update::Notifications(store) => self.toasts.serve(store.clone()),
+                Update::Notification(Change::Notified(id)) => self.toasts.notified(*id, now),
+                Update::Notification(Change::Closed(id, _)) => self.toasts.closed(*id),
+                _ => {}
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        let _ = now;
+        self.data.apply(update);
     }
 
     /// Marks every bar to be drawn again.
@@ -196,6 +221,7 @@ impl App {
             data,
             stats,
             power_menu,
+            toasts,
             ..
         } = self;
         let now = Local::now().fixed_offset();
@@ -222,6 +248,8 @@ impl App {
         if let Some(menu) = power_menu {
             menu.draw(text)?;
         }
+        toasts.sync(shell, &look, Instant::now())?;
+        toasts.draw(text)?;
         for window in windows.values_mut().filter(|window| window.dirty) {
             let hovered = window.hovered();
             let drawn = modules::draw(
