@@ -403,3 +403,39 @@ fn the_agent_s_question_takes_the_header_from_a_rename() {
         Outcome::Answer(Reply::Yes)
     );
 }
+
+#[test]
+fn a_new_question_takes_enter_from_the_outline() {
+    let mut setup = setup(&[]);
+    let window = setup.menu.panel.window();
+    setup
+        .shell
+        .key_press(window, KeyCode::ArrowDown)
+        .expect("a key");
+    assert_eq!(setup.pump(), Outcome::Redraw, "the power switch outlined");
+    let theme = setup.theme.clone();
+    let look = Look {
+        theme: &theme,
+        measure: &measure,
+        measure_in: &|text, _| measure(text),
+        line_height: 20.0,
+        calendar_line_height: 20.0,
+    };
+    let ask = Ask {
+        device: "Kbd",
+        question: Question::Pin,
+        typed: "",
+    };
+    setup
+        .menu
+        .refresh(&mut setup.shell, &look, &adapter(), &[], Some(ask))
+        .expect("refreshed");
+    let window = setup.menu.panel.window();
+    setup.shell.commit_text(window, "42").expect("typed");
+    setup.pump();
+    setup
+        .shell
+        .key_press(window, KeyCode::Enter)
+        .expect("a key");
+    assert_eq!(setup.pump(), Outcome::Answer(Reply::Pin("42".to_owned())));
+}

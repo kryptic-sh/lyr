@@ -168,6 +168,10 @@ impl BluetoothMenu {
         ask: Option<Ask<'_>>,
     ) -> anyhow::Result<()> {
         let new_header = self.follow(ask, devices);
+        // A new question's Enter answers it, wherever the outline was.
+        if new_header {
+            self.panel.unfocus();
+        }
         self.paths = paths(devices);
         let drawn = bluetooth_menu::draw(
             adapter,

@@ -565,11 +565,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   the call is tested against lyr's daemon on a peer-to-peer connection, the glue
   that sends it is not. Two equally strong access points of one SSID: the first
   listed is joined, which either would do. The header's buttons take the arrow
-  keys from the right (No before Yes), as in the Bluetooth menu. The Bluetooth
-  menu keeps the outline where it was when a question appears, so Enter there
-  presses the outlined button rather than answering; the Wi-Fi menu drops the
-  outline instead (`MenuPanel::unfocus`). Whether the Bluetooth menu should do
-  the same is open.
+  keys from the right (No before Yes), as in the Bluetooth menu. Both menus drop
+  the keyboard's outline when a question appears (`MenuPanel::unfocus`), so
+  Enter answers it.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a
