@@ -57,8 +57,9 @@ state + config + theme ──► lyr-core: layout ──► DrawList + hit regio
   loop. With FIFO, `vkQueuePresentKHR` can block indefinitely on a Wayland
   output that is off (hypridle turns DPMS off with
   `hl.dsp.dpms({ action = "off" })`). lyr only presents after a frame callback,
-  and the compositor does not send one for an output that is off. Whether
-  crcbl's Wayland present path already works this way is unverified (backlog).
+  and the compositor does not send one for an output that is off. crcbl's
+  Wayland path does not pace on frame callbacks yet; crcbl is adding
+  `Shell::request_frame` and `ShellEvent::FrameReady` for it (backlog).
 
 ## Text
 

@@ -82,13 +82,20 @@ implementation follows until they are answered. The ones that block a milestone:
   does not count as one (M5 measures Hyprland). S3: the Wayland
   `reposition_popup` path needs xdg_wm_base 3 and has not run anywhere.
   `ui.scrollbar` is vertical only.
-- **crcbl: Wayland present path.** Whether crcbl presents only after a frame
-  callback, or can block in FIFO `vkQueuePresentKHR` on an output that is off
-  (hypridle DPMS), is unverified
-  ([plan/04](plan/04-rendering-and-theme.md#repaint-on-change-only)).
-  crcbl-shell 0.5.0 has no frame-callback event for lyr to pace on. Asked crcbl
-  on 2026-10-19 whether the path can block and, if it can, for a
-  `FrameReady`-style event on every backend; waiting on the answer.
+- **crcbl: Wayland present path.** It can block on an output that is off
+  (hypridle DPMS), by crcbl's reading of its own source on 2026-10-19, not
+  reproduced: its Wayland backend requests no `wl_surface.frame`, `Pacing::Auto`
+  is FIFO, and crcbl-vk acquires with an infinite timeout. crcbl decided on
+  `Shell::request_frame(window)` and `ShellEvent::FrameReady { window }`, with
+  `ShellCaps::FRAME_CALLBACK` set where the compositor really paces (Wayland,
+  and AppKit if it has a real signal); elsewhere `FrameReady` comes at the next
+  pump, so lyr has one code path. It is queued after opacity groups, for the
+  release after next unless it fits the next one. lyr's loop then becomes: on a
+  change mark the bar dirty; with no frame pending, present and request one; on
+  `FrameReady`, present again if still dirty
+  ([plan/04](plan/04-rendering-and-theme.md#repaint-on-change-only)). crcbl
+  declined a finite acquire timeout, which would turn the hang into a busy
+  retry.
 - **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
   the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
   S8 – S27. pikr's session tracks the move in pikr's own backlog and
@@ -245,8 +252,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   lyr's own choice; crcbl leaves it to the application). Scrolling away from the
   user steps to the previous workspace. Not tried with a real click: the tests
   cover the resolution and the step arithmetic, and the Windows run had no
-  pointer input. Not built: hover (the active-or-hovered workspace colour) and
-  tooltips (M5).
+  pointer input. Hover is built: the workspace button under the pointer takes
+  the active colour, as waybar's style colours both (`apps/lyr/src/modules.rs`),
+  and moving onto another button redraws the bar. Not built: tooltips (M5).
 - **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second
