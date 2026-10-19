@@ -9,14 +9,13 @@
 
 use futures_util::StreamExt;
 use futures_util::stream::select;
-use lyr_core::bluetooth::Reading;
 use tokio::sync::watch;
 use zbus::fdo::{ManagedObjects, ObjectManagerProxy};
 use zbus::message::Type;
 use zbus::proxy::CacheProperties;
 use zbus::{Connection, MatchRule, MessageStream, ObjectPath, OwnedVariant};
 
-use super::{Adapter, Device, DeviceAction, Switch, Tracker};
+use super::{Adapter, Device, DeviceAction, Snapshot, Switch, Tracker};
 
 /// BlueZ's service name.
 const SERVICE: &str = "org.bluez";
@@ -167,13 +166,13 @@ impl BlueZ {
         Ok(parse(&self.objects.get_managed_objects().await?))
     }
 
-    /// Sends the reading to `readings` now and after every change, until
+    /// Sends a snapshot to `snapshots` now and after every change, until
     /// BlueZ goes away or every receiver is dropped.
     ///
     /// # Errors
     ///
     /// When subscribing or reading fails.
-    pub async fn watch(&self, readings: &watch::Sender<Option<Reading>>) -> zbus::Result<()> {
+    pub async fn watch(&self, snapshots: &watch::Sender<Snapshot>) -> zbus::Result<()> {
         let properties = MatchRule::builder()
             .msg_type(Type::Signal)
             .interface("org.freedesktop.DBus.Properties")
@@ -190,14 +189,17 @@ impl BlueZ {
             MessageStream::for_match_rule(objects, &self.connection, None).await?,
         );
         let mut tracker = Tracker::default();
-        let (adapter, devices) = self.read().await?;
-        readings.send_replace(tracker.reading(adapter.as_ref(), &devices));
-        while changes.next().await.is_some() {
+        let mut snapshot = async || {
             let (adapter, devices) = self.read().await?;
-            if readings
-                .send(tracker.reading(adapter.as_ref(), &devices))
-                .is_err()
-            {
+            Ok::<_, zbus::Error>(Snapshot {
+                reading: tracker.reading(adapter.as_ref(), &devices),
+                adapter,
+                devices,
+            })
+        };
+        snapshots.send_replace(snapshot().await?);
+        while changes.next().await.is_some() {
+            if snapshots.send(snapshot().await?).is_err() {
                 break;
             }
         }

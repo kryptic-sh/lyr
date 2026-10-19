@@ -21,9 +21,9 @@ pub enum Update {
     /// The power profiles, or `None` when the daemon lists none.
     #[cfg(target_os = "linux")]
     PowerProfile(Option<lyr_sources::power_profile::Profiles>),
-    /// Bluetooth, or `None` when there is no adapter.
+    /// BlueZ: the module's reading and the menu's adapter and devices.
     #[cfg(target_os = "linux")]
-    Bluetooth(Option<lyr_core::bluetooth::Reading>),
+    Bluetooth(lyr_sources::bluetooth::Snapshot),
     /// Hyprland's workspaces.
     #[cfg(target_os = "linux")]
     Workspaces(lyr_wm::hyprland::State),
@@ -39,6 +39,17 @@ pub enum Update {
     /// The media players on the session bus.
     #[cfg(target_os = "linux")]
     Players(Vec<lyr_core::media::Player>),
+}
+
+/// What the Bluetooth menu asks of BlueZ, by object path.
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+pub enum BluetoothRequest {
+    Switch(String, lyr_core::bluetooth_menu::Switch, bool),
+    Scan(String, bool),
+    Device(String, lyr_core::bluetooth_menu::DeviceAction),
+    /// The adapter's path, then the device's.
+    Forget(String, String),
 }
 
 /// What the bar asks of the notification daemon.
@@ -64,6 +75,8 @@ pub struct Commands {
     notifications: tokio::sync::mpsc::UnboundedSender<NotificationRequest>,
     #[cfg(target_os = "linux")]
     media: tokio::sync::mpsc::UnboundedSender<(String, lyr_core::media::Control)>,
+    #[cfg(target_os = "linux")]
+    bluetooth: tokio::sync::mpsc::UnboundedSender<BluetoothRequest>,
 }
 
 #[cfg(target_os = "linux")]
@@ -93,6 +106,11 @@ impl Commands {
     /// Presses `control` on the media player at `bus_name`.
     pub fn media(&self, bus_name: String, control: lyr_core::media::Control) {
         let _stopped = self.media.send((bus_name, control));
+    }
+
+    /// Asks BlueZ for what the Bluetooth menu's click wants.
+    pub fn bluetooth(&self, request: BluetoothRequest) {
+        let _stopped = self.bluetooth.send(request);
     }
 
     /// Closes every notification, as Clear All does.
@@ -144,6 +162,7 @@ pub fn start(
         let (power, power_requests) = tokio::sync::mpsc::unbounded_channel();
         let (notifications, notification_requests) = tokio::sync::mpsc::unbounded_channel();
         let (media, media_requests) = tokio::sync::mpsc::unbounded_channel();
+        let (bluetooth, bluetooth_requests) = tokio::sync::mpsc::unbounded_channel();
         linux::start(
             sender,
             linux::Requests {
@@ -152,6 +171,7 @@ pub fn start(
                 power: power_requests,
                 notifications: notification_requests,
                 media: media_requests,
+                bluetooth: bluetooth_requests,
             },
             replace_notifications,
             waker,
@@ -164,6 +184,7 @@ pub fn start(
                 power,
                 notifications,
                 media,
+                bluetooth,
             },
         ))
     }
@@ -182,6 +203,7 @@ mod linux {
     use lyr_core::media::Control;
     use lyr_core::power_menu::Entry;
     use lyr_sources::battery::linux::UPower;
+    use lyr_sources::bluetooth::Snapshot;
     use lyr_sources::bluetooth::linux::BlueZ;
     use lyr_sources::clock::linux::TimeDate;
     use lyr_sources::mpris::linux::Players;
@@ -196,7 +218,7 @@ mod linux {
     use lyr_core::notifications::Store;
     use lyr_sources::notifications::linux::{Daemon, serve_session};
 
-    use super::{NotificationRequest, Update};
+    use super::{BluetoothRequest, NotificationRequest, Update};
 
     /// Hands `update` to the main loop and wakes it. `false` once the main
     /// loop has gone.
@@ -215,6 +237,7 @@ mod linux {
         pub(super) power: UnboundedReceiver<Entry>,
         pub(super) notifications: UnboundedReceiver<NotificationRequest>,
         pub(super) media: UnboundedReceiver<(String, Control)>,
+        pub(super) bluetooth: UnboundedReceiver<BluetoothRequest>,
     }
 
     pub(super) fn start(
@@ -229,6 +252,7 @@ mod linux {
             power,
             notifications: notification_requests,
             media,
+            bluetooth: bluetooth_requests,
         } = requests;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -240,7 +264,7 @@ mod linux {
                     tokio::join!(
                         battery(sender.clone(), waker.clone()),
                         power_profile(sender.clone(), profile, waker.clone()),
-                        bluetooth(sender.clone(), waker.clone()),
+                        bluetooth(sender.clone(), bluetooth_requests, waker.clone()),
                         clock(sender.clone(), waker.clone()),
                         players(sender.clone(), media, waker.clone()),
                         notifications(
@@ -280,7 +304,11 @@ mod linux {
         }
     }
 
-    async fn bluetooth(sender: mpsc::Sender<Update>, waker: Option<ShellWaker>) {
+    async fn bluetooth(
+        sender: mpsc::Sender<Update>,
+        mut requests: UnboundedReceiver<BluetoothRequest>,
+        waker: Option<ShellWaker>,
+    ) {
         let bluez = match BlueZ::system().await {
             Ok(bluez) => bluez,
             Err(error) => {
@@ -288,16 +316,34 @@ mod linux {
                 return;
             }
         };
-        let (readings, mut changed) = watch::channel(None);
+        let (snapshots, mut changed) = watch::channel(Snapshot::default());
         let forward = async {
             while changed.changed().await.is_ok() {
-                let reading = changed.borrow_and_update().clone();
-                if !deliver(&sender, waker.as_ref(), Update::Bluetooth(reading)) {
+                let snapshot = changed.borrow_and_update().clone();
+                if !deliver(&sender, waker.as_ref(), Update::Bluetooth(snapshot)) {
                     break;
                 }
             }
         };
-        let (watched, ()) = tokio::join!(bluez.watch(&readings), forward);
+        let act = async {
+            while let Some(request) = requests.recv().await {
+                // What it changed comes back as a change; a refusal is logged.
+                let done = match &request {
+                    BluetoothRequest::Switch(adapter, switch, on) => {
+                        bluez.set(adapter, *switch, *on).await
+                    }
+                    BluetoothRequest::Scan(adapter, on) => bluez.scan(adapter, *on).await,
+                    BluetoothRequest::Device(device, action) => bluez.device(device, *action).await,
+                    BluetoothRequest::Forget(adapter, device) => {
+                        bluez.forget(adapter, device).await
+                    }
+                };
+                if let Err(error) = done {
+                    tracing::warn!("bluetooth: {request:?}: {error}");
+                }
+            }
+        };
+        let (watched, (), ()) = tokio::join!(bluez.watch(&snapshots), forward, act);
         if let Err(error) = watched {
             tracing::warn!("bluetooth: BlueZ stopped answering: {error}");
         }

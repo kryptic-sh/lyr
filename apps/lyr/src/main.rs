@@ -5,6 +5,7 @@
 //! for the design and `docs/plan/15-milestones.md` for the build order.
 
 mod bar;
+mod bluetooth_menu;
 mod clock_panel;
 mod control;
 mod exec;

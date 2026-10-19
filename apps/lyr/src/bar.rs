@@ -28,6 +28,7 @@ use lyr_render::text::Text;
 use lyr_render::translate::translate;
 use lyr_shell::bars::Bars;
 
+use crate::bluetooth_menu::BluetoothMenu;
 use crate::clock_panel::{ClockPanel, Contents};
 use crate::control;
 use crate::modules::{self, Data};
@@ -53,6 +54,8 @@ struct App {
     toasts: Toasts,
     /// The clock panel, while it is open.
     clock_panel: Option<ClockPanel>,
+    /// The Bluetooth menu, while it is open.
+    bluetooth_menu: Option<BluetoothMenu>,
     /// The power menu, while it is open.
     power_menu: Option<PowerMenu>,
     /// The event batch that last dismissed the power menu: a click outside it
@@ -113,6 +116,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         commands,
         toasts: Toasts::default(),
         clock_panel: None,
+        bluetooth_menu: None,
         power_menu: None,
         menu_dismissed_at: None,
         hidden: false,
@@ -140,10 +144,14 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             if let Some(panel) = app.clock_panel.take() {
                 panel.close(shell.as_mut(), false)?;
             }
+            if let Some(menu) = app.bluetooth_menu.take() {
+                menu.close(shell.as_mut(), false)?;
+            }
             return app.close_all(shell.as_mut());
         }
         while let Ok(update) = updates.try_recv() {
             app.update(update, Instant::now());
+            app.refresh_bluetooth_menu(shell.as_mut())?;
             app.stats.events += 1;
             app.redraw_all();
         }
@@ -170,6 +178,10 @@ impl App {
             || self.power_menu.as_ref().is_some_and(PowerMenu::dirty)
             || self.toasts.dirty()
             || self.clock_panel.as_ref().is_some_and(ClockPanel::dirty)
+            || self
+                .bluetooth_menu
+                .as_ref()
+                .is_some_and(BluetoothMenu::dirty)
         {
             return Duration::ZERO;
         }
@@ -244,6 +256,53 @@ impl App {
         Ok(())
     }
 
+    /// Opens the Bluetooth menu `left` from the output's left edge, or
+    /// closes it if it is open. Returns why it did not open: there is no
+    /// adapter.
+    fn toggle_bluetooth_menu(
+        &mut self,
+        shell: &mut dyn Shell,
+        left: f64,
+    ) -> anyhow::Result<Result<(), &'static str>> {
+        if let Some(menu) = self.bluetooth_menu.take() {
+            menu.close(shell, false)?;
+            return Ok(Ok(()));
+        }
+        let Some(adapter) = &self.data.bluetooth_adapter else {
+            return Ok(Err("there is no Bluetooth adapter"));
+        };
+        let look = Look {
+            theme: &self.config.theme,
+            measure: &|s: &str| self.text.measure(s),
+            line_height: self.text.line_height(),
+        };
+        self.bluetooth_menu = Some(
+            BluetoothMenu::open(shell, left, &look, adapter, &self.data.bluetooth_devices)
+                .context("opening the Bluetooth menu")?,
+        );
+        Ok(Ok(()))
+    }
+
+    /// Draws the Bluetooth menu again, if it is open, for BlueZ as it is
+    /// now; closes it if the adapter went.
+    fn refresh_bluetooth_menu(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {
+        let Some(menu) = &mut self.bluetooth_menu else {
+            return Ok(());
+        };
+        let Some(adapter) = &self.data.bluetooth_adapter else {
+            if let Some(menu) = self.bluetooth_menu.take() {
+                menu.close(shell, false)?;
+            }
+            return Ok(());
+        };
+        let look = Look {
+            theme: &self.config.theme,
+            measure: &|s: &str| self.text.measure(s),
+            line_height: self.text.line_height(),
+        };
+        menu.refresh(shell, &look, adapter, &self.data.bluetooth_devices)
+    }
+
     /// Marks every bar to be drawn again.
     fn redraw_all(&mut self) {
         self.windows
@@ -280,6 +339,7 @@ impl App {
             toasts,
             commands,
             clock_panel,
+            bluetooth_menu,
             ..
         } = self;
         let now = Local::now().fixed_offset();
@@ -308,6 +368,9 @@ impl App {
         }
         if let Some(panel) = clock_panel {
             panel.draw(text)?;
+        }
+        if let Some(menu) = bluetooth_menu {
+            menu.draw(text)?;
         }
         for id in toasts.expire(Instant::now()) {
             commands.close_notification(id, lyr_core::notifications::CloseReason::Expired);

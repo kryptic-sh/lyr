@@ -138,7 +138,10 @@ pub fn act(
             }
         }
         Action::Builtin(
-            builtin @ (Builtin::OpenClockPanel | Builtin::OpenPowerMenu | Builtin::ToggleDnd),
+            builtin @ (Builtin::OpenBluetoothMenu
+            | Builtin::OpenClockPanel
+            | Builtin::OpenPowerMenu
+            | Builtin::ToggleDnd),
         ) => {
             return Some(builtin);
         }

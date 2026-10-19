@@ -16,6 +16,7 @@ use lyr_core::power_menu;
 
 use super::App;
 use super::window::Window;
+use crate::bluetooth_menu::Outcome as BluetoothOutcome;
 use crate::clock_panel::{Contents, Outcome as ClockOutcome};
 use crate::control;
 use crate::input::{self, Pointer};
@@ -35,6 +36,13 @@ impl App {
             self.bars
                 .handle(shell, &self.config.bar, event)
                 .context("keeping a bar on every output")?;
+        }
+        if self
+            .bluetooth_menu
+            .as_ref()
+            .is_some_and(|menu| event.window().is_some_and(|window| menu.owns(window)))
+        {
+            return self.bluetooth_event(shell, event);
         }
         if self
             .clock_panel
@@ -155,6 +163,7 @@ impl App {
                 // Applied once the bar is no longer borrowed.
                 let mut toggle_dnd = false;
                 let mut toggle_panel = false;
+                let mut bluetooth_at = None;
                 for press in presses {
                     let Some(target) = window.pointer.target(&window.regions) else {
                         continue;
@@ -174,6 +183,10 @@ impl App {
                     }
                     if opens == Some(Builtin::OpenClockPanel) {
                         toggle_panel = !toggle_panel;
+                        continue;
+                    }
+                    if opens == Some(Builtin::OpenBluetoothMenu) {
+                        bluetooth_at = window.regions.rect(target).map(|rect| f64::from(rect.x));
                         continue;
                     }
                     if opens != Some(Builtin::OpenPowerMenu) {
@@ -204,6 +217,11 @@ impl App {
                 if toggle_panel {
                     self.toggle_clock_panel(shell)?;
                 }
+                if let Some(left) = bluetooth_at
+                    && let Err(why) = self.toggle_bluetooth_menu(shell, left)?
+                {
+                    tracing::warn!("open_bluetooth_menu: {why}");
+                }
                 if toggle_dnd {
                     let reply = self.notifications(Request::Dnd);
                     if reply != control::OK {
@@ -214,6 +232,69 @@ impl App {
         }
         Ok(())
     }
+
+    /// Applies `event`, which is for the Bluetooth menu's window.
+    fn bluetooth_event(&mut self, shell: &mut dyn Shell, event: &ShellEvent) -> anyhow::Result<()> {
+        let Some(menu) = &mut self.bluetooth_menu else {
+            return Ok(());
+        };
+        if let ShellEvent::WindowDestroyed { .. } = event {
+            if let Some(menu) = self.bluetooth_menu.take() {
+                menu.close(shell, true)?;
+            }
+            return Ok(());
+        }
+        match menu.event(shell, event)? {
+            BluetoothOutcome::Kept => {}
+            outcome @ (BluetoothOutcome::Close | BluetoothOutcome::Closed) => {
+                if let Some(menu) = self.bluetooth_menu.take() {
+                    menu.close(shell, outcome == BluetoothOutcome::Closed)?;
+                }
+            }
+            BluetoothOutcome::Act(target) => self.bluetooth_act(target),
+        }
+        Ok(())
+    }
+
+    /// Carries out a click in the Bluetooth menu.
+    #[cfg(target_os = "linux")]
+    fn bluetooth_act(&self, target: lyr_core::bluetooth_menu::Target) {
+        use lyr_core::bluetooth_menu::{Switch, Target, order};
+
+        use crate::sources::BluetoothRequest;
+        let Some(adapter) = &self.data.bluetooth_adapter else {
+            return;
+        };
+        let devices = order(&self.data.bluetooth_devices);
+        let request = match target {
+            Target::Switch(switch) => {
+                let on = match switch {
+                    Switch::Powered => adapter.powered,
+                    Switch::Discoverable => adapter.discoverable,
+                    Switch::Pairable => adapter.pairable,
+                };
+                BluetoothRequest::Switch(adapter.path.clone(), switch, !on)
+            }
+            Target::Scan => BluetoothRequest::Scan(adapter.path.clone(), !adapter.discovering),
+            Target::Device(index, action) => {
+                let Some(device) = devices.get(index) else {
+                    return;
+                };
+                BluetoothRequest::Device(device.path.clone(), action)
+            }
+            Target::Forget(index) => {
+                let Some(device) = devices.get(index) else {
+                    return;
+                };
+                BluetoothRequest::Forget(adapter.path.clone(), device.path.clone())
+            }
+        };
+        self.commands.bluetooth(request);
+    }
+
+    /// Windows and macOS: the menu has no adapter to open on yet.
+    #[cfg(not(target_os = "linux"))]
+    fn bluetooth_act(&self, _target: lyr_core::bluetooth_menu::Target) {}
 
     /// Applies `event`, which is for the clock panel's window.
     fn panel_event(&mut self, shell: &mut dyn Shell, event: &ShellEvent) -> anyhow::Result<()> {

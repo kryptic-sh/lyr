@@ -41,6 +41,22 @@ impl App {
                 self.toggle_clock_panel(shell)?;
                 incoming.reply(control::OK);
             }
+            Request::Panel(Panel::Bluetooth) => {
+                // Under the module where a bar shows it, else at the edge.
+                let left = self
+                    .windows
+                    .values()
+                    .find_map(|window| {
+                        window.regions.rect(&lyr_core::draw::Target::Module(
+                            lyr_config::Module::Bluetooth,
+                        ))
+                    })
+                    .map_or(crate::toasts::EDGE_MARGIN, |rect| f64::from(rect.x));
+                match self.toggle_bluetooth_menu(shell, left)? {
+                    Ok(()) => incoming.reply(control::OK),
+                    Err(why) => incoming.reply(format!("error: {why}")),
+                }
+            }
             request @ (Request::Dnd | Request::Clear) => {
                 let reply = self.notifications(request);
                 incoming.reply(reply);

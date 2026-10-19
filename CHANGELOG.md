@@ -25,8 +25,9 @@ and this project adheres to
   the running one when the new one is invalid, and `lyr toggle` hides and shows
   the bars. On Linux, while lyr is the notification daemon, `lyr dnd` turns
   do-not-disturb on or off and `lyr clear` dismisses every notification.
-  `lyr panel clock` opens the clock panel; the other panels are not implemented
-  yet. A second `lyr` exits when one is already running.
+  `lyr panel clock` opens the clock panel and, on Linux, `lyr panel bluetooth`
+  the Bluetooth menu; the other panels are not implemented yet. A second `lyr`
+  exits when one is already running.
 - On Linux lyr is the notification daemon when no other daemon (such as swaync)
   holds the name; `notifications.replace = true` takes it over. Notifications
   show as toasts at the top right, swaync's look, timed out as swaync times
@@ -44,6 +45,10 @@ and this project adheres to
   asks Hyprland to exit; on Windows and macOS the entries are not built yet.
   `[power.menu]` sets an entry to a command instead
   (`lock = { exec = "hyprlock" }`).
+- On Linux, the Bluetooth menu, opened by a click on the Bluetooth module or
+  `lyr panel bluetooth`: the adapter's power, discoverable and pairable
+  switches, a scan toggle, and each device with connect or disconnect, pair,
+  trust and forget.
 - The clock panel, opened by a click on the clock or `lyr panel clock`: waybar's
   year calendar, three months across with week numbers and today underlined; a
   right click switches to the month, scrolling moves through years or months,

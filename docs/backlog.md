@@ -438,9 +438,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (`lyr_core::bluetooth_menu::draw`): the power, discoverable and pairable
   switches and the scan toggle, then the devices, paired first and by name, each
   with connect or disconnect, pair while unpaired, trust or untrust, and Forget,
-  in the power menu's box; tested and mutation-checked. Not built: the menu's
-  window and wiring, the pairing agent (`org.bluez.Agent1`, for passkeys and
-  PINs), rename, favourites, and the Windows and macOS menus.
+  in the power menu's box; tested and mutation-checked. The menu is up
+  (`apps/lyr/src/bluetooth_menu.rs`): a panel at the top left, under the
+  Bluetooth module, opened by `open_bluetooth_menu` or `lyr panel bluetooth`,
+  taking the keyboard (Escape and losing focus close it), each click sent to
+  BlueZ, and drawn again as BlueZ changes (recreated when its size changes).
+  Tested on crcbl's headless shell and mutation-checked; never run against a
+  real BlueZ, and on Windows `lyr panel bluetooth` answers that there is no
+  adapter. Not built: keyboard navigation in it, the pairing agent
+  (`org.bluez.Agent1`, for passkeys and PINs), rename, favourites, and the
+  Windows and macOS menus.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

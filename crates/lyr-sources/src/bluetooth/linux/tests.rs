@@ -9,6 +9,7 @@ use zbus::object_server::InterfaceRef;
 use zbus::{Connection, Guid};
 
 use super::BlueZ;
+use crate::bluetooth::Snapshot;
 
 const ADAPTER_PATH: &str = "/org/bluez/hci0";
 const DEVICE_PATH: &str = "/org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF";
@@ -82,19 +83,19 @@ async fn fake_bluez() -> (Connection, Connection) {
     tokio::try_join!(server, client).expect("connected")
 }
 
-async fn next(readings: &mut watch::Receiver<Option<Reading>>) -> Option<Reading> {
+async fn next(readings: &mut watch::Receiver<Snapshot>) -> Option<Reading> {
     tokio::time::timeout(Duration::from_secs(5), readings.changed())
         .await
         .expect("a reading within 5 s")
         .expect("the source is running");
-    readings.borrow_and_update().clone()
+    readings.borrow_and_update().reading.clone()
 }
 
 #[tokio::test]
 async fn a_device_connecting_comes_through_with_its_battery() {
     let (server, client) = fake_bluez().await;
     let bluez = BlueZ::on(&client).await.expect("proxy");
-    let (sender, mut readings) = watch::channel(None);
+    let (sender, mut readings) = watch::channel(Snapshot::default());
     let source = tokio::spawn(async move { bluez.watch(&sender).await });
 
     let first = next(&mut readings).await.expect("an adapter");

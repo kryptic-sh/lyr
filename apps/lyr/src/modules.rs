@@ -23,6 +23,10 @@ pub struct Data {
     pub power_profile: Option<lyr_sources::power_profile::Profiles>,
     #[cfg(target_os = "linux")]
     pub bluetooth: Option<lyr_core::bluetooth::Reading>,
+    /// The adapter and devices, for the Bluetooth menu. Empty where there
+    /// is no source for them.
+    pub bluetooth_adapter: Option<lyr_core::bluetooth_menu::Adapter>,
+    pub bluetooth_devices: Vec<lyr_core::bluetooth_menu::Device>,
     #[cfg(target_os = "linux")]
     pub workspaces: Option<lyr_wm::hyprland::State>,
     /// The system time zone's name, from timedate1.
@@ -52,7 +56,11 @@ impl Data {
             #[cfg(target_os = "linux")]
             Update::PowerProfile(profiles) => self.power_profile = profiles,
             #[cfg(target_os = "linux")]
-            Update::Bluetooth(reading) => self.bluetooth = reading,
+            Update::Bluetooth(snapshot) => {
+                self.bluetooth = snapshot.reading;
+                self.bluetooth_adapter = snapshot.adapter;
+                self.bluetooth_devices = snapshot.devices;
+            }
             #[cfg(target_os = "linux")]
             Update::Workspaces(state) => self.workspaces = Some(state),
             #[cfg(target_os = "linux")]
