@@ -241,8 +241,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second
   `lyr` refused; `lyr quit` stopped the bar, exit 0, the work area restored).
-  The other requests reach the bar and answer "not implemented yet": `reload`
-  (M3), `toggle`, `panel` (M5), `dnd` and `clear` (M6). Not built:
+  `lyr reload` reloads the config, keeping the running one when the new one is
+  invalid or its font will not load, and recreates the bars when `[bar]`
+  changed; run end to end on Windows (30 px to 40 px, then a bad `bar.height`
+  refused with the bar still running). The other requests answer "not
+  implemented yet": `toggle`, `panel` (M5), `dnd` and `clear` (M6). Not built:
   `lyr event workspace` for AeroSpace (M10).
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]` and `[theme]`, the embedded defaults,
@@ -252,8 +255,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   broken and seen to fail. The `[<module>.on]` action bindings (`actions.rs`)
   are built and checked against the module they are bound in. Not built: running
   them (the main loop), the tray's table (M8), checking the clock's strftime
-  format, reload (the file watcher, `lyr reload`, the old-and-new diff), the
-  control socket (its own entry above), the README's schema docs, and the
+  format, the file watcher that reloads on save (it needs a crate such as
+  `notify`, new to lyr, so the owner's call), a finer diff (a reload redraws
+  everything, and recreates the bars only when `[bar]` changed), the control
+  socket (its own entry above), the README's schema docs, and the
   defaults-parity test against `config.jsonc`. The dotfiles are at
   `~/Projects/mxaddict/dotfiles` on the owner's Windows machine, not next to
   lyr, and not on CI, so the test needs either a path from the environment or a

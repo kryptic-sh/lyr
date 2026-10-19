@@ -20,7 +20,8 @@ and this project adheres to
   wheel steps through them. A module's `[<module>.on]` table binds clicks and
   scrolling to a command (`{ exec = "…" }`) or a built-in action. Of the
   built-ins, only `cycle_profile` and `cycle_profile_back` work yet.
-- `lyr quit` stops the running bar. `lyr reload`, `lyr toggle`, `lyr panel`,
+- `lyr quit` stops the running bar, and `lyr reload` reloads its config, keeping
+  the running one when the new one is invalid. `lyr toggle`, `lyr panel`,
   `lyr dnd` and `lyr clear` reach it over its control socket and report that
   they are not implemented yet. A second `lyr` exits when one is already
   running.

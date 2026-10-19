@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use anyhow::Context as _;
 use chrono::Local;
 use crcbl_shell::{ShellEvent, WindowId};
-use lyr_config::{Module, Platform};
+use lyr_config::{Config, Module, Platform};
 use lyr_core::clock::Tick;
 use lyr_core::control::Request;
 use lyr_core::draw::Target;
@@ -58,15 +58,8 @@ impl Window {
     }
 }
 
-/// Runs the bar until `lyr quit` stops it.
-pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
-    let (config, _) =
-        lyr_config::load(config, Platform::current()).context("loading the config")?;
-    let mut shell = crcbl_shell::open().context("opening the window system")?;
-    // Bound before anything else is loaded or drawn, so a second lyr stops
-    // here.
-    let requests = control::listen(control::path()?, shell.waker())?;
-
+/// Loads the theme's font, saying what was missing.
+fn load_text(config: &Config) -> anyhow::Result<Text> {
     let font = lyr_render::fonts::load(&config.theme.font).context("loading the bar font")?;
     if let Some(family) = &font.missing {
         tracing::warn!("font `{family}` is not installed; using a monospace font");
@@ -74,8 +67,36 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
     for (path, reason) in &font.unreadable {
         tracing::warn!("fallback font {} skipped: {reason}", path.display());
     }
-    let text = Text::new(font.font, config.theme.font_size as f32);
-    let tick = Tick::of(&config.clock.format);
+    Ok(Text::new(font.font, config.theme.font_size as f32))
+}
+
+/// Closes every bar: their surfaces first, then their windows.
+fn close_all(
+    shell: &mut dyn crcbl_shell::Shell,
+    bars: &mut Bars,
+    windows: &mut HashMap<WindowId, Window>,
+) -> anyhow::Result<()> {
+    for (_, window) in windows.drain() {
+        window.surface.destroy()?;
+    }
+    for (_, bar) in bars.windows().collect::<Vec<_>>() {
+        shell.destroy_window(bar)?;
+    }
+    *bars = Bars::default();
+    Ok(())
+}
+
+/// Runs the bar until `lyr quit` stops it.
+pub fn run(config_path: Option<&Path>) -> anyhow::Result<()> {
+    let (mut config, _) =
+        lyr_config::load(config_path, Platform::current()).context("loading the config")?;
+    let mut shell = crcbl_shell::open().context("opening the window system")?;
+    // Bound before anything else is loaded or drawn, so a second lyr stops
+    // here.
+    let requests = control::listen(control::path()?, shell.waker())?;
+
+    let mut text = load_text(&config)?;
+    let mut tick = Tick::of(&config.clock.format);
 
     let mut bars = Bars::default();
     bars.sync(shell.as_mut(), &config.bar)
@@ -101,22 +122,57 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
         }
         let mut quit = false;
         while let Ok(incoming) = requests.try_recv() {
-            if incoming.request == Request::Quit {
-                quit = true;
-                incoming.reply(control::OK);
-            } else {
-                let what = incoming.request.to_string();
-                incoming.reply(format!("error: `{what}` is not implemented yet"));
+            match incoming.request {
+                Request::Quit => {
+                    quit = true;
+                    incoming.reply(control::OK);
+                }
+                Request::Reload => {
+                    // An invalid config is logged and the running one kept
+                    // (plan 05); so is a font that will not load.
+                    let reloaded = lyr_config::load(config_path, Platform::current())
+                        .map_err(anyhow::Error::from)
+                        .and_then(|(new, _)| {
+                            let new_text = if new.theme.font == config.theme.font
+                                && new.theme.font_size == config.theme.font_size
+                            {
+                                None
+                            } else {
+                                Some(load_text(&new)?)
+                            };
+                            Ok((new, new_text))
+                        });
+                    match reloaded {
+                        Err(error) => {
+                            tracing::warn!("reload: keeping the running config: {error:#}");
+                            incoming.reply(format!("error: {error:#}"));
+                        }
+                        Ok((new, new_text)) => {
+                            if let Some(new_text) = new_text {
+                                text = new_text;
+                            }
+                            if new.bar != config.bar {
+                                close_all(shell.as_mut(), &mut bars, &mut windows)?;
+                                bars.sync(shell.as_mut(), &new.bar)
+                                    .context("creating the bars")?;
+                            }
+                            tick = Tick::of(&new.clock.format);
+                            next_tick =
+                                Instant::now() + tick.until_next(&Local::now().fixed_offset());
+                            config = new;
+                            windows.values_mut().for_each(|window| window.dirty = true);
+                            tracing::info!("reload: config reloaded");
+                            incoming.reply(control::OK);
+                        }
+                    }
+                }
+                other => {
+                    incoming.reply(format!("error: `{other}` is not implemented yet"));
+                }
             }
         }
         if quit {
-            for (_, window) in windows.drain() {
-                window.surface.destroy()?;
-            }
-            for (_, bar) in bars.windows().collect::<Vec<_>>() {
-                shell.destroy_window(bar)?;
-            }
-            return Ok(());
+            return close_all(shell.as_mut(), &mut bars, &mut windows);
         }
         while let Ok(update) = updates.try_recv() {
             data.apply(update);
