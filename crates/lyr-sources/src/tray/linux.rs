@@ -12,13 +12,14 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use futures_util::StreamExt;
 use futures_util::stream::select;
+use lyr_core::tray::menu::{self, Entry};
 use lyr_core::tray::{Item, Registry, Status, item_address};
 use tokio::sync::watch;
 use zbus::fdo::{DBusProxy, PropertiesProxy, RequestNameFlags, RequestNameReply};
 use zbus::message::{Header, Type};
 use zbus::names::{BusName, InterfaceName};
 use zbus::object_server::SignalEmitter;
-use zbus::{Connection, MatchRule, MessageStream, OwnedObjectPath, OwnedVariant};
+use zbus::{Connection, MatchRule, MessageStream, OwnedObjectPath, OwnedVariant, Variant};
 
 /// The watcher's well-known name, and its object.
 pub const WATCHER: &str = "org.kde.StatusNotifierWatcher";
@@ -251,6 +252,66 @@ trait ItemControl {
     fn scroll(&self, delta: i32, orientation: &str) -> zbus::Result<()>;
 }
 
+/// An item's menu (`com.canonical.dbusmenu`).
+#[zbus::proxy(interface = "com.canonical.dbusmenu")]
+trait DbusMenu {
+    fn get_layout(
+        &self,
+        parent_id: i32,
+        recursion_depth: i32,
+        property_names: &[&str],
+    ) -> zbus::Result<(u32, Layout)>;
+    fn event(
+        &self,
+        id: i32,
+        event_id: &str,
+        data: &Variant<'_>,
+        timestamp: u32,
+    ) -> zbus::Result<()>;
+    fn about_to_show(&self, id: i32) -> zbus::Result<bool>;
+}
+
+/// A menu entry as `GetLayout` lays it out: its id, its properties, and its
+/// children, each in the same shape inside a variant.
+pub(crate) type Layout = (i32, HashMap<String, OwnedVariant>, Vec<OwnedVariant>);
+
+/// The entry `layout` describes, with its submenus. A child in another
+/// shape is left out.
+fn entry((id, properties, children): &Layout) -> Entry {
+    let text = |name: &str| {
+        properties
+            .get(name)
+            .and_then(|value| String::try_from(value.clone()).ok())
+    };
+    let flag = |name: &str| {
+        properties
+            .get(name)
+            .and_then(|value| bool::try_from(value).ok())
+    };
+    let defaults = Entry::new(*id);
+    Entry {
+        label: text("label")
+            .map(|raw| menu::label(&raw))
+            .unwrap_or_default(),
+        enabled: flag("enabled").unwrap_or(defaults.enabled),
+        visible: flag("visible").unwrap_or(defaults.visible),
+        separator: text("type").as_deref() == Some("separator"),
+        toggle: menu::toggle(
+            &text("toggle-type").unwrap_or_default(),
+            properties
+                .get("toggle-state")
+                .and_then(|value| i32::try_from(value).ok())
+                .unwrap_or(-1),
+        ),
+        children: children
+            .iter()
+            .filter_map(|child| Layout::try_from(child.clone()).ok())
+            .map(|child| entry(&child))
+            .collect(),
+        ..defaults
+    }
+}
+
 /// `ToolTip`: icon name, icon pixmaps, title and description.
 pub(crate) type ToolTip = (String, Vec<(i32, i32, Vec<u8>)>, String, String);
 
@@ -378,6 +439,44 @@ impl Host {
         ItemControlProxy::builder(&self.connection)
             .destination(bus_name.to_owned())
             .path(path.to_owned())
+            .build()
+            .await
+    }
+
+    /// The menu at `menu` of the item at `bus_name`, read whole after
+    /// telling it the menu is about to show.
+    ///
+    /// # Errors
+    ///
+    /// When the item serves no such menu, as some that name one do not
+    /// (Steam, by waybar's `Item::handleClick`): the caller falls back to
+    /// `ContextMenu`.
+    pub async fn menu(&self, bus_name: &str, menu: &str) -> zbus::Result<Entry> {
+        let proxy = self.dbus_menu(bus_name, menu).await?;
+        proxy.about_to_show(0).await?;
+        let (_revision, layout) = proxy.get_layout(0, -1, &[]).await?;
+        Ok(entry(&layout))
+    }
+
+    /// Tells the menu at `menu` of the item at `bus_name` that its entry
+    /// `id` was clicked.
+    ///
+    /// # Errors
+    ///
+    /// When the item refuses or does not answer.
+    pub async fn menu_clicked(&self, bus_name: &str, menu: &str, id: i32) -> zbus::Result<()> {
+        // The spec gives a click no data; libdbusmenu sends an int 0.
+        self.dbus_menu(bus_name, menu)
+            .await?
+            .event(id, "clicked", &Variant::from(0_i32), 0)
+            .await
+    }
+
+    async fn dbus_menu(&self, bus_name: &str, menu: &str) -> zbus::Result<DbusMenuProxy<'static>> {
+        DbusMenuProxy::builder(&self.connection)
+            .destination(bus_name.to_owned())
+            .path(menu.to_owned())
+            .cache_properties(zbus::proxy::CacheProperties::No)
             .build()
             .await
     }

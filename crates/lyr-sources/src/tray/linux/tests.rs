@@ -383,3 +383,159 @@ async fn the_watcher_signals_each_change() {
     assert_eq!(next().await, "IsStatusNotifierHostRegistered");
     assert_eq!(next().await, "StatusNotifierHostUnregistered");
 }
+
+/// A menu: "_Open" (id 1), a separator (2), a disabled "Quit" (3), a
+/// submenu "More" (4) holding a checked "Sync" (5), and a hidden entry (6).
+struct FakeMenu {
+    calls: Calls,
+}
+
+fn layout(
+    id: i32,
+    properties: &[(&str, zbus::Variant<'static>)],
+    children: Vec<super::Layout>,
+) -> super::Layout {
+    (
+        id,
+        properties
+            .iter()
+            .map(|(name, value)| {
+                (
+                    (*name).to_owned(),
+                    zbus::OwnedVariant::try_from(value.clone()).expect("owned"),
+                )
+            })
+            .collect(),
+        children
+            .into_iter()
+            .map(|child| zbus::OwnedVariant::try_from(zbus::Variant::from(child)).expect("owned"))
+            .collect(),
+    )
+}
+
+#[zbus::interface(name = "com.canonical.dbusmenu")]
+impl FakeMenu {
+    fn get_layout(
+        &self,
+        parent_id: i32,
+        recursion_depth: i32,
+        _property_names: Vec<String>,
+    ) -> (u32, super::Layout) {
+        self.record(format!("layout {parent_id} {recursion_depth}"));
+        let text = |value: &'static str| zbus::Variant::from(value);
+        let more = layout(
+            4,
+            &[
+                ("label", text("More")),
+                ("children-display", text("submenu")),
+            ],
+            vec![layout(
+                5,
+                &[
+                    ("label", text("Sync")),
+                    ("toggle-type", text("checkmark")),
+                    ("toggle-state", zbus::Variant::from(1_i32)),
+                ],
+                vec![],
+            )],
+        );
+        let root = layout(
+            0,
+            &[],
+            vec![
+                layout(1, &[("label", text("_Open"))], vec![]),
+                layout(2, &[("type", text("separator"))], vec![]),
+                layout(
+                    3,
+                    &[
+                        ("label", text("Quit")),
+                        ("enabled", zbus::Variant::from(false)),
+                    ],
+                    vec![],
+                ),
+                more,
+                layout(6, &[("visible", zbus::Variant::from(false))], vec![]),
+            ],
+        );
+        (7, root)
+    }
+
+    fn event(&self, id: i32, event_id: &str, _data: zbus::OwnedVariant, _timestamp: u32) {
+        self.record(format!("event {id} {event_id}"));
+    }
+
+    fn about_to_show(&self, id: i32) -> bool {
+        self.record(format!("about to show {id}"));
+        false
+    }
+}
+
+impl FakeMenu {
+    fn record(&self, call: String) {
+        self.calls
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(call);
+    }
+}
+
+#[tokio::test]
+async fn a_menu_is_read_whole_and_a_click_is_sent() {
+    let running = running("/MenuBar").await;
+    running
+        .server
+        .object_server()
+        .at(
+            "/MenuBar",
+            FakeMenu {
+                calls: running.calls.clone(),
+            },
+        )
+        .await
+        .expect("served");
+    let host = Host::on(&running.client).await.expect("host");
+    let root = host.menu(BUS, "/MenuBar").await.expect("read");
+    let shown: Vec<(i32, &str, bool, bool)> = root
+        .shown()
+        .map(|entry| {
+            (
+                entry.id,
+                entry.label.as_str(),
+                entry.enabled,
+                entry.separator,
+            )
+        })
+        .collect();
+    assert_eq!(
+        shown,
+        [
+            (1, "Open", true, false),
+            (2, "", true, true),
+            (3, "Quit", false, false),
+            (4, "More", true, false),
+        ]
+    );
+    let sync = root.find(5).expect("in the submenu");
+    assert_eq!(
+        sync.toggle,
+        Some(lyr_core::tray::menu::Toggle {
+            radio: false,
+            on: Some(true)
+        })
+    );
+    assert!(root.find(1).expect("open").toggle.is_none());
+    host.menu_clicked(BUS, "/MenuBar", 1)
+        .await
+        .expect("clicked");
+    assert_eq!(
+        calls(&running.calls),
+        ["about to show 0", "layout 0 -1", "event 1 clicked"]
+    );
+}
+
+#[tokio::test]
+async fn an_item_without_its_menu_is_an_error() {
+    let running = running("/MenuBar").await;
+    let host = Host::on(&running.client).await.expect("host");
+    assert!(host.menu(BUS, "/MenuBar").await.is_err());
+}

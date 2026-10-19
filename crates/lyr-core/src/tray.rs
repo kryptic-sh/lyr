@@ -3,6 +3,8 @@
 //! asks of it, following waybar's `src/modules/sni` (master `c15ec02`, read
 //! 2026-10-20). The platforms' sources fill it in (`lyr_sources::tray`).
 
+pub mod menu;
+
 use crate::pointer::Press;
 
 /// Where an item lives when it registers with only its bus name.
