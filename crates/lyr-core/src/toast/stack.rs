@@ -16,6 +16,8 @@ use crate::notifications::Store;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Up {
     id: u32,
+    /// When it arrived, for its "2 mins ago".
+    since: Instant,
     /// When it goes, or `None` for never (a critical notification) or while
     /// the pointer pauses it.
     until: Option<Instant>,
@@ -48,7 +50,15 @@ impl Stack {
         } else {
             (timeout.map(|timeout| now + timeout), None)
         };
-        self.up.insert(0, Up { id, until, paused });
+        self.up.insert(
+            0,
+            Up {
+                id,
+                since: now,
+                until,
+                paused,
+            },
+        );
     }
 
     /// The notification `id` closed: its toast goes.
@@ -93,18 +103,32 @@ impl Stack {
         self.up.iter().filter_map(|up| up.until).min()
     }
 
+    /// When a toast's "N mins ago" next changes, at `now` or later: a whole
+    /// minute after it arrived.
+    #[must_use]
+    pub fn next_label_change(&self, now: Instant) -> Option<Instant> {
+        self.up
+            .iter()
+            .map(|up| {
+                let minutes = now.saturating_duration_since(up.since).as_secs() / 60;
+                up.since + Duration::from_secs((minutes + 1) * 60)
+            })
+            .min()
+    }
+
     /// The ids of the toasts that are up, newest first.
     pub fn ids(&self) -> impl Iterator<Item = u32> + '_ {
         self.up.iter().map(|up| up.id)
     }
 
-    /// The stack drawn from `store`, newest on top and [`MARGIN`] apart: its
-    /// draw list, its size, and each toast's region. Empty when no toast is
-    /// up.
+    /// The stack drawn from `store` at `now`, newest on top and [`MARGIN`]
+    /// apart: its draw list, its size, and each toast's region. Empty when no
+    /// toast is up.
     #[must_use]
     pub fn draw(
         &self,
         store: &Store,
+        now: Instant,
         measure: impl Fn(&str) -> f32,
         line_height: f32,
         theme: &Theme,
@@ -115,8 +139,14 @@ impl Stack {
             width: 0.0,
             height: 0.0,
         };
-        for notification in self.ids().filter_map(|id| store.get(id)) {
-            let (toast, toast_size) = draw(&notification.content, &measure, line_height, theme);
+        for (up, notification) in self
+            .up
+            .iter()
+            .filter_map(|up| Some((up, store.get(up.id)?)))
+        {
+            let elapsed = now.saturating_duration_since(up.since);
+            let (toast, toast_size) =
+                draw(&notification.content, elapsed, &measure, line_height, theme);
             let top = if size.height > 0.0 {
                 size.height + MARGIN
             } else {

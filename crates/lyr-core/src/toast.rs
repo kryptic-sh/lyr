@@ -2,11 +2,13 @@
 //! wrapped to the toast's width, and its draw list, in swaync's look from the
 //! dotfiles' `config.json` and `style.css`.
 //!
-//! Drawn so far: the summary over the body, the border coloured by urgency.
-//! Not yet: the arrival time, the close button, action buttons, images, body
+//! Drawn so far: the summary over the body, when it arrived, the border
+//! coloured by urgency. Not yet: the close button, action buttons, images, body
 //! markup (lyr advertises no `body-markup`, so applications send plain text).
 
 pub mod stack;
+
+use std::time::Duration;
 
 use lyr_config::Theme;
 
@@ -51,11 +53,29 @@ pub fn wrap(text: &str, width: f32, measure: impl Fn(&str) -> f32) -> Vec<String
     lines
 }
 
-/// The toast for `content`: its draw list and its size, its text measured by
-/// `measure` in lines `line_height` tall.
+/// How long ago a notification arrived, as swaync 0.12.6 words it with its
+/// default `relative-timestamps` (`get_relative_time` in
+/// `src/notification/notification.vala`): "Now" under a minute, then whole
+/// minutes, hours and days, rounded down.
+#[must_use]
+pub fn relative_time(elapsed: Duration) -> String {
+    let minutes = elapsed.as_secs() / 60;
+    let (count, unit) = match minutes {
+        0 => return "Now".to_owned(),
+        1..60 => (minutes, "min"),
+        60..1440 => (minutes / 60, "hour"),
+        _ => (minutes / 1440, "day"),
+    };
+    let plural = if count > 1 { "s" } else { "" };
+    format!("{count} {unit}{plural} ago")
+}
+
+/// The toast for `content`, which arrived `elapsed` ago: its draw list and
+/// its size, its text measured by `measure` in lines `line_height` tall.
 #[must_use]
 pub fn draw(
     content: &Incoming,
+    elapsed: Duration,
     measure: impl Fn(&str) -> f32,
     line_height: f32,
     theme: &Theme,
@@ -83,6 +103,19 @@ pub fn draw(
         fill: theme.toast_background,
         border: Some((BORDER, border)),
     }];
+    // On the summary's line, at the right, as swaync places it.
+    let time = relative_time(elapsed);
+    let time_width = measure(&time);
+    items.push(Item::Text {
+        rect: Rect {
+            x: WIDTH - BORDER - INSET - time_width,
+            y: BORDER + INSET,
+            width: time_width,
+            height: line_height,
+        },
+        text: time,
+        colour: theme.toast_time,
+    });
     for (index, text) in lines.into_iter().enumerate() {
         items.push(Item::Text {
             rect: Rect {

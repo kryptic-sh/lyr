@@ -261,8 +261,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   and takes the toast down, a middle click dismisses the notification. Tested on
   crcbl's headless shell and mutation-checked; **never seen on screen**: Windows
   has no daemon and WSL has no compositor, so the owner's Hyprland is the first
-  real run. The bell is drawn from the store while lyr is the daemon. Not built:
-  a toast's arrival time, close button, action buttons and images, markup,
+  real run. The bell is drawn from the store while lyr is the daemon. A toast
+  shows when it arrived as swaync words it ("Now", "2 mins ago", from
+  `get_relative_time` at v0.12.6), redrawn as the words change; a summary long
+  enough to reach the time runs under it, since swaync's ellipsis is not
+  carried. Not built: a toast's close button, action buttons and images, markup,
   MPRIS, do-not-disturb and Clear All in the panel (`lyr dnd` and `lyr clear`
   work; on Windows they answer that lyr is not the daemon, run there). A
   transient notification, kept in no history, closes as expired when its toast

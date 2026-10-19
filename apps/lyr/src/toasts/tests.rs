@@ -53,7 +53,9 @@ impl Setup {
             line_height: 20.0,
         };
         self.toasts.expire(now);
-        self.toasts.sync(&mut self.shell, &look).expect("synced");
+        self.toasts
+            .sync(&mut self.shell, &look, now)
+            .expect("synced");
         self.toasts.panel.as_ref().map(|panel| panel.window)
     }
 
@@ -154,7 +156,11 @@ fn the_pointer_over_a_toast_holds_it_up() {
         .move_pointer(window, PhysicalPoint { x: 20.0, y: 20.0 }, (0.0, 0.0))
         .expect("moved");
     assert_eq!(setup.pump(start + Duration::from_secs(1)), None);
-    assert_eq!(setup.toasts.next_wake(), None, "paused");
+    assert_eq!(
+        setup.toasts.next_wake(),
+        Some(start + Duration::from_secs(60)),
+        "paused: only its time's next change"
+    );
     assert_eq!(setup.sync(start + NORMAL_TIMEOUT * 3), Some(window));
 }
 
@@ -172,4 +178,32 @@ fn only_a_transient_toast_that_times_out_is_to_close() {
     assert!(setup.toasts.expire(start).is_empty());
     assert_eq!(setup.toasts.expire(start + NORMAL_TIMEOUT), [transient]);
     assert!(setup.store.lock().expect("store").get(kept).is_some());
+}
+
+#[test]
+fn a_toast_up_for_a_minute_is_redrawn_for_its_new_time() {
+    let mut setup = setup();
+    let start = Instant::now();
+    let id = setup.store.lock().expect("store").notify(Incoming {
+        summary: "stays".to_owned(),
+        expiry: Some(lyr_core::notifications::Expiry::Never),
+        ..Incoming::default()
+    });
+    setup.toasts.notified(id, start);
+    setup.sync(start);
+    let minute = start + Duration::from_secs(60);
+    assert_eq!(setup.toasts.next_wake(), Some(minute));
+    setup.sync(minute);
+    let panel = setup.toasts.panel.as_ref().expect("a panel");
+    assert!(
+        panel.list.items.iter().any(|item| matches!(
+            item,
+            lyr_core::draw::Item::Text { text, .. } if text == "1 min ago"
+        )),
+        "redrawn with its new time"
+    );
+    assert_eq!(
+        setup.toasts.next_wake(),
+        Some(start + Duration::from_secs(120))
+    );
 }

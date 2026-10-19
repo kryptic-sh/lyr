@@ -458,4 +458,6 @@ pub struct Theme {
     pub toast_border: Colour,
     pub toast_border_low: Colour,
     pub toast_border_critical: Colour,
+    /// When it arrived.
+    pub toast_time: Colour,
 }

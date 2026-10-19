@@ -1,6 +1,8 @@
+use std::time::Duration;
+
 use lyr_config::{Platform, Theme, from_sources};
 
-use super::{BORDER, INSET, WIDTH, draw, wrap};
+use super::{BORDER, INSET, WIDTH, draw, relative_time, wrap};
 use crate::draw::Item;
 use crate::notifications::{Incoming, Urgency};
 
@@ -62,19 +64,23 @@ fn a_toast_stacks_its_summary_over_its_body() {
         body: "file.zip".to_owned(),
         ..Incoming::default()
     };
-    let (list, size) = draw(&content, measure, 20.0, &theme);
+    let (list, size) = draw(&content, Duration::ZERO, measure, 20.0, &theme);
     let top = BORDER + INSET;
     assert_eq!((size.width, size.height), (WIDTH, 2.0 * top + 40.0));
     assert_eq!(
         texts(&list.items),
-        [("Download done", top), ("file.zip", top + 20.0)]
+        [
+            ("Now", top),
+            ("Download done", top),
+            ("file.zip", top + 20.0)
+        ]
     );
     let no_body = Incoming {
         summary: "Ping".to_owned(),
         ..Incoming::default()
     };
-    let (list, size) = draw(&no_body, measure, 20.0, &theme);
-    assert_eq!(texts(&list.items), [("Ping", top)]);
+    let (list, size) = draw(&no_body, Duration::ZERO, measure, 20.0, &theme);
+    assert_eq!(texts(&list.items), [("Now", top), ("Ping", top)]);
     assert_eq!(size.height, 2.0 * top + 20.0);
 }
 
@@ -87,7 +93,10 @@ fn the_border_follows_the_urgency() {
             urgency,
             ..Incoming::default()
         };
-        match draw(&content, measure, 20.0, &theme).0.items[0] {
+        match draw(&content, Duration::ZERO, measure, 20.0, &theme)
+            .0
+            .items[0]
+        {
             Item::Box {
                 border: Some((width, colour)),
                 fill,
@@ -102,4 +111,41 @@ fn the_border_follows_the_urgency() {
     assert_eq!(border(Urgency::Low), theme.toast_border_low);
     assert_eq!(border(Urgency::Normal), theme.toast_border);
     assert_eq!(border(Urgency::Critical), theme.toast_border_critical);
+}
+
+#[test]
+fn the_time_reads_as_swaync_words_it() {
+    let at = |secs| relative_time(Duration::from_secs(secs));
+    assert_eq!(at(0), "Now");
+    assert_eq!(at(59), "Now");
+    assert_eq!(at(60), "1 min ago");
+    assert_eq!(at(119), "1 min ago");
+    assert_eq!(at(120), "2 mins ago");
+    assert_eq!(at(3599), "59 mins ago");
+    assert_eq!(at(3600), "1 hour ago");
+    assert_eq!(at(7200), "2 hours ago");
+    assert_eq!(at(86_399), "23 hours ago");
+    assert_eq!(at(86_400), "1 day ago");
+    assert_eq!(at(3 * 86_400), "3 days ago");
+}
+
+#[test]
+fn the_time_sits_at_the_right_of_the_summary() {
+    let theme = theme();
+    let content = Incoming {
+        summary: "hello".to_owned(),
+        ..Incoming::default()
+    };
+    let (list, _) = draw(&content, Duration::from_secs(120), measure, 20.0, &theme);
+    let time = list
+        .items
+        .iter()
+        .find_map(|item| match item {
+            Item::Text { text, rect, colour } if text == "2 mins ago" => Some((*rect, *colour)),
+            _ => None,
+        })
+        .expect("the time");
+    assert_eq!(time.0.x + time.0.width, WIDTH - BORDER - INSET);
+    assert_eq!(time.0.y, BORDER + INSET);
+    assert_eq!(time.1, theme.toast_time);
 }

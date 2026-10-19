@@ -138,14 +138,14 @@ fn the_stack_draws_each_toast_below_the_last() {
     stack.notified(&store, older, false, start);
     let newer = notify(&mut store, "newer", Urgency::Normal);
     stack.notified(&store, newer, false, start);
-    let (list, size, regions) = stack.draw(&store, measure, 20.0, &theme);
+    let (list, size, regions) = stack.draw(&store, start, measure, 20.0, &theme);
     let toast = 2.0 * (BORDER + INSET) + 20.0;
     assert_eq!(size.height, 2.0 * toast + MARGIN);
     let tops: Vec<(&str, f32)> = list
         .items
         .iter()
         .filter_map(|item| match item {
-            Item::Text { text, rect, .. } => Some((text.as_str(), rect.y)),
+            Item::Text { text, rect, .. } if text != "Now" => Some((text.as_str(), rect.y)),
             _ => None,
         })
         .collect();
@@ -159,6 +159,27 @@ fn the_stack_draws_each_toast_below_the_last() {
     assert_eq!(regions.hit(10.0, 1.0), Some(&newer));
     assert_eq!(regions.hit(10.0, toast + MARGIN + 1.0), Some(&older));
     assert_eq!(regions.hit(10.0, toast + 1.0), None, "between them");
-    let empty = Stack::default().draw(&store, measure, 20.0, &theme);
+    let empty = Stack::default().draw(&store, start, measure, 20.0, &theme);
     assert!(empty.0.items.is_empty() && empty.1.height == 0.0);
+}
+
+#[test]
+fn a_label_changes_a_whole_minute_after_its_toast_arrived() {
+    let start = Instant::now();
+    let mut store = Store::default();
+    let mut stack = Stack::default();
+    assert_eq!(stack.next_label_change(start), None);
+    let id = notify(&mut store, "critical", Urgency::Critical);
+    stack.notified(&store, id, false, start);
+    let minute = Duration::from_secs(60);
+    assert_eq!(stack.next_label_change(start), Some(start + minute));
+    assert_eq!(
+        stack.next_label_change(start + minute),
+        Some(start + 2 * minute),
+        "on the boundary, the next one"
+    );
+    assert_eq!(
+        stack.next_label_change(start + minute * 3 / 2),
+        Some(start + 2 * minute)
+    );
 }

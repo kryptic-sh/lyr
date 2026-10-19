@@ -252,7 +252,7 @@ impl App {
         for id in toasts.expire(Instant::now()) {
             commands.close_notification(id, lyr_core::notifications::CloseReason::Expired);
         }
-        toasts.sync(shell, &look)?;
+        toasts.sync(shell, &look, Instant::now())?;
         toasts.draw(text)?;
         for window in windows.values_mut().filter(|window| window.dirty) {
             let hovered = window.hovered();

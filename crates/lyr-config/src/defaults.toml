@@ -136,6 +136,7 @@ toast_foreground = "#c0caf5"
 toast_border = "#73daca"
 toast_border_low = "#7aa2f7"
 toast_border_critical = "#f7768e"
+toast_time = "#565f89"
 
 # The tray belongs to Explorer on Windows and to the menu bar on macOS, and
 # macOS has no notification API, so those modules are left out there.

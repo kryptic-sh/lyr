@@ -59,6 +59,8 @@ pub struct Toasts {
     pointer: Pointer,
     /// Whether the stack changed since the panel was built.
     changed: bool,
+    /// When a toast's "N mins ago" next changes, so the panel is rebuilt.
+    relabel_at: Option<Instant>,
 }
 
 impl Toasts {
@@ -99,7 +101,11 @@ impl Toasts {
 
     /// When the toasts next have something to do.
     pub fn next_wake(&self) -> Option<Instant> {
-        self.stack.next_wake()
+        self.stack
+            .next_wake()
+            .into_iter()
+            .chain(self.relabel_at)
+            .min()
     }
 
     /// Whether the panel has a frame to present.
@@ -131,9 +137,17 @@ impl Toasts {
             .collect()
     }
 
-    /// Brings the panel in line with the stack: rebuilt, recreated at a new
-    /// size, or closed.
-    pub fn sync(&mut self, shell: &mut dyn Shell, look: &Look<'_>) -> anyhow::Result<()> {
+    /// Brings the panel in line with the stack at `now`: rebuilt, recreated
+    /// at a new size, or closed.
+    pub fn sync(
+        &mut self,
+        shell: &mut dyn Shell,
+        look: &Look<'_>,
+        now: Instant,
+    ) -> anyhow::Result<()> {
+        if self.relabel_at.is_some_and(|at| at <= now) {
+            self.changed = true;
+        }
         if !std::mem::take(&mut self.changed) {
             return Ok(());
         }
@@ -143,8 +157,9 @@ impl Toasts {
         let (list, size, regions) = {
             let store = store.lock().unwrap_or_else(PoisonError::into_inner);
             self.stack
-                .draw(&store, look.measure, look.line_height, look.theme)
+                .draw(&store, now, look.measure, look.line_height, look.theme)
         };
+        self.relabel_at = self.stack.next_label_change(now);
         if size.height == 0.0 {
             return self.close(shell);
         }
