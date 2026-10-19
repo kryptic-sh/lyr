@@ -41,6 +41,8 @@ and this project adheres to
   Shutdown, Logout, Reboot), driven by the arrow keys and Enter or the pointer.
   On Linux each entry asks logind as `systemctl` and `loginctl` do, and Logout
   asks Hyprland to exit; on Windows and macOS the entries are not built yet.
+  `[power.menu]` sets an entry to a command instead
+  (`lock = { exec = "hyprlock" }`).
 - `lyr --stats` logs the bar's main-loop wake-ups, the events it applied and the
   frames it presented on each output, once a minute, to check that an idle bar
   stays idle.

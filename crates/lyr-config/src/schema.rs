@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 
-use crate::actions::On;
+use crate::actions::{On, PowerMenu};
 use crate::colour::Colour;
 use crate::format::Format;
 
@@ -176,6 +176,9 @@ pub struct Power {
     /// No placeholders: the button is a glyph.
     pub format: Format,
     pub tooltip_format: Format,
+    /// The menu's entries set to a command instead of lyr's own action.
+    #[serde(default)]
+    pub menu: PowerMenu,
     /// What a click or a scroll does.
     #[serde(default)]
     pub on: On,

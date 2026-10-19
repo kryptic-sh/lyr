@@ -18,7 +18,7 @@ mod schema;
 
 use std::path::{Path, PathBuf};
 
-pub use actions::{Binding, Builtin, On};
+pub use actions::{Binding, Builtin, Exec, On, PowerMenu};
 pub use colour::{Colour, InvalidColour};
 pub use format::{Format, InvalidFormat};
 pub use hjkl_config::{ConfigError, ConfigSource};
@@ -329,6 +329,11 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
         }
     }
     check_placeholders("power.format", &config.power.format, &[])?;
+    for (key, command) in config.power.menu.commands() {
+        if command.exec.trim().is_empty() {
+            return Err(format!("power.menu.{key}: `exec` is empty"));
+        }
+    }
     check_placeholders("power.tooltip_format", &config.power.tooltip_format, &[])?;
     let volume = &config.volume;
     let volume_formats = [

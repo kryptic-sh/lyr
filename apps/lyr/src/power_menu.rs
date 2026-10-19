@@ -21,6 +21,18 @@ use lyr_shell::bars::NAMESPACE;
 use crate::input::Pointer;
 use crate::tooltips::Look;
 
+/// The command the config sets for `entry`, or `None` for lyr's own action.
+pub fn configured(menu: &lyr_config::PowerMenu, entry: Entry) -> Option<&lyr_config::Exec> {
+    match entry {
+        Entry::Lock => menu.lock.as_ref(),
+        Entry::Sleep => menu.sleep.as_ref(),
+        Entry::Hibernate => menu.hibernate.as_ref(),
+        Entry::Shutdown => menu.shutdown.as_ref(),
+        Entry::Logout => menu.logout.as_ref(),
+        Entry::Reboot => menu.reboot.as_ref(),
+    }
+}
+
 /// The open power menu.
 pub struct PowerMenu {
     window: WindowId,

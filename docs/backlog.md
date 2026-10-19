@@ -397,11 +397,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   crcbl, whose fix (every backend) and the scancode-0 key codes below sit on its
   `win32-popup-leave` branch until that branch's CI passes, for 0.6.0. Keys
   injected with `SendKeys` arrive with no scancode, so crcbl names no key for
-  them; `keybd_event` with scancodes works. Not built: an entry set to a command
-  instead of its built-in (plan 10 allows either), the Windows and macOS actions
-  (plan 10 names Win32 APIs that need `windows-sys`, new to lyr), and checking
-  what Hyprland does with an outside click (M5's open question for panels
-  applies to this grab popup too).
+  them; `keybd_event` with scancodes works. `[power.menu]` sets an entry to a
+  command (`{ exec = … }`), which runs instead of lyr's action. Not built: the
+  Windows and macOS actions (plan 10 names Win32 APIs that need `windows-sys`,
+  new to lyr), and checking what Hyprland does with an outside click (M5's open
+  question for panels applies to this grab popup too).
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

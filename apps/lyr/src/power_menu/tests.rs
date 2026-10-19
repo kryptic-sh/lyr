@@ -6,7 +6,7 @@ use lyr_config::{Platform, Position, Theme, from_sources};
 use lyr_core::hit::Rect;
 use lyr_core::power_menu::{Entry, PADDING, entries};
 
-use super::{Outcome, PowerMenu};
+use super::{Outcome, PowerMenu, configured};
 use crate::tooltips::Look;
 
 /// Every character is 10 px wide.
@@ -166,4 +166,31 @@ fn closing_destroys_its_window() {
     let window = menu.window;
     menu.close(&mut shell, false).expect("closed");
     assert!(shell.title(window).is_err());
+}
+
+#[test]
+fn each_entry_reads_its_own_command() {
+    let exec = |text: &str| {
+        Some(lyr_config::Exec {
+            exec: text.to_owned(),
+        })
+    };
+    let menu = lyr_config::PowerMenu {
+        lock: exec("lock"),
+        sleep: exec("sleep"),
+        hibernate: exec("hibernate"),
+        shutdown: exec("shutdown"),
+        logout: exec("logout"),
+        reboot: exec("reboot"),
+    };
+    for entry in entries(Platform::Linux) {
+        assert_eq!(
+            configured(&menu, entry).map(|command| command.exec.as_str()),
+            Some(entry.label().to_lowercase().as_str())
+        );
+    }
+    assert_eq!(
+        configured(&lyr_config::PowerMenu::default(), Entry::Lock),
+        None
+    );
 }

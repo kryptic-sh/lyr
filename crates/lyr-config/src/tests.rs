@@ -306,3 +306,31 @@ fn lyr_leaves_notifications_to_another_daemon_unless_told() {
     let replacing = user("[notifications]\nreplace = true\n", Platform::Linux).expect("valid");
     assert!(replacing.notifications.replace);
 }
+
+#[test]
+fn a_power_menu_entry_can_be_a_command() {
+    let defaults = from_sources(None, Platform::Linux).expect("the defaults");
+    assert_eq!(defaults.power.menu, super::PowerMenu::default());
+    let config = user(
+        "[power.menu]\nlock = { exec = \"hyprlock\" }\n",
+        Platform::Linux,
+    )
+    .expect("valid");
+    assert_eq!(
+        config.power.menu.lock.map(|lock| lock.exec).as_deref(),
+        Some("hyprlock")
+    );
+    assert_eq!(config.power.menu.sleep, None);
+    let message = invalid(user(
+        "[power.menu]\nreboot = { exec = \"\" }\n",
+        Platform::Linux,
+    ));
+    assert_eq!(message, "power.menu.reboot: `exec` is empty");
+    assert!(
+        user(
+            "[power.menu]\nsuspend = { exec = \"x\" }\n",
+            Platform::Linux
+        )
+        .is_err()
+    );
+}

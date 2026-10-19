@@ -54,6 +54,49 @@ pub enum Binding {
     Exec { exec: String },
 }
 
+/// `{ exec = "…" }` on its own: a command run through the platform shell.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Exec {
+    pub exec: String,
+}
+
+/// The power menu's entries set to a command
+/// (`docs/plan/10-popups-and-menus.md#power-menu`). An unset one does what
+/// lyr does itself.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct PowerMenu {
+    #[serde(default)]
+    pub lock: Option<Exec>,
+    #[serde(default)]
+    pub sleep: Option<Exec>,
+    #[serde(default)]
+    pub hibernate: Option<Exec>,
+    #[serde(default)]
+    pub shutdown: Option<Exec>,
+    #[serde(default)]
+    pub logout: Option<Exec>,
+    #[serde(default)]
+    pub reboot: Option<Exec>,
+}
+
+impl PowerMenu {
+    /// Every command set, with its key.
+    pub(crate) fn commands(&self) -> impl Iterator<Item = (&'static str, &Exec)> {
+        [
+            ("lock", &self.lock),
+            ("sleep", &self.sleep),
+            ("hibernate", &self.hibernate),
+            ("shutdown", &self.shutdown),
+            ("logout", &self.logout),
+            ("reboot", &self.reboot),
+        ]
+        .into_iter()
+        .filter_map(|(key, exec)| exec.as_ref().map(|exec| (key, exec)))
+    }
+}
+
 /// The built-in actions.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]

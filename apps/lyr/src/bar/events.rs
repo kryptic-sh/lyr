@@ -210,7 +210,14 @@ impl App {
                 if let Some(menu) = self.power_menu.take() {
                     menu.close(shell, false)?;
                 }
-                self.commands.power(entry);
+                match crate::power_menu::configured(&self.config.power.menu, entry) {
+                    Some(command) => {
+                        if let Err(error) = crate::exec::spawn(&command.exec) {
+                            tracing::warn!("`{}` did not start: {error}", command.exec);
+                        }
+                    }
+                    None => self.commands.power(entry),
+                }
             }
             Outcome::Cancelled => {
                 if let Some(menu) = self.power_menu.take() {
