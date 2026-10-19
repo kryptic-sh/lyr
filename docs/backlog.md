@@ -189,6 +189,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   around an empty placeholder, so a battery with no power reading shows
   `80% W Discharging`. Measuring text (the widths `layout` takes) needs
   crcbl-ui's font atlas, so it is done by the caller in `lyr-render`.
+- **Notification daemon, M6.** Built: the store (`lyr_core::notifications`): ids
+  from 1 that skip 0 and held ids, `replaces_id` kept as the id and replacing in
+  place (even for an id lyr does not hold, as the spec says), swaync's timeouts
+  by urgency unless the app set its own, the do-not-disturb rule (critical still
+  shows; nothing while the panel is open), and the history's order (transient
+  left out, grouped by `desktop-entry` or app, critical groups first, then
+  newest first), tested and mutation-checked. Not built: the D-Bus server for
+  `org.freedesktop.Notifications` (zbus), the check for another daemon owning
+  the name, toasts (M5's panels), markup, images, MPRIS and the bell module.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading

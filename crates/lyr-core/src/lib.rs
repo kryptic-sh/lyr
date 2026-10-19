@@ -22,5 +22,6 @@ pub mod hit;
 pub mod icon;
 pub mod layout;
 pub mod network;
+pub mod notifications;
 pub mod pointer;
 pub mod power_profile;
