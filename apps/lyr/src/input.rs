@@ -88,6 +88,12 @@ impl Pointer {
         }
     }
 
+    /// Where the pointer is, in logical pixels, or `None` when it is
+    /// elsewhere.
+    pub const fn position(&self) -> Option<(f32, f32)> {
+        self.position
+    }
+
     /// What the pointer is over in `regions`.
     pub fn target<'a, T>(&self, regions: &'a Regions<T>) -> Option<&'a T> {
         let (x, y) = self.position?;

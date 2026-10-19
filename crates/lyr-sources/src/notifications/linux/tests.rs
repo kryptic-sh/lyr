@@ -161,9 +161,15 @@ async fn the_server_says_what_it_is_and_claims_no_capabilities_yet() {
     );
 }
 
-/// The daemon served through [`Served`], and an application's proxy.
-async fn served() -> (Served, NotificationsProxy<'static>, Connection) {
-    let (sender, _changes) = mpsc::unbounded_channel();
+/// The daemon served through [`Served`], an application's proxy, and the
+/// changes it reports.
+async fn served() -> (
+    Served,
+    NotificationsProxy<'static>,
+    Connection,
+    mpsc::UnboundedReceiver<Change>,
+) {
+    let (sender, changes) = mpsc::unbounded_channel();
     let (server, client) = UnixStream::pair().expect("socket pair");
     let server = Builder::unix_stream(server)
         .server(Guid::generate())
@@ -181,12 +187,12 @@ async fn served() -> (Served, NotificationsProxy<'static>, Connection) {
     .await
     .expect("served");
     let proxy = NotificationsProxy::new(&client).await.expect("proxy");
-    (served, proxy, server)
+    (served, proxy, server, changes)
 }
 
 #[tokio::test]
 async fn lyr_closing_a_notification_signals_its_reason() {
-    let (served, client, _server) = served().await;
+    let (served, client, _server, mut changes) = served().await;
     let mut closed = client
         .receive_notification_closed()
         .await
@@ -200,6 +206,17 @@ async fn lyr_closing_a_notification_signals_its_reason() {
             .close(id, CloseReason::Expired)
             .await
             .expect("closed")
+    );
+    let mut next = async || {
+        tokio::time::timeout(Duration::from_secs(5), changes.recv())
+            .await
+            .expect("a change within 5 s")
+    };
+    assert_eq!(next().await, Some(Change::Notified(id)));
+    assert_eq!(
+        next().await,
+        Some(Change::Closed(id, CloseReason::Expired)),
+        "lyr's own close is reported too"
     );
     let signal = tokio::time::timeout(Duration::from_secs(5), closed.next())
         .await
@@ -223,7 +240,7 @@ async fn lyr_closing_a_notification_signals_its_reason() {
 
 #[tokio::test]
 async fn invoking_an_action_signals_it_and_closes_unless_resident() {
-    let (served, client, _server) = served().await;
+    let (served, client, _server, _changes) = served().await;
     let mut invoked = client.receive_action_invoked().await.expect("subscribed");
     let mut closed = client
         .receive_notification_closed()
@@ -276,7 +293,7 @@ async fn invoking_an_action_signals_it_and_closes_unless_resident() {
 
 #[tokio::test]
 async fn clear_all_dismisses_every_notification() {
-    let (served, client, _server) = served().await;
+    let (served, client, _server, _changes) = served().await;
     let mut closed = client
         .receive_notification_closed()
         .await

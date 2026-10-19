@@ -1,12 +1,13 @@
 //! The clock panel (`docs/plan/10-popups-and-menus.md#clock-panel`): a panel
 //! at the top right of the output the user is on, as swaync's control centre
 //! sits, running the output's height. It holds the calendar
-//! ([`lyr_core::calendar`]) so far; the notification centre below it is not
-//! built.
+//! ([`lyr_core::calendar`]) and, while lyr is the notification daemon, the
+//! notification centre below it ([`lyr_core::centre`]).
 //!
 //! It takes the keyboard. `Escape`, losing focus and the same click or
-//! binding again close it; a right click switches the calendar between year
-//! and month, and scrolling moves it by one of either.
+//! binding again close it. Over the calendar a right click switches between
+//! year and month, and scrolling moves by one of either; a click in the
+//! centre is the caller's to carry out.
 
 use chrono::{NaiveDate, Weekday};
 use crcbl_shell::{
@@ -14,9 +15,14 @@ use crcbl_shell::{
     PanelLayer, Reserve, Shell, ShellEvent, WindowDesc, WindowId, WindowRole,
 };
 use lyr_config::Theme;
+use std::time::Instant;
+
 use lyr_core::calendar::{self, Mode};
+use lyr_core::centre::{self, Target};
 use lyr_core::draw::{DrawList, Item, Size};
 use lyr_core::hit::Rect;
+use lyr_core::hit::Regions;
+use lyr_core::notifications::Store;
 use lyr_core::pointer::Press;
 use lyr_render::surface::Surface;
 use lyr_render::text::Text;
@@ -48,6 +54,11 @@ pub struct ClockPanel {
     size: Size,
     scale: f32,
     list: DrawList,
+    /// The calendar's height, below which the centre starts.
+    calendar_bottom: f32,
+    /// The centre's clicks, in its own coordinates, and where it sits.
+    centre: Regions<Target>,
+    centre_origin: (f32, f32),
     pointer: Pointer,
     surface: Option<Surface>,
     dirty: bool,
@@ -61,6 +72,16 @@ pub enum Outcome {
     Close,
     /// The window system is closing its window.
     Closed,
+    /// A click in the notification centre, for the caller to carry out.
+    Centre(Target, Press),
+}
+
+/// What the panel shows at a moment: today, and the notification store when
+/// lyr is the daemon.
+pub struct Contents<'a> {
+    pub today: NaiveDate,
+    pub store: Option<&'a Store>,
+    pub now: Instant,
 }
 
 impl ClockPanel {
@@ -110,6 +131,9 @@ impl ClockPanel {
             size: Size { width, height: 0.0 },
             scale: 1.0,
             list: DrawList::default(),
+            calendar_bottom: 0.0,
+            centre: Regions::default(),
+            centre_origin: (0.0, 0.0),
             pointer: Pointer::default(),
             surface: None,
             dirty: false,
@@ -132,7 +156,7 @@ impl ClockPanel {
         shell: &mut dyn Shell,
         event: &ShellEvent,
         look: &Look<'_>,
-        today: NaiveDate,
+        contents: &Contents<'_>,
     ) -> anyhow::Result<Outcome> {
         match *event {
             ShellEvent::Resized {
@@ -153,7 +177,7 @@ impl ClockPanel {
                         self.surface = Some(Surface::open(shell, self.window, device, self.scale)?);
                     }
                 }
-                self.rebuild(look, today);
+                self.rebuild(look, contents);
             }
             ShellEvent::CloseRequested { window } => {
                 shell.reply_close_request(window, CloseReply::Close)?;
@@ -167,6 +191,16 @@ impl ClockPanel {
             } => return Ok(Outcome::Close),
             _ => {
                 for press in self.pointer.handle(event, self.scale) {
+                    let Some((x, y)) = self.pointer.position() else {
+                        continue;
+                    };
+                    if y >= self.calendar_bottom {
+                        let (ox, oy) = self.centre_origin;
+                        if let Some(&target) = self.centre.hit(x - ox, y - oy) {
+                            return Ok(Outcome::Centre(target, press));
+                        }
+                        continue;
+                    }
                     let moved = match press {
                         Press::Right => {
                             self.mode = match self.mode {
@@ -180,7 +214,7 @@ impl ClockPanel {
                         Press::Left | Press::Middle => false,
                     };
                     if moved {
-                        self.rebuild(look, today);
+                        self.rebuild(look, contents);
                     }
                 }
             }
@@ -200,14 +234,21 @@ impl ClockPanel {
         }
     }
 
-    /// Draws the panel's frame again for its size, mode and month.
-    fn rebuild(&mut self, look: &Look<'_>, today: NaiveDate) {
+    /// Draws the panel again for what it shows now: after the notifications
+    /// or do-not-disturb changed.
+    pub fn refresh(&mut self, look: &Look<'_>, contents: &Contents<'_>) {
+        self.rebuild(look, contents);
+    }
+
+    /// Draws the panel's frame again for its size, mode and month, and the
+    /// centre below the calendar.
+    fn rebuild(&mut self, look: &Look<'_>, contents: &Contents<'_>) {
         self.list = frame(self.size, look.theme);
-        let (calendar, _) = calendar::draw::draw(
+        let (calendar, calendar_size) = calendar::draw::draw(
             self.shown,
             self.mode,
             FIRST_WEEKDAY,
-            today,
+            contents.today,
             look.measure,
             look.line_height,
             look.theme,
@@ -219,6 +260,24 @@ impl ClockPanel {
                 .into_iter()
                 .map(|item| item.offset(inset, inset)),
         );
+        self.calendar_bottom = inset + calendar_size.height;
+        self.centre = Regions::default();
+        if let Some(store) = contents.store {
+            let top = self.calendar_bottom + centre::GAP;
+            let (list, _, regions) = centre::draw(
+                store,
+                self.size.width - 2.0 * inset,
+                contents.now,
+                look.measure,
+                look.line_height,
+                look.theme,
+            );
+            self.list
+                .items
+                .extend(list.items.into_iter().map(|item| item.offset(inset, top)));
+            self.centre = regions;
+            self.centre_origin = (inset, top);
+        }
         self.dirty = true;
     }
 

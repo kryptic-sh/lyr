@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use chrono::NaiveDate;
 use crcbl_shell::{
     ButtonState, HeadlessShell, KeyCode, PhysicalPoint, PointerButton, ScrollDelta, Shell,
@@ -5,8 +7,11 @@ use crcbl_shell::{
 };
 use lyr_config::{Platform, Theme, from_sources};
 use lyr_core::calendar::Mode;
+use lyr_core::centre::Target;
+use lyr_core::notifications::Store;
+use lyr_core::pointer::Press;
 
-use super::{ClockPanel, Outcome};
+use super::{ClockPanel, Contents, Outcome};
 use crate::tooltips::Look;
 
 /// Every character is 10 px wide.
@@ -18,6 +23,8 @@ struct Setup {
     shell: HeadlessShell,
     theme: Theme,
     panel: ClockPanel,
+    /// Present while lyr is the notification daemon.
+    store: Option<Store>,
 }
 
 fn today() -> NaiveDate {
@@ -43,6 +50,7 @@ fn setup() -> Setup {
         shell,
         theme,
         panel,
+        store: None,
     }
 }
 
@@ -66,7 +74,16 @@ impl Setup {
         }) {
             outcome = self
                 .panel
-                .event(&mut self.shell, event, &look, today())
+                .event(
+                    &mut self.shell,
+                    event,
+                    &look,
+                    &Contents {
+                        today: today(),
+                        store: self.store.as_ref(),
+                        now: Instant::now(),
+                    },
+                )
                 .expect("applied");
         }
         outcome
@@ -113,6 +130,7 @@ fn a_close_request_closes_its_window() {
 #[test]
 fn a_right_click_switches_the_mode_and_scrolling_moves_by_it() {
     let mut setup = setup();
+    setup.lay_out(2000.0);
     let window = setup.panel.window;
     let at = PhysicalPoint { x: 50.0, y: 50.0 };
     setup
@@ -156,4 +174,78 @@ fn closing_destroys_its_window() {
     let window = panel.window;
     panel.close(&mut shell, false).expect("closed");
     assert!(shell.title(window).is_err());
+}
+
+impl Setup {
+    /// Lays the panel out as its first resize would, `height` tall.
+    fn lay_out(&mut self, height: f32) {
+        self.panel.size.height = height;
+        let look = Look {
+            theme: &self.theme,
+            measure: &measure,
+            line_height: 20.0,
+        };
+        self.panel.refresh(
+            &look,
+            &Contents {
+                today: today(),
+                store: self.store.as_ref(),
+                now: Instant::now(),
+            },
+        );
+    }
+}
+
+#[test]
+fn a_click_in_the_centre_is_the_caller_s_and_a_right_click_there_keeps_the_mode() {
+    let mut setup = setup();
+    setup.store = Some(Store::default());
+    setup.lay_out(2000.0);
+    let window = setup.panel.window;
+    // Clear All sits at the right of the centre's first row.
+    let (ox, oy) = setup.panel.centre_origin;
+    assert!(oy > setup.panel.calendar_bottom, "below the calendar");
+    let width = setup.panel.size.width - 2.0 * ox;
+    let at = PhysicalPoint {
+        x: f64::from(ox + width - 5.0),
+        y: f64::from(oy + 5.0),
+    };
+    setup
+        .shell
+        .move_pointer(window, at, (0.0, 0.0))
+        .expect("moved");
+    setup
+        .shell
+        .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
+        .expect("clicked");
+    assert_eq!(setup.pump(), Outcome::Centre(Target::ClearAll, Press::Left));
+    setup
+        .shell
+        .button(window, PointerButton::Right, ButtonState::Pressed, Some(at))
+        .expect("clicked");
+    assert_eq!(
+        setup.pump(),
+        Outcome::Centre(Target::ClearAll, Press::Right)
+    );
+    assert_eq!(setup.panel.mode, Mode::Year, "not the calendar's click");
+}
+
+#[test]
+fn without_the_daemon_there_is_no_centre() {
+    let mut setup = setup();
+    setup.lay_out(2000.0);
+    let window = setup.panel.window;
+    let at = PhysicalPoint {
+        x: 50.0,
+        y: f64::from(setup.panel.calendar_bottom + 40.0),
+    };
+    setup
+        .shell
+        .move_pointer(window, at, (0.0, 0.0))
+        .expect("moved");
+    setup
+        .shell
+        .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
+        .expect("clicked");
+    assert_eq!(setup.pump(), Outcome::Kept);
 }

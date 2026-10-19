@@ -215,6 +215,7 @@ pub async fn serve_session(daemon: Daemon, replace: bool) -> Result<Served, Serv
 pub struct Served {
     connection: Connection,
     store: Arc<Mutex<Store>>,
+    changes: UnboundedSender<Change>,
 }
 
 impl Served {
@@ -226,10 +227,12 @@ impl Served {
     /// When the object cannot be served.
     pub async fn at(connection: &Connection, daemon: Daemon) -> zbus::Result<Self> {
         let store = daemon.store.clone();
+        let changes = daemon.changes.clone();
         connection.object_server().at(PATH, daemon).await?;
         Ok(Self {
             connection: connection.clone(),
             store,
+            changes,
         })
     }
 
@@ -237,7 +240,8 @@ impl Served {
         SignalEmitter::new(&self.connection, PATH)
     }
 
-    /// Closes `id` for `reason` and signals it. Returns whether lyr held it.
+    /// Closes `id` for `reason`, signals it, and reports the change. Returns
+    /// whether lyr held it.
     ///
     /// # Errors
     ///
@@ -250,6 +254,8 @@ impl Served {
             .close(id)
             .is_some();
         if held {
+            // The bar has gone only when lyr is exiting.
+            let _gone = self.changes.send(Change::Closed(id, reason));
             Daemon::notification_closed(&self.emitter()?, id, reason as u32).await?;
         }
         Ok(held)
@@ -268,6 +274,9 @@ impl Served {
             .unwrap_or_else(PoisonError::into_inner)
             .clear();
         for &id in &ids {
+            let _gone = self
+                .changes
+                .send(Change::Closed(id, CloseReason::Dismissed));
             Daemon::notification_closed(&self.emitter()?, id, CloseReason::Dismissed as u32)
                 .await?;
         }

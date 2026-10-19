@@ -16,6 +16,7 @@ mod window;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::PoisonError;
 use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
@@ -27,7 +28,7 @@ use lyr_render::text::Text;
 use lyr_render::translate::translate;
 use lyr_shell::bars::Bars;
 
-use crate::clock_panel::ClockPanel;
+use crate::clock_panel::{ClockPanel, Contents};
 use crate::control;
 use crate::modules::{self, Data};
 use crate::power_menu::PowerMenu;
@@ -196,6 +197,30 @@ impl App {
         #[cfg(not(target_os = "linux"))]
         let _ = now;
         self.data.apply(update);
+        self.refresh_panel();
+    }
+
+    /// Draws the clock panel again, if it is open, for the notifications and
+    /// do-not-disturb as they are now.
+    fn refresh_panel(&mut self) {
+        let Some(panel) = &mut self.clock_panel else {
+            return;
+        };
+        let look = Look {
+            theme: &self.config.theme,
+            measure: &|s: &str| self.text.measure(s),
+            line_height: self.text.line_height(),
+        };
+        let store = self
+            .data
+            .notification_store()
+            .map(|store| store.lock().unwrap_or_else(PoisonError::into_inner));
+        let contents = Contents {
+            today: Local::now().date_naive(),
+            store: store.as_deref(),
+            now: Instant::now(),
+        };
+        panel.refresh(&look, &contents);
     }
 
     /// Opens the clock panel, or closes it if it is open. Opening it takes

@@ -110,6 +110,7 @@ impl App {
             self.toasts.take_down();
         }
         self.redraw_all();
+        self.refresh_panel();
         control::OK.to_owned()
     }
 

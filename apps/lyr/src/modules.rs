@@ -2,7 +2,8 @@
 //! from them.
 
 #[cfg(target_os = "linux")]
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::PoisonError;
+use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, FixedOffset};
 use lyr_config::{Config, Item, Module};
@@ -33,6 +34,14 @@ pub struct Data {
 }
 
 impl Data {
+    /// The notification store, while lyr is the notification daemon.
+    pub const fn notification_store(&self) -> Option<&Arc<Mutex<lyr_core::notifications::Store>>> {
+        #[cfg(target_os = "linux")]
+        return self.notifications.as_ref();
+        #[cfg(not(target_os = "linux"))]
+        None
+    }
+
     pub fn apply(&mut self, update: Update) {
         match update {
             #[cfg(target_os = "linux")]

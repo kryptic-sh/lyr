@@ -9,12 +9,14 @@ use lyr_core::hit::Regions;
 use lyr_render::surface::Surface;
 
 use lyr_config::{Builtin, Platform};
+use lyr_core::centre::Target;
 use lyr_core::control::Request;
+use lyr_core::pointer::Press;
 use lyr_core::power_menu;
 
 use super::App;
 use super::window::Window;
-use crate::clock_panel::Outcome as ClockOutcome;
+use crate::clock_panel::{Contents, Outcome as ClockOutcome};
 use crate::control;
 use crate::input::{self, Pointer};
 use crate::power_menu::{Outcome, PowerMenu};
@@ -229,14 +231,50 @@ impl App {
             measure: &|s: &str| self.text.measure(s),
             line_height: self.text.line_height(),
         };
-        let today = chrono::Local::now().date_naive();
-        let outcome = panel.event(shell, event, &look, today)?;
-        if outcome != ClockOutcome::Kept
-            && let Some(panel) = self.clock_panel.take()
-        {
-            panel.close(shell, outcome == ClockOutcome::Closed)?;
+        let store = self.data.notification_store().map(|store| {
+            store
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+        });
+        let contents = Contents {
+            today: chrono::Local::now().date_naive(),
+            store: store.as_deref(),
+            now: Instant::now(),
+        };
+        let outcome = panel.event(shell, event, &look, &contents)?;
+        drop(store);
+        match outcome {
+            ClockOutcome::Kept => {}
+            ClockOutcome::Close | ClockOutcome::Closed => {
+                if let Some(panel) = self.clock_panel.take() {
+                    panel.close(shell, outcome == ClockOutcome::Closed)?;
+                }
+            }
+            ClockOutcome::Centre(target, press) => self.centre_clicked(target, press),
         }
         Ok(())
+    }
+
+    /// Carries out a click in the clock panel's notification centre: Clear
+    /// All and the switch as `lyr clear` and `lyr dnd` do, and an entry as a
+    /// toast does.
+    fn centre_clicked(&mut self, target: Target, press: Press) {
+        let reply = match (target, press) {
+            (Target::ClearAll, Press::Left) => self.notifications(Request::Clear),
+            (Target::Dnd, Press::Left) => self.notifications(Request::Dnd),
+            (Target::Notification(id), Press::Left) => {
+                self.toast_clicked(Some(Clicked::Invoke(id)));
+                return;
+            }
+            (Target::Notification(id), Press::Middle) => {
+                self.toast_clicked(Some(Clicked::Dismiss(id)));
+                return;
+            }
+            _ => return,
+        };
+        if reply != control::OK {
+            tracing::warn!("clock panel: {reply}");
+        }
     }
 
     /// Applies `event`, which is for the power menu's window.
