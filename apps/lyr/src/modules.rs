@@ -123,7 +123,7 @@ fn content(
     };
     match module {
         Module::Clock => Some(label(
-            clock::view(now, "", &config.clock.format).text,
+            clock::view(now, None, &config.clock.format).text,
             theme.foreground,
         )),
         Module::Battery => {
@@ -173,6 +173,61 @@ fn content(
     }
 }
 
+/// The tooltip `module` shows now, or `None` when it has none or no data.
+/// The workspaces have none, as in waybar.
+pub fn tooltip(
+    module: Module,
+    config: &Config,
+    data: &Data,
+    now: &DateTime<FixedOffset>,
+) -> Option<String> {
+    match module {
+        Module::Clock => Some(clock::view(now, zone().as_deref(), &config.clock.format).tooltip),
+        Module::Battery => Some(battery::view(data.battery.as_ref()?, &config.battery).tooltip),
+        #[cfg(target_os = "linux")]
+        Module::PowerProfile => Some(
+            lyr_core::power_profile::view(
+                &data.power_profile.as_ref()?.active,
+                &config.power_profile,
+            )
+            .tooltip,
+        ),
+        #[cfg(target_os = "linux")]
+        Module::Bluetooth => {
+            Some(lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth).tooltip)
+        }
+        _ => None,
+    }
+}
+
+/// The system time zone's name, such as `Asia/Manila`: `TZ` when it names
+/// one, else where `/etc/localtime` links into the zoneinfo database, which
+/// is what systemd's `timedatectl` reports.
+#[cfg(target_os = "linux")]
+fn zone() -> Option<String> {
+    match std::env::var("TZ") {
+        Ok(tz) => zone_name(&tz),
+        Err(_) => zone_name(std::fs::read_link("/etc/localtime").ok()?.to_str()?),
+    }
+}
+
+/// The zone named by a `TZ` value or a zoneinfo path: a leading `:` (POSIX
+/// allows one before a zone file) and the path up to `zoneinfo/` dropped.
+/// `None` for an empty one.
+#[cfg(any(target_os = "linux", test))]
+fn zone_name(tz: &str) -> Option<String> {
+    let tz = tz.strip_prefix(':').unwrap_or(tz);
+    let name = tz.split_once("zoneinfo/").map_or(tz, |(_, name)| name);
+    (!name.is_empty()).then(|| name.to_owned())
+}
+
+/// Windows and macOS: the zone's name is not read yet, so the tooltip shows
+/// the offset alone.
+#[cfg(not(target_os = "linux"))]
+fn zone() -> Option<String> {
+    None
+}
+
 /// The workspaces a bar on `monitor` lists: every one, or with
 /// `all_outputs = false` its own output's.
 #[cfg(target_os = "linux")]
@@ -188,4 +243,25 @@ pub fn shown_workspaces<'a>(
                 || monitor.is_some_and(|monitor| workspace.monitor.as_deref() == Some(monitor))
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::zone_name;
+
+    #[test]
+    fn a_zone_is_named_from_tz_or_a_zoneinfo_path() {
+        assert_eq!(zone_name("Asia/Manila").as_deref(), Some("Asia/Manila"));
+        assert_eq!(zone_name(":Asia/Manila").as_deref(), Some("Asia/Manila"));
+        assert_eq!(
+            zone_name("/usr/share/zoneinfo/America/St_Johns").as_deref(),
+            Some("America/St_Johns")
+        );
+        assert_eq!(
+            zone_name(":/usr/share/zoneinfo/UTC").as_deref(),
+            Some("UTC")
+        );
+        assert_eq!(zone_name(""), None);
+        assert_eq!(zone_name(":"), None);
+    }
 }

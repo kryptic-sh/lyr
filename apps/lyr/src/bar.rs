@@ -28,6 +28,7 @@ use crate::input::{self, Pointer};
 use crate::modules::{self, Data};
 use crate::sources;
 use crate::stats::Stats;
+use crate::tooltips::{Anchor, Look, Tooltips};
 
 /// One bar window: its surface, its size, and what it drew last.
 struct Window {
@@ -47,6 +48,7 @@ struct Window {
     hovered: Option<usize>,
     /// Whether it must be drawn again: what it shows changed since.
     dirty: bool,
+    tooltips: Tooltips,
 }
 
 impl Window {
@@ -71,13 +73,14 @@ fn load_text(config: &Config) -> anyhow::Result<Text> {
     Ok(Text::new(font.font, config.theme.font_size as f32))
 }
 
-/// Closes every bar: their surfaces first, then their windows.
+/// Closes every bar: their tooltips and surfaces first, then their windows.
 fn close_all(
     shell: &mut dyn crcbl_shell::Shell,
     bars: &mut Bars,
     windows: &mut HashMap<WindowId, Window>,
 ) -> anyhow::Result<()> {
-    for (_, window) in windows.drain() {
+    for (_, mut window) in windows.drain() {
+        window.tooltips.close(shell)?;
         window.surface.destroy()?;
     }
     for (_, bar) in bars.windows().collect::<Vec<_>>() {
@@ -115,12 +118,20 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
     let mut stats = Stats::new(Instant::now());
 
     loop {
-        // A bar still to draw (a frame the swapchain swallowed) goes round
-        // again at once.
-        let wait = if windows.values().any(|window| window.dirty) {
+        // A bar or tooltip still to draw (a frame the swapchain swallowed)
+        // goes round again at once; otherwise the loop sleeps until the
+        // clock's next tick or a tooltip's delay is up.
+        let wait = if windows
+            .values()
+            .any(|window| window.dirty || window.tooltips.dirty())
+        {
             Duration::ZERO
         } else {
-            next_tick.saturating_duration_since(Instant::now())
+            let wake = windows
+                .values()
+                .filter_map(|window| window.tooltips.next_wake())
+                .fold(next_tick, Instant::min);
+            wake.saturating_duration_since(Instant::now())
         };
         shell.wait_events(Some(wait));
         stats.wakeups += 1;
@@ -203,10 +214,36 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         let mut events = Vec::new();
         shell.pump(&mut |event| events.push(event));
         stats.events += events.len() as u64;
+        let instant = Instant::now();
         for event in &events {
             if !hidden {
                 bars.handle(shell.as_mut(), &config.bar, event)
                     .context("keeping a bar on every output")?;
+            }
+            // A tooltip's own window: sized, or gone with its bar.
+            if let Some(owner) = event.window().and_then(|popup| {
+                windows
+                    .values_mut()
+                    .find(|window| window.tooltips.owns(popup))
+            }) {
+                match *event {
+                    ShellEvent::Resized {
+                        size, scale_factor, ..
+                    }
+                    | ShellEvent::ScaleFactorChanged {
+                        size, scale_factor, ..
+                    } => owner
+                        .tooltips
+                        .resized(
+                            shell.as_ref(),
+                            (size.width, size.height),
+                            scale_factor as f32,
+                        )
+                        .context("opening a tooltip's surface")?,
+                    ShellEvent::WindowDestroyed { .. } => owner.tooltips.destroyed()?,
+                    _ => {}
+                }
+                continue;
             }
             match *event {
                 ShellEvent::Resized {
@@ -248,12 +285,15 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
                                 workspaces: Vec::new(),
                                 hovered: None,
                                 dirty: true,
+                                tooltips: Tooltips::default(),
                             },
                         );
                     }
                 }
                 ShellEvent::WindowDestroyed { window } => {
-                    if let Some(gone) = windows.remove(&window) {
+                    if let Some(mut gone) = windows.remove(&window) {
+                        // Its tooltip's window went with it.
+                        gone.tooltips.destroyed()?;
                         gone.surface.destroy()?;
                     }
                 }
@@ -264,6 +304,12 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
                     let presses = window.pointer.handle(event, window.scale);
                     if window.hovered() != window.hovered {
                         window.dirty = true;
+                    }
+                    window
+                        .tooltips
+                        .hover(window.pointer.target(&window.regions), instant);
+                    if !presses.is_empty() {
+                        window.tooltips.press(instant);
                     }
                     for press in presses {
                         if let Some(target) = window.pointer.target(&window.regions) {
@@ -282,6 +328,26 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             }
         }
         let now = Local::now().fixed_offset();
+        let look = Look {
+            theme: &config.theme,
+            measure: &|s: &str| text.measure(s),
+            line_height: text.line_height(),
+        };
+        for (&bar, window) in &mut windows {
+            let anchor = Anchor {
+                bar,
+                regions: &window.regions,
+                position: config.bar.position,
+            };
+            window.tooltips.sync(
+                shell.as_mut(),
+                &anchor,
+                &look,
+                |module| modules::tooltip(module, &config, &data, &now),
+                Instant::now(),
+            )?;
+            window.tooltips.draw(&text)?;
+        }
         for window in windows.values_mut().filter(|window| window.dirty) {
             let hovered = window.hovered();
             let drawn = modules::draw(

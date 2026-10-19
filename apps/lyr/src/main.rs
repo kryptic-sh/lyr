@@ -12,6 +12,7 @@ mod log;
 mod modules;
 mod sources;
 mod stats;
+mod tooltips;
 
 use std::path::PathBuf;
 use std::process::ExitCode;

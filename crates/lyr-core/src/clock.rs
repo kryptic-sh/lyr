@@ -67,17 +67,19 @@ impl Tick {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct View {
     pub text: String,
-    /// The time zone and its offset, such as `Asia/Manila, UTC+08:00`.
+    /// The time zone and its offset, such as `Asia/Manila, UTC+08:00`, or
+    /// the offset alone when the zone's name is not known.
     pub tooltip: String,
 }
 
 /// The view of `now` in the zone named `zone`, under the strftime `format`.
 /// The config has already checked that `format` parses.
 #[must_use]
-pub fn view(now: &DateTime<FixedOffset>, zone: &str, format: &str) -> View {
+pub fn view(now: &DateTime<FixedOffset>, zone: Option<&str>, format: &str) -> View {
+    let offset = format!("UTC{}", now.format("%:z"));
     View {
         text: now.format(format).to_string(),
-        tooltip: format!("{zone}, UTC{}", now.format("%:z")),
+        tooltip: zone.map_or_else(|| offset.clone(), |zone| format!("{zone}, {offset}")),
     }
 }
 
@@ -97,7 +99,7 @@ mod tests {
     fn the_default_format_reads_as_waybars() {
         let shown = view(
             &at("2026-10-19T09:05:42.5+08:00"),
-            "Asia/Manila",
+            Some("Asia/Manila"),
             "%Y/%m/%d %H:%M",
         );
         assert_eq!(shown.text, "2026/10/19 09:05");
@@ -106,8 +108,18 @@ mod tests {
 
     #[test]
     fn a_negative_offset_is_shown_with_its_sign() {
-        let shown = view(&at("2026-10-19T09:05:00-03:30"), "America/St_Johns", "%H");
+        let shown = view(
+            &at("2026-10-19T09:05:00-03:30"),
+            Some("America/St_Johns"),
+            "%H",
+        );
         assert_eq!(shown.tooltip, "America/St_Johns, UTC-03:30");
+    }
+
+    #[test]
+    fn an_unknown_zone_leaves_the_offset_alone() {
+        let shown = view(&at("2026-10-19T09:05:00+08:00"), None, "%H");
+        assert_eq!(shown.tooltip, "UTC+08:00");
     }
 
     #[test]

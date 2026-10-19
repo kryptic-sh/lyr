@@ -254,5 +254,53 @@ pub fn build<T: Clone>(
     (list, regions)
 }
 
+/// The space around a tooltip's text: GTK 3's Adwaita pads both the
+/// tooltip's box and its label by 4 px (`tooltip * { padding: 4px }`).
+pub const TOOLTIP_PADDING: f32 = 8.0;
+
+/// A tooltip showing `text`, `text_width` wide and `line_height` tall: its
+/// draw list and its size. Square and borderless, as waybar's
+/// `* { border: none; border-radius: 0 }` leaves GTK's tooltip.
+#[must_use]
+pub fn tooltip(text: &str, text_width: f32, line_height: f32, theme: &Theme) -> (DrawList, Size) {
+    let size = Size {
+        width: text_width + 2.0 * TOOLTIP_PADDING,
+        height: line_height + 2.0 * TOOLTIP_PADDING,
+    };
+    let list = DrawList {
+        items: vec![
+            Item::Box {
+                rect: Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: size.width,
+                    height: size.height,
+                },
+                radius: 0.0,
+                fill: theme.tooltip_background,
+                border: None,
+            },
+            Item::Text {
+                rect: Rect {
+                    x: TOOLTIP_PADDING,
+                    y: TOOLTIP_PADDING,
+                    width: text_width,
+                    height: line_height,
+                },
+                text: text.to_owned(),
+                colour: theme.tooltip_foreground,
+            },
+        ],
+    };
+    (list, size)
+}
+
+/// A width and height in logical pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Size {
+    pub width: f32,
+    pub height: f32,
+}
+
 #[cfg(test)]
 mod tests;

@@ -31,6 +31,12 @@ impl Text {
         TextLayout::new(&self.font, text, self.size, self.line_height, None)
     }
 
+    /// The height of one line, in logical pixels.
+    #[must_use]
+    pub const fn line_height(&self) -> f32 {
+        self.line_height
+    }
+
     /// How wide `text` is on one line, in logical pixels.
     #[must_use]
     pub fn measure(&self, text: &str) -> f32 {

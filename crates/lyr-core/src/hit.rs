@@ -46,6 +46,19 @@ impl<T> Regions<T> {
         self.regions.push((rect, target));
     }
 
+    /// The rectangle of the topmost region standing for `target`.
+    #[must_use]
+    pub fn rect(&self, target: &T) -> Option<Rect>
+    where
+        T: PartialEq,
+    {
+        self.regions
+            .iter()
+            .rev()
+            .find(|(_, held)| held == target)
+            .map(|(rect, _)| *rect)
+    }
+
     /// The topmost region containing `(x, y)`.
     #[must_use]
     pub fn hit(&self, x: f32, y: f32) -> Option<&T> {
@@ -98,5 +111,16 @@ mod tests {
         regions.push(rect(10.0, 40.0), "workspace 1");
         assert_eq!(regions.hit(20.0, 20.0), Some(&"workspace 1"));
         assert_eq!(regions.hit(200.0, 20.0), Some(&"workspaces"));
+    }
+
+    #[test]
+    fn a_target_s_rect_is_found_by_what_it_stands_for() {
+        let mut regions = Regions::default();
+        regions.push(rect(0.0, 100.0), "power");
+        regions.push(rect(100.0, 50.0), "battery");
+        regions.push(rect(100.0, 20.0), "battery");
+        assert_eq!(regions.rect(&"power"), Some(rect(0.0, 100.0)));
+        assert_eq!(regions.rect(&"battery"), Some(rect(100.0, 20.0)), "topmost");
+        assert_eq!(regions.rect(&"clock"), None);
     }
 }

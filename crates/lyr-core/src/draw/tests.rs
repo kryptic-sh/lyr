@@ -197,3 +197,36 @@ fn a_crowded_module_falls_back_to_its_icon() {
     assert_eq!(shown[1], "i");
     assert_eq!(regions.hit(345.0, 20.0), Some(&Target::Module("network")));
 }
+
+#[test]
+fn a_tooltip_pads_its_text_on_its_own_background() {
+    let theme = theme();
+    let (list, size) = super::tooltip("Power Button", 120.0, 20.0, &theme);
+    assert_eq!((size.width, size.height), (136.0, 36.0));
+    assert_eq!(
+        list.items,
+        [
+            Item::Box {
+                rect: Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 136.0,
+                    height: 36.0,
+                },
+                radius: 0.0,
+                fill: theme.tooltip_background,
+                border: None,
+            },
+            Item::Text {
+                rect: Rect {
+                    x: 8.0,
+                    y: 8.0,
+                    width: 120.0,
+                    height: 20.0,
+                },
+                text: "Power Button".to_owned(),
+                colour: theme.tooltip_foreground,
+            },
+        ]
+    );
+}

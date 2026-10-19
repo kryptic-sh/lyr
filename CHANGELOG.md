@@ -25,6 +25,9 @@ and this project adheres to
   the bars. `lyr panel`, `lyr dnd` and `lyr clear` reach it over its control
   socket and report that they are not implemented yet. A second `lyr` exits when
   one is already running.
+- Tooltips on the clock (the time zone and its offset), battery, power profile
+  and Bluetooth modules, shown after half a second on a module and quickly when
+  moving from one to the next, as waybar's GTK tooltips are.
 - `lyr --stats` logs the bar's main-loop wake-ups, the events it applied and the
   frames it presented on each output, once a minute, to check that an idle bar
   stays idle.
