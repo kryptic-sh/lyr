@@ -285,40 +285,40 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked. The toast stack is `lyr_core::toast::stack::Stack` (newest
   on top, timeouts paused under the pointer) and a toast's draw list
   `lyr_core::toast` (swaync's look with the `toast_*` theme keys, its body
-  wrapped at spaces) (crcbl-ui is adding UAX #14 line breaking, approved
-  2026-10-19; lyr's wrap can move to it once it is released), both tested and
-  mutation-checked. The bar serves it on Linux (`apps/lyr/src/sources.rs`) and
-  leaves notifications to another daemon that has the name, logging which,
-  unless `notifications.replace = true` (read at start; a reload does not hand
-  the name over). Toasts are on screen (`apps/lyr/src/toasts.rs`): one Overlay
-  panel at the top right of the output the user is on, 16 px from the edges and
-  clear of the bar, recreated whenever the stack's size changes (crcbl 0.5.0
-  cannot resize a panel); a click invokes the `default` action when there is one
-  and takes the toast down, a middle click dismisses the notification. Tested on
-  crcbl's headless shell and mutation-checked; **never seen on screen**: Windows
-  has no daemon and WSL has no compositor, so the owner's Hyprland is the first
-  real run. The bell is drawn from the store while lyr is the daemon. A toast
-  shows when it arrived as swaync words it ("Now", "2 mins ago", from
-  `get_relative_time` at v0.12.6), redrawn as the words change; a summary long
-  enough to reach the time is cut short of it (`toast::TIME_GAP`), where swaync
-  ellipsizes. The toast under the pointer shows swaync's close button
-  (`toast::close_button`: red, 20 px, 6 px in from the top right, from swaync
-  0.12.6's `NotificationCloseButton` and the dotfiles' style; the `toast_close`
-  theme keys), which dismisses; tested on the headless shell and
-  mutation-checked. The notification centre's entries show it too, in the same
-  place (`centre::Shown::hovered`): swaync's `.control-center .close-button`
-  margins (10 px top, 6 px right) would put it partly outside the entry, since
-  lyr's entries do not keep the 18 px notification margin they count from, so
-  lyr keeps the toast's placement there. A body's markup is drawn
-  (`lyr_core::markup`: the spec's `<b>`, `<i>`, `<u>` and `<a href>`, XML's
-  entities, `<img>` left out, anything else shown as text; `toast::wrap` wraps
-  the styled spans), and `body-markup` is advertised. Not built: a toast's
-  images (the panel's Clear All, switch and media players work; `lyr dnd` and
-  `lyr clear` work; on Windows they answer that lyr is not the daemon, run
-  there). Each action but `default` gets a button under the body (swaync's
-  style, at the bar's text size until the owner rules on swaync's `0.2rem`), in
-  toasts and the panel's history; a click invokes it. A transient notification,
-  kept in no history, closes as expired when its toast times out.
+  wrapped at spaces) (crcbl-ui's main has UAX #14 line breaking, with bidi and
+  UAX #29 carets, for 0.6.0, approved 2026-10-19; lyr's wrap can move to it once
+  it is released), both tested and mutation-checked. The bar serves it on Linux
+  (`apps/lyr/src/sources.rs`) and leaves notifications to another daemon that
+  has the name, logging which, unless `notifications.replace = true` (read at
+  start; a reload does not hand the name over). Toasts are on screen
+  (`apps/lyr/src/toasts.rs`): one Overlay panel at the top right of the output
+  the user is on, 16 px from the edges and clear of the bar, recreated whenever
+  the stack's size changes (crcbl 0.5.0 cannot resize a panel); a click invokes
+  the `default` action when there is one and takes the toast down, a middle
+  click dismisses the notification. Tested on crcbl's headless shell and
+  mutation-checked; **never seen on screen**: Windows has no daemon and WSL has
+  no compositor, so the owner's Hyprland is the first real run. The bell is
+  drawn from the store while lyr is the daemon. A toast shows when it arrived as
+  swaync words it ("Now", "2 mins ago", from `get_relative_time` at v0.12.6),
+  redrawn as the words change; a summary long enough to reach the time is cut
+  short of it (`toast::TIME_GAP`), where swaync ellipsizes. The toast under the
+  pointer shows swaync's close button (`toast::close_button`: red, 20 px, 6 px
+  in from the top right, from swaync 0.12.6's `NotificationCloseButton` and the
+  dotfiles' style; the `toast_close` theme keys), which dismisses; tested on the
+  headless shell and mutation-checked. The notification centre's entries show it
+  too, in the same place (`centre::Shown::hovered`): swaync's
+  `.control-center .close-button` margins (10 px top, 6 px right) would put it
+  partly outside the entry, since lyr's entries do not keep the 18 px
+  notification margin they count from, so lyr keeps the toast's placement there.
+  A body's markup is drawn (`lyr_core::markup`: the spec's `<b>`, `<i>`, `<u>`
+  and `<a href>`, XML's entities, `<img>` left out, anything else shown as text;
+  `toast::wrap` wraps the styled spans), and `body-markup` is advertised. Not
+  built: a toast's images (the panel's Clear All, switch and media players work;
+  `lyr dnd` and `lyr clear` work; on Windows they answer that lyr is not the
+  daemon, run there). Each action but `default` gets a button under the body
+  (swaync's style, at the bar's text size until the owner rules on swaync's
+  `0.2rem`), in toasts and the panel's history; a click invokes it. A transient
+  notification, kept in no history, closes as expired when its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading
@@ -455,14 +455,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   reopen, a click on the bar outside it), where the entries log that they are
   not built. crcbl 0.5.0's Win32 grab delivers Escape as a key instead of the
   close request its docs promise, so lyr closes on the key itself; reported to
-  crcbl, whose fix (every backend) and the scancode-0 key codes below sit on its
-  `win32-popup-leave` branch until that branch's CI passes, for 0.6.0. Keys
-  injected with `SendKeys` arrive with no scancode, so crcbl names no key for
-  them; `keybd_event` with scancodes works. `[power.menu]` sets an entry to a
-  command (`{ exec = … }`), which runs instead of lyr's action. Not built: the
-  Windows and macOS actions (plan 10 names Win32 APIs that need `windows-sys`,
-  new to lyr), and checking what Hyprland does with an outside click (M5's open
-  question for panels applies to this grab popup too).
+  crcbl, whose fix is on its main (`2bf8c3b0`, unreleased, for 0.6.0): Escape on
+  a grab popup queues `CloseRequested` after the key on Win32, Wayland, AppKit
+  and headless, and on Wayland a grabbing popup gets the keys even when the
+  compositor keeps focus on the parent. Win32 keys injected with scancode 0 get
+  a key code from their virtual key there too. Once lyr takes 0.6.0, its own
+  close on Escape can go. Keys injected with `SendKeys` arrive with no scancode,
+  so crcbl names no key for them; `keybd_event` with scancodes works.
+  `[power.menu]` sets an entry to a command (`{ exec = … }`), which runs instead
+  of lyr's action. Not built: the Windows and macOS actions (plan 10 names Win32
+  APIs that need `windows-sys`, new to lyr), and checking what Hyprland does
+  with an outside click (M5's open question for panels applies to this grab
+  popup too).
 - **Bluetooth menu, M7.** Built: its actions on Linux
   (`lyr_sources::bluetooth::linux::BlueZ`): the adapter's power, discoverable
   and pairable switches (`set`), the scan (`scan`), and connect, disconnect,
