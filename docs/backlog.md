@@ -184,9 +184,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   and to stderr (`apps/lyr/src/log.rs`, `RUST_LOG` to filter), capped at
   `log::MAX_BYTES` by moving it to `lyr.log.1` (tested on Windows and Linux, not
   watched rotating in a running bar). `colour.rs` copies crcbl-ui's private
-  `srgb_to_linear`; crcbl's next release exports it as
-  `crcbl_ui::style::from_srgb8` (and `crcbl_core::srgb`), and lyr drops the copy
-  then. Group opacity is approximated until crcbl's opacity groups ship.
+  `srgb_to_linear`. crcbl's main (41859726, 2026-10-19, unreleased, for 0.6.0)
+  exports it as `crcbl_ui::style::from_srgb8` and has opacity groups
+  (`DrawList::push_opacity`/`pop_opacity`); lyr drops the copy and stops
+  approximating group opacity once 0.6.0 is published (lyr depends on released
+  crcbl only). crcbl's CI had not verified the opacity layer on Metal then.
 - **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors
@@ -308,9 +310,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   tooltip stays up after the pointer leaves the bar (with no popup, the leave
   arrives). Seen with a scripted `SetCursorPos`, not a physical mouse; reported
   to crcbl on 2026-10-19, which found the cause (`TME_LEAVE` armed only on the
-  first move after a leave, so nothing re-arms it once the popup cancels it) and
-  targets the fix for 0.6.0. Not done: a tooltip whose module moves while it is
-  open keeps its old place, and a tooltip of more than one line is drawn as one.
+  first move after a leave, so nothing re-arms it once the popup cancels it).
+  Its test with an ordinary parent window did not reproduce the bug; trying a
+  panel parent, as lyr's bar is, is next in crcbl's backlog, so the fix has no
+  release yet. Not done: a tooltip whose module moves while it is open keeps its
+  old place, and a tooltip of more than one line is drawn as one.
 - **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second
@@ -389,12 +393,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   reopen, a click on the bar outside it), where the entries log that they are
   not built. crcbl 0.5.0's Win32 grab delivers Escape as a key instead of the
   close request its docs promise, so lyr closes on the key itself; reported to
-  crcbl. Keys injected with `SendKeys` arrive with no scancode, so crcbl names
-  no key for them; `keybd_event` with scancodes works. Not built: an entry set
-  to a command instead of its built-in (plan 10 allows either), the Windows and
-  macOS actions (plan 10 names Win32 APIs that need `windows-sys`, new to lyr),
-  and checking what Hyprland does with an outside click (M5's open question for
-  panels applies to this grab popup too).
+  crcbl, whose fix (every backend) and the scancode-0 key codes below sit on its
+  `win32-popup-leave` branch until that branch's CI passes, for 0.6.0. Keys
+  injected with `SendKeys` arrive with no scancode, so crcbl names no key for
+  them; `keybd_event` with scancodes works. Not built: an entry set to a command
+  instead of its built-in (plan 10 allows either), the Windows and macOS actions
+  (plan 10 names Win32 APIs that need `windows-sys`, new to lyr), and checking
+  what Hyprland does with an outside click (M5's open question for panels
+  applies to this grab popup too).
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a
