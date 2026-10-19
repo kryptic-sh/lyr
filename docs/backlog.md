@@ -83,6 +83,23 @@ implementation follows meanwhile.
 - **The dotfiles' standalone tools** (M8). **Q:** When the dotfiles switch to
   lyr, do `wiremix` and `bluetui` stay installed, and do the `krypt menu` names
   stay as wrappers?
+- **Windows Bluetooth: build it on a machine that cannot show it?** (M9.) **Q:**
+  The development machine's Bluetooth adapter is in a PnP error state and
+  WinRT's `Radio::GetRadiosAsync` lists no radios (checked 2026-10-20), so a
+  Windows source (`Windows.Devices.Radios` for on/off/disabled, a
+  `DeviceWatcher` on `BluetoothDevice` and `BluetoothLEDevice`'s connected
+  selectors for the devices) could only be seen hiding the module. Build it
+  checked only that far, wait for a working adapter or dongle, or leave the
+  module out on Windows? Until then a click opens `ms-settings:bluetooth`.
+- **Windows workspaces: native virtual desktops on an Insider build?** (M9.)
+  **Q:** Plan 06's default is the undocumented `IVirtualDesktopManagerInternal`
+  with a per-build IID table, refusing an unknown build. The development machine
+  runs build 26300, which public IID tables (VirtualDesktopAccessor's and
+  others') may not cover yet, and a wrong IID calls through the wrong vtable
+  rather than failing cleanly, so it cannot be guessed. Options: build the table
+  for the released builds (24H2, 26100) and leave the module out on this
+  machine; target komorebi or GlazeWM's IPC instead (stable, but only if one of
+  them gets used); or leave workspaces out on Windows.
 
 ## Cross-repo work
 
@@ -446,8 +463,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   run on Windows (2026-10-20), `lyr panel audio` and `lyr panel bluetooth`
   brought up a Settings window, though which page it showed was not seen (it
   opened behind the terminal). Not built: the other Windows sources (Bluetooth,
-  workspaces) and the native menus plan 10 names; macOS's
-  `x-apple.systempreferences:` fallbacks wait on M10.
+  workspaces, both waiting on the owner's questions above) and the native menus
+  plan 10 names; macOS's `x-apple.systempreferences:` fallbacks wait on M10.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace
