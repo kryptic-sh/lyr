@@ -6,15 +6,17 @@
 //! that all of it is testable on every CI runner without a display.
 //!
 //! So far it holds the zone layout ([`layout`]), the draw list ([`draw`]), icon
-//! ramps ([`icon`]), hit testing ([`hit`]), what a click asks for
-//! ([`pointer`]), the control socket's requests ([`control`]) and the views of
+//! ramps ([`icon`]), hit testing ([`hit`]), the calendar ([`calendar`]), what
+//! a click asks for ([`pointer`]), the control socket's requests
+//! ([`control`]), the notification store ([`notifications`]) and the views of
 //! the battery, power-profile, network, bluetooth, volume, mic and clock
-//! modules. The rest lands with milestones M1 and M4
+//! modules. The rest lands with later milestones
 //! (`docs/plan/15-milestones.md`).
 
 pub mod audio;
 pub mod battery;
 pub mod bluetooth;
+pub mod calendar;
 pub mod clock;
 pub mod control;
 pub mod draw;

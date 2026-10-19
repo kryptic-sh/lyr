@@ -89,8 +89,10 @@ implementation follows until they are answered. The ones that block a milestone:
   `Shell::request_frame(window)` and `ShellEvent::FrameReady { window }`, with
   `ShellCaps::FRAME_CALLBACK` set where the compositor really paces (Wayland,
   and AppKit if it has a real signal); elsewhere `FrameReady` comes at the next
-  pump, so lyr has one code path. It is queued after opacity groups, for the
-  release after next unless it fits the next one. lyr's loop then becomes: on a
+  pump, so lyr has one code path. A window destroyed with a frame pending gets
+  no `FrameReady`. It is queued after opacity groups, the sRGB helper and AppKit
+  IME, which make 0.6.0; it ships in 0.6.0 if it is done before that is cut,
+  otherwise in 0.7.0, and crcbl will say which. lyr's loop then becomes: on a
   change mark the bar dirty; with no frame pending, present and request one; on
   `FrameReady`, present again if still dirty
   ([plan/04](plan/04-rendering-and-theme.md#repaint-on-change-only)). crcbl
@@ -321,6 +323,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   click on the empty desktop. M5 records what Hyprland does and picks a fix.
 - **Does the year calendar fit the 500 px panel?** Measured in M5; the panel
   widens if not ([plan/10](plan/10-popups-and-menus.md#clock-panel)).
+- **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
+  month's rows from a first weekday, waybar's week numbers (`%W` from Monday,
+  `%U` otherwise, the first row numbered by the 1st), the header order and
+  scrolling by a month or a year, tested against chrono's `%W` and `%U` for
+  every day of 2020 – 2030 and mutation-checked. The week numbers follow waybar,
+  not ISO, because the dotfiles do not set `iso8601`; ISO would be `%V`, a
+  one-line change, if the owner prefers it. Not built: the first weekday from
+  the system locale (`nl_langinfo` on Linux, `LOCALE_IFIRSTDAYOFWEEK` on
+  Windows, as waybar reads it), localised month and weekday names, and the panel
+  itself.
 - **Undocumented Windows APIs:** virtual desktops
   (`IVirtualDesktopManagerInternal`) and setting the power mode
   (`PowerSetActiveOverlayScheme`) can break with any Windows build.

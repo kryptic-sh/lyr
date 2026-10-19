@@ -59,8 +59,11 @@ From the top:
      (`mode-mon-col: 3`). Right click switches between year and month mode
      (`on-click-right: "mode"`). Scrolling over it shifts it by one unit of the
      current mode (`on-scroll: 1`): a year in year mode, a month in month mode.
-   - ISO week numbers in a right-hand column (`weeks-pos: right`), prefixed `W`
-     (`<b>W{}</b>`).
+   - Week numbers in a right-hand column (`weeks-pos: right`), prefixed `W`
+     (`<b>W{}</b>`). Not ISO: the dotfiles do not set waybar's `iso8601`, so
+     waybar numbers weeks as strftime's `%W` when the week starts on Monday and
+     `%U` otherwise, the first row by the 1st of the month and every other row
+     by its first day. lyr does the same (`lyr_core::calendar`).
    - Monospace and smaller than the bar's text, as waybar's `<tt><small>` makes
      it. The monospace family is the theme's `calendar_font`, defaulting to the
      bar font, which is proportional (Hack Nerd Font **Propo**), so the default
