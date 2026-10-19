@@ -568,6 +568,26 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   keys from the right (No before Yes), as in the Bluetooth menu. Both menus drop
   the keyboard's outline when a question appears (`MenuPanel::unfocus`), so
   Enter answers it.
+- **Tray, M8.** Built: the rules (`lyr_core::tray`, after waybar's
+  `src/modules/sni` at master `c15ec02`): an item's status (passive items
+  hidden, as waybar hides them by default), a click (left activates, or opens
+  the menu when `ItemIsMenu`; right opens the menu; middle secondary-activates),
+  a wheel step (`Scroll(±1, "vertical")`), how a registration names an item (a
+  path alone on the caller's connection, `name/path`, or a bus name with
+  `/StatusNotifierItem`), and the watcher's registry. The D-Bus side
+  (`lyr_sources::tray::linux`): lyr's `org.kde.StatusNotifierWatcher`, served
+  when no other process has the name (`serve`; waybar replaces an existing one,
+  lyr leaves it), with its properties and signals and a vanished name's
+  registrations dropped (`Served::vanished`, `follow_names`); and the host,
+  which registers `org.kde.StatusNotifierHost-<pid>`, reads every listed item
+  with `GetAll` (one that does not answer is named in `Listing::unreadable`),
+  re-reads on the watcher's or any item's signal, and sends `Activate`,
+  `SecondaryActivate`, `ContextMenu` and `Scroll`. Tested against a fake item on
+  a peer-to-peer connection and mutation-checked; `follow_names` and
+  `Host::register` need a bus and are untested. Not built: DBusMenu, the module
+  on the bar and its menu popup. Icons wait on images (the decision above);
+  until then an item is drawn as its title's first letter (`Item::letter`),
+  where plan 08 asks for a generic icon.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

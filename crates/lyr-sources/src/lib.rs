@@ -6,11 +6,12 @@
 //! polling (`docs/plan/07-modules.md`).
 //!
 //! So far it holds the battery ([`battery`]), Bluetooth ([`bluetooth`]),
-//! clock ([`clock`]), network ([`network`]) and power-profile ([`power_profile`]) sources and the
-//! notification daemon ([`notifications`]), with their Linux backends, and
-//! the power menu's actions ([`power`]), which are not a module's source but
-//! sit with the other system-bus clients. The rest land in milestones M4 and M6 to M8
-//! (`docs/plan/15-milestones.md`).
+//! clock ([`clock`]), network and Wi-Fi ([`network`]), power-profile
+//! ([`power_profile`]), media-player ([`mpris`]) and tray ([`tray`])
+//! sources and the notification daemon ([`notifications`]), with their
+//! Linux backends, and the power menu's actions ([`power`]), which are not a
+//! module's source but sit with the other system-bus clients. Audio waits on
+//! a dependency decision (`docs/backlog.md`).
 
 pub mod battery;
 pub mod bluetooth;
@@ -20,3 +21,4 @@ pub mod network;
 pub mod notifications;
 pub mod power;
 pub mod power_profile;
+pub mod tray;
