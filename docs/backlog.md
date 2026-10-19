@@ -137,7 +137,13 @@ implementation follows until they are answered. The ones that block a milestone:
   `Presenter` defaults to low power, so lyr gets the rule by keeping that
   default. It ships with crcbl's D3D12 start-up work, release not yet named. On
   this Windows machine lyr drew on the discrete RX 7900 XTX. Check which adapter
-  each bar gets once crcbl ships it.
+  each bar gets once crcbl ships it. The owner's call (2026-10-20, made for pikr
+  and to be done in lyr as well): on crcbl 0.6.0, pick each bar's GPU with
+  `crcbl_app::adapter::choose` (the display's GPU, then low power, with
+  `CRCBL_ADAPTER` overriding) rather than relying on the `Presenter`'s default.
+  lyr already depends on `crcbl-app`, so it takes no new dependency; read
+  `choose`'s signature in the 0.6.0 source before wiring it into
+  `lyr_render::surface::Surface::open`.
 - **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
   the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
   S8 – S27. pikr's session tracks the move in pikr's own backlog and
