@@ -104,6 +104,13 @@ implementation follows until they are answered. The ones that block a milestone:
   ([plan/04](plan/04-rendering-and-theme.md#repaint-on-change-only)). crcbl
   declined a finite acquire timeout, which would turn the hang into a busy
   retry.
+- **crcbl: changing a panel in place.** crcbl-shell 0.5.0 sets a panel's size
+  and margins only when it is created, so lyr's toast stack, whose height
+  changes with every toast, recreates its panel. Asked crcbl on 2026-10-19;
+  crcbl took `Shell::set_panel(window, size, &PanelDesc)` (all but namespace and
+  monitor change in place, every backend), after pikr's work and frame pacing,
+  likely in 0.7.0. lyr's bar would use it too, to change height on reload
+  without recreating.
 - **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
   the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
   S8 – S27. pikr's session tracks the move in pikr's own backlog and

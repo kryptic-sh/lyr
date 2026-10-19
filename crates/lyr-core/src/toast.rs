@@ -6,6 +6,8 @@
 //! Not yet: the arrival time, the close button, action buttons, images, body
 //! markup (lyr advertises no `body-markup`, so applications send plain text).
 
+pub mod stack;
+
 use lyr_config::Theme;
 
 use crate::draw::{DrawList, Item, Size};
