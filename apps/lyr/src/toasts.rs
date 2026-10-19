@@ -114,17 +114,26 @@ impl Toasts {
             .is_some_and(|panel| panel.window == window)
     }
 
-    /// Takes down the toasts whose time is up, and brings the panel in line
-    /// with the stack: rebuilt, recreated at a new size, or closed.
-    pub fn sync(
-        &mut self,
-        shell: &mut dyn Shell,
-        look: &Look<'_>,
-        now: Instant,
-    ) -> anyhow::Result<()> {
-        if !self.stack.expire(now).is_empty() {
-            self.changed = true;
+    /// Takes down the toasts whose time is up. Returns the transient ones
+    /// among them: kept nowhere else, they are to close as expired.
+    pub fn expire(&mut self, now: Instant) -> Vec<u32> {
+        let gone = self.stack.expire(now);
+        if gone.is_empty() {
+            return gone;
         }
+        self.changed = true;
+        let Some(store) = &self.store else {
+            return Vec::new();
+        };
+        let store = store.lock().unwrap_or_else(PoisonError::into_inner);
+        gone.into_iter()
+            .filter(|&id| store.get(id).is_some_and(|held| held.content.transient))
+            .collect()
+    }
+
+    /// Brings the panel in line with the stack: rebuilt, recreated at a new
+    /// size, or closed.
+    pub fn sync(&mut self, shell: &mut dyn Shell, look: &Look<'_>) -> anyhow::Result<()> {
         if !std::mem::take(&mut self.changed) {
             return Ok(());
         }

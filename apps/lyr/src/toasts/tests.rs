@@ -52,9 +52,8 @@ impl Setup {
             measure: &measure,
             line_height: 20.0,
         };
-        self.toasts
-            .sync(&mut self.shell, &look, now)
-            .expect("synced");
+        self.toasts.expire(now);
+        self.toasts.sync(&mut self.shell, &look).expect("synced");
         self.toasts.panel.as_ref().map(|panel| panel.window)
     }
 
@@ -157,4 +156,20 @@ fn the_pointer_over_a_toast_holds_it_up() {
     assert_eq!(setup.pump(start + Duration::from_secs(1)), None);
     assert_eq!(setup.toasts.next_wake(), None, "paused");
     assert_eq!(setup.sync(start + NORMAL_TIMEOUT * 3), Some(window));
+}
+
+#[test]
+fn only_a_transient_toast_that_times_out_is_to_close() {
+    let mut setup = setup();
+    let start = Instant::now();
+    let kept = setup.notify("kept", start);
+    let transient = setup.store.lock().expect("store").notify(Incoming {
+        summary: "transient".to_owned(),
+        transient: true,
+        ..Incoming::default()
+    });
+    setup.toasts.notified(transient, start);
+    assert!(setup.toasts.expire(start).is_empty());
+    assert_eq!(setup.toasts.expire(start + NORMAL_TIMEOUT), [transient]);
+    assert!(setup.store.lock().expect("store").get(kept).is_some());
 }

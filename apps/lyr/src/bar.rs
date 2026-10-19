@@ -222,6 +222,7 @@ impl App {
             stats,
             power_menu,
             toasts,
+            commands,
             ..
         } = self;
         let now = Local::now().fixed_offset();
@@ -248,7 +249,10 @@ impl App {
         if let Some(menu) = power_menu {
             menu.draw(text)?;
         }
-        toasts.sync(shell, &look, Instant::now())?;
+        for id in toasts.expire(Instant::now()) {
+            commands.close_notification(id, lyr_core::notifications::CloseReason::Expired);
+        }
+        toasts.sync(shell, &look)?;
         toasts.draw(text)?;
         for window in windows.values_mut().filter(|window| window.dirty) {
             let hovered = window.hovered();

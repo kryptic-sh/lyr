@@ -107,6 +107,10 @@ impl Commands {
             entry.label()
         );
     }
+
+    /// Windows and macOS: lyr is not the notification daemon there, so it
+    /// holds no notification to close.
+    pub fn close_notification(&self, _id: u32, _reason: lyr_core::notifications::CloseReason) {}
 }
 
 /// Starts every source this platform has. A source that cannot start, or

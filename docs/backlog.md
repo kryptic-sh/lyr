@@ -264,8 +264,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   real run. The bell is drawn from the store while lyr is the daemon. Not built:
   a toast's arrival time, close button, action buttons and images, markup,
   MPRIS, do-not-disturb and Clear All in the panel (`lyr dnd` and `lyr clear`
-  work; on Windows they answer that lyr is not the daemon, run there), and
-  closing a transient notification when its toast times out.
+  work; on Windows they answer that lyr is not the daemon, run there). A
+  transient notification, kept in no history, closes as expired when its toast
+  times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading
