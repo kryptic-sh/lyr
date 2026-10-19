@@ -54,10 +54,10 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
 
     let font = lyr_render::fonts::load(&config.theme.font).context("loading the bar font")?;
     if let Some(family) = &font.missing {
-        eprintln!("lyr: font `{family}` is not installed; using a monospace font");
+        tracing::warn!("font `{family}` is not installed; using a monospace font");
     }
     for (path, reason) in &font.unreadable {
-        eprintln!("lyr: fallback font {} skipped: {reason}", path.display());
+        tracing::warn!("fallback font {} skipped: {reason}", path.display());
     }
     let text = Text::new(font.font, config.theme.font_size as f32);
     let tick = Tick::of(&config.clock.format);
@@ -120,7 +120,7 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
                     } else {
                         let surface = Surface::open(shell.as_ref(), window, device, scale)
                             .context("opening a bar's surface")?;
-                        eprintln!("lyr: drawing on {}", surface.describe());
+                        tracing::info!("drawing on {}", surface.describe());
                         let monitor = bars
                             .windows()
                             .find(|&(_, bar)| bar == window)

@@ -149,11 +149,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   and text, as a screenshot showed, and the work area came back when the process
   was killed. Hack Nerd Font Propo is not installed on that machine, so it drew
   in the monospace fallback, and lyr said so. Not run on Hyprland, which is M1's
-  real check. `lyr quit` stops it. There is no logging yet (`tracing`; it prints
-  to stderr). `colour.rs` copies crcbl-ui's private `srgb_to_linear`; crcbl's
-  next release exports it as `crcbl_ui::style::from_srgb8` (and
-  `crcbl_core::srgb`), and lyr drops the copy then. Group opacity is
-  approximated until crcbl's opacity groups ship.
+  real check. `lyr quit` stops it. It logs through `tracing` to
+  `~/.local/state/lyr/logs/lyr.log` and to stderr (`apps/lyr/src/log.rs`,
+  `RUST_LOG` to filter); the file is appended to and never rotated or capped,
+  which a bar running for months needs. `colour.rs` copies crcbl-ui's private
+  `srgb_to_linear`; crcbl's next release exports it as
+  `crcbl_ui::style::from_srgb8` (and `crcbl_core::srgb`), and lyr drops the copy
+  then. Group opacity is approximated until crcbl's opacity groups ship.
 - **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors

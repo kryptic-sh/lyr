@@ -8,6 +8,7 @@ mod bar;
 mod control;
 mod exec;
 mod input;
+mod log;
 mod modules;
 mod sources;
 
@@ -91,10 +92,13 @@ impl PanelArg {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let Some(command) = cli.command else {
+        if let Err(error) = log::init() {
+            eprintln!("lyr: logging to stderr only: {error}");
+        }
         return match bar::run(cli.config.as_deref()) {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
-                eprintln!("lyr: {error:#}");
+                tracing::error!("{error:#}");
                 ExitCode::FAILURE
             }
         };

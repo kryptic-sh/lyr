@@ -21,12 +21,15 @@ anyhow = { version = "1.0.104" }
 chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 clap = { version = "4.6.7", features = ["derive"] }
 crcbl-shell = "=0.5.0"
+hjkl-xdg = "0.42.2"
 interprocess = "2.4.6"
 lyr-config.workspace = true
 lyr-core.workspace = true
 lyr-render.workspace = true
 lyr-shell.workspace = true
 thiserror = "2.0.21"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "env-filter", "std", "registry"] }
 
 [lints]
 workspace = true

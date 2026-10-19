@@ -113,11 +113,11 @@ pub fn act(
     match action {
         Action::Exec(command) => {
             if let Err(error) = exec::spawn(&command) {
-                eprintln!("lyr: `{command}` did not start: {error}");
+                tracing::warn!("`{command}` did not start: {error}");
             }
         }
         Action::Builtin(builtin) => {
-            eprintln!("lyr: `{}` is not implemented yet", builtin.name());
+            tracing::warn!("`{}` is not implemented yet", builtin.name());
         }
         #[cfg(target_os = "linux")]
         Action::FocusWorkspace(index) => {

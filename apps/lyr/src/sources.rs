@@ -46,7 +46,7 @@ impl Commands {
 }
 
 /// Starts every source this platform has. A source that cannot start, or
-/// stops, says why on stderr and its module stays out of the bar.
+/// stops, logs why and its module stays out of the bar.
 pub fn start(waker: Option<ShellWaker>) -> std::io::Result<(mpsc::Receiver<Update>, Commands)> {
     let (sender, receiver) = mpsc::channel();
     #[cfg(target_os = "linux")]
@@ -108,7 +108,7 @@ mod linux {
         let upower = match UPower::system().await {
             Ok(upower) => upower,
             Err(error) => {
-                eprintln!("lyr: battery: UPower is not reachable: {error}");
+                tracing::warn!("battery: UPower is not reachable: {error}");
                 return;
             }
         };
@@ -123,7 +123,7 @@ mod linux {
         };
         let (watched, ()) = tokio::join!(upower.watch(&readings), forward);
         if let Err(error) = watched {
-            eprintln!("lyr: battery: UPower stopped answering: {error}");
+            tracing::warn!("battery: UPower stopped answering: {error}");
         }
     }
 
@@ -152,7 +152,7 @@ mod linux {
                         // A refused switch changes nothing on screen, which
                         // is the truth; it is only logged.
                         if let Err(error) = hyprland.focus(&workspace).await {
-                            eprintln!("lyr: workspaces: {error}");
+                            tracing::warn!("workspaces: {error}");
                         }
                     }
                 }
@@ -160,7 +160,7 @@ mod linux {
             Ok::<_, lyr_wm::hyprland::Error>(())
         };
         if let Err(error) = run.await {
-            eprintln!("lyr: workspaces: {error}");
+            tracing::warn!("workspaces: {error}");
         }
     }
 }
