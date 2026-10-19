@@ -38,7 +38,9 @@ Linux under Wayland:
 - Tooltips, the power menu (its actions are built on Linux only), and the clock
   panel's calendar.
 - On Linux, the notification daemon with toasts, when no other daemon (such as
-  swaync) holds the name.
+  swaync) holds the name, and below the calendar the notification centre and the
+  media players playing.
+- On Linux, the Bluetooth menu, with lyr as the pairing agent.
 
 The design lives in [docs/plan/](docs/plan/00-index.md), the build order in
 [docs/plan/15-milestones.md](docs/plan/15-milestones.md), and what is not done
