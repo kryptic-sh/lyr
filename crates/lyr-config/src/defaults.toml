@@ -36,6 +36,10 @@ format = "%Y/%m/%d %H:%M"
 [clock.on]
 click = "open_clock_panel"
 
+[notifications]
+format = "{icon}"
+icons = { notification = "\uF071", none = "\uF0A2", dnd-notification = "\uF071", dnd-none = "\uF1F7" }
+
 [notifications.on]
 click = "open_clock_panel"
 click_right = "toggle_dnd"

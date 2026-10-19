@@ -228,7 +228,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   serve it yet: until it draws toasts, taking the name would swallow every
   notification on a desktop with no other daemon. Not built: claiming the name
   and the check for another daemon owning it, toasts (M5's panels), markup,
-  images, MPRIS and the bell module.
+  images and MPRIS. The bell's view is built (`lyr_core::bell`, with
+  `notifications.format` and `notifications.icons`, the dotfiles' three glyphs)
+  but not drawn: with the daemon not served there is no history to show, and a
+  module with no data is left out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading

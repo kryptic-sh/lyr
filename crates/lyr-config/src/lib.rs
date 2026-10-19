@@ -24,7 +24,7 @@ pub use format::{Format, InvalidFormat};
 pub use hjkl_config::{ConfigError, ConfigSource};
 pub use schema::{
     Bar, Battery, Bluetooth, Clock, Config, Icon, Item, Layer, Layout, Mic, Module, NamedIcons,
-    Network, Position, PowerProfile, Theme, Volume, Workspaces,
+    Network, Notifications, Position, PowerProfile, Theme, Volume, Workspaces,
 };
 
 /// The built-in config.
@@ -279,6 +279,11 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
     ] {
         check_placeholders(key, format, &["icon", "profile", "driver"])?;
     }
+    check_placeholders(
+        "notifications.format",
+        &config.notifications.format,
+        &["icon"],
+    )?;
     for (key, format) in config.network.formats() {
         if let Some(format) = format {
             check_placeholders(

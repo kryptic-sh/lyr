@@ -192,6 +192,15 @@ fn workspace_format_placeholders_are_checked() {
 }
 
 #[test]
+fn the_bell_format_takes_only_its_icon() {
+    let message = invalid(user(
+        "[notifications]\nformat = \"{count}\"\n",
+        Platform::Linux,
+    ));
+    assert!(message.starts_with("notifications.format: "), "{message}");
+}
+
+#[test]
 fn a_syntax_error_names_its_line_and_column() {
     let message = invalid(user("[bar]\nheight = = 3\n", Platform::Linux));
     assert!(message.contains("line 2, column 10"), "{message}");

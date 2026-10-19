@@ -186,6 +186,11 @@ pub struct Power {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Notifications {
+    /// `{icon}`.
+    pub format: Format,
+    /// By state: `notification` and `none`, and their `dnd-` forms while
+    /// do-not-disturb is on, waybar's names for swaync's states.
+    pub icons: NamedIcons,
     /// What a click or a scroll does.
     #[serde(default)]
     pub on: On,

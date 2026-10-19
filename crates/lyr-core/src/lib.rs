@@ -9,12 +9,13 @@
 //! ramps ([`icon`]), hit testing ([`hit`]), the calendar ([`calendar`]), what
 //! a click asks for ([`pointer`]), the control socket's requests
 //! ([`control`]), the notification store ([`notifications`]) and the views of
-//! the battery, power-profile, network, bluetooth, volume, mic and clock
-//! modules. The rest lands with later milestones
+//! the battery, power-profile, network, bluetooth, volume, mic, clock and
+//! notifications ([`bell`]) modules. The rest lands with later milestones
 //! (`docs/plan/15-milestones.md`).
 
 pub mod audio;
 pub mod battery;
+pub mod bell;
 pub mod bluetooth;
 pub mod calendar;
 pub mod clock;
