@@ -17,6 +17,12 @@ implementation follows until they are answered. The ones that block a milestone:
   `LOCALE_IFIRSTDAYOFWEEK`); lyr depends on neither directly. The alternative
   without them is a `clock.first_weekday` config key defaulting to Monday, with
   English names, which a Sunday-first locale would have to set by hand.
+- **Images: taking on `crcbl-image`** (M6, M8). A toast's `app_icon`,
+  `image-data` and `image-path`, a player's art and the tray all wait on
+  decoding images; crcbl-ui 0.5.0 can already draw them (its image atlas, the
+  draw list's `image` quads). The cross-repo entry below plans `crcbl-image`
+  "with M6", but adding a dependency is the owner's call, so it is not taken
+  yet. With it, `icon-static` can be advertised once the toast draws icons.
 - **Bluetooth favourites need somewhere to live** (M7). bluetui (master
   `ff92b24`, `src/favorite.rs`, read 2026-10-19) keeps them as device addresses
   in `favorites.txt` under its data directory, sorts favourites first among
