@@ -6,7 +6,7 @@
 //! the spec leaves a choice, from swaync, which lyr replaces. The D-Bus side
 //! is in `lyr-sources`.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// How urgent a notification is: the `urgency` hint's byte.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -93,6 +93,8 @@ pub struct Notification {
     /// When it arrived, as a count that only grows, so the history can be
     /// ordered newest first.
     pub arrival: u64,
+    /// When it arrived, for its "2 mins ago".
+    pub received: Instant,
 }
 
 impl Notification {
@@ -122,10 +124,10 @@ pub struct Store {
 }
 
 impl Store {
-    /// Takes a notification and returns its id: `replaces_id` when that is
-    /// set, as the spec requires, replacing the notification in place;
-    /// otherwise the next id, never 0.
-    pub fn notify(&mut self, incoming: Incoming) -> u32 {
+    /// Takes a notification that arrived at `now` and returns its id:
+    /// `replaces_id` when that is set, as the spec requires, replacing the
+    /// notification in place; otherwise the next id, never 0.
+    pub fn notify(&mut self, incoming: Incoming, now: Instant) -> u32 {
         self.arrivals += 1;
         let id = if incoming.replaces_id == 0 {
             self.next_id()
@@ -136,6 +138,7 @@ impl Store {
             id,
             content: incoming,
             arrival: self.arrivals,
+            received: now,
         };
         match self.notifications.iter_mut().find(|held| held.id == id) {
             Some(held) => *held = notification,

@@ -161,7 +161,10 @@ impl Toasts {
             self.stack
                 .draw(&store, now, look.measure, look.line_height, look.theme)
         };
-        self.relabel_at = self.stack.next_label_change(now);
+        self.relabel_at = {
+            let store = store.lock().unwrap_or_else(PoisonError::into_inner);
+            self.stack.next_label_change(&store, now)
+        };
         if size.height == 0.0 {
             return self.close(shell);
         }

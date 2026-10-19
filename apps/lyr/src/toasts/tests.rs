@@ -38,10 +38,13 @@ fn setup() -> Setup {
 
 impl Setup {
     fn notify(&mut self, summary: &str, now: Instant) -> u32 {
-        let id = self.store.lock().expect("store").notify(Incoming {
-            summary: summary.to_owned(),
-            ..Incoming::default()
-        });
+        let id = self.store.lock().expect("store").notify(
+            Incoming {
+                summary: summary.to_owned(),
+                ..Incoming::default()
+            },
+            now,
+        );
         self.toasts.notified(id, false, now);
         id
     }
@@ -117,11 +120,14 @@ fn a_second_toast_grows_the_panel_and_the_same_size_keeps_it() {
     let grown = setup.sync(start).expect("a panel");
     assert_ne!(first, grown, "recreated at its new size");
     assert!(setup.shell.title(first).is_err());
-    let id = setup.store.lock().expect("store").notify(Incoming {
-        summary: "replaced".to_owned(),
-        replaces_id: 1,
-        ..Incoming::default()
-    });
+    let id = setup.store.lock().expect("store").notify(
+        Incoming {
+            summary: "replaced".to_owned(),
+            replaces_id: 1,
+            ..Incoming::default()
+        },
+        start,
+    );
     setup.toasts.notified(id, false, start);
     assert_eq!(setup.sync(start), Some(grown), "same size, same panel");
 }
@@ -169,11 +175,14 @@ fn only_a_transient_toast_that_times_out_is_to_close() {
     let mut setup = setup();
     let start = Instant::now();
     let kept = setup.notify("kept", start);
-    let transient = setup.store.lock().expect("store").notify(Incoming {
-        summary: "transient".to_owned(),
-        transient: true,
-        ..Incoming::default()
-    });
+    let transient = setup.store.lock().expect("store").notify(
+        Incoming {
+            summary: "transient".to_owned(),
+            transient: true,
+            ..Incoming::default()
+        },
+        start,
+    );
     setup.toasts.notified(transient, false, start);
     assert!(setup.toasts.expire(start).is_empty());
     assert_eq!(setup.toasts.expire(start + NORMAL_TIMEOUT), [transient]);
@@ -184,11 +193,14 @@ fn only_a_transient_toast_that_times_out_is_to_close() {
 fn a_toast_up_for_a_minute_is_redrawn_for_its_new_time() {
     let mut setup = setup();
     let start = Instant::now();
-    let id = setup.store.lock().expect("store").notify(Incoming {
-        summary: "stays".to_owned(),
-        expiry: Some(lyr_core::notifications::Expiry::Never),
-        ..Incoming::default()
-    });
+    let id = setup.store.lock().expect("store").notify(
+        Incoming {
+            summary: "stays".to_owned(),
+            expiry: Some(lyr_core::notifications::Expiry::Never),
+            ..Incoming::default()
+        },
+        start,
+    );
     setup.toasts.notified(id, false, start);
     setup.sync(start);
     let minute = start + Duration::from_secs(60);

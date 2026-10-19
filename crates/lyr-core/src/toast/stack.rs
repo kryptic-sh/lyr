@@ -16,8 +16,6 @@ use crate::notifications::Store;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Up {
     id: u32,
-    /// When it arrived, for its "2 mins ago".
-    since: Instant,
     /// When it goes, or `None` for never (a critical notification) or while
     /// the pointer pauses it.
     until: Option<Instant>,
@@ -50,15 +48,7 @@ impl Stack {
         } else {
             (timeout.map(|timeout| now + timeout), None)
         };
-        self.up.insert(
-            0,
-            Up {
-                id,
-                since: now,
-                until,
-                paused,
-            },
-        );
+        self.up.insert(0, Up { id, until, paused });
     }
 
     /// The notification `id` closed: its toast goes.
@@ -104,14 +94,15 @@ impl Stack {
     }
 
     /// When a toast's "N mins ago" next changes, at `now` or later: a whole
-    /// minute after it arrived.
+    /// minute after it arrived in `store`.
     #[must_use]
-    pub fn next_label_change(&self, now: Instant) -> Option<Instant> {
+    pub fn next_label_change(&self, store: &Store, now: Instant) -> Option<Instant> {
         self.up
             .iter()
-            .map(|up| {
-                let minutes = now.saturating_duration_since(up.since).as_secs() / 60;
-                up.since + Duration::from_secs((minutes + 1) * 60)
+            .filter_map(|up| store.get(up.id))
+            .map(|held| {
+                let minutes = now.saturating_duration_since(held.received).as_secs() / 60;
+                held.received + Duration::from_secs((minutes + 1) * 60)
             })
             .min()
     }
@@ -139,12 +130,8 @@ impl Stack {
             width: 0.0,
             height: 0.0,
         };
-        for (up, notification) in self
-            .up
-            .iter()
-            .filter_map(|up| Some((up, store.get(up.id)?)))
-        {
-            let elapsed = now.saturating_duration_since(up.since);
+        for notification in self.ids().filter_map(|id| store.get(id)) {
+            let elapsed = now.saturating_duration_since(notification.received);
             let (toast, toast_size) =
                 draw(&notification.content, elapsed, &measure, line_height, theme);
             let top = if size.height > 0.0 {

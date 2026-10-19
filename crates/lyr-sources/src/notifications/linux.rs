@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Instant;
 
 use lyr_core::notifications::{CloseReason, Expiry, Incoming, Store, Urgency};
 use tokio::sync::mpsc::UnboundedSender;
@@ -97,7 +98,7 @@ impl Daemon {
             resident: flag("resident"),
             expiry: Some(Expiry::from_millis(expire_timeout)),
         };
-        let id = self.store().notify(incoming);
+        let id = self.store().notify(incoming, Instant::now());
         self.report(Change::Notified(id));
         id
     }

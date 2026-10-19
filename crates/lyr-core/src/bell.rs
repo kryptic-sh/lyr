@@ -27,6 +27,8 @@ pub fn view(store: &Store, config: &Config) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Instant;
+
     use lyr_config::{Platform, from_sources};
 
     use super::view;
@@ -49,7 +51,7 @@ mod tests {
         assert_eq!(view(&store, config), "\u{F0A2}");
         store.dnd = true;
         assert_eq!(view(&store, config), "\u{F1F7}");
-        store.notify(incoming(false));
+        store.notify(incoming(false), Instant::now());
         assert_eq!(view(&store, config), "\u{F071}");
         store.dnd = false;
         assert_eq!(view(&store, config), "\u{F071}");
@@ -59,7 +61,7 @@ mod tests {
     fn a_transient_notification_leaves_the_bell_empty() {
         let config = from_sources(None, Platform::Linux).expect("the defaults");
         let mut store = Store::default();
-        store.notify(incoming(true));
+        store.notify(incoming(true), Instant::now());
         assert_eq!(view(&store, &config.notifications), "\u{F0A2}");
     }
 }

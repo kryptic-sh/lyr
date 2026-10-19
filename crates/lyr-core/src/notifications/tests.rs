@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use super::{Expiry, Incoming, LOW_TIMEOUT, NORMAL_TIMEOUT, Store, Urgency};
 
@@ -20,19 +20,23 @@ fn critical(app: &str, summary: &str) -> Incoming {
 #[test]
 fn ids_start_at_1_and_are_not_reused_while_held() {
     let mut store = Store::default();
-    assert_eq!(store.notify(from("a", "1")), 1);
-    assert_eq!(store.notify(from("a", "2")), 2);
+    assert_eq!(store.notify(from("a", "1"), Instant::now()), 1);
+    assert_eq!(store.notify(from("a", "2"), Instant::now()), 2);
     store.close(1);
-    assert_eq!(store.notify(from("a", "3")), 3, "not 1 again straight away");
+    assert_eq!(
+        store.notify(from("a", "3"), Instant::now()),
+        3,
+        "not 1 again straight away"
+    );
 }
 
 #[test]
 fn ids_wrap_past_the_top_and_skip_0_and_held_ids() {
     let mut store = Store::default();
-    store.notify(from("a", "first"));
+    store.notify(from("a", "first"), Instant::now());
     store.last_id = u32::MAX;
     assert_eq!(
-        store.notify(from("a", "wrapped")),
+        store.notify(from("a", "wrapped"), Instant::now()),
         2,
         "1 is held, 0 is never used"
     );
@@ -41,12 +45,15 @@ fn ids_wrap_past_the_top_and_skip_0_and_held_ids() {
 #[test]
 fn a_replacement_keeps_the_id_and_takes_the_place() {
     let mut store = Store::default();
-    let id = store.notify(from("music", "Song A"));
-    store.notify(from("mail", "New mail"));
-    let replaced = store.notify(Incoming {
-        replaces_id: id,
-        ..from("music", "Song B")
-    });
+    let id = store.notify(from("music", "Song A"), Instant::now());
+    store.notify(from("mail", "New mail"), Instant::now());
+    let replaced = store.notify(
+        Incoming {
+            replaces_id: id,
+            ..from("music", "Song B")
+        },
+        Instant::now(),
+    );
     assert_eq!(replaced, id);
     assert_eq!(
         store.get(id).map(|n| n.content.summary.as_str()),
@@ -59,10 +66,13 @@ fn a_replacement_keeps_the_id_and_takes_the_place() {
 fn replacing_an_unknown_id_uses_that_id_as_the_spec_says() {
     let mut store = Store::default();
     assert_eq!(
-        store.notify(Incoming {
-            replaces_id: 42,
-            ..from("a", "x")
-        }),
+        store.notify(
+            Incoming {
+                replaces_id: 42,
+                ..from("a", "x")
+            },
+            Instant::now()
+        ),
         42
     );
 }
@@ -70,7 +80,7 @@ fn replacing_an_unknown_id_uses_that_id_as_the_spec_says() {
 #[test]
 fn closing_an_unknown_id_says_so() {
     let mut store = Store::default();
-    let id = store.notify(from("a", "x"));
+    let id = store.notify(from("a", "x"), Instant::now());
     assert!(store.close(id).is_some());
     assert!(store.close(id).is_none());
 }
@@ -79,7 +89,7 @@ fn closing_an_unknown_id_says_so() {
 fn timeouts_follow_the_app_then_swaync_by_urgency() {
     let mut store = Store::default();
     let timeout = |store: &mut Store, incoming| {
-        let id = store.notify(incoming);
+        let id = store.notify(incoming, Instant::now());
         Store::timeout(store.get(id).expect("held"))
     };
     assert_eq!(timeout(&mut store, from("a", "x")), Some(NORMAL_TIMEOUT));
@@ -105,8 +115,8 @@ fn timeouts_follow_the_app_then_swaync_by_urgency() {
 #[test]
 fn do_not_disturb_hides_toasts_but_not_critical_ones() {
     let mut store = Store::default();
-    let normal = store.notify(from("a", "x"));
-    let urgent = store.notify(critical("a", "y"));
+    let normal = store.notify(from("a", "x"), Instant::now());
+    let urgent = store.notify(critical("a", "y"), Instant::now());
     store.dnd = true;
     let shows = |store: &Store, id, panel| store.shows_toast(store.get(id).expect("held"), panel);
     assert!(!shows(&store, normal, false));
@@ -123,14 +133,17 @@ fn do_not_disturb_hides_toasts_but_not_critical_ones() {
 fn the_history_puts_critical_groups_first_then_the_newest() {
     let mut store = Store::default();
     // Chat arrives first, so only the newest-first rule puts mail ahead of it.
-    store.notify(from("chat", "hi"));
-    store.notify(from("mail", "old mail"));
-    store.notify(critical("battery", "low"));
-    store.notify(from("mail", "new mail"));
-    store.notify(Incoming {
-        transient: true,
-        ..from("volume", "50%")
-    });
+    store.notify(from("chat", "hi"), Instant::now());
+    store.notify(from("mail", "old mail"), Instant::now());
+    store.notify(critical("battery", "low"), Instant::now());
+    store.notify(from("mail", "new mail"), Instant::now());
+    store.notify(
+        Incoming {
+            transient: true,
+            ..from("volume", "50%")
+        },
+        Instant::now(),
+    );
     let history = store.history();
     let groups: Vec<&str> = history.iter().map(|(name, _)| *name).collect();
     assert_eq!(groups, ["battery", "mail", "chat"], "transient left out");
@@ -145,22 +158,28 @@ fn the_history_puts_critical_groups_first_then_the_newest() {
 #[test]
 fn the_desktop_entry_groups_ahead_of_the_app_name() {
     let mut store = Store::default();
-    store.notify(Incoming {
-        desktop_entry: Some("firefox".to_owned()),
-        ..from("Firefox Nightly", "a")
-    });
-    store.notify(Incoming {
-        desktop_entry: Some("firefox".to_owned()),
-        ..from("Firefox", "b")
-    });
+    store.notify(
+        Incoming {
+            desktop_entry: Some("firefox".to_owned()),
+            ..from("Firefox Nightly", "a")
+        },
+        Instant::now(),
+    );
+    store.notify(
+        Incoming {
+            desktop_entry: Some("firefox".to_owned()),
+            ..from("Firefox", "b")
+        },
+        Instant::now(),
+    );
     assert_eq!(store.history().len(), 1);
 }
 
 #[test]
 fn clear_all_closes_everything() {
     let mut store = Store::default();
-    store.notify(from("a", "x"));
-    store.notify(from("b", "y"));
+    store.notify(from("a", "x"), Instant::now());
+    store.notify(from("b", "y"), Instant::now());
     assert_eq!(store.clear(), [1, 2]);
     assert!(store.history().is_empty());
 }
