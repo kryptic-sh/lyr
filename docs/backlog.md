@@ -116,9 +116,14 @@ implementation follows until they are answered. The ones that block a milestone:
   output a bar is on, else the low-power one, `CRCBL_ADAPTER` still overriding.
   lyr takes crcbl's own adapter order today (`Surface::open`, with
   `crcbl_app::adapter::pin` for the override), so it follows the rule without
-  code of its own once crcbl's order or a per-surface query applies it; pikr has
-  asked crcbl for that. On this Windows machine lyr drew on the discrete RX 7900
-  XTX. Check which adapter each bar gets once crcbl ships it.
+  code of its own: crcbl decided (2026-10-19, relayed by pikr) that a device
+  request takes a power preference; an explicit pick or `CRCBL_ADAPTER` wins, a
+  display driven by a discrete adapter uses it, and otherwise (a hybrid laptop's
+  iGPU panel, or an unknown display) the preference decides. crcbl-app's
+  `Presenter` defaults to low power, so lyr gets the rule by keeping that
+  default. It ships with crcbl's D3D12 start-up work, release not yet named. On
+  this Windows machine lyr drew on the discrete RX 7900 XTX. Check which adapter
+  each bar gets once crcbl ships it.
 - **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
   the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
   S8 – S27. pikr's session tracks the move in pikr's own backlog and
