@@ -25,6 +25,9 @@ and this project adheres to
   the bars. `lyr panel`, `lyr dnd` and `lyr clear` reach it over its control
   socket and report that they are not implemented yet. A second `lyr` exits when
   one is already running.
+- `lyr --stats` logs the bar's main-loop wake-ups, the events it applied and the
+  frames it presented on each output, once a minute, to check that an idle bar
+  stays idle.
 - The config file `~/.config/lyr/config.toml` (`-c` to choose another), layered
   over built-in defaults that reproduce the waybar setup lyr replaces, with
   `[platform.linux]`, `[platform.windows]` and `[platform.macos]` override

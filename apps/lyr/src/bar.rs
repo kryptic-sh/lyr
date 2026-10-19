@@ -27,6 +27,7 @@ use crate::control;
 use crate::input::{self, Pointer};
 use crate::modules::{self, Data};
 use crate::sources;
+use crate::stats::Stats;
 
 /// One bar window: its surface, its size, and what it drew last.
 struct Window {
@@ -86,8 +87,9 @@ fn close_all(
     Ok(())
 }
 
-/// Runs the bar until `lyr quit` stops it.
-pub fn run(config_path: Option<&Path>) -> anyhow::Result<()> {
+/// Runs the bar until `lyr quit` stops it, logging [`Stats`] once a minute
+/// when `log_stats` is set.
+pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
     let (mut config, _) =
         lyr_config::load(config_path, Platform::current()).context("loading the config")?;
     let mut shell = crcbl_shell::open().context("opening the window system")?;
@@ -110,6 +112,7 @@ pub fn run(config_path: Option<&Path>) -> anyhow::Result<()> {
     let mut hidden = false;
     // When the clock's text next changes, so every bar is redrawn then.
     let mut next_tick = Instant::now() + tick.until_next(&Local::now().fixed_offset());
+    let mut stats = Stats::new(Instant::now());
 
     loop {
         // A bar still to draw (a frame the swapchain swallowed) goes round
@@ -120,6 +123,10 @@ pub fn run(config_path: Option<&Path>) -> anyhow::Result<()> {
             next_tick.saturating_duration_since(Instant::now())
         };
         shell.wait_events(Some(wait));
+        stats.wakeups += 1;
+        if log_stats {
+            stats.log_if_due(Instant::now());
+        }
         if Instant::now() >= next_tick {
             next_tick = Instant::now() + tick.until_next(&Local::now().fixed_offset());
             windows.values_mut().for_each(|window| window.dirty = true);
@@ -190,10 +197,12 @@ pub fn run(config_path: Option<&Path>) -> anyhow::Result<()> {
         }
         while let Ok(update) = updates.try_recv() {
             data.apply(update);
+            stats.events += 1;
             windows.values_mut().for_each(|window| window.dirty = true);
         }
         let mut events = Vec::new();
         shell.pump(&mut |event| events.push(event));
+        stats.events += events.len() as u64;
         for event in &events {
             if !hidden {
                 bars.handle(shell.as_mut(), &config.bar, event)
@@ -289,6 +298,9 @@ pub fn run(config_path: Option<&Path>) -> anyhow::Result<()> {
             window.workspaces = drawn.workspaces;
             window.hovered = hovered;
             window.dirty = !presented;
+            if presented {
+                stats.presented(window.monitor.as_deref());
+            }
         }
     }
 }

@@ -39,7 +39,9 @@ differs per driver.
 
 ## Checking it
 
-`lyr --stats` (debug builds) logs, once a minute, the number of main-loop
-wakeups, events applied and presents per window. The idle test in M2's exit
+`lyr --stats` logs, once a minute, the number of main-loop wakeups, events
+applied (window-system events and source updates) and presents per output. It is
+in every build, since the idle test is about the build people run, and it logs
+on a wakeup the loop has anyway, so it adds none. The idle test in M2's exit
 check reads that line and requires one wakeup per minute (the clock) and no
 presents apart from the clock's.

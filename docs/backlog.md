@@ -127,9 +127,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   hands its `State` to the main loop), and a click on a button or, with
   `workspaces.scroll`, a wheel step sends the switch through the same task
   (`apps/lyr/src/input.rs`, `lyr_core::pointer`). Not run against a real
-  Hyprland. Still to build: `lyr --stats`. The `WorkspaceBackend` trait waits
-  for the Windows backend (M9). Hyprland main's changes for the next release are
-  in [plan/06](plan/06-workspaces.md#linux--hyprland).
+  Hyprland. `lyr --stats` logs the idle counts (`apps/lyr/src/stats.rs`); on
+  Windows an idle bar showed 3 wake-ups, 2 events and 2 presents over 86 s (the
+  start and one per clock minute). The idle test itself, on Hyprland with every
+  source running, has not been run. The `WorkspaceBackend` trait waits for the
+  Windows backend (M9). Hyprland main's changes for the next release are in
+  [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Render, rest of M1.** `lyr-render` has the GPU-free half: the bar font found
   with crcbl-font and given the system's fallback faces (`fonts::load`), text
   measured and drawn as one glyph run per face (`text::Text`), sRGB colours in

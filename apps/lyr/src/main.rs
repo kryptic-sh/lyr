@@ -11,6 +11,7 @@ mod input;
 mod log;
 mod modules;
 mod sources;
+mod stats;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -30,6 +31,10 @@ struct Cli {
     /// Config file to use instead of ~/.config/lyr/config.toml.
     #[arg(short = 'c', long = "config", value_name = "FILE")]
     config: Option<PathBuf>,
+
+    /// Log the bar's wake-ups, events and presents once a minute.
+    #[arg(long)]
+    stats: bool,
 
     #[command(subcommand)]
     command: Option<Command>,
@@ -95,7 +100,7 @@ fn main() -> ExitCode {
         if let Err(error) = log::init() {
             eprintln!("lyr: logging to stderr only: {error}");
         }
-        return match bar::run(cli.config.as_deref()) {
+        return match bar::run(cli.config.as_deref(), cli.stats) {
             Ok(()) => ExitCode::SUCCESS,
             Err(error) => {
                 tracing::error!("{error:#}");
@@ -133,6 +138,8 @@ mod cli_tests {
         let cli = Cli::parse_from(["lyr", "-c", "/tmp/lyr.toml"]);
         assert_eq!(cli.config, Some(PathBuf::from("/tmp/lyr.toml")));
         assert_eq!(cli.command, None);
+        assert!(!cli.stats);
+        assert!(Cli::parse_from(["lyr", "--stats"]).stats);
     }
 
     #[test]
