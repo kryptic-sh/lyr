@@ -117,8 +117,7 @@ impl Tooltips {
         let Some(rect) = anchor.regions.rect(&Target::Module(module)) else {
             return Ok(());
         };
-        let (list, size) =
-            draw::tooltip(&text, (look.measure)(&text), look.line_height, look.theme);
+        let (list, size) = draw::tooltip(&text, look.measure, look.line_height, look.theme);
         let window = shell.create_window(&WindowDesc {
             title: NAMESPACE,
             app_id: NAMESPACE,

@@ -201,7 +201,7 @@ fn a_crowded_module_falls_back_to_its_icon() {
 #[test]
 fn a_tooltip_pads_its_text_on_its_own_background() {
     let theme = theme();
-    let (list, size) = super::tooltip("Power Button", 120.0, 20.0, &theme);
+    let (list, size) = super::tooltip("Power Button", measure, 20.0, &theme);
     assert_eq!((size.width, size.height), (136.0, 36.0));
     assert_eq!(
         list.items,
@@ -229,4 +229,21 @@ fn a_tooltip_pads_its_text_on_its_own_background() {
             },
         ]
     );
+}
+
+#[test]
+fn a_tooltip_of_several_lines_is_as_wide_as_its_widest() {
+    let theme = theme();
+    let (list, size) = super::tooltip("80%\nDischarging, 2h left", measure, 20.0, &theme);
+    // "Discharging, 2h left" is 20 characters.
+    assert_eq!((size.width, size.height), (216.0, 56.0));
+    let lines: Vec<(&str, f32)> = list
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Text { text, rect, .. } => Some((text.as_str(), rect.y)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(lines, [("80%", 8.0), ("Discharging, 2h left", 28.0)]);
 }

@@ -258,41 +258,49 @@ pub fn build<T: Clone>(
 /// tooltip's box and its label by 4 px (`tooltip * { padding: 4px }`).
 pub const TOOLTIP_PADDING: f32 = 8.0;
 
-/// A tooltip showing `text`, `text_width` wide and `line_height` tall: its
-/// draw list and its size. Square and borderless, as waybar's
-/// `* { border: none; border-radius: 0 }` leaves GTK's tooltip.
+/// A tooltip showing `text`, one row per line, measured by `measure` in lines
+/// `line_height` tall: its draw list and its size. Square and borderless, as
+/// waybar's `* { border: none; border-radius: 0 }` leaves GTK's tooltip.
 #[must_use]
-pub fn tooltip(text: &str, text_width: f32, line_height: f32, theme: &Theme) -> (DrawList, Size) {
+pub fn tooltip(
+    text: &str,
+    measure: impl Fn(&str) -> f32,
+    line_height: f32,
+    theme: &Theme,
+) -> (DrawList, Size) {
+    let lines: Vec<&str> = text.lines().collect();
+    let text_width = lines.iter().map(|line| measure(line)).fold(0.0, f32::max);
     let size = Size {
         width: text_width + 2.0 * TOOLTIP_PADDING,
-        height: line_height + 2.0 * TOOLTIP_PADDING,
+        height: line_height * lines.len() as f32 + 2.0 * TOOLTIP_PADDING,
     };
-    let list = DrawList {
-        items: vec![
-            Item::Box {
-                rect: Rect {
-                    x: 0.0,
-                    y: 0.0,
-                    width: size.width,
-                    height: size.height,
-                },
-                radius: 0.0,
-                fill: theme.tooltip_background,
-                border: None,
-            },
-            Item::Text {
+    let mut items = vec![Item::Box {
+        rect: Rect {
+            x: 0.0,
+            y: 0.0,
+            width: size.width,
+            height: size.height,
+        },
+        radius: 0.0,
+        fill: theme.tooltip_background,
+        border: None,
+    }];
+    items.extend(
+        lines
+            .into_iter()
+            .enumerate()
+            .map(|(index, line)| Item::Text {
                 rect: Rect {
                     x: TOOLTIP_PADDING,
-                    y: TOOLTIP_PADDING,
+                    y: TOOLTIP_PADDING + line_height * index as f32,
                     width: text_width,
                     height: line_height,
                 },
-                text: text.to_owned(),
+                text: line.to_owned(),
                 colour: theme.tooltip_foreground,
-            },
-        ],
-    };
-    (list, size)
+            }),
+    );
+    (DrawList { items }, size)
 }
 
 /// A width and height in logical pixels.
