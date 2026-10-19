@@ -693,9 +693,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Post-MVP
 
-- **Window title module** (`hyprland/window`; the draft plan listed it, but
-  today's bar does not have it). Built on Hyprland's `activewindowv2` event.
 - **`lyr import-waybar`**: convert `config.jsonc` + `style.css` to TOML.
+- **Window title module: built, not run.** `window` (`lyr_core::window`, and
+  `lyr_wm::hyprland::State::active_window`) follows Hyprland's
+  `activewindow>>CLASS,TITLE` event, seeded at start from `j/activeworkspace`'s
+  `lastwindowtitle` (what waybar reads) and the client's class; `{title}` and
+  `{class}`, `max_length` cut with an ellipsis, the tooltip the text unless
+  `tooltip_format` is set. Not in the default layout. Tested and
+  mutation-checked against recorded lines, not against a running Hyprland.
+  waybar's `rewrite` rules, `separate-outputs` and app icon are not carried.
 - **sway and niri workspace backends**, and komorebi or GlazeWM on Windows.
 
 ## Not yet verified

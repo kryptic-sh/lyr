@@ -24,7 +24,7 @@ pub use format::{Format, InvalidFormat};
 pub use hjkl_config::{ConfigError, ConfigSource};
 pub use schema::{
     Bar, Battery, Bluetooth, Clock, Config, Icon, Item, Layer, Layout, Mic, Module, NamedIcons,
-    Network, Notifications, Position, PowerProfile, Theme, Volume, Workspaces,
+    Network, Notifications, Position, PowerProfile, Theme, Volume, Window, Workspaces,
 };
 
 /// The built-in config.
@@ -151,6 +151,7 @@ fn typed(mut merged: toml::Table) -> Result<Config, String> {
         volume: section(&mut merged, "volume")?,
         mic: section(&mut merged, "mic")?,
         notifications: section(&mut merged, "notifications")?,
+        window: section(&mut merged, "window")?,
         theme: section(&mut merged, "theme")?,
     };
     match merged.keys().next() {
@@ -251,6 +252,13 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
         ));
     }
     check_placeholders("workspaces.format", &config.workspaces.format, &["name"])?;
+    check_placeholders("window.format", &config.window.format, &["title", "class"])?;
+    if let Some(format) = &config.window.tooltip_format {
+        check_placeholders("window.tooltip_format", format, &["title", "class"])?;
+    }
+    if config.window.max_length == Some(0) {
+        return Err("window.max_length: must be more than 0".to_owned());
+    }
     let clock = &config.clock.format;
     if chrono::format::StrftimeItems::new(clock).any(|item| item == chrono::format::Item::Error) {
         return Err(format!("clock.format: `{clock}` is not a strftime format"));

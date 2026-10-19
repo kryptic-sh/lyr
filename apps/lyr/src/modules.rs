@@ -244,6 +244,12 @@ fn content(
             let shown = lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth);
             Some(label(shown.text, theme.foreground))
         }
+        #[cfg(target_os = "linux")]
+        Module::Window => {
+            let (class, title) = data.workspaces.as_ref()?.active_window()?;
+            let shown = lyr_core::window::view(class, title, &config.window)?;
+            Some(label(shown.text, theme.foreground))
+        }
         Module::Tray => {
             // A letter stands in for each icon until lyr draws images.
             let buttons: Vec<draw::Button> = data
@@ -330,6 +336,11 @@ pub fn tooltip(
         ),
         #[cfg(target_os = "linux")]
         Module::Network => Some(data.network.as_ref()?.view(&config.network).tooltip),
+        #[cfg(target_os = "linux")]
+        Module::Window => {
+            let (class, title) = data.workspaces.as_ref()?.active_window()?;
+            Some(lyr_core::window::view(class, title, &config.window)?.tooltip)
+        }
         #[cfg(target_os = "linux")]
         Module::Bluetooth => {
             Some(lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth).tooltip)

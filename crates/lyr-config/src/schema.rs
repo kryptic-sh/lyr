@@ -28,6 +28,7 @@ pub struct Config {
     pub volume: Volume,
     pub mic: Mic,
     pub notifications: Notifications,
+    pub window: Window,
     pub theme: Theme,
 }
 
@@ -114,11 +115,12 @@ pub enum Module {
     Mic,
     Clock,
     Notifications,
+    Window,
 }
 
 impl Module {
     /// Every module, for error messages that list what a name could be.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Power,
         Self::Battery,
         Self::PowerProfile,
@@ -130,6 +132,7 @@ impl Module {
         Self::Mic,
         Self::Clock,
         Self::Notifications,
+        Self::Window,
     ];
 
     /// The name a zone uses for this module.
@@ -147,6 +150,7 @@ impl Module {
             Self::Mic => "mic",
             Self::Clock => "clock",
             Self::Notifications => "notifications",
+            Self::Window => "window",
         }
     }
 
@@ -167,6 +171,26 @@ pub struct Workspaces {
     pub format: Format,
     /// Scrolling over the module steps to the next or previous workspace.
     pub scroll: bool,
+}
+
+/// The focused window's title (waybar's `hyprland/window`, post-MVP in the
+/// backlog). Not in the default layout, as today's bar has none.
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Window {
+    /// `{title}` and `{class}`.
+    pub format: Format,
+    /// The same placeholders; unset, the tooltip is the module's text, as
+    /// waybar's is.
+    #[serde(default)]
+    pub tooltip_format: Option<Format>,
+    /// The most characters shown, the rest cut with an ellipsis (waybar's
+    /// `max-length`). Unset shows the whole title.
+    #[serde(default)]
+    pub max_length: Option<u32>,
+    /// What a click or a scroll does.
+    #[serde(default)]
+    pub on: On,
 }
 
 /// The power button (`docs/plan/07-modules.md#power-button`).

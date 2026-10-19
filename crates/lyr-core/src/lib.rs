@@ -39,3 +39,4 @@ pub mod toast;
 pub mod tooltip;
 pub mod tray;
 pub mod wifi_menu;
+pub mod window;

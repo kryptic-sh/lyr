@@ -45,6 +45,10 @@ pub enum Event {
     CloseWindow { window: String },
     /// `urgent>>ADDRESS`: a window asked for attention.
     Urgent { window: String },
+    /// `activewindow>>CLASS,TITLE`: the focused window, or its title, changed.
+    /// The title is everything after the first comma; both are empty when no
+    /// window has focus.
+    ActiveWindow { class: String, title: String },
 }
 
 /// An event line lyr acts on that does not have the shape its event's
@@ -117,6 +121,12 @@ pub fn parse_line(line: &str) -> Result<Option<Event>, ParseError> {
         "urgent" => Some(Event::Urgent {
             window: data.to_owned(),
         }),
+        "activewindow" => data
+            .split_once(',')
+            .map(|(class, title)| Event::ActiveWindow {
+                class: class.to_owned(),
+                title: title.to_owned(),
+            }),
         _ => return Ok(None),
     };
     parsed.map(Some).ok_or_else(|| ParseError::Malformed {
@@ -232,8 +242,28 @@ mod tests {
     }
 
     #[test]
+    fn the_active_window_s_title_is_after_the_first_comma() {
+        assert_eq!(
+            parse_line("activewindow>>kitty,~/src: vim, a,b"),
+            Ok(Some(Event::ActiveWindow {
+                class: "kitty".into(),
+                title: "~/src: vim, a,b".into(),
+            }))
+        );
+        assert_eq!(
+            parse_line("activewindow>>,"),
+            Ok(Some(Event::ActiveWindow {
+                class: String::new(),
+                title: String::new(),
+            })),
+            "no window"
+        );
+    }
+
+    #[test]
     fn a_known_event_with_bad_data_is_an_error() {
         for line in [
+            "activewindow>>kitty",
             "workspacev2>>three,3",
             "workspacev2>>3",
             "focusedmonv2>>DP-1",

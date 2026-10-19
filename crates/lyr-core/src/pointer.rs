@@ -88,6 +88,7 @@ const fn bindings(module: Module, config: &Config) -> Option<&On> {
         Module::Mic => &config.mic.on,
         Module::Clock => &config.clock.on,
         Module::Notifications => &config.notifications.on,
+        Module::Window => &config.window.on,
         Module::Workspaces | Module::Tray => return None,
     })
 }

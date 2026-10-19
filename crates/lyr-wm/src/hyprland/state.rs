@@ -39,17 +39,21 @@ pub struct State {
     /// Window address to workspace, so an `urgent` event, which names only a
     /// window, can mark the workspace it is on.
     windows: HashMap<String, WorkspaceId>,
+    /// The focused window's class and title.
+    window: Option<(String, String)>,
 }
 
 impl State {
     /// A state as the initial-state query found it: the workspaces, the one
-    /// active on the focused monitor, and which window is on which workspace.
+    /// active on the focused monitor, which window is on which workspace, and
+    /// the focused window's class and title.
     /// Special workspaces are left out, as [`State::apply`] leaves them out.
     #[cfg(unix)]
     pub(super) fn seeded(
         workspaces: impl IntoIterator<Item = Workspace>,
         active: Option<(WorkspaceId, String)>,
         windows: impl IntoIterator<Item = (String, WorkspaceId)>,
+        window: Option<(String, String)>,
     ) -> Self {
         let (active, focused_monitor) = active.unzip();
         Self {
@@ -61,7 +65,16 @@ impl State {
             active,
             focused_monitor,
             windows: windows.into_iter().collect(),
+            window,
         }
+    }
+
+    /// The focused window's class and title, while a window has focus.
+    #[must_use]
+    pub fn active_window(&self) -> Option<(&str, &str)> {
+        self.window
+            .as_ref()
+            .map(|(class, title)| (class.as_str(), title.as_str()))
     }
 
     /// The workspaces in id order, special workspaces left out.
@@ -152,6 +165,12 @@ impl State {
             Event::CloseWindow { window } => {
                 self.windows.remove(&window);
                 false
+            }
+            Event::ActiveWindow { class, title } => {
+                let window = (!class.is_empty() || !title.is_empty()).then_some((class, title));
+                let changed = window != self.window;
+                self.window = window;
+                changed
             }
             Event::Urgent { window } => {
                 let Some(&id) = self.windows.get(&window) else {
@@ -388,5 +407,26 @@ mod tests {
             ],
         );
         assert_eq!(feed(&mut state, &["urgent>>aa"]), [false]);
+    }
+
+    #[test]
+    fn the_focused_window_follows_its_events() {
+        let mut state = State::default();
+        assert_eq!(state.active_window(), None);
+        assert_eq!(
+            feed(
+                &mut state,
+                &[
+                    "activewindow>>kitty,vim",
+                    "activewindow>>kitty,vim",
+                    "activewindow>>kitty,vim: lyr",
+                ]
+            ),
+            [true, false, true],
+            "a title change redraws, the same one does not"
+        );
+        assert_eq!(state.active_window(), Some(("kitty", "vim: lyr")));
+        assert_eq!(feed(&mut state, &["activewindow>>,"]), [true]);
+        assert_eq!(state.active_window(), None, "no window focused");
     }
 }

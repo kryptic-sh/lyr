@@ -51,6 +51,9 @@ and this project adheres to
   asks Hyprland to exit; on Windows and macOS the entries are not built yet.
   `[power.menu]` sets an entry to a command instead
   (`lock = { exec = "hyprlock" }`).
+- A `window` module, not in the default layout: the focused window's title on
+  Hyprland, as waybar's `hyprland/window` shows it, with `{title}` and `{class}`
+  placeholders and `max_length`.
 - On Linux, the tray: lyr hosts StatusNotifierItems (Steam, Teams and the like),
   and serves `org.kde.StatusNotifierWatcher` when nothing else does. Each item
   shows as a button with its title's first letter until lyr draws icons, passive

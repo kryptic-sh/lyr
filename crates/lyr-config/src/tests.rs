@@ -334,3 +334,24 @@ fn a_power_menu_entry_can_be_a_command() {
         .is_err()
     );
 }
+
+#[test]
+fn the_window_module_takes_title_class_and_a_positive_length() {
+    let config = user(
+        "[window]\nformat = \"{class}: {title}\"\ntooltip_format = \"{title}\"\nmax_length = 40\n",
+        Platform::Linux,
+    )
+    .expect("valid");
+    assert_eq!(config.window.max_length, Some(40));
+    for (text, key) in [
+        ("[window]\nformat = \"{app}\"\n", "window.format: "),
+        (
+            "[window]\ntooltip_format = \"{app}\"\n",
+            "window.tooltip_format: ",
+        ),
+        ("[window]\nmax_length = 0\n", "window.max_length: "),
+    ] {
+        let message = invalid(user(text, Platform::Linux));
+        assert!(message.starts_with(key), "{text:?}: {message}");
+    }
+}

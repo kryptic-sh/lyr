@@ -20,12 +20,20 @@ struct WorkspaceReply {
 struct ActiveReply {
     id: WorkspaceId,
     monitor: String,
+    /// The workspace's focused window and its title, what waybar's
+    /// `hyprland/window` shows; `0x0` and empty with no window.
+    #[serde(default)]
+    lastwindow: String,
+    #[serde(default)]
+    lastwindowtitle: String,
 }
 
 #[derive(Deserialize)]
 struct ClientReply {
     address: String,
     workspace: ClientWorkspace,
+    #[serde(default)]
+    class: String,
 }
 
 #[derive(Deserialize)]
@@ -41,6 +49,16 @@ pub(super) fn parse(workspaces: &str, active: &str, clients: &str) -> serde_json
     let workspaces: Vec<WorkspaceReply> = serde_json::from_str(workspaces)?;
     let active: ActiveReply = serde_json::from_str(active)?;
     let clients: Vec<ClientReply> = serde_json::from_str(clients)?;
+    // The focused window: its title from the active workspace, its class
+    // from the client at that address.
+    let window = (!active.lastwindowtitle.is_empty()).then(|| {
+        let class = clients
+            .iter()
+            .find(|client| client.address == active.lastwindow)
+            .map(|client| client.class.clone())
+            .unwrap_or_default();
+        (class, active.lastwindowtitle.clone())
+    });
     Ok(State::seeded(
         workspaces.into_iter().map(|workspace| Workspace {
             id: workspace.id,
@@ -58,6 +76,7 @@ pub(super) fn parse(workspaces: &str, active: &str, clients: &str) -> serde_json
                 .map_or_else(|| client.address.clone(), str::to_owned);
             (address, client.workspace.id)
         }),
+        window,
     ))
 }
 
@@ -106,6 +125,11 @@ mod tests {
             ]
         );
         assert_eq!(state.active(), Some(1));
+        assert_eq!(
+            state.active_window(),
+            Some(("kitty", "kitty")),
+            "the active workspace's last window, its class from the clients"
+        );
 
         // The client's `0x…` address matches the bare hex an event carries.
         assert!(state.apply(Event::Urgent {
