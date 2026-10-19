@@ -94,6 +94,19 @@ fn with_no_estimate_the_tooltip_names_the_status() {
 }
 
 #[test]
+fn no_power_reading_is_zero_watts_as_in_waybar() {
+    let tooltip = view(
+        &Reading {
+            power: None,
+            ..reading(80, Status::Discharging, TimeTo::Unknown)
+        },
+        &defaults(),
+    )
+    .tooltip;
+    assert_eq!(tooltip, "80% 0W Discharging");
+}
+
+#[test]
 fn an_estimate_under_a_minute_has_an_empty_time_as_in_waybar() {
     let tooltip = view(
         &reading(80, Status::Discharging, TimeTo::Empty(0.001)),
@@ -101,11 +114,4 @@ fn an_estimate_under_a_minute_has_an_empty_time_as_in_waybar() {
     )
     .tooltip;
     assert_eq!(tooltip, "80% 7.5W Empty in ");
-}
-
-#[test]
-fn an_unknown_power_draw_is_left_blank() {
-    let mut no_power = reading(80, Status::Discharging, TimeTo::Unknown);
-    no_power.power = None;
-    assert_eq!(view(&no_power, &defaults()).tooltip, "80% W Discharging");
 }

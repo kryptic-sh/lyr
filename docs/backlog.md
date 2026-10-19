@@ -283,10 +283,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   last draw shows on the next tick instead. Text is cut at its rect's edges
   (`lyr_render::translate` clips each text item), so a label wider than its box
   no longer runs over its neighbours. Not built: images (tray, M8). A format
-  cannot drop the literal text around an empty placeholder, so a battery with no
-  power reading shows `80% W Discharging`. Measuring text (the widths `layout`
-  takes) needs crcbl-ui's font atlas, so it is done by the caller in
-  `lyr-render`.
+  cannot drop the literal text around an empty placeholder; the one case that
+  came up, a battery with no power reading, now shows 0 W as waybar 0.15.0 does
+  (`total_power / 1e6`), and UPower always reports a rate. Measuring text (the
+  widths `layout` takes) needs crcbl-ui's font atlas, so it is done by the
+  caller in `lyr-render`.
 - **Notification daemon, M6.** Built: the store (`lyr_core::notifications`): ids
   from 1 that skip 0 and held ids, `replaces_id` kept as the id and replacing in
   place (even for an id lyr does not hold, as the spec says), swaync's timeouts

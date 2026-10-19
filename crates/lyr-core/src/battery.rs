@@ -50,7 +50,8 @@ pub struct Reading {
     /// 0 – 100.
     pub capacity: u8,
     pub status: Status,
-    /// Watts, when the platform reports the draw.
+    /// Watts, when the platform reports the draw; shown as 0 when it does
+    /// not, as waybar shows it.
     pub power: Option<f32>,
     pub time_to: TimeTo,
 }
@@ -91,10 +92,8 @@ pub fn view(reading: &Reading, config: &Config) -> View {
 
     let icon = ramp(&config.icons, u32::from(reading.capacity), 100).map_or("", String::as_str);
     let capacity = reading.capacity.to_string();
-    let power = reading
-        .power
-        .map(|watts| watts.to_string())
-        .unwrap_or_default();
+    // waybar's power is the batteries' total draw, 0 when none reports one.
+    let power = reading.power.unwrap_or(0.0).to_string();
     let time = match reading.time_to {
         TimeTo::Empty(hours) | TimeTo::Full(hours) => hours_and_minutes(hours),
         TimeTo::Unknown => String::new(),
