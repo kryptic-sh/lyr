@@ -251,6 +251,10 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
         ));
     }
     check_placeholders("workspaces.format", &config.workspaces.format, &["name"])?;
+    let clock = &config.clock.format;
+    if chrono::format::StrftimeItems::new(clock).any(|item| item == chrono::format::Item::Error) {
+        return Err(format!("clock.format: `{clock}` is not a strftime format"));
+    }
     let battery = &config.battery;
     let bar_formats = [
         ("battery.format", Some(&battery.format)),

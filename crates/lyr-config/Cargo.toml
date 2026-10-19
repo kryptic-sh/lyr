@@ -11,6 +11,7 @@ authors.workspace = true
 readme.workspace = true
 
 [dependencies]
+chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 hjkl-config = "0.42.2"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_path_to_error = "0.1.20"

@@ -282,3 +282,10 @@ fn an_empty_command_and_an_unknown_action_are_errors() {
     ));
     assert!(message.starts_with("clock.on.click: "), "{message}");
 }
+
+#[test]
+fn a_bad_clock_format_is_an_error() {
+    let message = invalid(user("[clock]\nformat = \"%H:%Q\"\n", Platform::Linux));
+    assert_eq!(message, "clock.format: `%H:%Q` is not a strftime format");
+    assert!(user("[clock]\nformat = \"%H:%M:%S\"\n", Platform::Linux).is_ok());
+}

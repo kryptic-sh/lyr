@@ -198,9 +198,11 @@ muted, and unmuting output restores that state.
 
 - Format `{:%Y/%m/%d %H:%M}`, exactly the current one. The finest unit is a
   **minute**, so the timer fires once a minute, aligned to the minute boundary.
-  The draft plan's 1 Hz timer was 59 wasted wakeups a minute. A format with `%S`
-  switches it to 1 Hz. The timer interval is derived from the format, not
-  configured separately.
+  The draft plan's 1 Hz timer was 59 wasted wakeups a minute. A format that
+  shows seconds or finer (`%S`, and `%T`, `%X`, `%c`, `%r`, `%s`, `%+` or a
+  fraction, which include them) switches it to 1 Hz. The timer interval is
+  derived from the format, not configured separately (`lyr_core::clock::Tick`),
+  and the format is chrono's strftime, checked when the config loads.
 - Click opens the clock panel ([10](10-popups-and-menus.md#clock-panel)): the
   calendar on top and the notification centre below. Waybar showed the calendar
   as the clock's tooltip and used clicks and scroll to change its mode and

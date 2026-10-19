@@ -282,7 +282,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   sizes waybar's boxes exactly so, and centres a label in a box held open by
   `min-width`, is from the CSS model and GTK's label default, not checked
   against a running waybar. Not built: the modules' actions (click, scroll;
-  M3/M4), the clock view (`chrono`, approved 2026-10-18), images (tray, M8), and
+  M3/M4), the clock's source (the system zone's name, from `timedate1` on Linux;
+  the view, `clock::view`, and its tick are built), images (tray, M8), and
   clipping text that overflows a box. A format cannot drop the literal text
   around an empty placeholder, so a battery with no power reading shows
   `80% W Discharging`. Measuring text (the widths `layout` takes) needs
