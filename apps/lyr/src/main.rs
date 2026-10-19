@@ -10,6 +10,7 @@ mod clock_panel;
 mod control;
 mod exec;
 mod input;
+mod list_popup;
 mod log;
 mod menu_panel;
 mod modules;

@@ -26,6 +26,7 @@ pub mod draw;
 pub mod hit;
 pub mod icon;
 pub mod layout;
+pub mod list_menu;
 pub mod markup;
 pub mod media;
 pub mod menu;

@@ -20,7 +20,8 @@ use crate::bluetooth_menu::Outcome as BluetoothOutcome;
 use crate::clock_panel::{Contents, Outcome as ClockOutcome};
 use crate::control;
 use crate::input::{self, Pointer};
-use crate::power_menu::{Outcome, PowerMenu};
+use crate::list_popup::Outcome;
+use crate::power_menu::PowerMenu;
 use crate::toasts::Clicked;
 use crate::tooltips::{Look, Tooltips};
 
@@ -222,7 +223,7 @@ impl App {
                             id,
                             anchor,
                             self.config.bar.position,
-                            power_menu::entries(Platform::current()),
+                            power_menu::rows(&power_menu::entries(Platform::current())),
                             &look,
                         )
                         .context("opening the power menu")?;
