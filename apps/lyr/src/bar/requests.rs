@@ -73,10 +73,18 @@ impl App {
                     Err(why) => incoming.reply(format!("error: {why}")),
                 }
             }
+            // Windows has no audio menu yet: its Settings page stands in.
+            #[cfg(windows)]
+            Request::Panel(Panel::Audio) => {
+                crate::settings::open(crate::settings::Page::Sound);
+                incoming.reply(control::OK);
+            }
             request @ (Request::Dnd | Request::Clear) => {
                 let reply = self.notifications(request);
                 incoming.reply(reply);
             }
+            // The audio menu, which Windows' Settings stands in for there.
+            #[cfg(not(windows))]
             other => {
                 incoming.reply(format!("error: `{other}` is not implemented yet"));
             }

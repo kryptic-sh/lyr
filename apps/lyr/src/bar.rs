@@ -310,7 +310,7 @@ impl App {
 
     /// Opens the Bluetooth menu `left` from the output's left edge, or
     /// closes it if it is open. Returns why it did not open: there is no
-    /// adapter.
+    /// adapter. Windows opens its Bluetooth Settings page instead.
     fn toggle_bluetooth_menu(
         &mut self,
         shell: &mut dyn Shell,
@@ -321,6 +321,13 @@ impl App {
             return Ok(Ok(()));
         }
         let Some(adapter) = &self.data.bluetooth_adapter else {
+            // Windows has no Bluetooth menu yet: its Settings page stands in.
+            #[cfg(windows)]
+            {
+                crate::settings::open(crate::settings::Page::Bluetooth);
+                return Ok(Ok(()));
+            }
+            #[cfg(not(windows))]
             return Ok(Err("there is no Bluetooth adapter"));
         };
         let look = Look {

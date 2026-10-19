@@ -440,8 +440,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (2026-10-20): the bar showed the output at 40 % and the input at 100 %. The
   mute and volume clicks have not been run (they change this machine's real
   volume), and a Bluetooth endpoint is not told apart (`Sink::bluetooth` is
-  false). Not built: the other Windows sources (Bluetooth, workspaces) and
-  menus.
+  false). The Wi-Fi, Bluetooth and audio menus open Windows' Settings pages in
+  their place (`apps/lyr/src/settings.rs`, `ms-settings:network`, `:bluetooth`,
+  `:sound` through `cmd /C start`), from their bindings and from `lyr panel`;
+  run on Windows (2026-10-20), `lyr panel audio` and `lyr panel bluetooth`
+  brought up a Settings window, though which page it showed was not seen (it
+  opened behind the terminal). Not built: the other Windows sources (Bluetooth,
+  workspaces) and the native menus plan 10 names; macOS's
+  `x-apple.systempreferences:` fallbacks wait on M10.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace

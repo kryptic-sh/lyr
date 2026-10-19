@@ -13,7 +13,8 @@ use crate::wifi_menu::{DOUBLE_CLICK, Outcome, WifiMenu};
 impl App {
     /// Opens the Wi-Fi menu `left` from the output's left edge at `now`, or
     /// closes it if it is open, unless it opened a double click's interval
-    /// ago. Returns why it did not open: there is no Wi-Fi device.
+    /// ago. Returns why it did not open: there is no Wi-Fi device. Windows
+    /// opens its network Settings page instead.
     pub(super) fn toggle_wifi_menu(
         &mut self,
         shell: &mut dyn Shell,
@@ -31,6 +32,13 @@ impl App {
             return Ok(Ok(()));
         }
         let Some(wifi) = self.data.wifi.as_ref().filter(|wifi| wifi.device.is_some()) else {
+            // Windows has no Wi-Fi menu yet: its Settings page stands in.
+            #[cfg(windows)]
+            {
+                crate::settings::open(crate::settings::Page::Network);
+                return Ok(Ok(()));
+            }
+            #[cfg(not(windows))]
             return Ok(Err("there is no Wi-Fi device"));
         };
         // A rescan on every open, so the list is current.

@@ -167,6 +167,11 @@ pub fn act(
                 _ => commands.step_volume(input, -step),
             }
         }
+        // Windows has no audio menu yet: its Settings page stands in.
+        #[cfg(windows)]
+        Action::Builtin(Builtin::OpenAudioMenu) => {
+            crate::settings::open(crate::settings::Page::Sound);
+        }
         Action::Builtin(builtin) => {
             tracing::warn!("`{}` is not implemented yet", builtin.name());
         }

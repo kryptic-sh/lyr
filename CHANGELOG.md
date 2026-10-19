@@ -18,6 +18,8 @@ and this project adheres to
   its address and, on Wi-Fi, the network's name and signal), Bluetooth (from
   BlueZ, with a connected device's battery) and the Hyprland workspaces. The
   other modules are not drawn yet.
+- On Windows the Wi-Fi, Bluetooth and audio menus open the matching Settings
+  page, from their bindings and from `lyr panel`.
 - On Windows the volume and mic modules show the default output and input, their
   level and mute, updated as they change, and their click and scroll bindings
   mute and step them.
