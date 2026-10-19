@@ -22,6 +22,14 @@ impl FakeAdapter {
     fn powered(&self) -> bool {
         true
     }
+    #[zbus(property)]
+    fn discovering(&self) -> bool {
+        true
+    }
+    #[zbus(property)]
+    fn pairable(&self) -> bool {
+        true
+    }
 }
 
 /// A stand-in for one paired device.
@@ -42,6 +50,10 @@ impl FakeDevice {
     #[zbus(property)]
     fn connected(&self) -> bool {
         self.connected
+    }
+    #[zbus(property)]
+    fn paired(&self) -> bool {
+        true
     }
 }
 
@@ -262,4 +274,22 @@ async fn the_menu_s_actions_reach_the_adapter_and_the_device() {
             &format!("RemoveDevice({DEVICE_PATH})"),
         ]
     );
+}
+
+#[tokio::test]
+async fn the_menu_s_state_is_read_with_the_rest() {
+    let (_server, client) = fake_bluez().await;
+    let bluez = BlueZ::on(&client).await.expect("bluez");
+    let (adapter, devices) = bluez.read().await.expect("read");
+    let adapter = adapter.expect("an adapter");
+    assert_eq!(adapter.path, ADAPTER_PATH);
+    assert_eq!(
+        (adapter.discoverable, adapter.pairable, adapter.discovering),
+        (false, true, true),
+        "an unsent property is off"
+    );
+    let [device] = &devices[..] else {
+        panic!("one device: {devices:?}");
+    };
+    assert_eq!((device.paired, device.trusted), (true, false));
 }

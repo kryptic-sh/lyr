@@ -230,6 +230,9 @@ fn parse(objects: &ManagedObjects) -> (Option<Adapter>, Vec<Device>) {
             adapter = Some(Adapter {
                 path: path.to_string(),
                 powered: flag(ADAPTER, "Powered").unwrap_or(false),
+                discoverable: flag(ADAPTER, "Discoverable").unwrap_or(false),
+                pairable: flag(ADAPTER, "Pairable").unwrap_or(false),
+                discovering: flag(ADAPTER, "Discovering").unwrap_or(false),
                 power_state: text(ADAPTER, "PowerState"),
             });
         }
@@ -238,6 +241,8 @@ fn parse(objects: &ManagedObjects) -> (Option<Adapter>, Vec<Device>) {
                 path: path.to_string(),
                 alias: text(DEVICE, "Alias").unwrap_or_default(),
                 connected: flag(DEVICE, "Connected").unwrap_or(false),
+                paired: flag(DEVICE, "Paired").unwrap_or(false),
+                trusted: flag(DEVICE, "Trusted").unwrap_or(false),
                 battery: property(BATTERY, "Percentage").and_then(|value| u8::try_from(value).ok()),
             });
         }

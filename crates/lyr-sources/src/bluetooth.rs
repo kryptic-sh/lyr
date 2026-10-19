@@ -15,6 +15,10 @@ pub struct Adapter {
     /// Its object path, which identifies it.
     pub path: String,
     pub powered: bool,
+    /// The menu's switches, and whether a scan is running.
+    pub discoverable: bool,
+    pub pairable: bool,
+    pub discovering: bool,
     /// `PowerState`, which BlueZ marks experimental and may not send;
     /// `off-blocked` is an rfkill block.
     pub power_state: Option<String>,
@@ -28,6 +32,9 @@ pub struct Device {
     pub path: String,
     pub alias: String,
     pub connected: bool,
+    /// Paired with this machine; a device a scan found is not.
+    pub paired: bool,
+    pub trusted: bool,
     pub battery: Option<u8>,
 }
 
@@ -107,6 +114,9 @@ mod tests {
         Adapter {
             path: "/org/bluez/hci0".to_owned(),
             powered,
+            discoverable: false,
+            pairable: false,
+            discovering: false,
             power_state: None,
         }
     }
@@ -116,6 +126,8 @@ mod tests {
             path: path.to_owned(),
             alias: path.trim_start_matches("/org/bluez/hci0/").to_owned(),
             connected,
+            paired: true,
+            trusted: false,
             battery: None,
         }
     }
@@ -144,6 +156,9 @@ mod tests {
         let blocked = Adapter {
             path: "/org/bluez/hci0".to_owned(),
             powered: false,
+            discoverable: false,
+            pairable: false,
+            discovering: false,
             power_state: Some("off-blocked".to_owned()),
         };
         assert_eq!(state(blocked, &[]), Some(State::Disabled));
