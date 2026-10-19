@@ -169,10 +169,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors
   come and go and as the config changes, tested against crcbl-shell's
-  `HeadlessShell` and mutation-checked. Not built: drawing into them (waits on
-  `crcbl-app`), scale changes, pointer input to hit tests, and a run on a real
-  compositor (the owner's Hyprland is the M1 check; this machine is Windows,
-  where the same panels are Win32 appbars).
+  `HeadlessShell` and mutation-checked. The main loop draws into them through
+  crcbl-app (`lyr_render::surface::Surface`), follows resizes and scale changes,
+  and hands pointer events to the hit tests (`apps/lyr/src/bar.rs`). Not done: a
+  run on a real compositor (the owner's Hyprland is the M1 check; this machine
+  is Windows, where the same panels are Win32 appbars, and has run there), and a
+  scale change seen on a real output.
 - **Core, rest of M1.** `lyr-core` has the zone layout (`layout::layout`, tested
   and mutation-checked). Icon ramps are `icon::ramp`, transcribing waybar
   0.15.0's `ALabel::getIcon` and tested against its integer steps. Hit testing
@@ -189,13 +191,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   bounds the content; padding and the 2 px border sit outside it). That GTK3
   sizes waybar's boxes exactly so, and centres a label in a box held open by
   `min-width`, is from the CSS model and GTK's label default, not checked
-  against a running waybar. Not built: the modules' actions (click, scroll;
-  M3/M4), the clock's source (the system zone's name, from `timedate1` on Linux;
-  the view, `clock::view`, and its tick are built), images (tray, M8), and
-  clipping text that overflows a box. A format cannot drop the literal text
-  around an empty placeholder, so a battery with no power reading shows
-  `80% W Discharging`. Measuring text (the widths `layout` takes) needs
-  crcbl-ui's font atlas, so it is done by the caller in `lyr-render`.
+  against a running waybar. The click and scroll actions are resolved by
+  `pointer::action` (see "Pointer input"). Not built: the clock's source (the
+  system zone's name, from `timedate1` on Linux; the view, `clock::view`, and
+  its tick are built), images (tray, M8), and clipping text that overflows a
+  box. A format cannot drop the literal text around an empty placeholder, so a
+  battery with no power reading shows `80% W Discharging`. Measuring text (the
+  widths `layout` takes) needs crcbl-ui's font atlas, so it is done by the
+  caller in `lyr-render`.
 - **Notification daemon, M6.** Built: the store (`lyr_core::notifications`): ids
   from 1 that skip 0 and held ids, `replaces_id` kept as the id and replacing in
   place (even for an id lyr does not hold, as the spec says), swaync's timeouts
@@ -257,17 +260,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   back). The other requests answer "not implemented yet": `panel` (M5), `dnd`
   and `clear` (M6). Not built: `lyr event workspace` for AeroSpace (M10).
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
-  `[layout]`, `[workspaces]`, `[clock]` and `[theme]`, the embedded defaults,
-  `[platform.*]` layering on both the defaults and the user file, and validation
-  that names the key (unknown keys and modules, modules the platform cannot run,
-  colours, ranges, workspace format placeholders), with tests that were each
-  broken and seen to fail. The `[<module>.on]` action bindings (`actions.rs`)
-  are built and checked against the module they are bound in. Not built: running
-  them (the main loop), the tray's table (M8), checking the clock's strftime
-  format, the file watcher that reloads on save (it needs a crate such as
-  `notify`, new to lyr, so the owner's call), a finer diff (a reload redraws
-  everything, and recreates the bars only when `[bar]` changed), the control
-  socket (its own entry above), the README's schema docs, and the
+  `[layout]`, `[workspaces]`, `[clock]`, `[theme]` and every module's table, the
+  embedded defaults, `[platform.*]` layering on both the defaults and the user
+  file, and validation that names the key (unknown keys and modules, modules the
+  platform cannot run, colours, ranges, format placeholders, the clock's
+  strftime format), with tests that were each broken and seen to fail. The
+  `[<module>.on]` action bindings (`actions.rs`) are checked against the module
+  they are bound in, and the main loop runs them (see "Pointer input"). Not
+  built: the tray's table (M8), the file watcher that reloads on save (it needs
+  a crate such as `notify`, new to lyr, so the owner's call), a finer diff (a
+  reload redraws everything, and recreates the bars only when `[bar]` changed),
+  the control socket (its own entry above), the README's schema docs, and the
   defaults-parity test against `config.jsonc`. The dotfiles are at
   `~/Projects/mxaddict/dotfiles` on the owner's Windows machine, not next to
   lyr, and not on CI, so the test needs either a path from the environment or a
