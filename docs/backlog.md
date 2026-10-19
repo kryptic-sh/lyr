@@ -3,37 +3,73 @@
 Work raised and not finished, decisions still open, and gaps in what has been
 verified. Delete an entry when it ships; `git log` keeps the history.
 
-## Decisions awaiting the owner
+## Deferred: questions for the owner
 
-The provisional decisions in
+Each item below waits on a decision that is the owner's to make, and is deferred
+until it is answered. The question comes first, then the options and what each
+costs. The provisional decisions in
 [plan/16-open-questions.md](plan/16-open-questions.md) are the defaults the
-implementation follows until they are answered. The ones that block a milestone:
+implementation follows meanwhile.
 
-- **New dependencies** `libpulse-binding` blocks M4's audio sources. An
-  rtnetlink crate (`rtnetlink` or `neli`) is now needed only for the network
-  module on a machine without NetworkManager (plan 07's fallback), since the
-  network source reads NetworkManager over zbus; whether to build that fallback
-  at all is part of the same question.
-- **The calendar's first weekday and names from the system locale** (M5) need
-  `libc` on Linux (`nl_langinfo` with `_NL_TIME_FIRST_WEEKDAY`, as waybar reads
-  it) and `windows-sys` on Windows (`GetLocaleInfoEx` with
-  `LOCALE_IFIRSTDAYOFWEEK`); lyr depends on neither directly. The alternative
-  without them is a `clock.first_weekday` config key defaulting to Monday, with
-  English names, which a Sunday-first locale would have to set by hand.
-- **Images: taking on `crcbl-image`** (M6, M8). A toast's `app_icon`,
-  `image-data` and `image-path`, a player's art and the tray all wait on
-  decoding images; crcbl-ui 0.5.0 can already draw them (its image atlas, the
-  draw list's `image` quads). The cross-repo entry below plans `crcbl-image`
-  "with M6", but adding a dependency is the owner's call, so it is not taken
-  yet. With it, `icon-static` can be advertised once the toast draws icons.
-- **Bluetooth favourites need somewhere to live** (M7). bluetui (master
-  `ff92b24`, `src/favorite.rs`, read 2026-10-19) keeps them as device addresses
-  in `favorites.txt` under its data directory, sorts favourites first among
-  paired devices, and marks them. lyr writes no state today. The options: a file
-  lyr writes (`~/.local/share/lyr/`, bluetui's way; the menu toggles it), or a
-  `bluetooth.favourites` list of addresses in `config.toml` (declarative, but
-  lyr never writes the config, so the menu could not toggle it). Or drop
-  favourites: BlueZ's `Trusted` already marks the devices that matter.
+- **Audio: may lyr take `libpulse-binding`?** (M4 volume and mic modules, M7
+  audio menu.) **Q:** Add `libpulse-binding` (the PulseAudio protocol through
+  `pipewire-pulse`, plan 07's default), or go native PipeWire with WirePlumber
+  metadata instead (no libpulse, more code)? Nothing for audio is built until
+  this is answered.
+- **Network without NetworkManager: build the rtnetlink fallback?** (M4.) **Q:**
+  The network module reads NetworkManager over zbus, which the dotfiles use.
+  Should lyr also support machines without it, through a new rtnetlink crate
+  (`rtnetlink` or `neli`) and a 30 s nl80211 read for the signal (plan 07), or
+  leave the module out there?
+- **Calendar locale: may lyr take `libc` and `windows-sys`?** (M5.) **Q:** Read
+  the first weekday and day and month names from the system locale, as waybar
+  does (`nl_langinfo` with `_NL_TIME_FIRST_WEEKDAY` on Linux, `GetLocaleInfoEx`
+  with `LOCALE_IFIRSTDAYOFWEEK` on Windows; lyr depends on neither directly), or
+  add a `clock.first_weekday` config key defaulting to Monday, with English
+  names, which a Sunday-first locale sets by hand?
+- **Week numbers: waybar's or ISO?** (M5.) **Q:** The calendar numbers weeks as
+  waybar does for a Monday start (`%W`), since the dotfiles do not set
+  `iso8601`. ISO weeks (`%V`) are a one-line change. Keep `%W`?
+- **Calendar font: proportional or monospace by default?** (M5.) **Q:**
+  `theme.calendar_font` defaults to the bar's font, where waybar's `<tt>` makes
+  the calendar monospace. Should the default be `"monospace"`? Judge it against
+  waybar's look on the owner's machine.
+- **Images: may lyr take `crcbl-image`?** (M6, M8.) **Q:** Add `crcbl-image`
+  (crcbl's decoder for PNG, JPEG, SVG and icon themes) so toasts show `app_icon`
+  and `image-data`, players their art, and the tray its icons? crcbl-ui already
+  draws images. Until then the tray shows each item's first letter, and
+  `icon-static` is not advertised.
+- **Notification links: how should a click open one?** (M6.) **Q:** lyr draws a
+  body's `<a href>` (in `toast_link`, underlined) but opens nothing and does not
+  advertise `body-hyperlinks`. A link comes from any program on the session bus,
+  so: open it with the system's URL handler (`xdg-open`)? Which schemes (only
+  `http`/`https`)? With a confirmation first?
+- **Two swaync style values that look like slips** (M6). **Q:** The dotfiles'
+  swaync style has `font-family: 'Hadk Nerd Font'`, which names no font (swaync
+  falls back; lyr uses the bar's font), and action buttons at `0.2rem`, about 3
+  px (lyr uses the bar's text size). Copy them as they are, or treat them as
+  typos ([plan/09](plan/09-notifications.md#what-swaync-does-today))?
+- **Bluetooth favourites: where do they live?** (M7.) **Q:** bluetui (master
+  `ff92b24`, `src/favorite.rs`) keeps favourites as addresses in `favorites.txt`
+  under its data directory, sorts them first and marks them. lyr writes no state
+  today. Options: a file lyr writes (`~/.local/share/lyr/`; the menu can toggle
+  it); a `bluetooth.favourites` list in `config.toml` (declarative, but the menu
+  cannot toggle it, since lyr never writes the config); or no favourites, since
+  BlueZ's `Trusted` already marks the devices that matter.
+- **Config reload on save: may lyr take `notify`?** (M3.) **Q:** Reloading the
+  config when the file is saved needs a file watcher; `notify` is the usual
+  crate and new to lyr. Add it, or keep reloading on `lyr reload` only?
+- **The defaults-parity test: where does it read `config.jsonc`?** (M3.) **Q:**
+  The test that checks lyr's defaults against the dotfiles' waybar config needs
+  that file, which is at `~/Projects/mxaddict/dotfiles` on the owner's machine
+  and not on CI. Check a copy into lyr as a test fixture, or read a path from
+  the environment and skip the test on CI?
+- **Windows: may lyr take `windows-sys`?** (M9.) **Q:** The Windows power
+  actions, sources and menus (plan 10, plan 11) need Win32 calls through
+  `windows-sys`, new to lyr. Add it when M9 starts?
+- **The dotfiles' standalone tools** (M8). **Q:** When the dotfiles switch to
+  lyr, do `wiremix` and `bluetui` stay installed, and do the `krypt menu` names
+  stay as wrappers?
 
 ## Cross-repo work
 
@@ -137,9 +173,8 @@ implementation follows until they are answered. The ones that block a milestone:
   the owner.
 - **dotfiles: switch from waybar, swaync and the `krypt menu` Wi-Fi, Bluetooth
   and audio commands to lyr** at M8
-  ([plan/05](plan/05-layout-and-config.md#migration-from-waybar)). Whether
-  `wiremix` and `bluetui` stay installed as standalone tools, and whether the
-  `krypt menu` names stay as wrappers, is the owner's call then.
+  ([plan/05](plan/05-layout-and-config.md#migration-from-waybar)). What happens
+  to `wiremix`, `bluetui` and the `krypt menu` names is a question above.
 
 ## The fallback stack, if crcbl declines
 
@@ -436,15 +471,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   NetworkManager (plan 10 has them from the online API reference) (M7);
   bluetui's and wiremix's source, beyond the READMEs plan 10 now follows (M7);
   the Windows and macOS menu APIs (M9, M10).
-- **Opening a notification's link** (M6). lyr draws a body's `<a href>` link (in
-  `toast_link`, underlined) but does not open it, and does not advertise
-  `body-hyperlinks`; a link comes from any program on the session bus, so how a
-  click opens it (the system's URL handler, which schemes, a confirmation) is a
-  security choice to make in M6, not a default.
-- **Two swaync style values that look like slips** (M6, the owner's call):
-  `font-family: 'Hadk Nerd Font'` names no font, so swaync falls back today (lyr
-  defaults to the bar's font), and action buttons are `0.2rem`, about 3 px
-  ([plan/09](plan/09-notifications.md#what-swaync-does-today)).
 - **Power menu, M5.** Built: the Linux actions
   (`lyr_sources::power::linux::Logind`): Lock, Sleep, Hibernate, Reboot and
   Power off as systemd v262.1's `loginctl` and `systemctl` call logind, with the
