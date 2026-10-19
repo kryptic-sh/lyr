@@ -428,6 +428,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   Windows and macOS actions (plan 10 names Win32 APIs that need `windows-sys`,
   new to lyr), and checking what Hyprland does with an outside click (M5's open
   question for panels applies to this grab popup too).
+- **Bluetooth menu, M7.** Built: its actions on Linux
+  (`lyr_sources::bluetooth::linux::BlueZ`): the adapter's power, discoverable
+  and pairable switches (`set`), the scan (`scan`), and connect, disconnect,
+  pair, trust and untrust (`device`) and forget (`forget`), tested against a
+  recording fake BlueZ and mutation-checked; the adapter's reading now carries
+  its path. Not built: the menu itself, the pairing agent (`org.bluez.Agent1`,
+  for passkeys and PINs), rename, favourites, listing devices found by a scan
+  with their paired and trusted state, and the Windows and macOS menus.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

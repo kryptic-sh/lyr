@@ -13,15 +13,49 @@ use lyr_core::bluetooth::Reading;
 use tokio::sync::watch;
 use zbus::fdo::{ManagedObjects, ObjectManagerProxy};
 use zbus::message::Type;
-use zbus::{Connection, MatchRule, MessageStream, OwnedVariant};
+use zbus::proxy::CacheProperties;
+use zbus::{Connection, MatchRule, MessageStream, ObjectPath, OwnedVariant};
 
-use super::{Adapter, Device, Tracker};
+use super::{Adapter, Device, DeviceAction, Switch, Tracker};
 
 /// BlueZ's service name.
 const SERVICE: &str = "org.bluez";
 const ADAPTER: &str = "org.bluez.Adapter1";
 const DEVICE: &str = "org.bluez.Device1";
 const BATTERY: &str = "org.bluez.Battery1";
+
+/// An adapter's calls and switches (`org.bluez.Adapter1`), as the
+/// Bluetooth menu uses them.
+#[zbus::proxy(interface = "org.bluez.Adapter1", default_service = "org.bluez")]
+trait AdapterControl {
+    fn start_discovery(&self) -> zbus::Result<()>;
+    fn stop_discovery(&self) -> zbus::Result<()>;
+    fn remove_device(&self, device: &ObjectPath<'_>) -> zbus::Result<()>;
+    #[zbus(property)]
+    fn powered(&self) -> zbus::Result<bool>;
+    #[zbus(property)]
+    fn set_powered(&self, on: bool) -> zbus::Result<()>;
+    #[zbus(property)]
+    fn discoverable(&self) -> zbus::Result<bool>;
+    #[zbus(property)]
+    fn set_discoverable(&self, on: bool) -> zbus::Result<()>;
+    #[zbus(property)]
+    fn pairable(&self) -> zbus::Result<bool>;
+    #[zbus(property)]
+    fn set_pairable(&self, on: bool) -> zbus::Result<()>;
+}
+
+/// A device's calls and its trust (`org.bluez.Device1`).
+#[zbus::proxy(interface = "org.bluez.Device1", default_service = "org.bluez")]
+trait DeviceControl {
+    fn connect(&self) -> zbus::Result<()>;
+    fn disconnect(&self) -> zbus::Result<()>;
+    fn pair(&self) -> zbus::Result<()>;
+    #[zbus(property)]
+    fn trusted(&self) -> zbus::Result<bool>;
+    #[zbus(property)]
+    fn set_trusted(&self, on: bool) -> zbus::Result<()>;
+}
 
 /// BlueZ on one connection.
 #[derive(Clone, Debug)]
@@ -55,6 +89,73 @@ impl BlueZ {
             connection: connection.clone(),
             objects,
         })
+    }
+
+    async fn adapter(&self, adapter: &str) -> zbus::Result<AdapterControlProxy<'static>> {
+        AdapterControlProxy::builder(&self.connection)
+            .path(adapter.to_owned())
+            .cache_properties(CacheProperties::No)
+            .build()
+            .await
+    }
+
+    /// Turns the `adapter`'s `switch` on or off.
+    ///
+    /// # Errors
+    ///
+    /// When BlueZ refuses (an rfkill block refuses power, for one).
+    pub async fn set(&self, adapter: &str, switch: Switch, on: bool) -> zbus::Result<()> {
+        let proxy = self.adapter(adapter).await?;
+        match switch {
+            Switch::Powered => proxy.set_powered(on).await,
+            Switch::Discoverable => proxy.set_discoverable(on).await,
+            Switch::Pairable => proxy.set_pairable(on).await,
+        }
+    }
+
+    /// Starts or stops the `adapter`'s scan for new devices.
+    ///
+    /// # Errors
+    ///
+    /// When BlueZ refuses.
+    pub async fn scan(&self, adapter: &str, on: bool) -> zbus::Result<()> {
+        let proxy = self.adapter(adapter).await?;
+        if on {
+            proxy.start_discovery().await
+        } else {
+            proxy.stop_discovery().await
+        }
+    }
+
+    /// Does `action` to the device at `device`.
+    ///
+    /// # Errors
+    ///
+    /// When BlueZ or the device refuses.
+    pub async fn device(&self, device: &str, action: DeviceAction) -> zbus::Result<()> {
+        let proxy = DeviceControlProxy::builder(&self.connection)
+            .path(device.to_owned())
+            .cache_properties(CacheProperties::No)
+            .build()
+            .await?;
+        match action {
+            DeviceAction::Connect => proxy.connect().await,
+            DeviceAction::Disconnect => proxy.disconnect().await,
+            DeviceAction::Pair => proxy.pair().await,
+            DeviceAction::Trust => proxy.set_trusted(true).await,
+            DeviceAction::Untrust => proxy.set_trusted(false).await,
+        }
+    }
+
+    /// Forgets the device at `device`: the `adapter` removes it, pairing and
+    /// all.
+    ///
+    /// # Errors
+    ///
+    /// When BlueZ refuses.
+    pub async fn forget(&self, adapter: &str, device: &str) -> zbus::Result<()> {
+        let path = ObjectPath::try_from(device)?;
+        self.adapter(adapter).await?.remove_device(&path).await
     }
 
     /// The first adapter and every device, as they are now.
@@ -127,6 +228,7 @@ fn parse(objects: &ManagedObjects) -> (Option<Adapter>, Vec<Device>) {
         };
         if adapter.is_none() && property(ADAPTER, "Powered").is_some() {
             adapter = Some(Adapter {
+                path: path.to_string(),
                 powered: flag(ADAPTER, "Powered").unwrap_or(false),
                 power_state: text(ADAPTER, "PowerState"),
             });

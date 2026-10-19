@@ -12,6 +12,8 @@ pub mod linux;
 /// The adapter's properties the module uses (`org.bluez.Adapter1`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Adapter {
+    /// Its object path, which identifies it.
+    pub path: String,
     pub powered: bool,
     /// `PowerState`, which BlueZ marks experimental and may not send;
     /// `off-blocked` is an rfkill block.
@@ -27,6 +29,24 @@ pub struct Device {
     pub alias: String,
     pub connected: bool,
     pub battery: Option<u8>,
+}
+
+/// One of the adapter's switches in the Bluetooth menu.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Switch {
+    Powered,
+    Discoverable,
+    Pairable,
+}
+
+/// What the Bluetooth menu does to a device.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DeviceAction {
+    Connect,
+    Disconnect,
+    Pair,
+    Trust,
+    Untrust,
 }
 
 /// The connected devices in the order they connected, so the module shows
@@ -85,6 +105,7 @@ mod tests {
 
     fn adapter(powered: bool) -> Adapter {
         Adapter {
+            path: "/org/bluez/hci0".to_owned(),
             powered,
             power_state: None,
         }
@@ -121,6 +142,7 @@ mod tests {
             Some(State::Connected)
         );
         let blocked = Adapter {
+            path: "/org/bluez/hci0".to_owned(),
             powered: false,
             power_state: Some("off-blocked".to_owned()),
         };
