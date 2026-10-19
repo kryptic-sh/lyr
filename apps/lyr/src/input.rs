@@ -116,6 +116,23 @@ pub fn act(
                 tracing::warn!("`{command}` did not start: {error}");
             }
         }
+        #[cfg(target_os = "linux")]
+        Action::Builtin(
+            builtin @ (lyr_config::Builtin::CycleProfile | lyr_config::Builtin::CycleProfileBack),
+        ) => {
+            use lyr_core::power_profile::{Direction, cycle};
+            let Some(profiles) = data.power_profile.as_ref() else {
+                return;
+            };
+            let direction = if builtin == lyr_config::Builtin::CycleProfile {
+                Direction::Next
+            } else {
+                Direction::Previous
+            };
+            if let Some(next) = cycle(&profiles.available, &profiles.active.name, direction) {
+                commands.set_profile(next.to_owned());
+            }
+        }
         Action::Builtin(builtin) => {
             tracing::warn!("`{}` is not implemented yet", builtin.name());
         }
@@ -128,7 +145,7 @@ pub fn act(
                     .find(|workspace| workspace.id == *id)
             });
             if let Some(workspace) = workspace {
-                commands.send(crate::sources::Command::Focus(workspace.clone()));
+                commands.focus(workspace.clone());
             }
         }
         #[cfg(target_os = "linux")]
@@ -146,7 +163,7 @@ pub fn act(
                 .then_some(monitor)
                 .flatten();
             if let Some(workspace) = state.step(step, own) {
-                commands.send(crate::sources::Command::Focus(workspace.clone()));
+                commands.focus(workspace.clone());
             }
         }
         #[cfg(not(target_os = "linux"))]

@@ -12,8 +12,9 @@ and this project adheres to
 
 - `lyr` with no command runs the bar: one transparent bar along the top of every
   output (a layer-shell panel on Wayland, an appbar on Windows), drawn through
-  crcbl, with the clock module, and on Linux the battery (from UPower) and the
-  Hyprland workspaces. The other modules are not drawn yet.
+  crcbl, with the clock module, and on Linux the battery (from UPower), the
+  power profile (from power-profiles-daemon; a click cycles it) and the Hyprland
+  workspaces. The other modules are not drawn yet.
 - Clicking a workspace switches to it, and with `workspaces.scroll = true` the
   wheel steps through them. A module's `[<module>.on]` table binds clicks and
   scrolling to a command (`{ exec = "…" }`); the built-in actions are not

@@ -10,3 +10,4 @@
 //! to M8 (`docs/plan/15-milestones.md`).
 
 pub mod battery;
+pub mod power_profile;

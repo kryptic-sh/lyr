@@ -196,13 +196,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   Hyprland workspaces, on a tokio runtime of its own thread
   (`apps/lyr/src/sources.rs`), each update handed to the main loop and the loop
   woken through crcbl's `ShellWaker`. Not run against a real UPower or Hyprland,
-  which needs the owner's machine. Not built: every other source. Network and
-  audio wait on the new-dependency decision above.
+  which needs the owner's machine. The power-profile source is built the same
+  way (`lyr_sources::power_profile::linux::PowerProfiles`): the daemon found
+  under `org.freedesktop.UPower.PowerProfiles` or its older `net.hadess` name,
+  followed on `PropertiesChanged`, switched by the `cycle_profile` built-ins,
+  and tested against a fake daemon that has only the old name. Not built: the
+  other sources. Network and audio wait on the new-dependency decision above.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace
   button focuses its workspace, `{ exec = … }` runs through `sh -c` or `cmd /C`
-  (`apps/lyr/src/exec.rs`), and the built-ins say they are not implemented yet.
+  (`apps/lyr/src/exec.rs`), `cycle_profile` and `cycle_profile_back` switch the
+  power profile, and the other built-ins say they are not implemented yet.
   Touchpad scrolling makes one step per 50 device pixels (`PIXELS_PER_STEP`,
   lyr's own choice; crcbl leaves it to the application). Scrolling away from the
   user steps to the previous workspace. Not tried with a real click: the tests
