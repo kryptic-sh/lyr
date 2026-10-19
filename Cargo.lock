@@ -890,6 +890,7 @@ dependencies = [
  "lyr-shell",
  "lyr-sources",
  "lyr-wm",
+ "tempfile",
  "thiserror",
  "tokio",
  "tracing",

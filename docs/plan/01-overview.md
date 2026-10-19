@@ -108,6 +108,7 @@ Each provisional call is listed with its alternatives in
 - Binary and repo: `lyr`. Crates: `lyr-*` under `crates/`, the binary under
   `apps/lyr`.
 - Config at `~/.config/lyr/config.toml` on every platform (`%APPDATA%` is not
-  used, so the dotfiles carry one path). Logs at `~/.local/state/lyr/logs/`.
+  used, so the dotfiles carry one path). Logs at `~/.local/state/lyr/logs/`:
+  `lyr.log`, and the one before it as `lyr.log.1` once it reaches its cap.
 - Wayland layer namespace `lyr`, so compositor rules can match the bar (Hyprland
   `layerrule`).

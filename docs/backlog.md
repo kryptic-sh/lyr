@@ -156,11 +156,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   changed (plan 04), but not yet paced by Wayland's frame callback, which plan
   04 requires for an output that is off (hypridle's DPMS). It logs through
   `tracing` to `~/.local/state/lyr/logs/lyr.log` and to stderr
-  (`apps/lyr/src/log.rs`, `RUST_LOG` to filter); the file is appended to and
-  never rotated or capped, which a bar running for months needs. `colour.rs`
-  copies crcbl-ui's private `srgb_to_linear`; crcbl's next release exports it as
-  `crcbl_ui::style::from_srgb8` (and `crcbl_core::srgb`), and lyr drops the copy
-  then. Group opacity is approximated until crcbl's opacity groups ship.
+  (`apps/lyr/src/log.rs`, `RUST_LOG` to filter), capped at `log::MAX_BYTES` by
+  moving it to `lyr.log.1` (tested on Windows and Linux, not watched rotating in
+  a running bar). `colour.rs` copies crcbl-ui's private `srgb_to_linear`;
+  crcbl's next release exports it as `crcbl_ui::style::from_srgb8` (and
+  `crcbl_core::srgb`), and lyr drops the copy then. Group opacity is
+  approximated until crcbl's opacity groups ship.
 - **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors

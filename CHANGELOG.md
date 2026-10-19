@@ -28,6 +28,9 @@ and this project adheres to
 - `lyr --stats` logs the bar's main-loop wake-ups, the events it applied and the
   frames it presented on each output, once a minute, to check that an idle bar
   stays idle.
+- The bar logs to `~/.local/state/lyr/logs/lyr.log` and to stderr (`RUST_LOG`
+  filters it). The file is capped at 10 MiB: past it, it becomes `lyr.log.1`,
+  replacing the one before.
 - The config file `~/.config/lyr/config.toml` (`-c` to choose another), layered
   over built-in defaults that reproduce the waybar setup lyr replaces, with
   `[platform.linux]`, `[platform.windows]` and `[platform.macos]` override
