@@ -28,10 +28,74 @@ on the GPU through [crcbl](https://github.com/kryptic-sh/crcbl). Part of the
 
 ## Status
 
-**Pre-alpha: nothing works yet.** This repository holds the plan and the
-workspace scaffold. The binary parses its command line and reports that no bar
-is implemented. The design lives in [docs/plan/](docs/plan/00-index.md) and the
-build order in [docs/plan/15-milestones.md](docs/plan/15-milestones.md).
+**Pre-alpha.** It runs, on Windows and (untried on a real compositor yet) on
+Linux under Wayland:
+
+- One transparent bar along the top of every output, with the power button, the
+  clock and, on Linux, the battery (UPower), power profile
+  (power-profiles-daemon), Bluetooth (BlueZ), the notification bell and the
+  Hyprland workspaces. Network, volume, mic and the tray are not built yet.
+- Tooltips, and the power menu (its actions are built on Linux only).
+- On Linux, the notification daemon with toasts, when no other daemon (such as
+  swaync) holds the name.
+
+The design lives in [docs/plan/](docs/plan/00-index.md), the build order in
+[docs/plan/15-milestones.md](docs/plan/15-milestones.md), and what is not done
+yet in [docs/backlog.md](docs/backlog.md).
+
+## Using it
+
+`lyr` with no command runs the bar. Every other command talks to the running
+bar:
+
+| Command                 | Does                                                                 |
+| ----------------------- | -------------------------------------------------------------------- |
+| `lyr reload`            | Reloads the config, keeping the running one if it is bad             |
+| `lyr toggle`            | Hides or shows the bars                                              |
+| `lyr quit`              | Stops the bar                                                        |
+| `lyr dnd` / `lyr clear` | Do-not-disturb on or off / dismiss every notification                |
+| `lyr panel <name>`      | Opens a panel (`clock`, `wifi`, `bluetooth`, `audio`); not built yet |
+
+`lyr -c FILE` uses another config file, and `lyr --stats` logs the bar's
+wake-ups and redraws once a minute. Logs go to `~/.local/state/lyr/logs/lyr.log`
+and to stderr; `RUST_LOG` filters them.
+
+## Configuration
+
+`~/.config/lyr/config.toml`, on every platform. It is layered over built-in
+defaults that reproduce the waybar setup lyr replaces, so an empty file (or
+none) gives that bar, and a file sets only what it changes. A
+`[platform.linux]`, `[platform.windows]` or `[platform.macos]` table holds
+settings for one platform. An invalid config is an error naming the key.
+
+The defaults are the reference for every key and value:
+[crates/lyr-config/src/defaults.toml](crates/lyr-config/src/defaults.toml).
+
+| Table             | Keys                                                                                                                              |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `[bar]`           | `position` (`top`, `bottom`), `height`, `output` (names; empty is every output), `layer`                                          |
+| `[layout]`        | `left`, `center`, `right`: module names in order                                                                                  |
+| `[workspaces]`    | `all_outputs`, `format` (`{name}`), `scroll`                                                                                      |
+| `[power]`         | `format`, `tooltip_format`, `[power.menu]` (`lock`, `sleep`, `hibernate`, `shutdown`, `logout`, `reboot` as `{ exec = "…" }`)     |
+| `[clock]`         | `format` (strftime)                                                                                                               |
+| `[battery]`       | `format`, `format_charging`, `format_plugged`, `format_full`, `icons`, `tooltip_format`, `warning`, `critical`                    |
+| `[power_profile]` | `format`, `tooltip_format`, `icons`                                                                                               |
+| `[network]`       | `format`, `format_<state>` and `tooltip_format_<state>` for `wifi`, `ethernet`, `linked`, `disconnected`, `disabled`, `icons`     |
+| `[bluetooth]`     | `format`, `format_on`, `format_off`, `format_disabled`, `format_connected`, `format_connected_battery`, `tooltip_format`, `icons` |
+| `[volume]`        | `format`, `format_muted`, `format_bluetooth`, `format_bluetooth_muted`, `tooltip_format`, `icons`, `scroll_step`                  |
+| `[mic]`           | `format`, `format_muted`, `tooltip_format`, `scroll_step`                                                                         |
+| `[notifications]` | `replace`, `format`, `icons`                                                                                                      |
+| `[theme]`         | font, colours and box metrics; see the defaults                                                                                   |
+
+Every module also takes an `[<module>.on]` table binding `click`, `click_right`,
+`click_middle`, `scroll_up` and `scroll_down` to a command (`{ exec = "…" }`,
+run through the platform shell) or a built-in: `toggle_mute`, `volume_up`,
+`volume_down` (volume and mic), `cycle_profile`, `cycle_profile_back` (power
+profile), `open_clock_panel`, `open_power_menu`, `open_wifi_menu`,
+`open_bluetooth_menu`, `open_audio_menu`, `toggle_dnd`. Of these,
+`cycle_profile`, `cycle_profile_back` and `open_power_menu` work so far.
+
+A config file is code: its commands run as you ([SECURITY.md](SECURITY.md)).
 
 ## Building
 

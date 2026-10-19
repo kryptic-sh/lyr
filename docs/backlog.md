@@ -346,17 +346,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   built: the tray's table (M8), the file watcher that reloads on save (it needs
   a crate such as `notify`, new to lyr, so the owner's call), a finer diff (a
   reload redraws everything, and recreates the bars only when `[bar]` changed),
-  the control socket (its own entry above), the README's schema docs, and the
-  defaults-parity test against `config.jsonc`. The dotfiles are at
-  `~/Projects/mxaddict/dotfiles` on the owner's Windows machine, not next to
-  lyr, and not on CI, so the test needs either a path from the environment or a
-  copy of `config.jsonc` checked into lyr as a fixture; that is open. Format
-  strings are one `Format` type (`lyr-config`'s `format.rs`), parsed when the
-  config loads and rendered with `Format::render`, so validation and drawing
-  will share one parser. Every error names its full key (`layout.right[0]: …`,
-  `theme.border: …`, the latter through `serde_path_to_error`). `lyr-config`
-  keeps its own copy of the table merge, because `hjkl_config`'s `deep_merge`
-  and `locate` are private in 0.42.2; if hjkl exports them, lyr drops the copy.
+  the control socket (its own entry above), and the defaults-parity test against
+  `config.jsonc`. The dotfiles are at `~/Projects/mxaddict/dotfiles` on the
+  owner's Windows machine, not next to lyr, and not on CI, so the test needs
+  either a path from the environment or a copy of `config.jsonc` checked into
+  lyr as a fixture; that is open. Format strings are one `Format` type
+  (`lyr-config`'s `format.rs`), parsed when the config loads and rendered with
+  `Format::render`, so validation and drawing will share one parser. Every error
+  names its full key (`layout.right[0]: …`, `theme.border: …`, the latter
+  through `serde_path_to_error`). `lyr-config` keeps its own copy of the table
+  merge, because `hjkl_config`'s `deep_merge` and `locate` are private in
+  0.42.2; if hjkl exports them, lyr drops the copy.
 - **Waybar parity, still to check.** The plan was reviewed against the dotfiles'
   `config.jsonc` and `style.css` (2026-10-16), with waybar's own defaults read
   in its 0.15.0 source. Open: the calendar's `<tt>` monospace look with a
