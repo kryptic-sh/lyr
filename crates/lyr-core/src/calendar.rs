@@ -3,6 +3,8 @@
 //! month or a year. It follows waybar 0.15.0's `clock.cpp`, whose calendar the
 //! panel carries over.
 
+pub mod draw;
+
 use chrono::{Datelike, Months, NaiveDate, Weekday};
 
 /// One row of a month: its week number, and the day of the month in each of

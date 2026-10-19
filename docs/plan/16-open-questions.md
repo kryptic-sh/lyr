@@ -87,3 +87,8 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
     the calendar inside the panel rather than on the clock; the clock's tooltip
     names the time zone; mic's right click opens the audio menu on input devices
     rather than outputs.
+19. **The calendar's first weekday and names** (backlog). waybar reads both from
+    the system locale, which needs `libc` on Linux and `windows-sys` on Windows,
+    new to lyr. Default until that is decided: weeks start on Monday, week
+    numbers are `%W` (waybar's rule for a Monday start), and the month and
+    weekday names are English.

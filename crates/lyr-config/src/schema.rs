@@ -460,4 +460,11 @@ pub struct Theme {
     pub toast_border_critical: Colour,
     /// When it arrived.
     pub toast_time: Colour,
+    /// The clock panel's calendar: waybar's calendar format in the dotfiles.
+    pub calendar_months: Colour,
+    pub calendar_days: Colour,
+    pub calendar_weeks: Colour,
+    pub calendar_weekdays: Colour,
+    /// Today, also underlined.
+    pub calendar_today: Colour,
 }
