@@ -45,6 +45,13 @@ impl App {
             return self.bluetooth_event(shell, event);
         }
         if self
+            .wifi_menu
+            .as_ref()
+            .is_some_and(|menu| event.window().is_some_and(|window| menu.owns(window)))
+        {
+            return self.wifi_event(shell, event);
+        }
+        if self
             .clock_panel
             .as_ref()
             .is_some_and(|panel| event.window().is_some_and(|window| panel.owns(window)))
@@ -164,6 +171,7 @@ impl App {
                 let mut toggle_dnd = false;
                 let mut toggle_panel = false;
                 let mut bluetooth_at = None;
+                let mut wifi_at = None;
                 for press in presses {
                     let Some(target) = window.pointer.target(&window.regions) else {
                         continue;
@@ -187,6 +195,10 @@ impl App {
                     }
                     if opens == Some(Builtin::OpenBluetoothMenu) {
                         bluetooth_at = window.regions.rect(target).map(|rect| f64::from(rect.x));
+                        continue;
+                    }
+                    if opens == Some(Builtin::OpenWifiMenu) {
+                        wifi_at = window.regions.rect(target).map(|rect| f64::from(rect.x));
                         continue;
                     }
                     if opens != Some(Builtin::OpenPowerMenu) {
@@ -223,6 +235,11 @@ impl App {
                     && let Err(why) = self.toggle_bluetooth_menu(shell, left)?
                 {
                     tracing::warn!("open_bluetooth_menu: {why}");
+                }
+                if let Some(left) = wifi_at
+                    && let Err(why) = self.toggle_wifi_menu(shell, left, instant)?
+                {
+                    tracing::warn!("open_wifi_menu: {why}");
                 }
                 if toggle_dnd {
                     let reply = self.notifications(Request::Dnd);

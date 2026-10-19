@@ -141,6 +141,7 @@ pub fn act(
             builtin @ (Builtin::OpenBluetoothMenu
             | Builtin::OpenClockPanel
             | Builtin::OpenPowerMenu
+            | Builtin::OpenWifiMenu
             | Builtin::ToggleDnd),
         ) => {
             return Some(builtin);

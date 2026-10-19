@@ -135,6 +135,11 @@ impl<T: Copy> MenuPanel<T> {
         Ok(shell.set_text_input(self.window, purpose)?)
     }
 
+    /// Takes the keyboard's outline away, so Enter is the menu's own.
+    pub const fn unfocus(&mut self) {
+        self.focus = None;
+    }
+
     /// The target the keyboard is on.
     pub fn focused(&self) -> Option<T> {
         self.regions.targets().nth(self.focus?).copied()

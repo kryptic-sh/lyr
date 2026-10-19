@@ -57,6 +57,22 @@ impl App {
                     Err(why) => incoming.reply(format!("error: {why}")),
                 }
             }
+            Request::Panel(Panel::Wifi) => {
+                // Under the module where a bar shows it, else at the edge.
+                let left = self
+                    .windows
+                    .values()
+                    .find_map(|window| {
+                        window
+                            .regions
+                            .rect(&lyr_core::draw::Target::Module(lyr_config::Module::Network))
+                    })
+                    .map_or(crate::toasts::EDGE_MARGIN, |rect| f64::from(rect.x));
+                match self.toggle_wifi_menu(shell, left, std::time::Instant::now())? {
+                    Ok(()) => incoming.reply(control::OK),
+                    Err(why) => incoming.reply(format!("error: {why}")),
+                }
+            }
             request @ (Request::Dnd | Request::Clear) => {
                 let reply = self.notifications(request);
                 incoming.reply(reply);

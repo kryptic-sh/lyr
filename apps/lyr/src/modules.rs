@@ -23,6 +23,9 @@ pub struct Data {
     pub power_profile: Option<lyr_sources::power_profile::Profiles>,
     #[cfg(target_os = "linux")]
     pub network: Option<lyr_core::network::Reading>,
+    /// The Wi-Fi device, its networks and profiles, for the Wi-Fi menu.
+    /// `None` where there is no source for them.
+    pub wifi: Option<lyr_core::wifi_menu::Wifi>,
     #[cfg(target_os = "linux")]
     pub bluetooth: Option<lyr_core::bluetooth::Reading>,
     /// The adapter and devices, for the Bluetooth menu. Empty where there
@@ -78,6 +81,11 @@ impl Data {
             Update::PowerProfile(profiles) => self.power_profile = profiles,
             #[cfg(target_os = "linux")]
             Update::Network(reading) => self.network = reading,
+            #[cfg(target_os = "linux")]
+            Update::Wifi(wifi) => self.wifi = Some(wifi),
+            // The Wi-Fi menu takes it.
+            #[cfg(target_os = "linux")]
+            Update::WifiJoined(_) => {}
             #[cfg(target_os = "linux")]
             Update::BluetoothAsk(id, device, question) => {
                 self.bluetooth_ask = Some((id, device, question));

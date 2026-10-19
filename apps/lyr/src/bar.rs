@@ -12,6 +12,7 @@
 
 mod events;
 mod requests;
+mod wifi;
 mod window;
 
 use std::collections::HashMap;
@@ -38,6 +39,7 @@ use crate::stats::Stats;
 use crate::toasts::EDGE_MARGIN;
 use crate::toasts::Toasts;
 use crate::tooltips::{Anchor, Look};
+use crate::wifi_menu::WifiMenu;
 use window::Window;
 
 /// Everything the main loop keeps between wake-ups.
@@ -57,6 +59,8 @@ struct App {
     clock_panel: Option<ClockPanel>,
     /// The Bluetooth menu, while it is open.
     bluetooth_menu: Option<BluetoothMenu>,
+    /// The Wi-Fi menu, while it is open.
+    wifi_menu: Option<WifiMenu>,
     /// The power menu, while it is open.
     power_menu: Option<PowerMenu>,
     /// The event batch that last dismissed the power menu: a click outside it
@@ -135,6 +139,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         toasts: Toasts::default(),
         clock_panel: None,
         bluetooth_menu: None,
+        wifi_menu: None,
         power_menu: None,
         menu_dismissed_at: None,
         hidden: false,
@@ -146,6 +151,10 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         app.stats.wakeups += 1;
         if log_stats {
             app.stats.log_if_due(Instant::now());
+        }
+        if app.wifi_wake().is_some_and(|wake| Instant::now() >= wake) {
+            // The wait for a scan is up.
+            app.refresh_wifi_menu(shell.as_mut())?;
         }
         if Instant::now() >= app.next_tick {
             app.next_tick = next_tick(app.tick);
@@ -165,11 +174,15 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             if let Some(menu) = app.bluetooth_menu.take() {
                 menu.close(shell.as_mut(), false)?;
             }
+            if let Some(menu) = app.wifi_menu.take() {
+                menu.close(shell.as_mut(), false)?;
+            }
             return app.close_all(shell.as_mut());
         }
         while let Ok(update) = updates.try_recv() {
             app.update(update, Instant::now());
             app.refresh_bluetooth_menu(shell.as_mut())?;
+            app.refresh_wifi_menu(shell.as_mut())?;
             app.stats.events += 1;
             app.redraw_all();
         }
@@ -200,6 +213,7 @@ impl App {
                 .bluetooth_menu
                 .as_ref()
                 .is_some_and(BluetoothMenu::dirty)
+            || self.wifi_menu.as_ref().is_some_and(WifiMenu::dirty)
         {
             return Duration::ZERO;
         }
@@ -208,6 +222,7 @@ impl App {
             .values()
             .filter_map(|window| window.tooltips.next_wake())
             .chain(self.toasts.next_wake())
+            .chain(self.wifi_wake())
             .fold(self.next_tick, Instant::min);
         wake.saturating_duration_since(Instant::now())
     }
@@ -223,6 +238,7 @@ impl App {
                     self.toasts.notified(*id, self.clock_panel.is_some(), now);
                 }
                 Update::Notification(Change::Closed(id, _)) => self.toasts.closed(*id),
+                Update::WifiJoined(joined) => self.wifi_joined(joined.clone()),
                 _ => {}
             }
         }
@@ -386,6 +402,7 @@ impl App {
             commands,
             clock_panel,
             bluetooth_menu,
+            wifi_menu,
             ..
         } = self;
         let now = Local::now().fixed_offset();
@@ -418,6 +435,9 @@ impl App {
             panel.draw(text)?;
         }
         if let Some(menu) = bluetooth_menu {
+            menu.draw(text)?;
+        }
+        if let Some(menu) = wifi_menu {
             menu.draw(text)?;
         }
         for id in toasts.expire(Instant::now()) {

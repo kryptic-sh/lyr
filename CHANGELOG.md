@@ -28,8 +28,8 @@ and this project adheres to
   the bars. On Linux, while lyr is the notification daemon, `lyr dnd` turns
   do-not-disturb on or off and `lyr clear` dismisses every notification.
   `lyr panel clock` opens the clock panel and, on Linux, `lyr panel bluetooth`
-  the Bluetooth menu; the other panels are not implemented yet. A second `lyr`
-  exits when one is already running.
+  the Bluetooth menu and `lyr panel wifi` the Wi-Fi menu; the audio menu is not
+  implemented yet. A second `lyr` exits when one is already running.
 - On Linux lyr is the notification daemon when no other daemon (such as swaync)
   holds the name; `notifications.replace = true` takes it over. It advertises
   the `actions`, `body`, `body-markup` and `persistence` capabilities: a body's
@@ -51,6 +51,14 @@ and this project adheres to
   asks Hyprland to exit; on Windows and macOS the entries are not built yet.
   `[power.menu]` sets an entry to a command instead
   (`lock = { exec = "hyprlock" }`).
+- On Linux, the Wi-Fi menu, opened by a click on the network module or
+  `lyr panel wifi`, over NetworkManager: a switch for the radio, the networks a
+  scan found (one row per name, strongest first, the one in use marked), a fresh
+  scan asked for on every open, Connect, which joins a saved network at once and
+  asks for a new one's password in a masked field, and Forget, after a
+  confirmation. WEP and enterprise networks are refused with a message. A saved
+  network whose password fails is offered a new one; a new profile that fails on
+  its password, or an open one that fails, is deleted.
 - On Linux, the Bluetooth menu, opened by a click on the Bluetooth module or
   `lyr panel bluetooth`: the adapter's power, discoverable and pairable
   switches, a scan toggle, and each device with connect or disconnect, pair,

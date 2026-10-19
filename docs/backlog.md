@@ -404,8 +404,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   them, so their space is given back on every platform, and shows them by
   creating them again (run on Windows: the work area grew by 50 px and shrank
   back). `lyr dnd` and `lyr clear` act on the notification daemon on Linux and
-  answer that lyr is not the daemon elsewhere. `lyr panel clock` opens the clock
-  panel; the other panels answer "not implemented yet" (M7). Not built:
+  answer that lyr is not the daemon elsewhere. `lyr panel clock`,
+  `lyr panel bluetooth` and `lyr panel wifi` open their panels;
+  `lyr panel audio` answers "not implemented yet" (M7). Not built:
   `lyr event workspace` for AeroSpace (M10).
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]`, `[theme]` and every module's table, the
@@ -540,10 +541,32 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   for SAE), the radio switch (no click while a hardware switch blocks it), the
   scan's state in place of the list, a masked password field, Forget's
   confirmation, an error until OK, and no clicks on the rows while joining.
-  Tested and mutation-checked. Not built: reading the device, access points and
-  saved profiles from NetworkManager, scanning, joining and forgetting, the
-  panel itself, and the double-click guard. Two equally strong access points of
-  one SSID: the first listed is joined, which either would do.
+  Tested and mutation-checked. NetworkManager's side is
+  `lyr_sources::network::linux::wifi`: the first Wi-Fi device by `GetDevices`,
+  its state (10 and 20 cannot scan), `LastScan`, `GetAllAccessPoints` and the
+  access point in use, the saved Wi-Fi client profiles (`802-11-wireless` with
+  no mode or `infrastructure`), the radio switch, `RequestScan`, joining with
+  `ActivateConnection` or `AddAndActivateConnection` and waiting for the
+  device's `StateChanged` to 100 or 120, `Delete`, and a new password through
+  `Update`. The time since boot, which `LastScan` counts on, is read from
+  `/proc/uptime` (the kernel fills it from the boot clock). Tested against a
+  fake NetworkManager and mutation-checked; not run against a real one. The
+  panel is up (`apps/lyr/src/wifi_menu.rs`, its glue in
+  `apps/lyr/src/bar/wifi.rs`): opened by `open_wifi_menu` or `lyr panel wifi`
+  under the network module, a rescan asked for on every open and "Scanning…"
+  until a newer scan lands or `wifi_menu::SCAN_WAIT` (lyr's own 15 s) is up,
+  unless the last scan is under 30 s old; a password typed with text input
+  `Password`, spaces kept; `recovery` applied to a failure by the source task; a
+  second click on the module within GTK's default double-click time leaves it
+  open. Tested on crcbl's headless shell and mutation-checked. Not built: a
+  failure while the menu is closed is only logged, where plan 10 asks for a
+  notification with the SSID escaped for markup. Two equally strong access
+  points of one SSID: the first listed is joined, which either would do. The
+  header's buttons take the arrow keys from the right (No before Yes), as in the
+  Bluetooth menu. The Bluetooth menu keeps the outline where it was when a
+  question appears, so Enter there presses the outlined button rather than
+  answering; the Wi-Fi menu drops the outline instead (`MenuPanel::unfocus`).
+  Whether the Bluetooth menu should do the same is open.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

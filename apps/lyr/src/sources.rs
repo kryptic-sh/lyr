@@ -24,6 +24,12 @@ pub enum Update {
     /// NetworkManager's reading, or `None` before the first.
     #[cfg(target_os = "linux")]
     Network(Option<lyr_core::network::Reading>),
+    /// What the Wi-Fi menu shows.
+    #[cfg(target_os = "linux")]
+    Wifi(lyr_core::wifi_menu::Wifi),
+    /// How a join the Wi-Fi menu asked for ended.
+    #[cfg(target_os = "linux")]
+    WifiJoined(crate::wifi_menu::Joined),
     /// BlueZ: the module's reading and the menu's adapter and devices.
     #[cfg(target_os = "linux")]
     Bluetooth(lyr_sources::bluetooth::Snapshot),
@@ -66,6 +72,32 @@ pub enum BluetoothRequest {
     Answer(u64, lyr_core::bluetooth_menu::Reply),
 }
 
+/// What the Wi-Fi menu asks of NetworkManager.
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+pub enum WifiRequest {
+    Radio(bool),
+    /// A scan on the device at this path.
+    Scan(String),
+    Join(JoinRequest),
+    /// The saved profiles at these paths are to go.
+    Forget(Vec<String>),
+}
+
+/// A join the Wi-Fi menu asked for.
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+pub struct JoinRequest {
+    /// The device's path.
+    pub device: String,
+    pub join: lyr_sources::network::Join,
+    /// The network's name and security, for what a failure means.
+    pub ssid: String,
+    pub security: lyr_core::wifi_menu::Security,
+    /// A new password for the saved profile it joins with, set first.
+    pub new_password: Option<String>,
+}
+
 /// What the bar asks of the notification daemon.
 #[cfg(target_os = "linux")]
 #[derive(Debug)]
@@ -91,6 +123,8 @@ pub struct Commands {
     media: tokio::sync::mpsc::UnboundedSender<(String, lyr_core::media::Control)>,
     #[cfg(target_os = "linux")]
     bluetooth: tokio::sync::mpsc::UnboundedSender<BluetoothRequest>,
+    #[cfg(target_os = "linux")]
+    wifi: tokio::sync::mpsc::UnboundedSender<WifiRequest>,
 }
 
 #[cfg(target_os = "linux")]
@@ -115,6 +149,11 @@ impl Commands {
         let _stopped = self
             .notifications
             .send(NotificationRequest::Close(id, reason));
+    }
+
+    /// Asks NetworkManager what the Wi-Fi menu wants.
+    pub fn wifi(&self, request: WifiRequest) {
+        let _stopped = self.wifi.send(request);
     }
 
     /// Presses `control` on the media player at `bus_name`.
@@ -177,6 +216,7 @@ pub fn start(
         let (notifications, notification_requests) = tokio::sync::mpsc::unbounded_channel();
         let (media, media_requests) = tokio::sync::mpsc::unbounded_channel();
         let (bluetooth, bluetooth_requests) = tokio::sync::mpsc::unbounded_channel();
+        let (wifi, wifi_requests) = tokio::sync::mpsc::unbounded_channel();
         linux::start(
             sender,
             linux::Requests {
@@ -186,6 +226,7 @@ pub fn start(
                 notifications: notification_requests,
                 media: media_requests,
                 bluetooth: bluetooth_requests,
+                wifi: wifi_requests,
             },
             replace_notifications,
             waker,
@@ -199,6 +240,7 @@ pub fn start(
                 notifications,
                 media,
                 bluetooth,
+                wifi,
             },
         ))
     }
@@ -216,6 +258,7 @@ mod linux {
     use crcbl_shell::ShellWaker;
     use lyr_core::media::Control;
     use lyr_core::power_menu::Entry;
+    use lyr_core::wifi_menu::Wifi;
     use lyr_sources::battery::linux::UPower;
     use lyr_sources::bluetooth::Snapshot;
     use lyr_sources::bluetooth::linux::BlueZ;
@@ -234,7 +277,8 @@ mod linux {
     use lyr_core::notifications::Store;
     use lyr_sources::notifications::linux::{Daemon, serve_session};
 
-    use super::{BluetoothRequest, NotificationRequest, Update};
+    use super::{BluetoothRequest, JoinRequest, NotificationRequest, Update, WifiRequest};
+    use crate::wifi_menu::Joined;
 
     /// Hands `update` to the main loop and wakes it. `false` once the main
     /// loop has gone.
@@ -254,6 +298,7 @@ mod linux {
         pub(super) notifications: UnboundedReceiver<NotificationRequest>,
         pub(super) media: UnboundedReceiver<(String, Control)>,
         pub(super) bluetooth: UnboundedReceiver<BluetoothRequest>,
+        pub(super) wifi: UnboundedReceiver<WifiRequest>,
     }
 
     pub(super) fn start(
@@ -269,6 +314,7 @@ mod linux {
             notifications: notification_requests,
             media,
             bluetooth: bluetooth_requests,
+            wifi,
         } = requests;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -279,7 +325,7 @@ mod linux {
                 runtime.block_on(async move {
                     tokio::join!(
                         battery(sender.clone(), waker.clone()),
-                        network(sender.clone(), waker.clone()),
+                        network(sender.clone(), wifi, waker.clone()),
                         power_profile(sender.clone(), profile, waker.clone()),
                         bluetooth(sender.clone(), bluetooth_requests, waker.clone()),
                         clock(sender.clone(), waker.clone()),
@@ -321,7 +367,11 @@ mod linux {
         }
     }
 
-    async fn network(sender: mpsc::Sender<Update>, waker: Option<ShellWaker>) {
+    async fn network(
+        sender: mpsc::Sender<Update>,
+        mut requests: UnboundedReceiver<WifiRequest>,
+        waker: Option<ShellWaker>,
+    ) {
         let network = match NetworkManager::system().await {
             Ok(network) => network,
             Err(error) => {
@@ -338,9 +388,87 @@ mod linux {
                 }
             }
         };
-        let (watched, ()) = tokio::join!(network.watch(&readings), forward);
-        if let Err(error) = watched {
-            tracing::warn!("network: NetworkManager stopped answering: {error}");
+        let (states, mut wifi_changed) = watch::channel(Wifi::default());
+        let forward_wifi = async {
+            while wifi_changed.changed().await.is_ok() {
+                let state = wifi_changed.borrow_and_update().clone();
+                if !deliver(&sender, waker.as_ref(), Update::Wifi(state)) {
+                    break;
+                }
+            }
+        };
+        // One at a time: a join holds the next request until it ends.
+        let act = async {
+            while let Some(request) = requests.recv().await {
+                // What changes comes back through the watch.
+                let done = match request {
+                    WifiRequest::Radio(on) => network.set_radio(on).await,
+                    WifiRequest::Scan(device) => network.scan(&device).await,
+                    WifiRequest::Forget(profiles) => network.forget(&profiles).await,
+                    WifiRequest::Join(request) => {
+                        let joined = join(&network, request).await;
+                        if !deliver(&sender, waker.as_ref(), Update::WifiJoined(joined)) {
+                            break;
+                        }
+                        Ok(())
+                    }
+                };
+                if let Err(error) = done {
+                    tracing::warn!("wi-fi: {error}");
+                }
+            }
+        };
+        let (watched, watched_wifi, (), (), ()) = tokio::join!(
+            network.watch(&readings),
+            network.watch_wifi(&states),
+            forward,
+            forward_wifi,
+            act
+        );
+        for watched in [watched, watched_wifi] {
+            if let Err(error) = watched {
+                tracing::warn!("network: NetworkManager stopped answering: {error}");
+            }
+        }
+    }
+
+    /// Carries out `request` and says how it ended: a failed profile is
+    /// kept, deleted or offered a new password as
+    /// [`lyr_core::wifi_menu::recovery`] says.
+    async fn join(network: &NetworkManager, request: JoinRequest) -> Joined {
+        use lyr_core::wifi_menu::{Recovery, failure_text, recovery};
+        use lyr_sources::network::Join;
+
+        let JoinRequest {
+            device,
+            join,
+            ssid,
+            security,
+            new_password,
+        } = request;
+        if let (Some(password), Join::Saved { profile, .. }) = (&new_password, &join)
+            && let Err(error) = network.replace_password(profile, password).await
+        {
+            return Joined::Failed(format!("Saving the password for {ssid} failed: {error}"));
+        }
+        let saved = matches!(join, Join::Saved { .. });
+        match network.join(&device, &join).await {
+            Ok(Ok(())) => Joined::Up,
+            Ok(Err(failed)) => {
+                let recovery = recovery(saved, security, failed.reason);
+                if recovery == Recovery::Delete
+                    && let Some(profile) = failed.profile
+                    && let Err(error) = network.forget(&[profile]).await
+                {
+                    tracing::warn!("wi-fi: deleting the failed profile for {ssid}: {error}");
+                }
+                if recovery == Recovery::NewPassword {
+                    Joined::NewPassword
+                } else {
+                    Joined::Failed(failure_text(&ssid, failed.reason))
+                }
+            }
+            Err(error) => Joined::Failed(format!("Joining {ssid} failed: {error}")),
         }
     }
 
