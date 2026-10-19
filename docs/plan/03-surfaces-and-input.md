@@ -180,9 +180,10 @@ The owner asked on 2026-10-17 that every row work on every backend. crcbl's
 session built this matrix from crcbl's code, e2e tests and CI logs at main
 `4d48eaf4` (CI run 38988977910), and `d3f7e280` for the transparency rows, and
 reported it on 2026-10-17. It is crcbl's report; lyr has not checked it. Since
-then, 0.3.0 fixed `GpuContext`'s and crcbl-mtl's forced opacity (S16), and crcbl
-main `81085253` made `TEXT_IME` honest (S9) and added the fall-through to D3D12
-(S16). The cells below are not yet updated for those.
+then, 0.3.0 fixed `GpuContext`'s and crcbl-mtl's forced opacity (S16); 0.4.0
+made `TEXT_IME` honest (S9), added the fall-through to D3D12 (S16) and
+cursor-shape-v1 on Wayland (S20, the `CURSOR_SHAPE` cap); and X11 cursor shapes
+are on main after 0.5.0. The cells below are not yet updated for those.
 
 - **CI**: an automated test runs it in that CI job.
 - **unit**: pure tests only.

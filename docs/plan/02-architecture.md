@@ -111,10 +111,10 @@ Checked when choosing the stack (October 2026):
 | `buffr` | winit 0.30 on all three platforms                                            | wgpu 30, `fontdb` + `fontdue`         | Precedent for `fontdb` (system font lookup). winit has no layer-shell, appbar or panel API                                                                                                                                                                                                                  |
 | `pikr`  | floem on **forks** of floem and winit that add layer-shell                   | vello (wgpu)                          | Not a base. pikr is the **other consumer** of the crcbl requirements: its own research wants to leave the forks ([03](03-surfaces-and-input.md#what-crcbl-must-provide))                                                                                                                                    |
 
-crcbl 0.3.0 is on crates.io (released 2026-10-18) and has everything lyr asked
-of it, the asset crate (S28) and `crcbl-font` included, so lyr depends on
-released crcbl crates only. A git dependency would block lyr's own release,
-because `cargo publish` rejects one ([15](15-milestones.md)).
+crcbl 0.5.0 is on crates.io (released 2026-10-19) and has everything lyr asked
+of it, the asset crate (S28), `crcbl-font` and `crcbl-app` included, so lyr
+depends on released crcbl crates only. A git dependency would block lyr's own
+release, because `cargo publish` rejects one ([15](15-milestones.md)).
 
 ## Dependencies (initial)
 
@@ -127,7 +127,7 @@ before it is added.
 | crcbl's image and asset crate (S28)                                                | sources               | image decoding, raw-buffer conversion, resizing and icon-theme lookup, shared with pikr instead of lyr adding `image`, `resvg` and `freedesktop-icons` ([03](03-surfaces-and-input.md#what-crcbl-must-provide))              |
 | `crcbl-font` (`system-fonts` feature)                                              | render                | system font lookup and the glyph fallback order, shared with pikr instead of lyr adding `fontdb` (the owner's choice, 2026-10-17); the `crcbl` umbrella's `system-fonts` feature turns it on                                 |
 | `crcbl-shell`, `crcbl-hal`, `crcbl-vk`, `crcbl-mtl`, `crcbl-dx12`, crcbl's UI pass | shell, render         | Exact versions (`=0.x.y`), bumped deliberately in their own commit, because crcbl breaks every release                                                                                                                       |
-| `crcbl-app` (crcbl 0.4.0)                                                          | render                | the window-plus-device layer (`GpuContext`, backend fall-through, `open_window`, `wait_for_configure`, `TextPump`), split out of the `crcbl` umbrella at lyr's request so lyr links no engine, audio (cpal, ALSA) or physics |
+| `crcbl-app` (since crcbl 0.4.0)                                                    | render                | the window-plus-device layer (`GpuContext`, backend fall-through, `open_window`, `wait_for_configure`, `TextPump`), split out of the `crcbl` umbrella at lyr's request so lyr links no engine, audio (cpal, ALSA) or physics |
 | `clap` 4 (derive)                                                                  | app                   | CLI                                                                                                                                                                                                                          |
 | `anyhow`                                                                           | app                   | binary-level errors                                                                                                                                                                                                          |
 | `thiserror` 2                                                                      | library crates        | typed errors                                                                                                                                                                                                                 |

@@ -37,7 +37,7 @@ Also: `.github/workflows/cron.yml` (`cargo deny` on Mondays at 06:00 UTC),
   `https://github.com/kryptic-sh/crcbl` until crcbl is on crates.io, as tmxr did
   for its crossterm fork. The entry is removed when crcbl publishes.
 - **Toolchain:** lyr's `rust-version` follows crcbl's (1.98 since lyr took on
-  `crcbl-shell` 0.3.0), and is raised with each crcbl bump that raises it.
+  `crcbl-shell`), and is raised with each crcbl bump that raises it.
 - **Linux system packages:** crcbl `dlopen`s libwayland and the Vulkan loader at
   runtime, so they are not needed to build. Whether the Linux runner needs any
   `-dev` packages (crcbl's own docs mention `libasound2-dev` for its audio
@@ -64,7 +64,7 @@ Before the first tag:
 
 - **Every crcbl crate lyr uses is on crates.io**, at a release that has what lyr
   needs. `publish-crates` fails on a git dependency, so this is a hard block.
-  crcbl 0.3.0 (2026-10-18) has all of it, so this holds while lyr avoids git
+  crcbl 0.5.0 (2026-10-19) has all of it, so this holds while lyr avoids git
   pins.
 - lyr is added to the allowlists of the org secrets `AUR_SSH_KEY`,
   `BREW_SSH_KEY` and `SCOOP_SSH_KEY`, and has `CARGO_REGISTRY_TOKEN`.
