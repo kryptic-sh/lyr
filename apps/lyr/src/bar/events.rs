@@ -396,7 +396,11 @@ impl App {
                 self.toast_clicked(Some(Clicked::Action(id, index)));
                 return;
             }
-            (Target::Notification(id) | Target::Action(id, _), Press::Middle) => {
+            (Target::Close(id), Press::Left)
+            | (
+                Target::Notification(id) | Target::Action(id, _) | Target::Close(id),
+                Press::Middle,
+            ) => {
                 self.toast_clicked(Some(Clicked::Dismiss(id)));
                 return;
             }

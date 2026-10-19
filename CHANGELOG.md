@@ -59,7 +59,8 @@ and this project adheres to
   Escape closes it. Weeks start on Monday for now. On Linux, while lyr is the
   notification daemon, the notification centre sits below the calendar: Clear
   All, the do-not-disturb switch, the media players playing (title, artist,
-  previous, play/pause, next) and the history, grouped by app.
+  previous, play/pause, next) and the history, grouped by app, each entry with a
+  close button while the pointer is over it.
 - `lyr --stats` logs the bar's main-loop wake-ups, the events it applied and the
   frames it presented on each output, once a minute, to check that an idle bar
   stays idle.

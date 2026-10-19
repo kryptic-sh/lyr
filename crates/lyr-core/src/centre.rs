@@ -27,6 +27,19 @@ pub enum Target {
     Action(u32, usize),
     /// A media player's control, by the player's index in the list drawn.
     Media(usize, Control),
+    /// The close button of the entry under the pointer.
+    Close(u32),
+}
+
+impl Target {
+    /// The history entry it is part of, if any.
+    #[must_use]
+    pub const fn entry(self) -> Option<u32> {
+        match self {
+            Self::Notification(id) | Self::Action(id, _) | Self::Close(id) => Some(id),
+            Self::ClearAll | Self::Dnd | Self::Media(..) => None,
+        }
+    }
 }
 
 /// Above the do-not-disturb row and the history: swaync's `widget-dnd`
@@ -57,19 +70,34 @@ const fn symbol(control: Control, status: Status) -> &'static str {
     }
 }
 
-/// The centre for `store` and the media `players` at `now`, `width` wide:
-/// its draw list, its size, and what each click lands on, its text measured
-/// by `measure` in lines `line_height` tall.
+/// What the centre shows at a moment.
+#[derive(Clone, Copy, Debug)]
+pub struct Shown<'a> {
+    pub store: &'a Store,
+    pub players: &'a [Player],
+    pub now: Instant,
+    /// The history entry under the pointer, which shows its close button
+    /// as a toast does.
+    pub hovered: Option<u32>,
+}
+
+/// The centre showing `shown`, `width` wide: its draw list, its size, and
+/// what each click lands on, its text measured by `measure` in lines
+/// `line_height` tall.
 #[must_use]
 pub fn draw(
-    store: &Store,
-    players: &[Player],
+    shown: &Shown<'_>,
     width: f32,
-    now: Instant,
     measure: &dyn Fn(&str) -> f32,
     line_height: f32,
     theme: &Theme,
 ) -> (DrawList, Size, Regions<Target>) {
+    let Shown {
+        store,
+        players,
+        now,
+        hovered,
+    } = *shown;
     let mut items = Vec::new();
     let mut regions = Regions::default();
     let label = |text: &str, x: f32, y: f32, colour| Item::Text {
@@ -206,6 +234,17 @@ pub fn draw(
                         ..rect
                     },
                     Target::Action(held.id, index),
+                );
+            }
+            if hovered == Some(held.id) {
+                let (close, rect) = toast::close_button(size.width, measure, line_height, theme);
+                items.extend(close.into_iter().map(|item| item.offset(0.0, y)));
+                regions.push(
+                    Rect {
+                        y: rect.y + y,
+                        ..rect
+                    },
+                    Target::Close(held.id),
                 );
             }
             bottom = y + size.height;

@@ -293,14 +293,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   pointer shows swaync's close button (`toast::close_button`: red, 20 px, 6 px
   in from the top right, from swaync 0.12.6's `NotificationCloseButton` and the
   dotfiles' style; the `toast_close` theme keys), which dismisses; tested on the
-  headless shell and mutation-checked. The notification centre's entries have
-  none yet, where swaync's control centre shows one too. Not built: a toast's
-  images, and markup (the panel's Clear All, switch and media players work;
-  `lyr dnd` and `lyr clear` work; on Windows they answer that lyr is not the
-  daemon, run there). Each action but `default` gets a button under the body
-  (swaync's style, at the bar's text size until the owner rules on swaync's
-  `0.2rem`), in toasts and the panel's history; a click invokes it. A transient
-  notification, kept in no history, closes as expired when its toast times out.
+  headless shell and mutation-checked. The notification centre's entries show it
+  too, in the same place (`centre::Shown::hovered`): swaync's
+  `.control-center .close-button` margins (10 px top, 6 px right) would put it
+  partly outside the entry, since lyr's entries do not keep the 18 px
+  notification margin they count from, so lyr keeps the toast's placement there.
+  Not built: a toast's images, and markup (the panel's Clear All, switch and
+  media players work; `lyr dnd` and `lyr clear` work; on Windows they answer
+  that lyr is not the daemon, run there). Each action but `default` gets a
+  button under the body (swaync's style, at the bar's text size until the owner
+  rules on swaync's `0.2rem`), in toasts and the panel's history; a click
+  invokes it. A transient notification, kept in no history, closes as expired
+  when its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading

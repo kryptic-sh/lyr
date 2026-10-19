@@ -2,10 +2,10 @@ use std::time::Instant;
 
 use lyr_config::{Platform, Theme, from_sources};
 
-use super::{GAP, Target, draw};
+use super::{GAP, Shown, Target, draw};
 use crate::draw::Item;
 use crate::notifications::{Incoming, Store, Urgency};
-use crate::toast::{BORDER, INSET};
+use crate::toast::{BORDER, CLOSE_INSET, CLOSE_SIZE, INSET};
 
 fn theme() -> Theme {
     from_sources(None, Platform::Linux)
@@ -37,10 +37,13 @@ fn notify(store: &mut Store, app: &str, urgency: Urgency, now: Instant) -> u32 {
 fn the_title_row_has_clear_all_at_the_right() {
     let theme = theme();
     let (list, _, regions) = draw(
-        &Store::default(),
-        &[],
+        &Shown {
+            store: &Store::default(),
+            players: &[],
+            now: Instant::now(),
+            hovered: None,
+        },
         WIDTH,
-        Instant::now(),
         &measure,
         LINE,
         &theme,
@@ -61,7 +64,18 @@ fn the_title_row_has_clear_all_at_the_right() {
 fn the_switch_shows_do_not_disturb() {
     let theme = theme();
     let knob = |store: &Store| {
-        let (list, _, regions) = draw(store, &[], WIDTH, Instant::now(), &measure, LINE, &theme);
+        let (list, _, regions) = draw(
+            &Shown {
+                store,
+                players: &[],
+                now: Instant::now(),
+                hovered: None,
+            },
+            WIDTH,
+            &measure,
+            LINE,
+            &theme,
+        );
         // Below the 32 px title row and a gap.
         let switch_y = 32.0 + GAP;
         assert_eq!(regions.hit(WIDTH - 1.0, switch_y), Some(&Target::Dnd));
@@ -92,7 +106,18 @@ fn the_history_follows_the_switch_newest_first() {
     let mut store = Store::default();
     let older = notify(&mut store, "mail", Urgency::Normal, now);
     let newer = notify(&mut store, "chat", Urgency::Normal, now);
-    let (_, size, regions) = draw(&store, &[], WIDTH, now, &measure, LINE, &theme);
+    let (_, size, regions) = draw(
+        &Shown {
+            store: &store,
+            players: &[],
+            now,
+            hovered: None,
+        },
+        WIDTH,
+        &measure,
+        LINE,
+        &theme,
+    );
     let first = 32.0 + GAP + LINE + GAP;
     let entry = 2.0 * (BORDER + INSET) + LINE;
     assert_eq!(regions.hit(1.0, first), Some(&Target::Notification(newer)));
@@ -106,10 +131,13 @@ fn the_history_follows_the_switch_newest_first() {
 #[test]
 fn an_empty_history_ends_at_the_switch() {
     let (_, size, _) = draw(
-        &Store::default(),
-        &[],
+        &Shown {
+            store: &Store::default(),
+            players: &[],
+            now: Instant::now(),
+            hovered: None,
+        },
         WIDTH,
-        Instant::now(),
         &measure,
         LINE,
         &theme(),
@@ -124,7 +152,18 @@ fn entries_of_one_app_sit_closer_than_groups() {
     let mut store = Store::default();
     let first = notify(&mut store, "mail", Urgency::Normal, now);
     let second = notify(&mut store, "mail", Urgency::Normal, now);
-    let (_, _, regions) = draw(&store, &[], WIDTH, now, &measure, LINE, &theme);
+    let (_, _, regions) = draw(
+        &Shown {
+            store: &store,
+            players: &[],
+            now,
+            hovered: None,
+        },
+        WIDTH,
+        &measure,
+        LINE,
+        &theme,
+    );
     let top = 32.0 + GAP + LINE + GAP;
     let entry = 2.0 * (BORDER + INSET) + LINE;
     assert_eq!(regions.hit(1.0, top), Some(&Target::Notification(second)));
@@ -147,7 +186,18 @@ fn an_entry_s_action_button_is_its_own_target() {
         },
         now,
     );
-    let (_, _, regions) = draw(&store, &[], WIDTH, now, &measure, LINE, &theme);
+    let (_, _, regions) = draw(
+        &Shown {
+            store: &store,
+            players: &[],
+            now,
+            hovered: None,
+        },
+        WIDTH,
+        &measure,
+        LINE,
+        &theme,
+    );
     let entry = 32.0 + GAP + LINE + GAP;
     let button_y = entry + BORDER + INSET + LINE + 4.0 + 1.0;
     assert_eq!(
@@ -170,7 +220,18 @@ fn a_media_player_is_a_card_with_its_controls_before_the_history() {
         artist: "Someone".to_owned(),
         status: Status::Playing,
     }];
-    let (list, _, regions) = draw(&store, &players, WIDTH, now, &measure, LINE, &theme);
+    let (list, _, regions) = draw(
+        &Shown {
+            store: &store,
+            players: &players,
+            now,
+            hovered: None,
+        },
+        WIDTH,
+        &measure,
+        LINE,
+        &theme,
+    );
     let card_top = 32.0 + GAP + LINE + GAP;
     // Two lines inside an 8 px padding and a 2 px border.
     let card = 2.0 * (2.0 + 8.0 + LINE);
@@ -204,4 +265,60 @@ fn a_media_player_is_a_card_with_its_controls_before_the_history() {
             .any(|item| matches!(item, Item::Text { text, .. } if *text == pause)),
         "a playing player offers pause"
     );
+}
+
+#[test]
+fn the_entry_under_the_pointer_has_a_close_button() {
+    let theme = theme();
+    let now = Instant::now();
+    let mut store = Store::default();
+    let id = store.notify(
+        Incoming {
+            summary: "hello".to_owned(),
+            ..Incoming::default()
+        },
+        now,
+    );
+    let (_, _, plain) = draw(
+        &Shown {
+            store: &store,
+            players: &[],
+            now,
+            hovered: None,
+        },
+        WIDTH,
+        &measure,
+        LINE,
+        &theme,
+    );
+    assert!(
+        !plain
+            .targets()
+            .any(|target| matches!(target, Target::Close(_)))
+    );
+    let (_, _, regions) = draw(
+        &Shown {
+            store: &store,
+            players: &[],
+            now,
+            hovered: Some(id),
+        },
+        WIDTH,
+        &measure,
+        LINE,
+        &theme,
+    );
+    let entry = 32.0 + GAP + LINE + GAP;
+    let x = WIDTH - CLOSE_INSET - CLOSE_SIZE + 1.0;
+    assert_eq!(
+        regions.hit(x, entry + CLOSE_INSET + 1.0),
+        Some(&Target::Close(id))
+    );
+    assert_eq!(
+        regions.hit(x - 2.0, entry + CLOSE_INSET + 1.0),
+        Some(&Target::Notification(id))
+    );
+    assert_eq!(Target::Close(id).entry(), Some(id));
+    assert_eq!(Target::Notification(id).entry(), Some(id));
+    assert_eq!(Target::ClearAll.entry(), None);
 }

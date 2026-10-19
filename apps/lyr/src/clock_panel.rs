@@ -67,6 +67,8 @@ pub struct ClockPanel {
     /// How far the centre is scrolled up, and how far it can go.
     scroll: f32,
     scroll_max: f32,
+    /// The history entry under the pointer, which shows its close button.
+    hovered: Option<u32>,
     pointer: Pointer,
     surface: Option<Surface>,
     dirty: bool,
@@ -152,6 +154,7 @@ impl ClockPanel {
             },
             scroll: 0.0,
             scroll_max: 0.0,
+            hovered: None,
             pointer: Pointer::default(),
             surface: None,
             dirty: false,
@@ -209,7 +212,7 @@ impl ClockPanel {
             } => return Ok(Outcome::Close),
             _ => {
                 for press in self.pointer.handle(event, self.scale) {
-                    let Some((x, y)) = self.pointer.position() else {
+                    let Some((_, y)) = self.pointer.position() else {
                         continue;
                     };
                     if y >= self.calendar_bottom {
@@ -224,10 +227,7 @@ impl ClockPanel {
                             self.rebuild(look, contents);
                             continue;
                         }
-                        let (ox, oy) = self.centre_origin;
-                        if self.centre_view.contains(x, y)
-                            && let Some(&target) = self.centre.hit(x - ox, y - oy)
-                        {
+                        if let Some(target) = self.centre_target() {
                             return Ok(Outcome::Centre(target, press));
                         }
                         continue;
@@ -248,9 +248,24 @@ impl ClockPanel {
                         self.rebuild(look, contents);
                     }
                 }
+                let hovered = self.centre_target().and_then(Target::entry);
+                if hovered != self.hovered {
+                    self.hovered = hovered;
+                    self.rebuild(look, contents);
+                }
             }
         }
         Ok(Outcome::Kept)
+    }
+
+    /// What in the centre is under the pointer.
+    fn centre_target(&self) -> Option<Target> {
+        let (x, y) = self.pointer.position()?;
+        let (ox, oy) = self.centre_origin;
+        if !self.centre_view.contains(x, y) {
+            return None;
+        }
+        self.centre.hit(x - ox, y - oy).copied()
     }
 
     /// Moves the calendar by `steps` of its mode's unit. Returns whether it
@@ -295,11 +310,15 @@ impl ClockPanel {
         self.centre = Regions::default();
         if let Some(store) = contents.store {
             let top = self.calendar_bottom + centre::GAP;
-            let (list, centre_size, regions) = centre::draw(
+            let shown = centre::Shown {
                 store,
-                contents.players,
+                players: contents.players,
+                now: contents.now,
+                hovered: self.hovered,
+            };
+            let (list, centre_size, regions) = centre::draw(
+                &shown,
                 self.size.width - 2.0 * inset,
-                contents.now,
                 look.measure,
                 look.line_height,
                 look.theme,

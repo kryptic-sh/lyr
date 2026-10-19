@@ -301,3 +301,109 @@ fn a_tall_history_scrolls_by_three_lines_and_no_further_than_it_goes() {
     assert_eq!(setup.panel.scroll, setup.panel.scroll_max, "nor the bottom");
     assert_eq!(setup.panel.mode, Mode::Year, "the calendar did not move");
 }
+
+#[test]
+fn the_entry_under_the_pointer_shows_its_close_button() {
+    let mut setup = setup();
+    let mut store = Store::default();
+    let id = store.notify(
+        lyr_core::notifications::Incoming {
+            summary: "hello".to_owned(),
+            ..lyr_core::notifications::Incoming::default()
+        },
+        Instant::now(),
+    );
+    setup.store = Some(store);
+    setup.lay_out(2000.0);
+    let window = setup.panel.window;
+    let (ox, oy) = setup.panel.centre_origin;
+    let entry = setup
+        .panel
+        .centre
+        .rect(&Target::Notification(id))
+        .expect("an entry");
+    let point = |x: f32, y: f32| PhysicalPoint {
+        x: f64::from(ox + x),
+        y: f64::from(oy + y),
+    };
+    let on_entry = point(entry.x + 5.0, entry.y + entry.height - 5.0);
+    setup
+        .shell
+        .move_pointer(window, on_entry, (0.0, 0.0))
+        .expect("moved");
+    assert_eq!(setup.pump(), Outcome::Kept);
+    assert_eq!(setup.panel.hovered, Some(id));
+    let close = setup
+        .panel
+        .centre
+        .rect(&Target::Close(id))
+        .expect("a close button");
+    let at = point(close.x + 2.0, close.y + 2.0);
+    setup
+        .shell
+        .move_pointer(window, at, (0.0, 0.0))
+        .expect("moved");
+    setup
+        .shell
+        .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
+        .expect("clicked");
+    assert_eq!(
+        setup.pump(),
+        Outcome::Centre(Target::Close(id), Press::Left)
+    );
+    // Over the calendar, no entry is.
+    setup
+        .shell
+        .move_pointer(window, PhysicalPoint { x: 30.0, y: 30.0 }, (0.0, 0.0))
+        .expect("moved");
+    setup.pump();
+    assert_eq!(setup.panel.hovered, None);
+    assert_eq!(
+        setup.panel.centre.rect(&Target::Close(id)),
+        None,
+        "drawn without it"
+    );
+}
+
+#[test]
+fn an_entry_scrolled_up_under_the_calendar_is_not_hovered() {
+    let mut setup = setup();
+    let mut store = Store::default();
+    for summary in 0..20 {
+        store.notify(
+            lyr_core::notifications::Incoming {
+                summary: summary.to_string(),
+                ..lyr_core::notifications::Incoming::default()
+            },
+            Instant::now(),
+        );
+    }
+    setup.store = Some(store);
+    setup.lay_out(1000.0);
+    setup.panel.scroll = setup.panel.scroll_max;
+    setup.lay_out(1000.0);
+    let window = setup.panel.window;
+    let (ox, oy) = setup.panel.centre_origin;
+    let (x, y) = (ox + 5.0, setup.panel.centre_view.y - 5.0);
+    assert!(
+        setup
+            .panel
+            .centre
+            .hit(x - ox, y - oy)
+            .is_some_and(|target| target.entry().is_some()),
+        "an entry lies there, out of view"
+    );
+    setup
+        .shell
+        .move_pointer(
+            window,
+            PhysicalPoint {
+                x: f64::from(x),
+                y: f64::from(y),
+            },
+            (0.0, 0.0),
+        )
+        .expect("moved");
+    setup.pump();
+    assert_eq!(setup.panel.hovered, None);
+}
