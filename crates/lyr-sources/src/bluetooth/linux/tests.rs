@@ -211,6 +211,17 @@ impl RecordingDevice {
             .expect("calls")
             .push(format!("Trusted={on}"));
     }
+    #[zbus(property)]
+    fn alias(&self) -> String {
+        "Buds".to_owned()
+    }
+    #[zbus(property)]
+    fn set_alias(&mut self, alias: String) {
+        self.calls
+            .lock()
+            .expect("calls")
+            .push(format!("Alias={alias}"));
+    }
 }
 
 #[tokio::test]
@@ -255,6 +266,7 @@ async fn the_menu_s_actions_reach_the_adapter_and_the_device() {
     ] {
         bluez.device(DEVICE_PATH, action).await.expect("done");
     }
+    bluez.rename(DEVICE_PATH, "Desk").await.expect("renamed");
     bluez
         .forget(ADAPTER_PATH, DEVICE_PATH)
         .await
@@ -272,6 +284,7 @@ async fn the_menu_s_actions_reach_the_adapter_and_the_device() {
             "Pair",
             "Trusted=true",
             "Trusted=false",
+            "Alias=Desk",
             &format!("RemoveDevice({DEVICE_PATH})"),
         ]
     );

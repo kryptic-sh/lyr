@@ -57,6 +57,8 @@ pub enum BluetoothRequest {
     Device(String, lyr_core::bluetooth_menu::DeviceAction),
     /// The adapter's path, then the device's.
     Forget(String, String),
+    /// The device's path, then its new name.
+    Rename(String, String),
     /// The answer to the pairing agent's question with this id.
     Answer(u64, lyr_core::bluetooth_menu::Reply),
 }
@@ -379,6 +381,7 @@ mod linux {
                     BluetoothRequest::Forget(adapter, device) => {
                         bluez.forget(adapter, device).await
                     }
+                    BluetoothRequest::Rename(device, name) => bluez.rename(device, name).await,
                     BluetoothRequest::Answer(..) => Ok(()),
                 };
                 if let Err(error) = done {

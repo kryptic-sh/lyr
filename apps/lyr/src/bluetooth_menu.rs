@@ -2,9 +2,10 @@
 //! panel at the top left, under the Bluetooth module where a bar shows one,
 //! taking the keyboard. A click on a switch or a device's button is the
 //! caller's to carry out, as is Enter on the one the arrow keys have moved
-//! to, and so is the answer to the pairing agent's question, a PIN typed
-//! into it through the window system's text input; `Escape`, losing focus
-//! and the same click or binding again close it.
+//! to, and so are the answer to the pairing agent's question and a paired
+//! device's new name, what is typed coming through the window system's text
+//! input; `Escape` (once a rename is cancelled), losing focus and the same
+//! click or binding again close it.
 //!
 //! It is a panel rather than a popup so `lyr panel bluetooth` can open it:
 //! a Wayland popup's grab needs the serial of the input that opened it. It is
@@ -15,7 +16,9 @@ use crcbl_shell::{
     ButtonState, CloseReply, KeyCode, LogicalSize, Margins, PanelAnchor, PanelDesc, PanelKeyboard,
     PanelLayer, Reserve, Shell, ShellEvent, TextPurpose, WindowDesc, WindowId, WindowRole,
 };
-use lyr_core::bluetooth_menu::{self, Adapter, Ask, Device, PIN_LENGTH, Question, Reply, Target};
+use lyr_core::bluetooth_menu::{
+    self, Adapter, Ask, Device, Header, PIN_LENGTH, Question, Reply, Target, order,
+};
 use lyr_core::draw::{DrawList, Size};
 use lyr_core::hit::Regions;
 use lyr_core::pointer::Press;
@@ -38,14 +41,28 @@ pub struct BluetoothMenu {
     regions: Regions<Target>,
     /// The keyboard's place, by the target's index in the order drawn.
     focus: Option<usize>,
-    /// The pairing agent's question shown, by the device's name.
-    asked: Option<(String, Question)>,
-    /// The PIN typed so far.
+    /// The devices' paths, in the order drawn.
+    paths: Vec<String>,
+    /// The device being renamed, by its path, until the name is sent or
+    /// the pairing agent asks something.
+    renaming: Option<String>,
+    /// What the header shows.
+    showing: Option<Showing>,
+    /// What has been typed into the header's field.
     typed: String,
     pointer: Pointer,
     scale: f32,
     surface: Option<Surface>,
     dirty: bool,
+}
+
+/// What the menu's header shows.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum Showing {
+    /// The pairing agent's question, by the device's name.
+    Ask(String, Question),
+    /// A new name for the device at this path.
+    Rename(String),
 }
 
 /// What an event did to the menu.
@@ -60,6 +77,8 @@ pub enum Outcome {
     Act(Target),
     /// The pairing agent's question was answered.
     Answer(Reply),
+    /// The device at this path is to take this name.
+    Rename(String, String),
     /// The keyboard moved its place or typed: the menu is to be drawn again.
     Redraw,
 }
@@ -106,7 +125,7 @@ impl BluetoothMenu {
         let (list, size, regions) = bluetooth_menu::draw(
             adapter,
             devices,
-            ask,
+            ask.map(Header::Ask),
             None,
             look.measure,
             look.line_height,
@@ -119,7 +138,9 @@ impl BluetoothMenu {
             list,
             regions,
             focus: None,
-            asked: ask.map(|ask| (ask.device.to_owned(), ask.question)),
+            paths: paths(devices),
+            renaming: None,
+            showing: ask.map(|ask| Showing::Ask(ask.device.to_owned(), ask.question)),
             typed: String::new(),
             pointer: Pointer::default(),
             scale: 1.0,
@@ -130,15 +151,60 @@ impl BluetoothMenu {
         Ok(menu)
     }
 
-    /// Whether a PIN is being asked for.
-    fn asks_pin(&self) -> bool {
-        matches!(self.asked, Some((_, Question::Pin)))
+    /// What the header's field takes, when it has one.
+    const fn field(&self) -> Option<TextPurpose> {
+        match self.showing {
+            Some(Showing::Ask(_, Question::Pin)) => Some(TextPurpose::Pin),
+            Some(Showing::Rename(_)) => Some(TextPurpose::Normal),
+            Some(Showing::Ask(..)) | None => None,
+        }
     }
 
-    /// Has the window system's text input on while a PIN is asked for.
+    /// Has the window system's text input on while the header has a field.
     fn take_typing(&self, shell: &mut dyn Shell) -> anyhow::Result<()> {
-        let field = self.asks_pin().then_some(TextPurpose::Pin);
-        Ok(shell.set_text_input(self.window, field)?)
+        Ok(shell.set_text_input(self.window, self.field())?)
+    }
+
+    /// Brings the header up to date with the agent's question `ask` and
+    /// the `devices`, returning whether it changed; what was typed goes
+    /// when it does.
+    fn follow(&mut self, ask: Option<Ask<'_>>, devices: &[Device]) -> bool {
+        // The agent's question comes first, and a gone device's rename goes.
+        if ask.is_some()
+            || self
+                .renaming
+                .as_ref()
+                .is_some_and(|path| !devices.iter().any(|device| device.path == *path))
+        {
+            self.renaming = None;
+        }
+        let showing = match ask {
+            Some(ask) => Some(Showing::Ask(ask.device.to_owned(), ask.question)),
+            None => self.renaming.clone().map(Showing::Rename),
+        };
+        let changed = showing != self.showing;
+        if changed {
+            self.showing = showing;
+            self.typed.clear();
+        }
+        changed
+    }
+
+    /// The header for the agent's question `ask` or the rename, with what
+    /// was typed.
+    fn header<'a>(&'a self, ask: Option<Ask<'a>>, devices: &'a [Device]) -> Option<Header<'a>> {
+        if let Some(ask) = ask {
+            return Some(Header::Ask(Ask {
+                typed: &self.typed,
+                ..ask
+            }));
+        }
+        let path = self.renaming.as_ref()?;
+        let device = devices.iter().find(|device| device.path == *path)?;
+        Some(Header::Rename {
+            device: &device.alias,
+            typed: &self.typed,
+        })
     }
 
     /// Whether `window` is the menu.
@@ -161,20 +227,12 @@ impl BluetoothMenu {
         devices: &[Device],
         ask: Option<Ask<'_>>,
     ) -> anyhow::Result<()> {
-        let asked = ask.map(|ask| (ask.device.to_owned(), ask.question));
-        let new_question = asked != self.asked;
-        if new_question {
-            self.asked = asked;
-            self.typed.clear();
-        }
-        let ask = ask.map(|ask| Ask {
-            typed: &self.typed,
-            ..ask
-        });
+        let new_header = self.follow(ask, devices);
+        self.paths = paths(devices);
         let (list, size, regions) = bluetooth_menu::draw(
             adapter,
             devices,
-            ask,
+            self.header(ask, devices),
             self.focused(),
             look.measure,
             look.line_height,
@@ -191,7 +249,7 @@ impl BluetoothMenu {
             self.window = create(shell, size, self.left)?;
             self.size = size;
         }
-        if resized || new_question {
+        if resized || new_header {
             self.take_typing(shell)?;
         }
         self.list = list;
@@ -226,14 +284,25 @@ impl BluetoothMenu {
                 shell.reply_close_request(window, CloseReply::Close)?;
                 return Ok(Outcome::Closed);
             }
+            ShellEvent::Key {
+                key_code: Some(KeyCode::Escape),
+                state: ButtonState::Pressed,
+                ..
+            } if self.renaming.is_some() => {
+                self.renaming = None;
+                return Ok(Outcome::Redraw);
+            }
             ShellEvent::Focus { focused: false, .. }
             | ShellEvent::Key {
                 key_code: Some(KeyCode::Escape),
                 state: ButtonState::Pressed,
                 ..
             } => return Ok(Outcome::Close),
-            ShellEvent::TextCommit { ref text, .. } if self.asks_pin() => {
-                let room = PIN_LENGTH - self.typed.chars().count();
+            ShellEvent::TextCommit { ref text, .. } if self.field().is_some() => {
+                let room = match self.field() {
+                    Some(TextPurpose::Pin) => PIN_LENGTH - self.typed.chars().count(),
+                    _ => usize::MAX,
+                };
                 self.typed
                     .extend(text.chars().filter(|c| !c.is_control()).take(room));
                 return Ok(Outcome::Redraw);
@@ -242,7 +311,7 @@ impl BluetoothMenu {
                 key_code: Some(KeyCode::Backspace),
                 state: ButtonState::Pressed,
                 ..
-            } if self.asks_pin() => {
+            } if self.field().is_some() => {
                 self.typed.pop();
                 return Ok(Outcome::Redraw);
             }
@@ -264,10 +333,12 @@ impl BluetoothMenu {
                         self.focus = Some(self.focus.map_or(0, |at| at.saturating_sub(1)));
                         return Ok(Outcome::Redraw);
                     }
-                    // With nothing chosen, Enter sends the PIN typed.
+                    // With nothing chosen, Enter sends what was typed.
                     KeyCode::Enter | KeyCode::NumpadEnter => match self.focused() {
                         Some(target) => return Ok(self.act(target)),
-                        None if self.asks_pin() => return Ok(self.act(Target::Answer(true))),
+                        None if self.field().is_some() => {
+                            return Ok(self.act(Target::Answer(true)));
+                        }
                         None => {}
                     },
                     _ => {}
@@ -285,15 +356,32 @@ impl BluetoothMenu {
         Ok(Outcome::Kept)
     }
 
-    /// What choosing `target` does: an answer to the pairing agent, which
-    /// for a PIN is what was typed (nothing yet answers nothing), or the
-    /// caller's to carry out.
-    fn act(&self, target: Target) -> Outcome {
-        match (target, self.asks_pin()) {
+    /// What choosing `target` does: a rename started, sent or cancelled,
+    /// an answer to the pairing agent, which for a PIN is what was typed
+    /// (nothing yet answers nothing), or the caller's to carry out.
+    fn act(&mut self, target: Target) -> Outcome {
+        let pin = matches!(self.showing, Some(Showing::Ask(_, Question::Pin)));
+        match (target, &self.showing) {
+            (Target::Rename(index), _) => match self.paths.get(index) {
+                Some(path) => {
+                    self.renaming = Some(path.clone());
+                    Outcome::Redraw
+                }
+                None => Outcome::Kept,
+            },
+            (Target::Answer(yes), Some(Showing::Rename(path))) => {
+                let outcome = if yes {
+                    Outcome::Rename(path.clone(), self.typed.clone())
+                } else {
+                    Outcome::Redraw
+                };
+                self.renaming = None;
+                outcome
+            }
             (Target::Answer(false), _) => Outcome::Answer(Reply::No),
-            (Target::Answer(true), false) => Outcome::Answer(Reply::Yes),
-            (Target::Answer(true), true) if self.typed.is_empty() => Outcome::Kept,
-            (Target::Answer(true), true) => Outcome::Answer(Reply::Pin(self.typed.clone())),
+            (Target::Answer(true), _) if pin && self.typed.is_empty() => Outcome::Kept,
+            (Target::Answer(true), _) if pin => Outcome::Answer(Reply::Pin(self.typed.clone())),
+            (Target::Answer(true), _) => Outcome::Answer(Reply::Yes),
             (target, _) => Outcome::Act(target),
         }
     }
@@ -322,6 +410,14 @@ impl BluetoothMenu {
         }
         Ok(())
     }
+}
+
+/// The `devices`' paths, in the order the menu draws them.
+fn paths(devices: &[Device]) -> Vec<String> {
+    order(devices)
+        .into_iter()
+        .map(|device| device.path.clone())
+        .collect()
 }
 
 #[cfg(test)]

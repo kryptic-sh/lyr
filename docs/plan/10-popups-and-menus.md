@@ -226,8 +226,11 @@ It replaces bluetui in a floating terminal, over BlueZ's D-Bus API
 
 The list matches bluetui 0.8.2's documented actions (its README and default key
 bindings, read 2026-10-18): adapter power, pairing and discovery, a scan toggle,
-and for paired devices unpair, trust, favourite and rename. Its source was not
-read; what a favourite does there (it most likely sorts first) is checked in M7.
+and for paired devices unpair, trust, favourite and rename. Its source (master
+`ff92b24`, read 2026-10-19) renames a paired device by setting its alias from a
+text field, and keeps favourites as addresses in a file of its own, sorted first
+among paired devices; where lyr would keep them is open
+([backlog](../backlog.md)).
 
 ## Audio menu
 

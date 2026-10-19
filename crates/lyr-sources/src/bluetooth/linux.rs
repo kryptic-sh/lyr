@@ -56,6 +56,10 @@ trait DeviceControl {
     fn trusted(&self) -> zbus::Result<bool>;
     #[zbus(property)]
     fn set_trusted(&self, on: bool) -> zbus::Result<()>;
+    #[zbus(property)]
+    fn alias(&self) -> zbus::Result<String>;
+    #[zbus(property)]
+    fn set_alias(&self, alias: &str) -> zbus::Result<()>;
 }
 
 /// BlueZ on one connection.
@@ -159,6 +163,21 @@ impl BlueZ {
             DeviceAction::Trust => proxy.set_trusted(true).await,
             DeviceAction::Untrust => proxy.set_trusted(false).await,
         }
+    }
+
+    /// Names the device at `device` `name`; an empty name gives it back the
+    /// name it reports (`Alias` in BlueZ's `doc/org.bluez.Device.rst`).
+    ///
+    /// # Errors
+    ///
+    /// When BlueZ refuses.
+    pub async fn rename(&self, device: &str, name: &str) -> zbus::Result<()> {
+        let proxy = DeviceControlProxy::builder(&self.connection)
+            .path(device.to_owned())
+            .cache_properties(CacheProperties::No)
+            .build()
+            .await?;
+        proxy.set_alias(name).await
     }
 
     /// Forgets the device at `device`: the `adapter` removes it, pairing and

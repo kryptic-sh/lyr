@@ -105,10 +105,45 @@ impl Ask<'_> {
     }
 }
 
+/// The row at the top of the menu.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Header<'a> {
+    /// The pairing agent's question.
+    Ask(Ask<'a>),
+    /// A new name for the device named `device`, `typed` so far. An empty
+    /// one gives the device back the name it reports.
+    Rename { device: &'a str, typed: &'a str },
+}
+
+impl<'a> Header<'a> {
+    /// What it asks, in words.
+    #[must_use]
+    pub fn text(&self) -> String {
+        match self {
+            Self::Ask(ask) => ask.text(),
+            Self::Rename { device, .. } => format!("Name for {device}"),
+        }
+    }
+
+    /// What has been typed, when it asks for typing.
+    #[must_use]
+    pub const fn typed(self) -> Option<&'a str> {
+        match self {
+            Self::Ask(Ask {
+                question: Question::Pin,
+                typed,
+                ..
+            })
+            | Self::Rename { typed, .. } => Some(typed),
+            Self::Ask(_) => None,
+        }
+    }
+}
+
 /// What a click in the menu lands on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
-    /// Yes or No to the agent's question.
+    /// Yes (or OK) or No (or Cancel) to the header.
     Answer(bool),
     Switch(Switch),
     /// The scan toggle.
@@ -116,6 +151,8 @@ pub enum Target {
     /// A device's button, by the device's index in the order drawn
     /// ([`order`]).
     Device(usize, DeviceAction),
+    /// A paired device's Rename button.
+    Rename(usize),
     /// A device's Forget button.
     Forget(usize),
 }
@@ -140,6 +177,7 @@ pub fn order(devices: &[Device]) -> Vec<&Device> {
 #[derive(Clone, Copy)]
 enum Button {
     Action(DeviceAction),
+    Rename,
     Forget,
 }
 
@@ -148,13 +186,15 @@ impl Button {
     const fn target(self, index: usize) -> Target {
         match self {
             Self::Action(action) => Target::Device(index, action),
+            Self::Rename => Target::Rename(index),
             Self::Forget => Target::Forget(index),
         }
     }
 }
 
 /// A device's buttons, left to right: connect or disconnect, pair while it
-/// is not paired, trust or untrust, then Forget.
+/// is not paired, trust or untrust, Rename once it is paired, as bluetui
+/// does, then Forget.
 fn buttons(device: &Device) -> Vec<(&'static str, Button)> {
     let mut buttons = vec![if device.connected {
         ("Disconnect", Button::Action(DeviceAction::Disconnect))
@@ -169,6 +209,9 @@ fn buttons(device: &Device) -> Vec<(&'static str, Button)> {
     } else {
         ("Trust", Button::Action(DeviceAction::Trust))
     });
+    if device.paired {
+        buttons.push(("Rename", Button::Rename));
+    }
     buttons.push(("Forget", Button::Forget));
     buttons
 }
@@ -180,7 +223,7 @@ fn buttons(device: &Device) -> Vec<(&'static str, Button)> {
 pub fn draw(
     adapter: &Adapter,
     devices: &[Device],
-    ask: Option<Ask<'_>>,
+    header: Option<Header<'_>>,
     focus: Option<Target>,
     measure: &dyn Fn(&str) -> f32,
     line_height: f32,
@@ -222,23 +265,28 @@ pub fn draw(
                 .sum::<f32>()
         })
         .fold(2.0 * row, f32::max);
-    let pin = ask.is_some_and(|ask| ask.question == Question::Pin);
-    let answers = if pin {
+    let typed = header.and_then(|header| header.typed());
+    let answers = if typed.is_some() {
         [("OK", true), ("Cancel", false)]
     } else {
         [("Yes", true), ("No", false)]
     };
-    // The PIN's field holds the longest PIN, so typing never resizes it.
+    // The field holds the longest PIN, so typing never resizes it; a longer
+    // name scrolls in it.
     let field_width = measure(&"0".repeat(PIN_LENGTH)) + 2.0 * across;
-    let ask_width = ask.map_or(0.0, |ask| {
-        measure(&ask.text())
-            + if pin { GAP + field_width } else { 0.0 }
+    let header_width = header.map_or(0.0, |header| {
+        measure(&header.text())
+            + if typed.is_some() {
+                GAP + field_width
+            } else {
+                0.0
+            }
             + answers
                 .iter()
                 .map(|(label, _)| GAP + button_width(label))
                 .sum::<f32>()
     });
-    let width = 2.0 * PADDING + (label_width + GAP + buttons_width).max(ask_width);
+    let width = 2.0 * PADDING + (label_width + GAP + buttons_width).max(header_width);
     let mut items = Vec::new();
     let mut regions = Regions::default();
     let text = |text: String, x: f32, y: f32, colour| Item::Text {
@@ -252,23 +300,38 @@ pub fn draw(
         colour,
     };
     let mut y = PADDING;
-    // The agent's question first, where it cannot be missed.
-    if let Some(ask) = ask {
-        items.push(text(ask.text(), PADDING, y, theme.workspace_active));
-        if pin {
-            let x = PADDING + measure(&ask.text()) + GAP;
+    // The header first, where it cannot be missed.
+    if let Some(header) = header {
+        items.push(text(header.text(), PADDING, y, theme.workspace_active));
+        if let Some(typed) = typed {
+            let field = Rect {
+                x: PADDING + measure(&header.text()) + GAP,
+                y,
+                width: field_width,
+                height: row,
+            };
             items.push(Item::Box {
-                rect: Rect {
-                    x,
-                    y,
-                    width: field_width,
-                    height: row,
-                },
+                rect: field,
                 radius: theme.radius as f32,
                 fill: theme.module_background,
                 border: Some((theme.border_width as f32, theme.workspace_active)),
             });
-            items.push(text(ask.typed.to_owned(), x + across, y, theme.foreground));
+            // Its end shows, where the typing is.
+            let inside = field_width - 2.0 * across;
+            let scrolled = (measure(typed) - inside).max(0.0);
+            items.push(Item::Clip {
+                rect: Rect {
+                    x: field.x + across,
+                    width: inside,
+                    ..field
+                },
+                items: vec![text(
+                    typed.to_owned(),
+                    field.x + across - scrolled,
+                    y,
+                    theme.foreground,
+                )],
+            });
         }
         let mut x = width - PADDING;
         for (label, answer) in answers.iter().rev() {

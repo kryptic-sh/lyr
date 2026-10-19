@@ -283,3 +283,111 @@ fn a_new_question_of_the_same_size_still_turns_the_text_input_on() {
         Some(TextPurpose::Pin)
     );
 }
+
+#[test]
+fn a_paired_device_is_renamed_through_a_field_and_escape_cancels_it() {
+    let devices = [device("Buds")];
+    let mut setup = setup(&devices);
+    let theme = setup.theme.clone();
+    let look = Look {
+        theme: &theme,
+        measure: &measure,
+        line_height: 20.0,
+    };
+    let refresh = |setup: &mut Setup| {
+        setup
+            .menu
+            .refresh(&mut setup.shell, &look, &adapter(), &devices, None)
+            .expect("refreshed");
+        let window = setup.menu.window;
+        setup.shell.text_input(window).expect("a window")
+    };
+    assert_eq!(setup.menu.act(Target::Rename(0)), Outcome::Redraw);
+    assert_eq!(refresh(&mut setup), Some(TextPurpose::Normal));
+    let window = setup.menu.window;
+    setup
+        .shell
+        .commit_text(window, "Desk speakers")
+        .expect("typed");
+    assert_eq!(setup.pump(), Outcome::Redraw);
+    assert_eq!(
+        setup.menu.typed.chars().count(),
+        13,
+        "a name is not cut at a PIN's length"
+    );
+    setup
+        .shell
+        .key_press(window, KeyCode::Enter)
+        .expect("a key");
+    assert_eq!(
+        setup.pump(),
+        Outcome::Rename(devices[0].path.clone(), "Desk speakers".to_owned())
+    );
+    assert_eq!(refresh(&mut setup), None, "sent: the field goes");
+    setup.menu.act(Target::Rename(0));
+    refresh(&mut setup);
+    let window = setup.menu.window;
+    setup
+        .shell
+        .key_press(window, KeyCode::Escape)
+        .expect("a key");
+    assert_eq!(setup.pump(), Outcome::Redraw, "the rename, not the menu");
+    assert_eq!(refresh(&mut setup), None);
+    setup.menu.act(Target::Rename(0));
+    refresh(&mut setup);
+    assert_eq!(
+        setup.menu.act(Target::Answer(false)),
+        Outcome::Redraw,
+        "Cancel"
+    );
+    assert_eq!(refresh(&mut setup), None);
+    assert_eq!(
+        setup.menu.act(Target::Rename(5)),
+        Outcome::Kept,
+        "no such device"
+    );
+    setup.menu.act(Target::Rename(0));
+    refresh(&mut setup);
+    setup
+        .menu
+        .refresh(&mut setup.shell, &look, &adapter(), &[], None)
+        .expect("refreshed");
+    let window = setup.menu.window;
+    assert_eq!(
+        (
+            setup.menu.renaming.as_ref(),
+            setup.shell.text_input(window).expect("a window")
+        ),
+        (None, None),
+        "the device went, and its rename with it"
+    );
+}
+
+#[test]
+fn the_agent_s_question_takes_the_header_from_a_rename() {
+    let devices = [device("Buds")];
+    let mut setup = setup(&devices);
+    let theme = setup.theme.clone();
+    let look = Look {
+        theme: &theme,
+        measure: &measure,
+        line_height: 20.0,
+    };
+    setup.menu.act(Target::Rename(0));
+    let ask = Ask {
+        device: "Kbd",
+        question: Question::Authorize,
+        typed: "",
+    };
+    setup
+        .menu
+        .refresh(&mut setup.shell, &look, &adapter(), &devices, Some(ask))
+        .expect("refreshed");
+    assert_eq!(setup.menu.renaming, None);
+    let window = setup.menu.window;
+    assert_eq!(setup.shell.text_input(window).expect("a window"), None);
+    assert_eq!(
+        setup.menu.act(Target::Answer(true)),
+        Outcome::Answer(Reply::Yes)
+    );
+}

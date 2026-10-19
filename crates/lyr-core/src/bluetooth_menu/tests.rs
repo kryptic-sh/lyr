@@ -1,7 +1,7 @@
 use lyr_config::{Platform, Theme, from_sources};
 
 use super::{
-    Adapter, Ask, Device, DeviceAction, GAP, PADDING, Question, Switch, Target, draw, order,
+    Adapter, Ask, Device, DeviceAction, GAP, Header, PADDING, Question, Switch, Target, draw, order,
 };
 use crate::draw::Item;
 
@@ -86,7 +86,8 @@ fn each_device_has_the_buttons_its_state_calls_for() {
     let names = ["Buds", "Phone"];
     assert_eq!(
         buttons_at(&list.items, first + 2.0, &names),
-        ["Disconnect", "Untrust", "Forget"]
+        ["Disconnect", "Untrust", "Rename", "Forget"],
+        "Rename once paired"
     );
     assert_eq!(
         buttons_at(&list.items, second + 2.0, &names),
@@ -153,7 +154,8 @@ fn the_agent_s_question_comes_first_with_yes_and_no() {
         typed: "",
     };
     assert_eq!(ask.text(), "Pair with Buds? Passkey 000042");
-    let (list, size, regions) = draw(&adapter(), &[], Some(ask), None, &measure, LINE, &theme);
+    let header = Some(Header::Ask(ask));
+    let (list, size, regions) = draw(&adapter(), &[], header, None, &measure, LINE, &theme);
     let x = size.width - PADDING - 1.0;
     assert_eq!(
         regions.hit(x, PADDING + 1.0),
@@ -198,7 +200,8 @@ fn a_pin_is_typed_into_a_field_with_ok_and_cancel() {
         typed: "0042",
     };
     assert_eq!(ask.text(), "PIN for Kbd");
-    let (list, size, regions) = draw(&adapter(), &[], Some(ask), None, &measure, LINE, &theme);
+    let header = Some(Header::Ask(ask));
+    let (list, size, regions) = draw(&adapter(), &[], header, None, &measure, LINE, &theme);
     // The question, then a field as wide as the longest PIN with its
     // padding, then OK and Cancel.
     let field = PADDING + 110.0 + GAP;
@@ -211,9 +214,10 @@ fn a_pin_is_typed_into_a_field_with_ok_and_cancel() {
         item,
         Item::Box { rect, .. } if rect.x == field && rect.width == field_width
     )));
-    assert!(list.items.iter().any(
-        |item| matches!(item, Item::Text { text, rect, .. } if text == "0042" && rect.x == field + 8.0)
-    ));
+    assert_eq!(
+        typed_in(&list.items),
+        Some(("0042".to_owned(), field + 8.0))
+    );
     let labels: Vec<&str> = list
         .items
         .iter()
@@ -227,6 +231,65 @@ fn a_pin_is_typed_into_a_field_with_ok_and_cancel() {
     assert_eq!(labels, ["Cancel", "OK"], "drawn right to left");
     let x = size.width - PADDING - 1.0;
     assert_eq!(regions.hit(x, PADDING + 1.0), Some(&Target::Answer(false)));
+}
+
+/// The text typed into the header's field, and where it starts.
+fn typed_in(items: &[Item]) -> Option<(String, f32)> {
+    items.iter().find_map(|item| match item {
+        Item::Clip { items, .. } => match items.as_slice() {
+            [Item::Text { text, rect, .. }] => Some((text.clone(), rect.x)),
+            _ => None,
+        },
+        _ => None,
+    })
+}
+
+#[test]
+fn a_name_longer_than_its_field_scrolls_to_its_end() {
+    let theme = theme();
+    fn header(typed: &str) -> Option<Header<'_>> {
+        Some(Header::Rename {
+            device: "Kbd",
+            typed,
+        })
+    }
+    assert_eq!(
+        header("").map(|header| header.text()).as_deref(),
+        Some("Name for Kbd")
+    );
+    let (list, _, regions) = draw(
+        &adapter(),
+        &[],
+        header("Desk"),
+        None,
+        &measure,
+        LINE,
+        &theme,
+    );
+    // "Name for Kbd" is 120 px.
+    let inside = PADDING + 120.0 + GAP + 8.0;
+    assert_eq!(typed_in(&list.items), Some(("Desk".to_owned(), inside)));
+    let Some(Item::Clip { rect, .. }) = list
+        .items
+        .iter()
+        .find(|item| matches!(item, Item::Clip { .. }))
+    else {
+        panic!("a clip");
+    };
+    assert_eq!(
+        (rect.x, rect.width),
+        (inside, 160.0),
+        "the field less its padding"
+    );
+    assert!(
+        regions
+            .targets()
+            .any(|target| *target == Target::Answer(true))
+    );
+    // 20 characters in a field 16 wide: 40 px out of sight on the left.
+    let long = "A".repeat(20);
+    let (list, _, _) = draw(&adapter(), &[], header(&long), None, &measure, LINE, &theme);
+    assert_eq!(typed_in(&list.items), Some((long.clone(), inside - 40.0)));
 }
 
 #[test]

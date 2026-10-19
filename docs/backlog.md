@@ -17,6 +17,14 @@ implementation follows until they are answered. The ones that block a milestone:
   `LOCALE_IFIRSTDAYOFWEEK`); lyr depends on neither directly. The alternative
   without them is a `clock.first_weekday` config key defaulting to Monday, with
   English names, which a Sunday-first locale would have to set by hand.
+- **Bluetooth favourites need somewhere to live** (M7). bluetui (master
+  `ff92b24`, `src/favorite.rs`, read 2026-10-19) keeps them as device addresses
+  in `favorites.txt` under its data directory, sorts favourites first among
+  paired devices, and marks them. lyr writes no state today. The options: a file
+  lyr writes (`~/.local/share/lyr/`, bluetui's way; the menu toggles it), or a
+  `bluetooth.favourites` list of addresses in `config.toml` (declarative, but
+  lyr never writes the config, so the menu could not toggle it). Or drop
+  favourites: BlueZ's `Trusted` already marks the devices that matter.
 
 ## Cross-repo work
 
@@ -463,7 +471,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked. A question BlueZ gives up on (the agent's `Cancel`) leaves
   the menu. Not built: the source task's side, which keeps each question's
   answer by id, is not tested end to end; the PIN field has never had a real
-  input method behind it; rename, favourites, and the Windows and macOS menus.
+  input method behind it; favourites (below); and the Windows and macOS menus.
+  Rename is built: a paired device's Rename button puts a field for its name at
+  the top of the menu (text input `Normal`, the end of a long name in sight), OK
+  or Enter sets `Device1.Alias` (empty gives back the device's own name), and
+  Cancel or Escape drops it; the agent's question takes the top over from it.
+  Tested on the headless shell and against a recording device on a peer-to-peer
+  connection, mutation-checked; not run against a real BlueZ.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

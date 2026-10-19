@@ -257,6 +257,11 @@ impl App {
                 // The question goes from the menu.
                 self.refresh_bluetooth_menu(shell)?;
             }
+            BluetoothOutcome::Rename(device, name) => {
+                self.bluetooth_rename(device, name);
+                // The name's field goes from the menu.
+                self.refresh_bluetooth_menu(shell)?;
+            }
             BluetoothOutcome::Redraw => self.refresh_bluetooth_menu(shell)?,
         }
         Ok(())
@@ -289,6 +294,7 @@ impl App {
                 };
                 BluetoothRequest::Device(device.path.clone(), action)
             }
+            Target::Rename(_) => return,
             Target::Forget(index) => {
                 let Some(device) = devices.get(index) else {
                     return;
@@ -308,9 +314,21 @@ impl App {
         }
     }
 
+    /// Gives the device at `device` the name `name` (BlueZ's own name back
+    /// when it is empty).
+    #[cfg(target_os = "linux")]
+    fn bluetooth_rename(&self, device: String, name: String) {
+        self.commands
+            .bluetooth(crate::sources::BluetoothRequest::Rename(device, name));
+    }
+
     /// Windows and macOS: the menu has no adapter to open on yet.
     #[cfg(not(target_os = "linux"))]
     fn bluetooth_act(&mut self, _target: lyr_core::bluetooth_menu::Target) {}
+
+    /// Windows and macOS: there is no device to rename.
+    #[cfg(not(target_os = "linux"))]
+    fn bluetooth_rename(&self, _device: String, _name: String) {}
 
     /// Windows and macOS: there is no pairing agent to answer.
     #[cfg(not(target_os = "linux"))]
