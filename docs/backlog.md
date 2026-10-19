@@ -462,10 +462,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   All and the switch act as `lyr clear` and `lyr dnd`, an entry as a toast does,
   and the panel redraws on every change (lyr's own closures now report a change
   as an application's do). The title and switch label are at the bar's text
-  size, not swaync's 2rem. Not built: MPRIS, scrolling a history taller than the
-  panel, reading the first weekday and names from the locale, the smaller
-  monospace `calendar_font`, redrawing at midnight, and checking what Hyprland
-  does with a click on the bare desktop while it is open.
+  size, not swaync's 2rem. The media players' source is built
+  (`lyr_sources::mpris::linux::Players`): every `org.mpris.MediaPlayer2.*` name
+  on the session bus, its title, artists and playback status, re-read on
+  `NameOwnerChanged` or any player's `PropertiesChanged`, and Previous,
+  PlayPause and Next; reading and the controls tested against a fake player and
+  mutation-checked, finding players by name not (it needs a bus). Not built: the
+  MPRIS widget in the panel, scrolling a history taller than the panel, reading
+  the first weekday and names from the locale, the smaller monospace
+  `calendar_font`, redrawing at midnight, and checking what Hyprland does with a
+  click on the bare desktop while it is open.
 - **Undocumented Windows APIs:** virtual desktops
   (`IVirtualDesktopManagerInternal`) and setting the power mode
   (`PowerSetActiveOverlayScheme`) can break with any Windows build.

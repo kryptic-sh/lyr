@@ -15,6 +15,7 @@
 pub mod battery;
 pub mod bluetooth;
 pub mod clock;
+pub mod mpris;
 pub mod notifications;
 pub mod power;
 pub mod power_profile;
