@@ -9,7 +9,7 @@ use crcbl_shell::{
     ShellCaps, WindowDesc, WindowId, WindowRole,
 };
 use lyr_config::{Module, Position, Theme};
-use lyr_core::draw::{self, DrawList, Size, Target};
+use lyr_core::draw::{self, DrawList, Size, Target, TextStyle};
 use lyr_core::hit::{Rect, Regions};
 use lyr_core::tooltip::Tooltip;
 use lyr_render::surface::Surface;
@@ -44,6 +44,9 @@ pub struct Anchor<'a> {
 pub struct Look<'a> {
     pub theme: &'a Theme,
     pub measure: &'a dyn Fn(&str) -> f32,
+    /// The same in a style, for text that may be bold or italic
+    /// (notification markup).
+    pub measure_in: &'a dyn Fn(&str, TextStyle) -> f32,
     pub line_height: f32,
 }
 

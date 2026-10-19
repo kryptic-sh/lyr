@@ -460,6 +460,8 @@ pub struct Theme {
     pub toast_border_critical: Colour,
     /// When it arrived.
     pub toast_time: Colour,
+    /// A link in its body, also underlined.
+    pub toast_link: Colour,
     /// The close button on the toast under the pointer, and its cross.
     pub toast_close: Colour,
     pub toast_close_foreground: Colour,

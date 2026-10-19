@@ -22,7 +22,7 @@ pub const PATH: &str = "/org/freedesktop/Notifications";
 /// The bus name the spec gives the daemon.
 pub const NAME: &str = "org.freedesktop.Notifications";
 /// What `GetCapabilities` answers.
-pub const CAPABILITIES: [&str; 3] = ["actions", "body", "persistence"];
+pub const CAPABILITIES: [&str; 4] = ["actions", "body", "body-markup", "persistence"];
 
 /// What changed in the store, for the bar to redraw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,10 +119,10 @@ impl Daemon {
         Ok(())
     }
 
-    /// Each capability is advertised only once it works: the body is drawn,
-    /// actions get buttons and are invoked, and the history keeps a
-    /// notification until it is dismissed or cleared. Not yet: markup,
-    /// hyperlinks and icons.
+    /// Each capability is advertised only once it works: the body is drawn
+    /// with its markup, actions get buttons and are invoked, and the history
+    /// keeps a notification until it is dismissed or cleared. Not yet:
+    /// hyperlinks (a link is drawn but not opened) and icons.
     fn get_capabilities(&self) -> Vec<String> {
         CAPABILITIES.iter().map(|&name| name.to_owned()).collect()
     }

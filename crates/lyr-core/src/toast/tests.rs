@@ -3,7 +3,8 @@ use std::time::Duration;
 use lyr_config::{Platform, Theme, from_sources};
 
 use super::{BORDER, INSET, TIME_GAP, WIDTH, draw, relative_time, wrap};
-use crate::draw::Item;
+use crate::draw::{Item, TextStyle};
+use crate::markup::{Span, Style, parse, plain};
 use crate::notifications::{Incoming, Urgency};
 
 fn theme() -> Theme {
@@ -12,37 +13,88 @@ fn theme() -> Theme {
         .theme
 }
 
-/// Every character is 10 px wide.
-fn measure(text: &str) -> f32 {
-    text.chars().count() as f32 * 10.0
+/// Every character is 10 px wide, or 15 in bold.
+fn measure(text: &str, style: TextStyle) -> f32 {
+    let each = if style.bold { 15.0 } else { 10.0 };
+    text.chars().count() as f32 * each
+}
+
+/// `text`'s lines in a body 100 px wide, without their styles.
+fn lines(text: &str) -> Vec<String> {
+    wrap(&parse(text), 100.0, measure)
+        .iter()
+        .map(|line| plain(line))
+        .collect()
 }
 
 #[test]
 fn text_wraps_at_spaces_within_the_width() {
-    assert_eq!(
-        wrap("the quick brown fox", 100.0, measure),
-        ["the quick", "brown fox"]
-    );
+    assert_eq!(lines("the quick brown fox"), ["the quick", "brown fox"]);
     // "the quick" is 90 px, and "the quick b" would be 110.
-    assert_eq!(wrap("the quick b", 100.0, measure), ["the quick", "b"]);
-    assert_eq!(wrap("exactly 10", 100.0, measure), ["exactly 10"], "fits");
+    assert_eq!(lines("the quick b"), ["the quick", "b"]);
+    assert_eq!(lines("exactly 10"), ["exactly 10"], "fits");
 }
 
 #[test]
 fn line_breaks_are_kept_and_a_long_word_runs_over() {
-    assert_eq!(wrap("one\ntwo three", 100.0, measure), ["one", "two three"]);
     assert_eq!(
-        wrap("a supercalifragilistic b", 100.0, measure),
+        lines(
+            "one
+two three"
+        ),
+        ["one", "two three"]
+    );
+    assert_eq!(
+        lines("a supercalifragilistic b"),
         ["a", "supercalifragilistic", "b"]
     );
     assert_eq!(
-        wrap("supercalifragilistic b", 100.0, measure),
+        lines("supercalifragilistic b"),
         ["supercalifragilistic", "b"],
         "no empty line before a long first word"
     );
     assert_eq!(
-        wrap("first\n\nthird", 100.0, measure),
+        lines(
+            "first
+
+third"
+        ),
         ["first", "", "third"]
+    );
+    assert_eq!(
+        lines(
+            "one
+two
+"
+        ),
+        ["one", "two"],
+        "as str::lines"
+    );
+    assert!(lines("").is_empty());
+    assert_eq!(lines("  a   b "), ["a b"], "spaces collapse");
+}
+
+#[test]
+fn bold_is_measured_bold_and_the_space_starts_the_next_span() {
+    // "bold words" fits 100 px in the regular face, but "bold" is 60 px.
+    assert_eq!(lines("<b>bold</b> words"), ["bold", "words"]);
+    let bold = Style {
+        bold: true,
+        ..Style::default()
+    };
+    assert_eq!(
+        wrap(&parse("a <b>b c</b>"), 1000.0, measure),
+        [vec![
+            Span {
+                text: "a".to_owned(),
+                style: Style::default()
+            },
+            Span {
+                text: " b c".to_owned(),
+                style: bold
+            },
+        ]],
+        "no span ends in a space"
     );
 }
 
@@ -180,7 +232,11 @@ fn the_summary_stops_short_of_the_time() {
     let text_width = WIDTH - 2.0 * (BORDER + INSET);
     // "Now" is 30 px.
     assert_eq!(width("a summary"), text_width - 30.0 - TIME_GAP);
-    assert_eq!(width("a body"), text_width);
+    assert_eq!(
+        width("a body"),
+        measure("a body that may use the whole width", TextStyle::PLAIN),
+        "the body is not cut for the time"
+    );
 }
 
 fn with_actions() -> Incoming {
@@ -245,4 +301,68 @@ fn a_notification_with_only_the_default_action_has_no_buttons() {
     let (_, size, buttons) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
     assert!(buttons.is_empty());
     assert_eq!(size.height, 2.0 * (BORDER + INSET) + 20.0);
+}
+
+#[test]
+fn the_body_s_spans_follow_one_another_and_a_link_is_blue_and_underlined() {
+    let theme = theme();
+    let content = Incoming {
+        summary: "s".to_owned(),
+        body: "a <b>b</b> <a href=\"https://x\">link</a>".to_owned(),
+        ..Incoming::default()
+    };
+    let (list, _, _) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let body: Vec<(&str, f32, f32, TextStyle, bool)> = list
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Text {
+                text,
+                rect,
+                colour,
+                style,
+            } if rect.y > BORDER + INSET => Some((
+                text.as_str(),
+                rect.x,
+                rect.width,
+                *style,
+                *colour == theme.toast_link,
+            )),
+            _ => None,
+        })
+        .collect();
+    let left = BORDER + INSET;
+    let bold = TextStyle {
+        bold: true,
+        ..TextStyle::PLAIN
+    };
+    let underlined = TextStyle {
+        underline: true,
+        ..TextStyle::PLAIN
+    };
+    assert_eq!(
+        body,
+        [
+            ("a", left, 10.0, TextStyle::PLAIN, false),
+            (" b", left + 10.0, 30.0, bold, false),
+            (" link", left + 40.0, 50.0, underlined, true),
+        ]
+    );
+}
+
+#[test]
+fn a_span_is_cut_at_the_text_s_right_edge() {
+    let theme = theme();
+    let long = "x".repeat(60);
+    let content = Incoming {
+        summary: "s".to_owned(),
+        body: long.clone(),
+        ..Incoming::default()
+    };
+    let (list, _, _) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let width = list.items.iter().find_map(|item| match item {
+        Item::Text { text, rect, .. } if *text == long => Some(rect.width),
+        _ => None,
+    });
+    assert_eq!(width, Some(WIDTH - 2.0 * (BORDER + INSET)), "not 600 px");
 }

@@ -145,7 +145,7 @@ fn the_stack_draws_each_toast_below_the_last() {
     let theme = from_sources(None, Platform::Linux)
         .expect("the defaults")
         .theme;
-    let measure = |text: &str| text.chars().count() as f32 * 10.0;
+    let measure = |text: &str, _| text.chars().count() as f32 * 10.0;
     let start = Instant::now();
     let mut store = Store::default();
     let mut stack = Stack::default();
@@ -207,7 +207,7 @@ fn an_action_button_is_its_own_region_on_top_of_the_toast() {
     let theme = from_sources(None, Platform::Linux)
         .expect("the defaults")
         .theme;
-    let measure = |text: &str| text.chars().count() as f32 * 10.0;
+    let measure = |text: &str, _| text.chars().count() as f32 * 10.0;
     let start = Instant::now();
     let mut store = Store::default();
     let mut stack = Stack::default();
@@ -234,7 +234,7 @@ fn the_toast_under_the_pointer_shows_its_close_button() {
     let theme = from_sources(None, Platform::Linux)
         .expect("the defaults")
         .theme;
-    let measure = |text: &str| text.chars().count() as f32 * 10.0;
+    let measure = |text: &str, _| text.chars().count() as f32 * 10.0;
     let start = Instant::now();
     let mut store = Store::default();
     let mut stack = Stack::default();

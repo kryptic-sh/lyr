@@ -319,7 +319,7 @@ impl ClockPanel {
             let (list, centre_size, regions) = centre::draw(
                 &shown,
                 self.size.width - 2.0 * inset,
-                look.measure,
+                look.measure_in,
                 look.line_height,
                 look.theme,
             );

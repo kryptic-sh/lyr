@@ -30,12 +30,14 @@ and this project adheres to
   exits when one is already running.
 - On Linux lyr is the notification daemon when no other daemon (such as swaync)
   holds the name; `notifications.replace = true` takes it over. It advertises
-  the `actions`, `body` and `persistence` capabilities. Notifications show as
-  toasts at the top right, swaync's look, timed out as swaync times them, held
-  up while the pointer is over them; a click runs the default action, a button
-  under the body runs its action, and a middle click, or the close button the
-  toast under the pointer shows, dismisses. The bell module shows whether any
-  are held and whether do-not-disturb is on.
+  the `actions`, `body`, `body-markup` and `persistence` capabilities: a body's
+  bold, italic, underlined and linked text is drawn so (a link is not opened),
+  and `&amp;` and the other entities read as the characters they stand for.
+  Notifications show as toasts at the top right, swaync's look, timed out as
+  swaync times them, held up while the pointer is over them; a click runs the
+  default action, a button under the body runs its action, and a middle click,
+  or the close button the toast under the pointer shows, dismisses. The bell
+  module shows whether any are held and whether do-not-disturb is on.
 - On Linux a change of time zone (`timedatectl set-timezone`) redraws the clock
   at once.
 - Tooltips on the power button, clock (the time zone and its offset), battery,

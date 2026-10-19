@@ -47,6 +47,7 @@ fn setup() -> Setup {
         &Look {
             theme: &theme,
             measure: &measure,
+            measure_in: &|text, _| measure(text),
             line_height: 20.0,
         },
     )
@@ -69,6 +70,7 @@ impl Setup {
         let look = Look {
             theme: &self.theme,
             measure: &measure,
+            measure_in: &|text, _| measure(text),
             line_height: 20.0,
         };
         let mut outcome = Outcome::Kept;

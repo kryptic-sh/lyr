@@ -153,8 +153,8 @@ async fn the_server_says_what_it_is_and_what_it_can_do() {
     assert_eq!((name.as_str(), spec.as_str()), ("lyr", "1.3"));
     assert_eq!(
         running.client.get_capabilities().await.expect("answered"),
-        ["actions", "body", "persistence"],
-        "not markup, hyperlinks or icons, which lyr does not draw yet"
+        ["actions", "body", "body-markup", "persistence"],
+        "not hyperlinks or icons, which lyr does not open or draw yet"
     );
 }
 

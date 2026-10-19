@@ -201,6 +201,7 @@ impl App {
                         let look = Look {
                             theme: &self.config.theme,
                             measure: &|s: &str| self.text.measure(s),
+                            measure_in: &|s: &str, style| self.text.measure_in(s, style),
                             line_height: self.text.line_height(),
                         };
                         self.power_menu = PowerMenu::open(
@@ -348,6 +349,7 @@ impl App {
         let look = Look {
             theme: &self.config.theme,
             measure: &|s: &str| self.text.measure(s),
+            measure_in: &|s: &str, style| self.text.measure_in(s, style),
             line_height: self.text.line_height(),
         };
         let store = self.data.notification_store().map(|store| {
@@ -430,6 +432,7 @@ impl App {
         let look = Look {
             theme: &self.config.theme,
             measure: &|s: &str| self.text.measure(s),
+            measure_in: &|s: &str, style| self.text.measure_in(s, style),
             line_height: self.text.line_height(),
         };
         match menu.event(shell, event, &look)? {

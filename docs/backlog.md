@@ -184,9 +184,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   measured and drawn as one glyph run per face (`text::Text`), sRGB colours in
   linear light (`colour::linear`), and lyr's draw list as crcbl-ui commands
   (`translate`), tested on Windows and Linux (WSL) and mutation-checked.
-  `fonts::load` itself is untested: it depends on what is installed. Presenting
-  is `surface::Surface` (crcbl-app's `Presenter` per bar, D3D12 asked for first
-  on Windows, crcbl-frame's `UiRenderer::with_ring`, as
+  `fonts::load` itself is untested: it depends on what is installed, including
+  the family's bold and italic faces it now loads for markup (`text::Text` picks
+  among them with crcbl-ui's `select_face`, which synthesises a face the family
+  lacks; underlines sit where the font's `post` table says, transcribed from
+  crcbl-ui's private `tree::emit::underline`). Presenting is `surface::Surface`
+  (crcbl-app's `Presenter` per bar, D3D12 asked for first on Windows,
+  crcbl-frame's `UiRenderer::with_ring`, as
   `crates/crcbl-app/examples/ui_window.rs` does), and `lyr` with no command now
   runs the main loop (`apps/lyr/src/bar.rs`): the config and font, a bar per
   output, a surface opened on each bar's first resize, and a redraw on the
@@ -299,8 +303,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   place (`centre::Shown::hovered`): swaync's `.control-center .close-button`
   margins (10 px top, 6 px right) would put it partly outside the entry, since
   lyr's entries do not keep the 18 px notification margin they count from, so
-  lyr keeps the toast's placement there. Not built: a toast's images, and markup
-  (the panel's Clear All, switch and media players work; `lyr dnd` and
+  lyr keeps the toast's placement there. A body's markup is drawn
+  (`lyr_core::markup`: the spec's `<b>`, `<i>`, `<u>` and `<a href>`, XML's
+  entities, `<img>` left out, anything else shown as text; `toast::wrap` wraps
+  the styled spans), and `body-markup` is advertised. Not built: a toast's
+  images (the panel's Clear All, switch and media players work; `lyr dnd` and
   `lyr clear` work; on Windows they answer that lyr is not the daemon, run
   there). Each action but `default` gets a button under the body (swaync's
   style, at the bar's text size until the owner rules on swaync's `0.2rem`), in
@@ -413,10 +420,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   NetworkManager (plan 10 has them from the online API reference) (M7);
   bluetui's and wiremix's source, beyond the READMEs plan 10 now follows (M7);
   the Windows and macOS menu APIs (M9, M10).
-- **Opening a notification's link** (M6). The spec asks for `<a href>` links and
-  lyr advertises `body-hyperlinks`, but a link comes from any program on the
-  session bus, so how a click opens it (the system's URL handler, which schemes,
-  a confirmation) is a security choice to make in M6, not a default.
+- **Opening a notification's link** (M6). lyr draws a body's `<a href>` link (in
+  `toast_link`, underlined) but does not open it, and does not advertise
+  `body-hyperlinks`; a link comes from any program on the session bus, so how a
+  click opens it (the system's URL handler, which schemes, a confirmation) is a
+  security choice to make in M6, not a default.
 - **Two swaync style values that look like slips** (M6, the owner's call):
   `font-family: 'Hadk Nerd Font'` names no font, so swaync falls back today (lyr
   defaults to the bar's font), and action buttons are `0.2rem`, about 3 px

@@ -2,10 +2,9 @@
 //! wrapped to the toast's width, and its draw list, in swaync's look from the
 //! dotfiles' `config.json` and `style.css`.
 //!
-//! Drawn so far: the summary over the body, when it arrived, the border
-//! coloured by urgency, a button per action, and the close button. Not yet:
-//! images, and body markup (lyr advertises no `body-markup`, so applications
-//! send plain text).
+//! Drawn so far: the summary over the body, the body's markup, when it
+//! arrived, the border coloured by urgency, a button per action, and the
+//! close button. Not yet: images.
 
 pub mod stack;
 
@@ -15,6 +14,7 @@ use lyr_config::Theme;
 
 use crate::draw::{DrawList, Item, Size, TextStyle};
 use crate::hit::Rect;
+use crate::markup::{self, Span, Style};
 use crate::notifications::{Incoming, Urgency};
 
 /// swaync's `notification-window-width`.
@@ -51,29 +51,102 @@ pub const DEFAULT_ACTION: &str = "default";
 /// long summary short: lyr's own, since swaync ellipsizes instead.
 pub const TIME_GAP: f32 = 8.0;
 
-/// `text` broken into lines no wider than `width`, at spaces, keeping its own
-/// line breaks. A word wider than `width` gets a line of its own and runs
-/// past it.
+/// How a span in `style` is drawn: a link underlined.
 #[must_use]
-pub fn wrap(text: &str, width: f32, measure: impl Fn(&str) -> f32) -> Vec<String> {
+pub const fn text_style(style: Style) -> TextStyle {
+    TextStyle {
+        bold: style.bold,
+        italic: style.italic,
+        underline: style.underline || style.link,
+    }
+}
+
+/// `spans` broken into lines no wider than `width`, at spaces, keeping the
+/// text's own line breaks, each line in spans of one style. A word wider
+/// than `width` gets a line of its own and runs past it. The space between
+/// two words starts the second one's span: a span's width does not count a
+/// space at its end.
+#[must_use]
+pub fn wrap(
+    spans: &[Span],
+    width: f32,
+    measure: impl Fn(&str, TextStyle) -> f32,
+) -> Vec<Vec<Span>> {
+    let width_of = |line: &[Span]| -> f32 {
+        line.iter()
+            .map(|span| measure(&span.text, text_style(span.style)))
+            .sum()
+    };
     let mut lines = Vec::new();
-    for paragraph in text.lines() {
-        let mut line = String::new();
-        for word in paragraph.split_whitespace() {
-            let candidate = if line.is_empty() {
-                word.to_owned()
-            } else {
-                format!("{line} {word}")
-            };
-            if line.is_empty() || measure(&candidate) <= width {
+    for paragraph in paragraphs(spans) {
+        let mut line = Vec::new();
+        for word in words(&paragraph) {
+            if line.is_empty() {
+                line = word;
+                continue;
+            }
+            let mut candidate = line.clone();
+            let mut spaced = word.clone();
+            spaced[0].text.insert(0, ' ');
+            append(&mut candidate, spaced);
+            if width_of(&candidate) <= width {
                 line = candidate;
             } else {
-                lines.push(std::mem::replace(&mut line, word.to_owned()));
+                lines.push(std::mem::replace(&mut line, word));
             }
         }
         lines.push(line);
     }
     lines
+}
+
+/// The text's lines, as `str::lines` splits them: a final line break ends
+/// the last line rather than starting another.
+fn paragraphs(spans: &[Span]) -> Vec<Vec<(char, Style)>> {
+    let chars: Vec<(char, Style)> = spans
+        .iter()
+        .flat_map(|span| span.text.chars().map(move |c| (c, span.style)))
+        .collect();
+    // A `\r` before a line break is whitespace, which a line's words leave
+    // out.
+    let mut paragraphs: Vec<Vec<(char, Style)>> = chars
+        .split(|&(c, _)| c == '\n')
+        .map(<[(char, Style)]>::to_vec)
+        .collect();
+    if chars.last().is_none_or(|&(c, _)| c == '\n') {
+        paragraphs.pop();
+    }
+    paragraphs
+}
+
+/// A line's words, each in spans of one style.
+fn words(line: &[(char, Style)]) -> Vec<Vec<Span>> {
+    line.split(|&(c, _)| c.is_whitespace())
+        .filter(|word| !word.is_empty())
+        .map(|word| {
+            let mut spans = Vec::new();
+            for &(c, style) in word {
+                append(
+                    &mut spans,
+                    vec![Span {
+                        text: String::from(c),
+                        style,
+                    }],
+                );
+            }
+            spans
+        })
+        .collect()
+}
+
+/// Adds `more` to the end of `line`, joining spans of one style.
+fn append(line: &mut Vec<Span>, more: Vec<Span>) {
+    for span in more {
+        match line.last_mut() {
+            Some(last) if last.style == span.style => last.text.push_str(&span.text),
+            _ => line.push(span),
+        }
+    }
 }
 
 /// The close button of a toast `width` wide, which swaync shows while the
@@ -82,7 +155,7 @@ pub fn wrap(text: &str, width: f32, measure: impl Fn(&str) -> f32) -> Vec<String
 #[must_use]
 pub fn close_button(
     width: f32,
-    measure: impl Fn(&str) -> f32,
+    measure: impl Fn(&str, TextStyle) -> f32,
     line_height: f32,
     theme: &Theme,
 ) -> ([Item; 2], Rect) {
@@ -92,7 +165,7 @@ pub fn close_button(
         width: CLOSE_SIZE,
         height: CLOSE_SIZE,
     };
-    let cross = measure(CLOSE);
+    let cross = measure(CLOSE, TextStyle::PLAIN);
     let items = [
         Item::Box {
             rect,
@@ -136,7 +209,7 @@ pub fn relative_time(elapsed: Duration) -> String {
 /// toast is [`WIDTH`]; the clock panel's history is as wide as the panel):
 /// its draw list, its size, and its action buttons' rects by the action's
 /// index in `content.actions`, its text measured by `measure` in lines
-/// `line_height` tall.
+/// `line_height` tall. The body is markup ([`markup`]).
 ///
 /// The buttons share a row under the body, as swaync's do, at the bar's
 /// text size: swaync's `font-size: 0.2rem` is one of the slips plan 09 asks
@@ -146,13 +219,13 @@ pub fn draw(
     content: &Incoming,
     elapsed: Duration,
     width: f32,
-    measure: impl Fn(&str) -> f32,
+    measure: impl Fn(&str, TextStyle) -> f32,
     line_height: f32,
     theme: &Theme,
 ) -> (DrawList, Size, Vec<(usize, Rect)>) {
+    let plain = |text: &str| measure(text, TextStyle::PLAIN);
     let text_width = width - 2.0 * (BORDER + INSET);
-    let mut lines = vec![content.summary.clone()];
-    lines.extend(wrap(&content.body, text_width, &measure));
+    let body = wrap(&markup::parse(&content.body), text_width, &measure);
     let actions: Vec<(usize, &str)> = content
         .actions
         .iter()
@@ -166,7 +239,8 @@ pub fn draw(
     } else {
         button_height + 2.0 * BUTTON_MARGIN
     };
-    let text_bottom = BORDER + INSET + line_height * lines.len() as f32;
+    // The summary's line, then the body's.
+    let text_bottom = BORDER + INSET + line_height * (1 + body.len()) as f32;
     let size = Size {
         width,
         height: text_bottom + buttons_height + BORDER + INSET,
@@ -189,7 +263,7 @@ pub fn draw(
     }];
     // On the summary's line, at the right, as swaync places it.
     let time = relative_time(elapsed);
-    let time_width = measure(&time);
+    let time_width = plain(&time);
     items.push(Item::Text {
         rect: Rect {
             x: width - BORDER - INSET - time_width,
@@ -201,23 +275,42 @@ pub fn draw(
         colour: theme.toast_time,
         style: TextStyle::PLAIN,
     });
-    for (index, text) in lines.into_iter().enumerate() {
-        let width = if index == 0 {
-            (text_width - time_width - TIME_GAP).max(0.0)
-        } else {
-            text_width
-        };
-        items.push(Item::Text {
-            rect: Rect {
-                x: BORDER + INSET,
-                y: BORDER + INSET + line_height * index as f32,
-                width,
-                height: line_height,
-            },
-            text,
-            colour: theme.toast_foreground,
-            style: TextStyle::PLAIN,
-        });
+    items.push(Item::Text {
+        rect: Rect {
+            x: BORDER + INSET,
+            y: BORDER + INSET,
+            width: (text_width - time_width - TIME_GAP).max(0.0),
+            height: line_height,
+        },
+        text: content.summary.clone(),
+        colour: theme.toast_foreground,
+        style: TextStyle::PLAIN,
+    });
+    // Each span after the last, cut at the text's right edge.
+    let right = BORDER + INSET + text_width;
+    for (index, line) in body.into_iter().enumerate() {
+        let y = BORDER + INSET + line_height * (index + 1) as f32;
+        let mut x = BORDER + INSET;
+        for span in line {
+            let style = text_style(span.style);
+            let span_width = measure(&span.text, style);
+            items.push(Item::Text {
+                rect: Rect {
+                    x,
+                    y,
+                    width: span_width.min(right - x).max(0.0),
+                    height: line_height,
+                },
+                text: span.text,
+                colour: if span.style.link {
+                    theme.toast_link
+                } else {
+                    theme.toast_foreground
+                },
+                style,
+            });
+            x += span_width;
+        }
     }
     let mut buttons = Vec::new();
     if !actions.is_empty() {
@@ -237,7 +330,7 @@ pub fn draw(
                 fill: theme.toast_background,
                 border: Some((BORDER, theme.toast_border)),
             });
-            let label_width = measure(label).min(rect.width - 2.0 * (BUTTON_PADDING + BORDER));
+            let label_width = plain(label).min(rect.width - 2.0 * (BUTTON_PADDING + BORDER));
             items.push(Item::Text {
                 rect: Rect {
                     x: rect.x + (rect.width - label_width) / 2.0,

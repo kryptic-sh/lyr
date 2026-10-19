@@ -224,6 +224,7 @@ impl App {
         let look = Look {
             theme: &self.config.theme,
             measure: &|s: &str| self.text.measure(s),
+            measure_in: &|s: &str, style| self.text.measure_in(s, style),
             line_height: self.text.line_height(),
         };
         let store = self
@@ -248,6 +249,7 @@ impl App {
         let look = Look {
             theme: &self.config.theme,
             measure: &|s: &str| self.text.measure(s),
+            measure_in: &|s: &str, style| self.text.measure_in(s, style),
             line_height: self.text.line_height(),
         };
         let today = Local::now().date_naive();
@@ -275,6 +277,7 @@ impl App {
         let look = Look {
             theme: &self.config.theme,
             measure: &|s: &str| self.text.measure(s),
+            measure_in: &|s: &str, style| self.text.measure_in(s, style),
             line_height: self.text.line_height(),
         };
         self.bluetooth_menu = Some(
@@ -313,6 +316,7 @@ impl App {
         let look = Look {
             theme: &self.config.theme,
             measure: &|s: &str| self.text.measure(s),
+            measure_in: &|s: &str, style| self.text.measure_in(s, style),
             line_height: self.text.line_height(),
         };
         menu.refresh(
@@ -367,6 +371,7 @@ impl App {
         let look = Look {
             theme: &config.theme,
             measure: &|s: &str| text.measure(s),
+            measure_in: &|s: &str, style| text.measure_in(s, style),
             line_height: text.line_height(),
         };
         for (&bar, window) in windows.iter_mut() {

@@ -71,6 +71,7 @@ impl Setup {
                 &Look {
                     theme: &self.theme,
                     measure: &measure,
+                    measure_in: &|text, _| measure(text),
                     line_height: 20.0,
                 },
                 |_| text.map(str::to_owned),

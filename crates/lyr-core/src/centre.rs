@@ -88,7 +88,7 @@ pub struct Shown<'a> {
 pub fn draw(
     shown: &Shown<'_>,
     width: f32,
-    measure: &dyn Fn(&str) -> f32,
+    measure: &dyn Fn(&str, TextStyle) -> f32,
     line_height: f32,
     theme: &Theme,
 ) -> (DrawList, Size, Regions<Target>) {
@@ -98,13 +98,14 @@ pub fn draw(
         now,
         hovered,
     } = *shown;
+    let plain = |text: &str| measure(text, TextStyle::PLAIN);
     let mut items = Vec::new();
     let mut regions = Regions::default();
     let label = |text: &str, x: f32, y: f32, colour| Item::Text {
         rect: Rect {
             x,
             y,
-            width: measure(text),
+            width: plain(text),
             height: line_height,
         },
         text: text.to_owned(),
@@ -115,9 +116,9 @@ pub fn draw(
     // The title and Clear All.
     let (across, down) = BUTTON_PADDING;
     let button = Rect {
-        x: width - (measure("Clear All") + 2.0 * (across + BORDER)),
+        x: width - (plain("Clear All") + 2.0 * (across + BORDER)),
         y: 0.0,
-        width: measure("Clear All") + 2.0 * (across + BORDER),
+        width: plain("Clear All") + 2.0 * (across + BORDER),
         height: line_height + 2.0 * (down + BORDER),
     };
     let row = button.height;
@@ -177,9 +178,9 @@ pub fn draw(
         for control in [Control::Next, Control::PlayPause, Control::Previous] {
             let text = symbol(control, player.status);
             let button = Rect {
-                x: right - measure(text),
+                x: right - plain(text),
                 y: middle,
-                width: measure(text),
+                width: plain(text),
                 height: line_height,
             };
             items.push(label(text, button.x, button.y, theme.panel_foreground));

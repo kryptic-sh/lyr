@@ -70,6 +70,7 @@ fn setup(devices: &[Device]) -> Setup {
     let look = Look {
         theme: &theme,
         measure: &measure,
+        measure_in: &|text, _| measure(text),
         line_height: 20.0,
     };
     let menu =
@@ -114,6 +115,7 @@ fn a_refresh_keeps_the_window_unless_the_size_changes() {
     let look = Look {
         theme: &theme,
         measure: &measure,
+        measure_in: &|text, _| measure(text),
         line_height: 20.0,
     };
     setup
@@ -187,6 +189,7 @@ fn a_pin_is_typed_with_the_text_input_on_and_sent_with_enter() {
     let look = Look {
         theme: &theme,
         measure: &measure,
+        measure_in: &|text, _| measure(text),
         line_height: 20.0,
     };
     let ask = Ask {
@@ -248,6 +251,7 @@ fn a_new_question_of_the_same_size_still_turns_the_text_input_on() {
     let look = Look {
         theme: &theme,
         measure: &measure,
+        measure_in: &|text, _| measure(text),
         line_height: 20.0,
     };
     let ask = |question| Ask {
@@ -292,6 +296,7 @@ fn a_paired_device_is_renamed_through_a_field_and_escape_cancels_it() {
     let look = Look {
         theme: &theme,
         measure: &measure,
+        measure_in: &|text, _| measure(text),
         line_height: 20.0,
     };
     let refresh = |setup: &mut Setup| {
@@ -371,6 +376,7 @@ fn the_agent_s_question_takes_the_header_from_a_rename() {
     let look = Look {
         theme: &theme,
         measure: &measure,
+        measure_in: &|text, _| measure(text),
         line_height: 20.0,
     };
     setup.menu.act(Target::Rename(0));

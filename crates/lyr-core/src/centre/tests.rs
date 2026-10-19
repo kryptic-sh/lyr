@@ -3,7 +3,7 @@ use std::time::Instant;
 use lyr_config::{Platform, Theme, from_sources};
 
 use super::{GAP, Shown, Target, draw};
-use crate::draw::Item;
+use crate::draw::{Item, TextStyle};
 use crate::notifications::{Incoming, Store, Urgency};
 use crate::toast::{BORDER, CLOSE_INSET, CLOSE_SIZE, INSET};
 
@@ -14,7 +14,7 @@ fn theme() -> Theme {
 }
 
 /// Every character is 10 px wide.
-fn measure(text: &str) -> f32 {
+fn measure(text: &str, _: TextStyle) -> f32 {
     text.chars().count() as f32 * 10.0
 }
 

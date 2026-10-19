@@ -162,7 +162,7 @@ impl Toasts {
         let (list, size, regions) = {
             let store = store.lock().unwrap_or_else(PoisonError::into_inner);
             self.stack
-                .draw(&store, now, look.measure, look.line_height, look.theme)
+                .draw(&store, now, look.measure_in, look.line_height, look.theme)
         };
         self.relabel_at = {
             let store = store.lock().unwrap_or_else(PoisonError::into_inner);
