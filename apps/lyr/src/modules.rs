@@ -122,6 +122,10 @@ fn content(
         colour,
     };
     match module {
+        Module::Power => Some(label(
+            config.power.format.render(|_| None),
+            theme.foreground,
+        )),
         Module::Clock => Some(label(
             clock::view(now, None, &config.clock.format).text,
             theme.foreground,
@@ -182,6 +186,7 @@ pub fn tooltip(
     now: &DateTime<FixedOffset>,
 ) -> Option<String> {
     match module {
+        Module::Power => Some(config.power.tooltip_format.render(|_| None)),
         Module::Clock => Some(clock::view(now, zone().as_deref(), &config.clock.format).tooltip),
         Module::Battery => Some(battery::view(data.battery.as_ref()?, &config.battery).tooltip),
         #[cfg(target_os = "linux")]
@@ -247,7 +252,31 @@ pub fn shown_workspaces<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::zone_name;
+    use chrono::DateTime;
+    use lyr_config::{Module, Platform, from_sources};
+    use lyr_core::draw::Content;
+
+    use super::{Data, content, tooltip, zone_name};
+
+    #[test]
+    fn the_power_button_is_its_glyph_with_its_tooltip() {
+        let config = from_sources(None, Platform::current()).expect("the defaults");
+        let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+        let data = Data::default();
+        let glyph = char::from_u32(0xF011).expect("a char").to_string();
+        assert_eq!(
+            content(Module::Power, &config, &data, &now, None, None),
+            Some(Content::Label {
+                text: glyph,
+                compact: None,
+                colour: config.theme.foreground,
+            })
+        );
+        assert_eq!(
+            tooltip(Module::Power, &config, &data, &now).as_deref(),
+            Some("Power Button")
+        );
+    }
 
     #[test]
     fn a_zone_is_named_from_tz_or_a_zoneinfo_path() {

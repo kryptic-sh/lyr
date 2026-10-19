@@ -182,7 +182,6 @@ pub struct Power {
 }
 
 /// The notification bell (`docs/plan/09-notifications.md#the-bell-module`).
-/// Its glyphs come with the notification daemon (M6).
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Notifications {

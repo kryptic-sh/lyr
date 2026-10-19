@@ -1,10 +1,10 @@
 //! Running the bar: the main loop that keeps a bar on every output, draws it
 //! and answers the pointer (`docs/plan/02-architecture.md`).
 //!
-//! It draws the modules that have data: the clock everywhere, and on Linux
-//! the battery and the workspaces once their sources report
-//! ([`crate::sources`]). A module with no data yet is left out rather than
-//! drawn empty.
+//! It draws the modules that have data: the power button and the clock
+//! everywhere, and on Linux the battery, power profile, Bluetooth and the
+//! workspaces once their sources report ([`crate::sources`]). A module with no
+//! data yet is left out rather than drawn empty.
 //!
 //! The loop's state is [`App`]; what it does with a control request is in
 //! `requests`, with a window-system event in `events`, and one bar window's

@@ -271,15 +271,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   and moving onto another button redraws the bar. Tooltips are built
   (`apps/lyr/src/tooltips.rs`): timed as GTK 3 does (`lyr_core::tooltip`), a
   passthrough popup below the module (above it on a bottom bar) drawn by
-  `lyr_core::draw::tooltip`, for the clock, battery, power profile and
-  Bluetooth; tested on crcbl's headless shell and mutation-checked. Seen on
-  Windows: the clock's `UTC+08:00` tooltip opened below it. **Known issue on
-  Windows:** once the popup is open, the bar gets no pointer-leave from crcbl
-  0.5.0's Win32 backend, so the tooltip stays up after the pointer leaves the
-  bar (with no popup, the leave arrives). Seen with a scripted `SetCursorPos`,
-  not a physical mouse; reported to crcbl on 2026-10-19. Not done: a tooltip
-  whose module moves while it is open keeps its old place, and a tooltip of more
-  than one line is drawn as one.
+  `lyr_core::draw::tooltip`, for the power button, clock, battery, power profile
+  and Bluetooth; tested on crcbl's headless shell and mutation-checked. Seen on
+  Windows: the clock's `UTC+08:00` and the power button's "Power Button"
+  tooltips opened below them. **Known issue on Windows:** once the popup is
+  open, the bar gets no pointer-leave from crcbl 0.5.0's Win32 backend, so the
+  tooltip stays up after the pointer leaves the bar (with no popup, the leave
+  arrives). Seen with a scripted `SetCursorPos`, not a physical mouse; reported
+  to crcbl on 2026-10-19, which found the cause (`TME_LEAVE` armed only on the
+  first move after a leave, so nothing re-arms it once the popup cancels it) and
+  targets the fix for 0.6.0. Not done: a tooltip whose module moves while it is
+  open keeps its old place, and a tooltip of more than one line is drawn as one.
 - **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second

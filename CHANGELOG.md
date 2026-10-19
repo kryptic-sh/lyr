@@ -12,10 +12,10 @@ and this project adheres to
 
 - `lyr` with no command runs the bar: one transparent bar along the top of every
   output (a layer-shell panel on Wayland, an appbar on Windows), drawn through
-  crcbl, with the clock module, and on Linux the battery (from UPower), the
-  power profile (from power-profiles-daemon; a click cycles it), Bluetooth (from
-  BlueZ, with a connected device's battery) and the Hyprland workspaces. The
-  other modules are not drawn yet.
+  crcbl, with the power button and the clock module, and on Linux the battery
+  (from UPower), the power profile (from power-profiles-daemon; a click cycles
+  it), Bluetooth (from BlueZ, with a connected device's battery) and the
+  Hyprland workspaces. The other modules are not drawn yet.
 - Clicking a workspace switches to it, and with `workspaces.scroll = true` the
   wheel steps through them. A module's `[<module>.on]` table binds clicks and
   scrolling to a command (`{ exec = "…" }`) or a built-in action. Of the
@@ -25,9 +25,9 @@ and this project adheres to
   the bars. `lyr panel`, `lyr dnd` and `lyr clear` reach it over its control
   socket and report that they are not implemented yet. A second `lyr` exits when
   one is already running.
-- Tooltips on the clock (the time zone and its offset), battery, power profile
-  and Bluetooth modules, shown after half a second on a module and quickly when
-  moving from one to the next, as waybar's GTK tooltips are.
+- Tooltips on the power button, clock (the time zone and its offset), battery,
+  power profile and Bluetooth modules, shown after half a second on a module and
+  quickly when moving from one to the next, as waybar's GTK tooltips are.
 - `lyr --stats` logs the bar's main-loop wake-ups, the events it applied and the
   frames it presented on each output, once a minute, to check that an idle bar
   stays idle.
