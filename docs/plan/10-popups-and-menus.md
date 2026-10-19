@@ -95,7 +95,10 @@ calendar alone.
 Opened from the power button, closed by a second click on it. Entries, in the
 order and with the labels `.menu-power` uses today: Lock, Sleep, Hibernate,
 Shutdown, Logout, Reboot. Each entry is a configured command or a built-in
-action.
+action. It looks like a module box (the theme's module background, border and
+radius) holding one row per entry, the selected row's text in the active
+workspace's colour: lyr's own choice, since `.menu-power` drew in another
+program.
 
 | Action    | Linux (logind over D-Bus)         | Windows                       | macOS                                  |
 | --------- | --------------------------------- | ----------------------------- | -------------------------------------- |

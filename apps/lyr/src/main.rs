@@ -10,6 +10,7 @@ mod exec;
 mod input;
 mod log;
 mod modules;
+mod power_menu;
 mod sources;
 mod stats;
 mod tooltips;

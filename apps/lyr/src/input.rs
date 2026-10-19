@@ -2,7 +2,7 @@
 //! lands on, and carrying out the action it asks for.
 
 use crcbl_shell::{ButtonState, PointerButton, ScrollDelta, ShellEvent};
-use lyr_config::{Config, Module};
+use lyr_config::{Builtin, Config, Module};
 use lyr_core::draw::Target;
 use lyr_core::hit::Regions;
 use lyr_core::pointer::{self, Action, Press};
@@ -89,7 +89,7 @@ impl Pointer {
     }
 
     /// What the pointer is over in `regions`.
-    pub fn target<'a>(&self, regions: &'a Regions<Target<Module>>) -> Option<&'a Target<Module>> {
+    pub fn target<'a, T>(&self, regions: &'a Regions<T>) -> Option<&'a T> {
         let (x, y) = self.position?;
         regions.hit(x, y)
     }
@@ -97,6 +97,7 @@ impl Pointer {
 
 /// Carries out the action `press` on `target` asks for. `workspaces` are the
 /// workspaces the bar's buttons stand for, and `monitor` the bar's output.
+/// Returns the built-in that opens a window, for the main loop to open.
 #[cfg_attr(not(target_os = "linux"), allow(unused_variables))]
 pub fn act(
     target: &Target<Module>,
@@ -106,10 +107,8 @@ pub fn act(
     workspaces: &[i64],
     monitor: Option<&str>,
     commands: &Commands,
-) {
-    let Some(action) = pointer::action(target, press, config) else {
-        return;
-    };
+) -> Option<Builtin> {
+    let action = pointer::action(target, press, config)?;
     match action {
         Action::Exec(command) => {
             if let Err(error) = exec::spawn(&command) {
@@ -121,9 +120,7 @@ pub fn act(
             builtin @ (lyr_config::Builtin::CycleProfile | lyr_config::Builtin::CycleProfileBack),
         ) => {
             use lyr_core::power_profile::{Direction, cycle};
-            let Some(profiles) = data.power_profile.as_ref() else {
-                return;
-            };
+            let profiles = data.power_profile.as_ref()?;
             let direction = if builtin == lyr_config::Builtin::CycleProfile {
                 Direction::Next
             } else {
@@ -133,6 +130,7 @@ pub fn act(
                 commands.set_profile(next.to_owned());
             }
         }
+        Action::Builtin(builtin @ Builtin::OpenPowerMenu) => return Some(builtin),
         Action::Builtin(builtin) => {
             tracing::warn!("`{}` is not implemented yet", builtin.name());
         }
@@ -152,9 +150,7 @@ pub fn act(
         Action::StepWorkspace(direction) => {
             use lyr_core::pointer::Direction;
             use lyr_wm::hyprland::Step;
-            let Some(state) = data.workspaces.as_ref() else {
-                return;
-            };
+            let state = data.workspaces.as_ref()?;
             let step = match direction {
                 Direction::Next => Step::Next,
                 Direction::Previous => Step::Previous,
@@ -169,6 +165,7 @@ pub fn act(
         #[cfg(not(target_os = "linux"))]
         Action::FocusWorkspace(_) | Action::StepWorkspace(_) => {}
     }
+    None
 }
 
 #[cfg(test)]

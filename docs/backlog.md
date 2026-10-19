@@ -350,9 +350,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked. Log out is `lyr_wm::hyprland::Hyprland::exit`
   (`hl.dsp.exit()` in Lua, as the dotfiles' `.menu-power` sends, or the `exit`
   dispatcher), tested against the fake Hyprland. Neither is run against the real
-  thing. Not built: the menu popup itself and its keys, the `open_power_menu`
-  built-in, and the Windows and macOS actions (plan 10 names Win32 APIs that
-  need `windows-sys`, new to lyr).
+  thing. The menu (`apps/lyr/src/power_menu.rs`, drawn by
+  `lyr_core::power_menu`) opens from `open_power_menu` as a grab popup under the
+  clicked module: arrow keys and the pointer move the selection, Enter or a
+  click carries the entry out on the source runtime, and Escape, a click outside
+  or a second click on the module closes it. Tested on crcbl's headless shell
+  and mutation-checked; run on Windows with injected input (open, Down, Escape,
+  reopen, a click on the bar outside it), where the entries log that they are
+  not built. crcbl 0.5.0's Win32 grab delivers Escape as a key instead of the
+  close request its docs promise, so lyr closes on the key itself; reported to
+  crcbl. Keys injected with `SendKeys` arrive with no scancode, so crcbl names
+  no key for them; `keybd_event` with scancodes works. Not built: an entry set
+  to a command instead of its built-in (plan 10 allows either), the Windows and
+  macOS actions (plan 10 names Win32 APIs that need `windows-sys`, new to lyr),
+  and checking what Hyprland does with an outside click (M5's open question for
+  panels applies to this grab popup too).
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

@@ -28,6 +28,10 @@ and this project adheres to
 - Tooltips on the power button, clock (the time zone and its offset), battery,
   power profile and Bluetooth modules, shown after half a second on a module and
   quickly when moving from one to the next, as waybar's GTK tooltips are.
+- A click on the power button opens the power menu (Lock, Sleep, Hibernate,
+  Shutdown, Logout, Reboot), driven by the arrow keys and Enter or the pointer.
+  On Linux each entry asks logind as `systemctl` and `loginctl` do, and Logout
+  asks Hyprland to exit; on Windows and macOS the entries are not built yet.
 - `lyr --stats` logs the bar's main-loop wake-ups, the events it applied and the
   frames it presented on each output, once a minute, to check that an idle bar
   stays idle.

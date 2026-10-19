@@ -29,6 +29,7 @@ use lyr_shell::bars::Bars;
 
 use crate::control;
 use crate::modules::{self, Data};
+use crate::power_menu::PowerMenu;
 use crate::sources::{self, Commands};
 use crate::stats::Stats;
 use crate::tooltips::{Anchor, Look};
@@ -46,6 +47,11 @@ struct App {
     windows: HashMap<WindowId, Window>,
     data: Data,
     commands: Commands,
+    /// The power menu, while it is open.
+    power_menu: Option<PowerMenu>,
+    /// The event batch that last dismissed the power menu: a click outside it
+    /// that the bar also receives must not open it again at once.
+    menu_dismissed_at: Option<Instant>,
     /// `lyr toggle` closes the bars rather than unmapping them, so their
     /// space is given back on every platform; while hidden, outputs coming
     /// and going make no bars.
@@ -97,6 +103,8 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         windows: HashMap::new(),
         data: Data::default(),
         commands,
+        power_menu: None,
+        menu_dismissed_at: None,
         hidden: false,
         stats: Stats::new(Instant::now()),
     };
@@ -143,6 +151,7 @@ impl App {
             .windows
             .values()
             .any(|window| window.dirty || window.tooltips.dirty())
+            || self.power_menu.as_ref().is_some_and(PowerMenu::dirty)
         {
             return Duration::ZERO;
         }
@@ -161,9 +170,12 @@ impl App {
             .for_each(|window| window.dirty = true);
     }
 
-    /// Closes every bar: their tooltips and surfaces first, then their
-    /// windows.
+    /// Closes the power menu and every bar: their tooltips and surfaces
+    /// first, then their windows.
     fn close_all(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {
+        if let Some(menu) = self.power_menu.take() {
+            menu.close(shell, false)?;
+        }
         for (_, mut window) in self.windows.drain() {
             window.tooltips.close(shell)?;
             window.surface.destroy()?;
@@ -183,6 +195,7 @@ impl App {
             windows,
             data,
             stats,
+            power_menu,
             ..
         } = self;
         let now = Local::now().fixed_offset();
@@ -205,6 +218,9 @@ impl App {
                 Instant::now(),
             )?;
             window.tooltips.draw(text)?;
+        }
+        if let Some(menu) = power_menu {
+            menu.draw(text)?;
         }
         for window in windows.values_mut().filter(|window| window.dirty) {
             let hovered = window.hovered();

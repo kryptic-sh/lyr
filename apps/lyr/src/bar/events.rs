@@ -8,10 +8,14 @@ use crcbl_shell::{Shell, ShellEvent};
 use lyr_core::hit::Regions;
 use lyr_render::surface::Surface;
 
+use lyr_config::{Builtin, Platform};
+use lyr_core::power_menu;
+
 use super::App;
 use super::window::Window;
 use crate::input::{self, Pointer};
-use crate::tooltips::Tooltips;
+use crate::power_menu::{Outcome, PowerMenu};
+use crate::tooltips::{Look, Tooltips};
 
 impl App {
     /// Applies `event`, which arrived at `instant`.
@@ -25,6 +29,13 @@ impl App {
             self.bars
                 .handle(shell, &self.config.bar, event)
                 .context("keeping a bar on every output")?;
+        }
+        if self
+            .power_menu
+            .as_ref()
+            .is_some_and(|menu| event.window().is_some_and(|window| menu.owns(window)))
+        {
+            return self.menu_event(shell, event, instant);
         }
         // A tooltip's own window: sized, or gone with its bar.
         if let Some(owner) = event.window().and_then(|popup| {
@@ -95,13 +106,19 @@ impl App {
             }
             ShellEvent::WindowDestroyed { window } => {
                 if let Some(mut gone) = self.windows.remove(&window) {
-                    // Its tooltip's window went with it.
+                    // Its tooltip's and menu's windows went with it.
                     gone.tooltips.destroyed()?;
                     gone.surface.destroy()?;
+                    if let Some(menu) = self.power_menu.take_if(|menu| menu.opened_from(window)) {
+                        menu.close(shell, true)?;
+                    }
                 }
             }
             _ => {
-                let Some(window) = event.window().and_then(|id| self.windows.get_mut(&id)) else {
+                let Some((id, window)) = event
+                    .window()
+                    .and_then(|id| Some((id, self.windows.get_mut(&id)?)))
+                else {
                     return Ok(());
                 };
                 let presses = window.pointer.handle(event, window.scale);
@@ -115,18 +132,87 @@ impl App {
                     window.tooltips.press(instant);
                 }
                 for press in presses {
-                    if let Some(target) = window.pointer.target(&window.regions) {
-                        input::act(
-                            target,
-                            press,
-                            &self.config,
-                            &self.data,
-                            &window.workspaces,
-                            window.monitor.as_deref(),
-                            &self.commands,
-                        );
+                    let Some(target) = window.pointer.target(&window.regions) else {
+                        continue;
+                    };
+                    let opens = input::act(
+                        target,
+                        press,
+                        &self.config,
+                        &self.data,
+                        &window.workspaces,
+                        window.monitor.as_deref(),
+                        &self.commands,
+                    );
+                    if opens != Some(Builtin::OpenPowerMenu) {
+                        continue;
+                    }
+                    // A second click closes it.
+                    if let Some(menu) = self.power_menu.take() {
+                        menu.close(shell, false)?;
+                    } else if self.menu_dismissed_at != Some(instant)
+                        && let Some(anchor) = window.regions.rect(target)
+                    {
+                        let look = Look {
+                            theme: &self.config.theme,
+                            measure: &|s: &str| self.text.measure(s),
+                            line_height: self.text.line_height(),
+                        };
+                        self.power_menu = PowerMenu::open(
+                            shell,
+                            id,
+                            anchor,
+                            self.config.bar.position,
+                            power_menu::entries(Platform::current()),
+                            &look,
+                        )
+                        .context("opening the power menu")?;
                     }
                 }
+            }
+        }
+        Ok(())
+    }
+
+    /// Applies `event`, which is for the power menu's window.
+    fn menu_event(
+        &mut self,
+        shell: &mut dyn Shell,
+        event: &ShellEvent,
+        instant: Instant,
+    ) -> anyhow::Result<()> {
+        let Some(menu) = &mut self.power_menu else {
+            return Ok(());
+        };
+        if let ShellEvent::WindowDestroyed { .. } = event {
+            if let Some(menu) = self.power_menu.take() {
+                menu.close(shell, true)?;
+            }
+            return Ok(());
+        }
+        let look = Look {
+            theme: &self.config.theme,
+            measure: &|s: &str| self.text.measure(s),
+            line_height: self.text.line_height(),
+        };
+        match menu.event(shell, event, &look)? {
+            Outcome::Kept => {}
+            Outcome::Chosen(entry) => {
+                if let Some(menu) = self.power_menu.take() {
+                    menu.close(shell, false)?;
+                }
+                self.commands.power(entry);
+            }
+            Outcome::Cancelled => {
+                if let Some(menu) = self.power_menu.take() {
+                    menu.close(shell, false)?;
+                }
+            }
+            Outcome::Dismissed => {
+                if let Some(menu) = self.power_menu.take() {
+                    menu.close(shell, true)?;
+                }
+                self.menu_dismissed_at = Some(instant);
             }
         }
         Ok(())

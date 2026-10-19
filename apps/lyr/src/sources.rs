@@ -36,6 +36,8 @@ pub struct Commands {
     focus: tokio::sync::mpsc::UnboundedSender<lyr_wm::hyprland::Workspace>,
     #[cfg(target_os = "linux")]
     profile: tokio::sync::mpsc::UnboundedSender<String>,
+    #[cfg(target_os = "linux")]
+    power: tokio::sync::mpsc::UnboundedSender<lyr_core::power_menu::Entry>,
 }
 
 #[cfg(target_os = "linux")]
@@ -49,6 +51,22 @@ impl Commands {
     pub fn set_profile(&self, name: String) {
         let _stopped = self.profile.send(name);
     }
+
+    /// Carries out a power menu entry.
+    pub fn power(&self, entry: lyr_core::power_menu::Entry) {
+        let _stopped = self.power.send(entry);
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+impl Commands {
+    /// Windows and macOS: the power menu's actions are not built yet.
+    pub fn power(&self, entry: lyr_core::power_menu::Entry) {
+        tracing::warn!(
+            "power menu: {} is not built on this platform yet",
+            entry.label()
+        );
+    }
 }
 
 /// Starts every source this platform has. A source that cannot start, or
@@ -59,8 +77,22 @@ pub fn start(waker: Option<ShellWaker>) -> std::io::Result<(mpsc::Receiver<Updat
     {
         let (focus, focus_requests) = tokio::sync::mpsc::unbounded_channel();
         let (profile, profile_requests) = tokio::sync::mpsc::unbounded_channel();
-        linux::start(sender, focus_requests, profile_requests, waker)?;
-        Ok((receiver, Commands { focus, profile }))
+        let (power, power_requests) = tokio::sync::mpsc::unbounded_channel();
+        linux::start(
+            sender,
+            focus_requests,
+            profile_requests,
+            power_requests,
+            waker,
+        )?;
+        Ok((
+            receiver,
+            Commands {
+                focus,
+                profile,
+                power,
+            },
+        ))
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -74,8 +106,10 @@ mod linux {
     use std::sync::mpsc;
 
     use crcbl_shell::ShellWaker;
+    use lyr_core::power_menu::Entry;
     use lyr_sources::battery::linux::UPower;
     use lyr_sources::bluetooth::linux::BlueZ;
+    use lyr_sources::power::linux::Logind;
     use lyr_sources::power_profile::linux::PowerProfiles;
     use lyr_wm::hyprland::{Hyprland, Workspace};
     use tokio::sync::mpsc::UnboundedReceiver;
@@ -97,6 +131,7 @@ mod linux {
         sender: mpsc::Sender<Update>,
         focus: UnboundedReceiver<Workspace>,
         profile: UnboundedReceiver<String>,
+        power: UnboundedReceiver<Entry>,
         waker: Option<ShellWaker>,
     ) -> std::io::Result<()> {
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -111,6 +146,7 @@ mod linux {
                         power_profile(sender.clone(), profile, waker.clone()),
                         bluetooth(sender.clone(), waker.clone()),
                         workspaces(sender, focus, waker),
+                        power_menu(power),
                     );
                 });
             })?;
@@ -234,5 +270,27 @@ mod linux {
         if let Err(error) = run.await {
             tracing::warn!("workspaces: {error}");
         }
+    }
+
+    /// Carries out the power menu's entries as they come. A refusal is only
+    /// logged: nothing on screen claims it happened.
+    async fn power_menu(mut requests: UnboundedReceiver<Entry>) {
+        while let Some(entry) = requests.recv().await {
+            if let Err(error) = power(entry).await {
+                tracing::warn!("power menu: {}: {error:#}", entry.label());
+            }
+        }
+    }
+
+    async fn power(entry: Entry) -> anyhow::Result<()> {
+        match entry {
+            Entry::Lock => Logind::system().await?.lock().await?,
+            Entry::Sleep => Logind::system().await?.sleep().await?,
+            Entry::Hibernate => Logind::system().await?.hibernate().await?,
+            Entry::Shutdown => Logind::system().await?.power_off().await?,
+            Entry::Reboot => Logind::system().await?.reboot().await?,
+            Entry::Logout => Hyprland::from_env().await?.exit().await?,
+        }
+        Ok(())
     }
 }
