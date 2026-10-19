@@ -273,12 +273,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked. The toast stack is `lyr_core::toast::stack::Stack` (newest
   on top, timeouts paused under the pointer) and a toast's draw list
   `lyr_core::toast` (swaync's look with the `toast_*` theme keys, its body
-  wrapped at spaces) (crcbl-ui's main has UAX #14 line breaking, with bidi and
-  UAX #29 carets, for 0.6.0, approved 2026-10-19; lyr's wrap can move to it once
-  it is released), both tested and mutation-checked. The bar serves it on Linux
-  (`apps/lyr/src/sources.rs`) and leaves notifications to another daemon that
-  has the name, logging which, unless `notifications.replace = true` (read at
-  start; a reload does not hand the name over). Toasts are on screen
+  wrapped at spaces) (crcbl-ui 0.6.0 has UAX #14 line breaking, but only inside
+  `TextLayout`, which lays out one font, and its break finder `font::breaks` is
+  crate-private; lyr's bodies mix bold, italic and plain spans, so lyr asked
+  crcbl on 2026-10-20 to export the break opportunities, and keeps breaking at
+  spaces until it does), both tested and mutation-checked. The bar serves it on
+  Linux (`apps/lyr/src/sources.rs`) and leaves notifications to another daemon
+  that has the name, logging which, unless `notifications.replace = true` (read
+  at start; a reload does not hand the name over). Toasts are on screen
   (`apps/lyr/src/toasts.rs`): one Overlay panel at the top right of the output
   the user is on, 16 px from the edges and clear of the bar, recreated whenever
   the stack's size changes (crcbl 0.5.0 cannot resize a panel); a click invokes
