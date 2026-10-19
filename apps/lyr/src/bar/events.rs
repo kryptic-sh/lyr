@@ -9,10 +9,12 @@ use lyr_core::hit::Regions;
 use lyr_render::surface::Surface;
 
 use lyr_config::{Builtin, Platform};
+use lyr_core::control::Request;
 use lyr_core::power_menu;
 
 use super::App;
 use super::window::Window;
+use crate::control;
 use crate::input::{self, Pointer};
 use crate::power_menu::{Outcome, PowerMenu};
 use crate::toasts::Clicked;
@@ -140,6 +142,8 @@ impl App {
                 if !presses.is_empty() {
                     window.tooltips.press(instant);
                 }
+                // Applied once the bar is no longer borrowed.
+                let mut toggle_dnd = false;
                 for press in presses {
                     let Some(target) = window.pointer.target(&window.regions) else {
                         continue;
@@ -153,6 +157,10 @@ impl App {
                         window.monitor.as_deref(),
                         &self.commands,
                     );
+                    if opens == Some(Builtin::ToggleDnd) {
+                        toggle_dnd = !toggle_dnd;
+                        continue;
+                    }
                     if opens != Some(Builtin::OpenPowerMenu) {
                         continue;
                     }
@@ -176,6 +184,12 @@ impl App {
                             &look,
                         )
                         .context("opening the power menu")?;
+                    }
+                }
+                if toggle_dnd {
+                    let reply = self.notifications(Request::Dnd);
+                    if reply != control::OK {
+                        tracing::warn!("toggle_dnd: {reply}");
                     }
                 }
             }

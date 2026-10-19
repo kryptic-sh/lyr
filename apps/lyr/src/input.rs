@@ -97,7 +97,8 @@ impl Pointer {
 
 /// Carries out the action `press` on `target` asks for. `workspaces` are the
 /// workspaces the bar's buttons stand for, and `monitor` the bar's output.
-/// Returns the built-in that opens a window, for the main loop to open.
+/// Returns the built-ins the main loop carries out itself: opening a
+/// window, and do-not-disturb, which lives with the notification daemon.
 #[cfg_attr(not(target_os = "linux"), allow(unused_variables))]
 pub fn act(
     target: &Target<Module>,
@@ -130,7 +131,9 @@ pub fn act(
                 commands.set_profile(next.to_owned());
             }
         }
-        Action::Builtin(builtin @ Builtin::OpenPowerMenu) => return Some(builtin),
+        Action::Builtin(builtin @ (Builtin::OpenPowerMenu | Builtin::ToggleDnd)) => {
+            return Some(builtin);
+        }
         Action::Builtin(builtin) => {
             tracing::warn!("`{}` is not implemented yet", builtin.name());
         }

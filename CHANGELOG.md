@@ -19,7 +19,8 @@ and this project adheres to
 - Clicking a workspace switches to it, and with `workspaces.scroll = true` the
   wheel steps through them. A module's `[<module>.on]` table binds clicks and
   scrolling to a command (`{ exec = "…" }`) or a built-in action. Of the
-  built-ins, only `cycle_profile` and `cycle_profile_back` work yet.
+  built-ins, `cycle_profile`, `cycle_profile_back`, `open_power_menu` and
+  `toggle_dnd` work so far.
 - `lyr quit` stops the running bar, and `lyr reload` reloads its config, keeping
   the running one when the new one is invalid, and `lyr toggle` hides and shows
   the bars. On Linux, while lyr is the notification daemon, `lyr dnd` turns

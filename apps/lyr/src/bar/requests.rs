@@ -90,9 +90,10 @@ impl App {
     }
 
     /// `lyr dnd` and `lyr clear`, which need lyr to be the notification
-    /// daemon. Returns the reply.
+    /// daemon; the `toggle_dnd` built-in asks for the first too. Returns the
+    /// reply.
     #[cfg(target_os = "linux")]
-    fn notifications(&mut self, request: Request) -> String {
+    pub(super) fn notifications(&mut self, request: Request) -> String {
         let Some(store) = &self.data.notifications else {
             return "error: lyr is not the notification daemon".to_owned();
         };
@@ -110,7 +111,7 @@ impl App {
 
     /// Windows and macOS keep their own notification centres.
     #[cfg(not(target_os = "linux"))]
-    fn notifications(&mut self, _request: Request) -> String {
+    pub(super) fn notifications(&mut self, _request: Request) -> String {
         "error: lyr is not the notification daemon on this platform".to_owned()
     }
 }

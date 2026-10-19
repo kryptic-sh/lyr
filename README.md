@@ -93,7 +93,8 @@ run through the platform shell) or a built-in: `toggle_mute`, `volume_up`,
 `volume_down` (volume and mic), `cycle_profile`, `cycle_profile_back` (power
 profile), `open_clock_panel`, `open_power_menu`, `open_wifi_menu`,
 `open_bluetooth_menu`, `open_audio_menu`, `toggle_dnd`. Of these,
-`cycle_profile`, `cycle_profile_back` and `open_power_menu` work so far.
+`cycle_profile`, `cycle_profile_back`, `open_power_menu` and (on Linux, while
+lyr is the notification daemon) `toggle_dnd` work so far.
 
 A config file is code: its commands run as you ([SECURITY.md](SECURITY.md)).
 
