@@ -24,6 +24,10 @@ pub enum Update {
     /// BlueZ: the module's reading and the menu's adapter and devices.
     #[cfg(target_os = "linux")]
     Bluetooth(lyr_sources::bluetooth::Snapshot),
+    /// The pairing agent asks, about the device at this path, under this
+    /// id.
+    #[cfg(target_os = "linux")]
+    BluetoothAsk(u64, String, lyr_core::bluetooth_menu::Question),
     /// Hyprland's workspaces.
     #[cfg(target_os = "linux")]
     Workspaces(lyr_wm::hyprland::State),
@@ -50,6 +54,8 @@ pub enum BluetoothRequest {
     Device(String, lyr_core::bluetooth_menu::DeviceAction),
     /// The adapter's path, then the device's.
     Forget(String, String),
+    /// Yes or no to the pairing agent's question with this id.
+    Answer(u64, bool),
 }
 
 /// What the bar asks of the notification daemon.
@@ -325,8 +331,32 @@ mod linux {
                 }
             }
         };
+        // The agent's questions waiting for an answer, by id.
+        let pending = std::cell::RefCell::new(std::collections::HashMap::new());
+        let (prompts, mut asked) = tokio::sync::mpsc::unbounded_channel();
+        if let Err(error) = bluez.register_agent(prompts).await {
+            tracing::warn!("bluetooth: BlueZ refused lyr's pairing agent: {error}");
+        }
+        let ask = async {
+            let mut next = 0;
+            while let Some(prompt) = asked.recv().await {
+                next += 1;
+                let update = Update::BluetoothAsk(next, prompt.device, prompt.question);
+                pending.borrow_mut().insert(next, prompt.answer);
+                if !deliver(&sender, waker.as_ref(), update) {
+                    break;
+                }
+            }
+        };
         let act = async {
             while let Some(request) = requests.recv().await {
+                if let BluetoothRequest::Answer(id, yes) = request {
+                    // BlueZ has given up on a question it no longer waits on.
+                    if let Some(answer) = pending.borrow_mut().remove(&id) {
+                        let _gone = answer.send(yes);
+                    }
+                    continue;
+                }
                 // What it changed comes back as a change; a refusal is logged.
                 let done = match &request {
                     BluetoothRequest::Switch(adapter, switch, on) => {
@@ -337,13 +367,14 @@ mod linux {
                     BluetoothRequest::Forget(adapter, device) => {
                         bluez.forget(adapter, device).await
                     }
+                    BluetoothRequest::Answer(..) => Ok(()),
                 };
                 if let Err(error) = done {
                     tracing::warn!("bluetooth: {request:?}: {error}");
                 }
             }
         };
-        let (watched, (), ()) = tokio::join!(bluez.watch(&snapshots), forward, act);
+        let (watched, (), (), ()) = tokio::join!(bluez.watch(&snapshots), forward, ask, act);
         if let Err(error) = watched {
             tracing::warn!("bluetooth: BlueZ stopped answering: {error}");
         }

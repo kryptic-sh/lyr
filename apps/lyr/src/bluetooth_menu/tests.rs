@@ -69,7 +69,8 @@ fn setup(devices: &[Device]) -> Setup {
         measure: &measure,
         line_height: 20.0,
     };
-    let menu = BluetoothMenu::open(&mut shell, 16.0, &look, &adapter(), devices).expect("opened");
+    let menu =
+        BluetoothMenu::open(&mut shell, 16.0, &look, &adapter(), devices, None).expect("opened");
     Setup { shell, theme, menu }
 }
 
@@ -114,7 +115,7 @@ fn a_refresh_keeps_the_window_unless_the_size_changes() {
     };
     setup
         .menu
-        .refresh(&mut setup.shell, &look, &adapter(), &renamed)
+        .refresh(&mut setup.shell, &look, &adapter(), &renamed, None)
         .expect("refreshed");
     assert_eq!(setup.menu.window, first, "the same size");
     setup
@@ -124,6 +125,7 @@ fn a_refresh_keeps_the_window_unless_the_size_changes() {
             &look,
             &adapter(),
             &[device("Buds"), device("Phone")],
+            None,
         )
         .expect("refreshed");
     let second = setup.menu.window;

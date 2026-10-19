@@ -258,15 +258,22 @@ impl App {
 
     /// Carries out a click in the Bluetooth menu.
     #[cfg(target_os = "linux")]
-    fn bluetooth_act(&self, target: lyr_core::bluetooth_menu::Target) {
+    fn bluetooth_act(&mut self, target: lyr_core::bluetooth_menu::Target) {
         use lyr_core::bluetooth_menu::{Switch, Target, order};
 
         use crate::sources::BluetoothRequest;
+        if let Target::Answer(yes) = target {
+            if let Some((id, _, _)) = self.data.bluetooth_ask.take() {
+                self.commands.bluetooth(BluetoothRequest::Answer(id, yes));
+            }
+            return;
+        }
         let Some(adapter) = &self.data.bluetooth_adapter else {
             return;
         };
         let devices = order(&self.data.bluetooth_devices);
         let request = match target {
+            Target::Answer(_) => return,
             Target::Switch(switch) => {
                 let on = match switch {
                     Switch::Powered => adapter.powered,
@@ -294,7 +301,7 @@ impl App {
 
     /// Windows and macOS: the menu has no adapter to open on yet.
     #[cfg(not(target_os = "linux"))]
-    fn bluetooth_act(&self, _target: lyr_core::bluetooth_menu::Target) {}
+    fn bluetooth_act(&mut self, _target: lyr_core::bluetooth_menu::Target) {}
 
     /// Applies `event`, which is for the clock panel's window.
     fn panel_event(&mut self, shell: &mut dyn Shell, event: &ShellEvent) -> anyhow::Result<()> {

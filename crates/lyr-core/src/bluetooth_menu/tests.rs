@@ -1,6 +1,8 @@
 use lyr_config::{Platform, Theme, from_sources};
 
-use super::{Adapter, Device, DeviceAction, GAP, PADDING, Switch, Target, draw, order};
+use super::{
+    Adapter, Ask, Device, DeviceAction, GAP, PADDING, Question, Switch, Target, draw, order,
+};
 use crate::draw::Item;
 
 fn theme() -> Theme {
@@ -77,7 +79,7 @@ fn each_device_has_the_buttons_its_state_calls_for() {
         device("Buds", true, true, true),
         device("Phone", false, false, false),
     ];
-    let (list, _, regions) = draw(&adapter(), &devices, &measure, LINE, &theme);
+    let (list, _, regions) = draw(&adapter(), &devices, None, &measure, LINE, &theme);
     // Four switch rows, then the devices after a gap.
     let first = PADDING + 4.0 * (ROW + GAP) + GAP;
     let second = first + ROW + GAP;
@@ -105,7 +107,7 @@ fn each_device_has_the_buttons_its_state_calls_for() {
 #[test]
 fn the_switches_show_the_adapter_and_take_clicks() {
     let theme = theme();
-    let (list, size, regions) = draw(&adapter(), &[], &measure, LINE, &theme);
+    let (list, size, regions) = draw(&adapter(), &[], None, &measure, LINE, &theme);
     let x = size.width - PADDING - 1.0;
     let targets: Vec<_> = (0..4)
         .map(|row| regions.hit(x, PADDING + row as f32 * (ROW + GAP) + 1.0))
@@ -140,4 +142,47 @@ fn the_switches_show_the_adapter_and_take_clicks() {
         "power and pairable on, discoverable and scan off"
     );
     assert_eq!(size.height, PADDING + 4.0 * ROW + 3.0 * GAP + PADDING);
+}
+
+#[test]
+fn the_agent_s_question_comes_first_with_yes_and_no() {
+    let theme = theme();
+    let ask = Ask {
+        device: "Buds",
+        question: Question::Confirm(42),
+    };
+    assert_eq!(ask.text(), "Pair with Buds? Passkey 000042");
+    let (list, size, regions) = draw(&adapter(), &[], Some(ask), &measure, LINE, &theme);
+    let x = size.width - PADDING - 1.0;
+    assert_eq!(
+        regions.hit(x, PADDING + 1.0),
+        Some(&Target::Answer(false)),
+        "No last"
+    );
+    // "No" is 20 px with 8 px each side; Yes sits a gap before it.
+    let yes = size.width - PADDING - 36.0 - GAP - 1.0;
+    assert_eq!(regions.hit(yes, PADDING + 1.0), Some(&Target::Answer(true)));
+    // The switches move down below it.
+    let switches = PADDING + ROW + 2.0 * GAP;
+    assert_eq!(
+        regions.hit(x, switches + 1.0),
+        Some(&Target::Switch(Switch::Powered))
+    );
+    assert!(list.items.iter().any(
+        |item| matches!(item, Item::Text { text, colour, .. } if text == "Pair with Buds? Passkey 000042" && *colour == theme.workspace_active)
+    ));
+    let asks = [
+        (Question::Authorize, "Let Buds pair?"),
+        (Question::AuthorizeService, "Let Buds connect?"),
+    ];
+    for (question, words) in asks {
+        assert_eq!(
+            Ask {
+                device: "Buds",
+                question
+            }
+            .text(),
+            words
+        );
+    }
 }

@@ -7,6 +7,7 @@
 //! PIN or a passkey; BlueZ's requests for those are rejected. Each question
 //! goes to the bar as a [`Prompt`], and the D-Bus call waits for the answer.
 
+pub use lyr_core::bluetooth_menu::Question;
 use tokio::sync::{mpsc, oneshot};
 use zbus::{Connection, ObjectPath, OwnedObjectPath};
 
@@ -14,17 +15,6 @@ use zbus::{Connection, ObjectPath, OwnedObjectPath};
 pub const PATH: &str = "/sh/kryptic/lyr/agent";
 /// What the agent can do: show a yes or no question.
 pub const CAPABILITY: &str = "DisplayYesNo";
-
-/// What the agent asks.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Question {
-    /// Does the device show this passkey?
-    Confirm(u32),
-    /// May the device pair?
-    Authorize,
-    /// May the device connect to a service?
-    AuthorizeService,
-}
 
 /// One question for the user, about the device at `device`; answer it on
 /// `answer`. Dropping it unanswered cancels the request.

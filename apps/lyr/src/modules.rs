@@ -27,6 +27,9 @@ pub struct Data {
     /// is no source for them.
     pub bluetooth_adapter: Option<lyr_core::bluetooth_menu::Adapter>,
     pub bluetooth_devices: Vec<lyr_core::bluetooth_menu::Device>,
+    /// The pairing agent's question waiting for an answer: its id, the
+    /// device's path, and the question.
+    pub bluetooth_ask: Option<(u64, String, lyr_core::bluetooth_menu::Question)>,
     #[cfg(target_os = "linux")]
     pub workspaces: Option<lyr_wm::hyprland::State>,
     /// The system time zone's name, from timedate1.
@@ -41,6 +44,21 @@ pub struct Data {
 }
 
 impl Data {
+    /// The pairing agent's question, about its device by name where BlueZ
+    /// gives one.
+    pub fn bluetooth_question(&self) -> Option<lyr_core::bluetooth_menu::Ask<'_>> {
+        let (_, path, question) = self.bluetooth_ask.as_ref()?;
+        let device = self
+            .bluetooth_devices
+            .iter()
+            .find(|device| device.path == *path)
+            .map_or(path.as_str(), |device| device.alias.as_str());
+        Some(lyr_core::bluetooth_menu::Ask {
+            device,
+            question: *question,
+        })
+    }
+
     /// The notification store, while lyr is the notification daemon.
     pub const fn notification_store(&self) -> Option<&Arc<Mutex<lyr_core::notifications::Store>>> {
         #[cfg(target_os = "linux")]
@@ -55,6 +73,10 @@ impl Data {
             Update::Battery(reading) => self.battery = reading,
             #[cfg(target_os = "linux")]
             Update::PowerProfile(profiles) => self.power_profile = profiles,
+            #[cfg(target_os = "linux")]
+            Update::BluetoothAsk(id, device, question) => {
+                self.bluetooth_ask = Some((id, device, question));
+            }
             #[cfg(target_os = "linux")]
             Update::Bluetooth(snapshot) => {
                 self.bluetooth = snapshot.reading;
@@ -345,5 +367,34 @@ mod tests {
         );
         assert_eq!(zone_name(""), None);
         assert_eq!(zone_name(":"), None);
+    }
+}
+
+#[cfg(test)]
+mod bluetooth_tests {
+    use lyr_core::bluetooth_menu::{Device, Question};
+
+    use super::Data;
+
+    #[test]
+    fn a_question_names_its_device_by_alias_or_else_its_path() {
+        let mut data = Data::default();
+        assert_eq!(data.bluetooth_question(), None);
+        let path = "/org/bluez/hci0/dev_1".to_owned();
+        data.bluetooth_ask = Some((7, path.clone(), Question::Confirm(1)));
+        assert_eq!(
+            data.bluetooth_question().map(|ask| ask.device),
+            Some(path.as_str())
+        );
+        data.bluetooth_devices.push(Device {
+            path: path.clone(),
+            alias: "Buds".to_owned(),
+            connected: false,
+            paired: false,
+            trusted: false,
+            battery: None,
+        });
+        let ask = data.bluetooth_question().expect("a question");
+        assert_eq!((ask.device, ask.question), ("Buds", Question::Confirm(1)));
     }
 }

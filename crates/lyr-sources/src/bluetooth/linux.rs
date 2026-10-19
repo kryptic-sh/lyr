@@ -100,6 +100,19 @@ impl BlueZ {
             .await
     }
 
+    /// Serves lyr's pairing agent and registers it with BlueZ, its
+    /// questions going to `prompts`.
+    ///
+    /// # Errors
+    ///
+    /// When BlueZ refuses it.
+    pub async fn register_agent(
+        &self,
+        prompts: tokio::sync::mpsc::UnboundedSender<agent::Prompt>,
+    ) -> zbus::Result<()> {
+        agent::register(&self.connection, agent::Agent { prompts }).await
+    }
+
     /// Turns the `adapter`'s `switch` on or off.
     ///
     /// # Errors

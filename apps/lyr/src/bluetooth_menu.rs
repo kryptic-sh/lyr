@@ -13,7 +13,7 @@ use crcbl_shell::{
     ButtonState, CloseReply, KeyCode, LogicalSize, Margins, PanelAnchor, PanelDesc, PanelKeyboard,
     PanelLayer, Reserve, Shell, ShellEvent, WindowDesc, WindowId, WindowRole,
 };
-use lyr_core::bluetooth_menu::{self, Adapter, Device, Target};
+use lyr_core::bluetooth_menu::{self, Adapter, Ask, Device, Target};
 use lyr_core::draw::{DrawList, Size};
 use lyr_core::hit::Regions;
 use lyr_core::pointer::Press;
@@ -89,9 +89,16 @@ impl BluetoothMenu {
         look: &Look<'_>,
         adapter: &Adapter,
         devices: &[Device],
+        ask: Option<Ask<'_>>,
     ) -> anyhow::Result<Self> {
-        let (list, size, regions) =
-            bluetooth_menu::draw(adapter, devices, look.measure, look.line_height, look.theme);
+        let (list, size, regions) = bluetooth_menu::draw(
+            adapter,
+            devices,
+            ask,
+            look.measure,
+            look.line_height,
+            look.theme,
+        );
         Ok(Self {
             window: create(shell, size, left)?,
             left,
@@ -123,9 +130,16 @@ impl BluetoothMenu {
         look: &Look<'_>,
         adapter: &Adapter,
         devices: &[Device],
+        ask: Option<Ask<'_>>,
     ) -> anyhow::Result<()> {
-        let (list, size, regions) =
-            bluetooth_menu::draw(adapter, devices, look.measure, look.line_height, look.theme);
+        let (list, size, regions) = bluetooth_menu::draw(
+            adapter,
+            devices,
+            ask,
+            look.measure,
+            look.line_height,
+            look.theme,
+        );
         if size != self.size {
             if let Some(surface) = self.surface.take() {
                 surface.destroy()?;

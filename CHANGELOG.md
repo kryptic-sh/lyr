@@ -48,7 +48,8 @@ and this project adheres to
 - On Linux, the Bluetooth menu, opened by a click on the Bluetooth module or
   `lyr panel bluetooth`: the adapter's power, discoverable and pairable
   switches, a scan toggle, and each device with connect or disconnect, pair,
-  trust and forget.
+  trust and forget. lyr is the pairing agent: a passkey to confirm shows at the
+  top of the menu with Yes and No.
 - The clock panel, opened by a click on the clock or `lyr panel clock`: waybar's
   year calendar, three months across with week numbers and today underlined; a
   right click switches to the month, scrolling moves through years or months,

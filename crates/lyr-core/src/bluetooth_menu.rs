@@ -55,9 +55,43 @@ pub enum DeviceAction {
     Untrust,
 }
 
+/// What the pairing agent asks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Question {
+    /// Does the device show this passkey?
+    Confirm(u32),
+    /// May the device pair?
+    Authorize,
+    /// May the device connect to a service?
+    AuthorizeService,
+}
+
+/// A question waiting at the top of the menu, about the device named
+/// `device`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Ask<'a> {
+    pub device: &'a str,
+    pub question: Question,
+}
+
+impl Ask<'_> {
+    /// The question in words.
+    #[must_use]
+    pub fn text(&self) -> String {
+        let device = self.device;
+        match self.question {
+            Question::Confirm(passkey) => format!("Pair with {device}? Passkey {passkey:06}"),
+            Question::Authorize => format!("Let {device} pair?"),
+            Question::AuthorizeService => format!("Let {device} connect?"),
+        }
+    }
+}
+
 /// What a click in the menu lands on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Target {
+    /// Yes or No to the agent's question.
+    Answer(bool),
     Switch(Switch),
     /// The scan toggle.
     Scan,
@@ -128,6 +162,7 @@ fn buttons(device: &Device) -> Vec<(&'static str, Button)> {
 pub fn draw(
     adapter: &Adapter,
     devices: &[Device],
+    ask: Option<Ask<'_>>,
     measure: &dyn Fn(&str) -> f32,
     line_height: f32,
     theme: &Theme,
@@ -168,7 +203,15 @@ pub fn draw(
                 .sum::<f32>()
         })
         .fold(2.0 * row, f32::max);
-    let width = 2.0 * PADDING + label_width + GAP + buttons_width;
+    let answers = [("Yes", true), ("No", false)];
+    let ask_width = ask.map_or(0.0, |ask| {
+        measure(&ask.text())
+            + answers
+                .iter()
+                .map(|(label, _)| GAP + button_width(label))
+                .sum::<f32>()
+    });
+    let width = 2.0 * PADDING + (label_width + GAP + buttons_width).max(ask_width);
     let mut items = Vec::new();
     let mut regions = Regions::default();
     let text = |text: String, x: f32, y: f32, colour| Item::Text {
@@ -182,6 +225,30 @@ pub fn draw(
         colour,
     };
     let mut y = PADDING;
+    // The agent's question first, where it cannot be missed.
+    if let Some(ask) = ask {
+        items.push(text(ask.text(), PADDING, y, theme.workspace_active));
+        let mut x = width - PADDING;
+        for (label, answer) in answers.iter().rev() {
+            x -= button_width(label);
+            let rect = Rect {
+                x,
+                y,
+                width: button_width(label),
+                height: row,
+            };
+            items.push(Item::Box {
+                rect,
+                radius: theme.radius as f32,
+                fill: theme.toast_background,
+                border: Some((theme.border_width as f32, theme.panel_border)),
+            });
+            items.push(text((*label).to_owned(), x + across, y, theme.foreground));
+            regions.push(rect, Target::Answer(*answer));
+            x -= GAP;
+        }
+        y += row + 2.0 * GAP;
+    }
     for (label, target, on) in switches {
         items.push(text(label.to_owned(), PADDING, y, theme.foreground));
         let rect = Rect {

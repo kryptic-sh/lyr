@@ -35,6 +35,7 @@ use crate::modules::{self, Data};
 use crate::power_menu::PowerMenu;
 use crate::sources::{self, Commands, Update};
 use crate::stats::Stats;
+use crate::toasts::EDGE_MARGIN;
 use crate::toasts::Toasts;
 use crate::tooltips::{Anchor, Look};
 use window::Window;
@@ -277,15 +278,29 @@ impl App {
             line_height: self.text.line_height(),
         };
         self.bluetooth_menu = Some(
-            BluetoothMenu::open(shell, left, &look, adapter, &self.data.bluetooth_devices)
-                .context("opening the Bluetooth menu")?,
+            BluetoothMenu::open(
+                shell,
+                left,
+                &look,
+                adapter,
+                &self.data.bluetooth_devices,
+                self.data.bluetooth_question(),
+            )
+            .context("opening the Bluetooth menu")?,
         );
         Ok(Ok(()))
     }
 
     /// Draws the Bluetooth menu again, if it is open, for BlueZ as it is
-    /// now; closes it if the adapter went.
+    /// now; closes it if the adapter went. A question from the pairing agent
+    /// opens it, since a question nobody sees times out.
     fn refresh_bluetooth_menu(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {
+        if self.bluetooth_menu.is_none() && self.data.bluetooth_ask.is_some() {
+            if let Err(why) = self.toggle_bluetooth_menu(shell, EDGE_MARGIN)? {
+                tracing::warn!("bluetooth: a pairing question, but {why}");
+            }
+            return Ok(());
+        }
         let Some(menu) = &mut self.bluetooth_menu else {
             return Ok(());
         };
@@ -300,7 +315,13 @@ impl App {
             measure: &|s: &str| self.text.measure(s),
             line_height: self.text.line_height(),
         };
-        menu.refresh(shell, &look, adapter, &self.data.bluetooth_devices)
+        menu.refresh(
+            shell,
+            &look,
+            adapter,
+            &self.data.bluetooth_devices,
+            self.data.bluetooth_question(),
+        )
     }
 
     /// Marks every bar to be drawn again.
