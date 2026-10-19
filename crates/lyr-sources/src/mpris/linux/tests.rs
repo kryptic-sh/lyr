@@ -6,7 +6,7 @@ use zbus::connection::Builder;
 use zbus::{Connection, Guid, OwnedVariant};
 
 use super::{PATH, control, read};
-use crate::mpris::{Control, Status};
+use lyr_core::media::{Control, Status};
 
 const NAME: &str = "org.mpris.MediaPlayer2.test";
 

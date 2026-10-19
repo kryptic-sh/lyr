@@ -13,7 +13,7 @@ use zbus::message::Type;
 use zbus::proxy::CacheProperties;
 use zbus::{Connection, MatchRule, MessageStream, OwnedVariant};
 
-use super::{Control, Player, Status};
+use lyr_core::media::{Control, Player, Status};
 
 /// The bus names MPRIS players take.
 pub const PREFIX: &str = "org.mpris.MediaPlayer2.";
