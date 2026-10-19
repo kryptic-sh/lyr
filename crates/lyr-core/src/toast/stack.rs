@@ -1,13 +1,14 @@
 //! Which notifications have a toast up, newest on top, and when each goes
 //! (`docs/plan/09-notifications.md#toasts`). A toast leaves when its timeout
 //! is up, while the pointer is off it: hovering pauses the timeout and
-//! leaving starts it again with what remained.
+//! leaving starts it again with what remained, and shows the toast's close
+//! button.
 
 use std::time::{Duration, Instant};
 
 use lyr_config::Theme;
 
-use super::{MARGIN, WIDTH, draw};
+use super::{MARGIN, WIDTH, close_button, draw};
 use crate::draw::{DrawList, Size};
 use crate::hit::{Rect, Regions};
 use crate::notifications::Store;
@@ -20,6 +21,18 @@ pub enum Part {
     /// An action button, by the action's index in the notification's
     /// actions.
     Action(u32, usize),
+    /// The close button of the toast under the pointer.
+    Close(u32),
+}
+
+impl Part {
+    /// The notification it belongs to.
+    #[must_use]
+    pub const fn id(self) -> u32 {
+        match self {
+            Self::Body(id) | Self::Action(id, _) | Self::Close(id) => id,
+        }
+    }
 }
 
 /// One toast that is up.
@@ -77,10 +90,11 @@ impl Stack {
     }
 
     /// The pointer is over the toast `id`, or over none: that one's timeout
-    /// pauses, and the one it left resumes with what remained.
-    pub fn hover(&mut self, id: Option<u32>, now: Instant) {
+    /// pauses, and the one it left resumes with what remained. Returns
+    /// whether it moved to another toast, which shows another close button.
+    pub fn hover(&mut self, id: Option<u32>, now: Instant) -> bool {
         if id == self.hovered {
-            return;
+            return false;
         }
         for up in &mut self.up {
             if Some(up.id) == self.hovered
@@ -95,6 +109,7 @@ impl Stack {
             }
         }
         self.hovered = id;
+        true
     }
 
     /// When [`Self::expire`] next has something to do.
@@ -173,6 +188,18 @@ impl Stack {
                         ..rect
                     },
                     Part::Action(notification.id, index),
+                );
+            }
+            if self.hovered == Some(notification.id) {
+                let (items, rect) = close_button(toast_size.width, &measure, line_height, theme);
+                list.items
+                    .extend(items.into_iter().map(|item| item.offset(0.0, top)));
+                regions.push(
+                    Rect {
+                        y: rect.y + top,
+                        ..rect
+                    },
+                    Part::Close(notification.id),
                 );
             }
             size = Size {

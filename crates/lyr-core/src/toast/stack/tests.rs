@@ -5,7 +5,7 @@ use lyr_config::{Platform, from_sources};
 use super::{Part, Stack};
 use crate::draw::Item;
 use crate::notifications::{Expiry, Incoming, LOW_TIMEOUT, NORMAL_TIMEOUT, Store, Urgency};
-use crate::toast::{BORDER, INSET, MARGIN};
+use crate::toast::{BORDER, CLOSE_INSET, CLOSE_SIZE, INSET, MARGIN, WIDTH};
 
 const MS: Duration = Duration::from_millis(1);
 
@@ -227,4 +227,51 @@ fn an_action_button_is_its_own_region_on_top_of_the_toast() {
         Some(&Part::Action(id, 0))
     );
     assert_eq!(regions.hit(1.0, 1.0), Some(&Part::Body(id)));
+}
+
+#[test]
+fn the_toast_under_the_pointer_shows_its_close_button() {
+    let theme = from_sources(None, Platform::Linux)
+        .expect("the defaults")
+        .theme;
+    let measure = |text: &str| text.chars().count() as f32 * 10.0;
+    let start = Instant::now();
+    let mut store = Store::default();
+    let mut stack = Stack::default();
+    let first = notify(&mut store, "first", Urgency::Normal, start);
+    stack.notified(&store, first, false, start);
+    let second = notify(&mut store, "second", Urgency::Normal, start);
+    stack.notified(&store, second, false, start);
+    let (plain, _, regions) = stack.draw(&store, start, measure, 20.0, &theme);
+    assert!(!regions.targets().any(|part| matches!(part, Part::Close(_))));
+    assert!(stack.hover(Some(first), start), "moved onto a toast");
+    assert!(!stack.hover(Some(first), start), "still on it");
+    let (list, size, regions) = stack.draw(&store, start, measure, 20.0, &theme);
+    // The first is now the lower toast.
+    let top = (size.height + MARGIN) / 2.0;
+    let x = WIDTH - CLOSE_INSET - CLOSE_SIZE + 1.0;
+    assert_eq!(
+        regions.hit(x, top + CLOSE_INSET + 1.0),
+        Some(&Part::Close(first))
+    );
+    assert_eq!(
+        regions.hit(x - 2.0, top + CLOSE_INSET + 1.0),
+        Some(&Part::Body(first))
+    );
+    assert_eq!(regions.hit(x, CLOSE_INSET + 1.0), Some(&Part::Body(second)));
+    assert_eq!(
+        list.items.len(),
+        plain.items.len() + 2,
+        "a box and its cross"
+    );
+    assert!(list.items.iter().any(|item| matches!(
+        item,
+        Item::Box { rect, fill, .. } if *fill == theme.toast_close && rect.y == top + CLOSE_INSET
+    )));
+    assert_eq!(Part::Close(first).id(), first);
+    assert_eq!(
+        (CLOSE_INSET, CLOSE_SIZE),
+        (6.0, 20.0),
+        "swaync's 24 px margin outside the toast's 18, and a 16 px icon padded 2"
+    );
 }

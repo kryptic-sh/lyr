@@ -460,6 +460,9 @@ pub struct Theme {
     pub toast_border_critical: Colour,
     /// When it arrived.
     pub toast_time: Colour,
+    /// The close button on the toast under the pointer, and its cross.
+    pub toast_close: Colour,
+    pub toast_close_foreground: Colour,
     /// The clock panel: swaync's `.control-center` in the dotfiles.
     pub panel_background: Colour,
     pub panel_foreground: Colour,

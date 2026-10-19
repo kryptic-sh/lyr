@@ -3,7 +3,8 @@
 //! the user is on, above windows and clear of the bar.
 //!
 //! A click on a toast invokes its `default` action when it has one and takes
-//! the toast down; a middle click dismisses the notification. The panel is
+//! the toast down; a middle click, or a click on the close button the toast
+//! under the pointer shows, dismisses the notification. The panel is
 //! recreated whenever the stack's size changes, since crcbl 0.5.0 cannot
 //! resize a panel in place.
 
@@ -259,15 +260,19 @@ impl Toasts {
             _ => {
                 let presses = self.pointer.handle(event, panel.scale);
                 let target = self.pointer.target(&panel.regions).copied();
-                let id = target.map(|(Part::Body(id) | Part::Action(id, _))| id);
-                self.stack.hover(id, now);
+                let id = target.map(Part::id);
+                if self.stack.hover(id, now) {
+                    self.changed = true;
+                }
                 let (Some(target), Some(id)) = (target, id) else {
                     return Ok(None);
                 };
                 let clicked = presses.into_iter().find_map(|press| match (press, target) {
                     (Press::Left, Part::Body(_)) => Some(Clicked::Invoke(id)),
                     (Press::Left, Part::Action(_, index)) => Some(Clicked::Action(id, index)),
-                    (Press::Middle, _) => Some(Clicked::Dismiss(id)),
+                    (Press::Left, Part::Close(_)) | (Press::Middle, _) => {
+                        Some(Clicked::Dismiss(id))
+                    }
                     _ => None,
                 });
                 if clicked.is_some() {

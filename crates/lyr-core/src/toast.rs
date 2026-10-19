@@ -3,7 +3,7 @@
 //! dotfiles' `config.json` and `style.css`.
 //!
 //! Drawn so far: the summary over the body, when it arrived, the border
-//! coloured by urgency, and a button per action. Not yet: the close button,
+//! coloured by urgency, a button per action, and the close button. Not yet:
 //! images, and body markup (lyr advertises no `body-markup`, so applications
 //! send plain text).
 
@@ -32,6 +32,18 @@ pub const INSET: f32 = 8.0 + 7.0;
 pub const BUTTON_PADDING: f32 = 8.0;
 /// Around an action button: swaync's 4 px margin.
 pub const BUTTON_MARGIN: f32 = 4.0;
+/// The close button's side: GTK's 16 px symbolic icon in the dotfiles' 2 px
+/// `.close-button` padding.
+pub const CLOSE_SIZE: f32 = 16.0 + 2.0 * 2.0;
+/// From the toast's top and right edges to its close button. swaync 0.12.6
+/// overlays the button on the box around `.notification`
+/// (`data/ui/notification.blp`), so the dotfiles' 24 px `.close-button`
+/// margin counts from outside the toast's own margin.
+pub const CLOSE_INSET: f32 = 24.0 - MARGIN;
+/// The close button's cross, a character every font has where swaync draws
+/// its `swaync-close-symbolic` icon.
+const CLOSE: &str = "\u{d7}";
+
 /// The action a click on the body invokes, which gets no button.
 pub const DEFAULT_ACTION: &str = "default";
 
@@ -62,6 +74,44 @@ pub fn wrap(text: &str, width: f32, measure: impl Fn(&str) -> f32) -> Vec<String
         lines.push(line);
     }
     lines
+}
+
+/// The close button of a toast `width` wide, which swaync shows while the
+/// pointer is over the toast (`NotificationCloseButton`): its items and its
+/// rect, at the top right.
+#[must_use]
+pub fn close_button(
+    width: f32,
+    measure: impl Fn(&str) -> f32,
+    line_height: f32,
+    theme: &Theme,
+) -> ([Item; 2], Rect) {
+    let rect = Rect {
+        x: width - CLOSE_INSET - CLOSE_SIZE,
+        y: CLOSE_INSET,
+        width: CLOSE_SIZE,
+        height: CLOSE_SIZE,
+    };
+    let cross = measure(CLOSE);
+    let items = [
+        Item::Box {
+            rect,
+            radius: RADIUS,
+            fill: theme.toast_close,
+            border: None,
+        },
+        Item::Text {
+            rect: Rect {
+                x: rect.x + (CLOSE_SIZE - cross) / 2.0,
+                y: rect.y + (CLOSE_SIZE - line_height) / 2.0,
+                width: cross,
+                height: line_height,
+            },
+            text: CLOSE.to_owned(),
+            colour: theme.toast_close_foreground,
+        },
+    ];
+    (items, rect)
 }
 
 /// How long ago a notification arrived, as swaync 0.12.6 words it with its

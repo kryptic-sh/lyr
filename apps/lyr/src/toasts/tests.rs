@@ -246,3 +246,28 @@ fn a_click_on_an_action_button_asks_for_that_action() {
         .expect("clicked");
     assert_eq!(setup.pump(start), Some(Clicked::Action(id, 0)));
 }
+
+#[test]
+fn the_close_button_shows_under_the_pointer_and_dismisses() {
+    use lyr_core::toast::{CLOSE_INSET, CLOSE_SIZE, WIDTH};
+    let mut setup = setup();
+    let start = Instant::now();
+    let id = setup.notify("hello", start);
+    let window = setup.sync(start).expect("a panel");
+    let at = PhysicalPoint {
+        x: f64::from(WIDTH - CLOSE_INSET - CLOSE_SIZE / 2.0),
+        y: f64::from(CLOSE_INSET + CLOSE_SIZE / 2.0),
+    };
+    setup
+        .shell
+        .move_pointer(window, at, (0.0, 0.0))
+        .expect("moved");
+    assert_eq!(setup.pump(start), None);
+    assert!(setup.toasts.changed, "the close button is to be drawn");
+    assert_eq!(setup.sync(start), Some(window), "the same size");
+    setup
+        .shell
+        .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
+        .expect("clicked");
+    assert_eq!(setup.pump(start), Some(Clicked::Dismiss(id)));
+}

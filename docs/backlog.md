@@ -289,14 +289,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   drawn from the store while lyr is the daemon. A toast shows when it arrived as
   swaync words it ("Now", "2 mins ago", from `get_relative_time` at v0.12.6),
   redrawn as the words change; a summary long enough to reach the time is cut
-  short of it (`toast::TIME_GAP`), where swaync ellipsizes. Not built: a toast's
-  close button and images, and markup (the panel's Clear All, switch and media
-  players work; `lyr dnd` and `lyr clear` work; on Windows they answer that lyr
-  is not the daemon, run there). Each action but `default` gets a button under
-  the body (swaync's style, at the bar's text size until the owner rules on
-  swaync's `0.2rem`), in toasts and the panel's history; a click invokes it. A
-  transient notification, kept in no history, closes as expired when its toast
-  times out.
+  short of it (`toast::TIME_GAP`), where swaync ellipsizes. The toast under the
+  pointer shows swaync's close button (`toast::close_button`: red, 20 px, 6 px
+  in from the top right, from swaync 0.12.6's `NotificationCloseButton` and the
+  dotfiles' style; the `toast_close` theme keys), which dismisses; tested on the
+  headless shell and mutation-checked. The notification centre's entries have
+  none yet, where swaync's control centre shows one too. Not built: a toast's
+  images, and markup (the panel's Clear All, switch and media players work;
+  `lyr dnd` and `lyr clear` work; on Windows they answer that lyr is not the
+  daemon, run there). Each action but `default` gets a button under the body
+  (swaync's style, at the bar's text size until the owner rules on swaync's
+  `0.2rem`), in toasts and the panel's history; a click invokes it. A transient
+  notification, kept in no history, closes as expired when its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading

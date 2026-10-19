@@ -137,6 +137,8 @@ toast_border = "#73daca"
 toast_border_low = "#7aa2f7"
 toast_border_critical = "#f7768e"
 toast_time = "#565f89"
+toast_close = "#f7768e"
+toast_close_foreground = "#1a1b26"
 # swaync's .control-center in the dotfiles.
 panel_background = "#1a1b26"
 panel_foreground = "#c0caf5"

@@ -32,8 +32,9 @@ and this project adheres to
   holds the name; `notifications.replace = true` takes it over. Notifications
   show as toasts at the top right, swaync's look, timed out as swaync times
   them, held up while the pointer is over them; a click runs the default action,
-  a button under the body runs its action, and a middle click dismisses. The
-  bell module shows whether any are held and whether do-not-disturb is on.
+  a button under the body runs its action, and a middle click, or the close
+  button the toast under the pointer shows, dismisses. The bell module shows
+  whether any are held and whether do-not-disturb is on.
 - On Linux a change of time zone (`timedatectl set-timezone`) redraws the clock
   at once.
 - Tooltips on the power button, clock (the time zone and its offset), battery,
