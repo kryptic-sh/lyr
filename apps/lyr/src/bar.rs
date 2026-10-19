@@ -13,11 +13,14 @@ use chrono::{DateTime, FixedOffset, Local};
 use crcbl_shell::{ShellEvent, WindowId};
 use lyr_config::{Config, Item, Module, Platform};
 use lyr_core::clock::{self, Tick};
+use lyr_core::control::Request;
 use lyr_core::draw::{self, Bar, Content};
 use lyr_render::surface::Surface;
 use lyr_render::text::Text;
 use lyr_render::translate::translate;
 use lyr_shell::bars::Bars;
+
+use crate::control;
 
 /// One bar window's surface and the size it was last drawn at.
 struct Window {
@@ -26,10 +29,15 @@ struct Window {
     width: f32,
 }
 
-/// Runs the bar until the process is stopped.
+/// Runs the bar until `lyr quit` stops it.
 pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
     let (config, _) =
         lyr_config::load(config, Platform::current()).context("loading the config")?;
+    let mut shell = crcbl_shell::open().context("opening the window system")?;
+    // Bound before anything else is loaded or drawn, so a second lyr stops
+    // here.
+    let requests = control::listen(control::path()?, shell.waker())?;
+
     let font = lyr_render::fonts::load(&config.theme.font).context("loading the bar font")?;
     if let Some(family) = &font.missing {
         eprintln!("lyr: font `{family}` is not installed; using a monospace font");
@@ -40,7 +48,6 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
     let text = Text::new(font.font, config.theme.font_size as f32);
     let tick = Tick::of(&config.clock.format);
 
-    let mut shell = crcbl_shell::open().context("opening the window system")?;
     let mut bars = Bars::default();
     bars.sync(shell.as_mut(), &config.bar)
         .context("creating the bars")?;
@@ -49,6 +56,25 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
     loop {
         let now = Local::now().fixed_offset();
         shell.wait_events(Some(tick.until_next(&now)));
+        let mut quit = false;
+        while let Ok(incoming) = requests.try_recv() {
+            if incoming.request == Request::Quit {
+                quit = true;
+                incoming.reply(control::OK);
+            } else {
+                let what = incoming.request.to_string();
+                incoming.reply(format!("error: `{what}` is not implemented yet"));
+            }
+        }
+        if quit {
+            for (_, window) in windows.drain() {
+                window.surface.destroy()?;
+            }
+            for (_, bar) in bars.windows().collect::<Vec<_>>() {
+                shell.destroy_window(bar)?;
+            }
+            return Ok(());
+        }
         let mut events = Vec::new();
         shell.pump(&mut |event| events.push(event));
         for event in &events {

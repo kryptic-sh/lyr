@@ -1,11 +1,11 @@
 //! `lyr` — a desktop status bar.
 //!
-//! With no command it runs the bar ([`bar::run`]). The commands sent to a
-//! running bar over its control socket are parsed but not sent yet: the socket
-//! does not exist, so they report that and exit non-zero. See `docs/plan/` for
-//! the design and `docs/plan/15-milestones.md` for the build order.
+//! With no command it runs the bar ([`bar::run`]); any other command is sent
+//! to the running bar over its control socket ([`control`]). See `docs/plan/`
+//! for the design and `docs/plan/15-milestones.md` for the build order.
 
 mod bar;
+mod control;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -95,11 +95,19 @@ fn main() -> ExitCode {
             }
         };
     };
-    eprintln!(
-        "lyr: {}: not implemented yet (the control socket is not built)",
-        command.request()
-    );
-    ExitCode::FAILURE
+    let request = command.request();
+    let reply = control::path().and_then(|path| control::send(path, request));
+    match reply {
+        Ok(reply) if reply == control::OK => ExitCode::SUCCESS,
+        Ok(reply) => {
+            eprintln!("lyr: {request}: {reply}");
+            ExitCode::FAILURE
+        }
+        Err(error) => {
+            eprintln!("lyr: {request}: no running bar answered ({error})");
+            ExitCode::FAILURE
+        }
+    }
 }
 
 #[cfg(test)]

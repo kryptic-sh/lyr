@@ -78,8 +78,21 @@ Windows), modelled on tmxr's `interprocess` use. It is used by:
   drawing a second set of bars.
 
 A request is one line of text (`panel wifi`), so the socket can be driven by
-hand. The requests and their wire form are `lyr_core::control::Request`, and the
-command line maps each command to one.
+hand, and the reply is one line: `ok`, or `error: …`. The requests and their
+wire form are `lyr_core::control::Request`, and the command line maps each
+command to one (`apps/lyr/src/control.rs`).
+
+- **Where:** on Unix, `lyr.sock` in `$XDG_RUNTIME_DIR` (private to the user by
+  the XDG spec), else `$TMPDIR` (per user on macOS); with neither set, lyr
+  refuses to start rather than use a shared `/tmp`. The socket is `0600`. On
+  Windows, the named pipe `\\.\pipe\lyr-<user>`, with Windows' default pipe
+  security, which gives other users read access only, and reading cannot send a
+  request. An owner-only DACL, as tmxr sets, would need `widestring`, which lyr
+  does not take on for this.
+- **Single instance:** a starting lyr first connects to the socket; if a bar
+  answers, it exits saying so. That check comes first because a Windows pipe
+  name accepts a second listener silently. On Unix a socket file nobody answers,
+  left by a lyr that died, is replaced.
 
 ## Data flow of a click
 

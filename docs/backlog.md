@@ -145,11 +145,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   with its border, radius and text, as a screenshot showed, and the work area
   came back when the process was killed. Hack Nerd Font Propo is not installed
   on that machine, so it drew in the monospace fallback, and lyr said so. Not
-  run on Hyprland, which is M1's real check. There is no way to stop the bar but
-  killing it (the control socket's `quit` is not built), nor logging (`tracing`;
-  it prints to stderr). `colour.rs` copies crcbl-ui's private `srgb_to_linear`;
-  if crcbl exports it, lyr drops the copy. Group opacity is approximated until
-  crcbl's opacity groups ship.
+  run on Hyprland, which is M1's real check. `lyr quit` stops it. There is no
+  logging yet (`tracing`; it prints to stderr). `colour.rs` copies crcbl-ui's
+  private `srgb_to_linear`; if crcbl exports it, lyr drops the copy. Group
+  opacity is approximated until crcbl's opacity groups ship.
 - **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors
@@ -189,12 +188,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked; CI's Linux job runs the same test. Not run against a real
   UPower. Not built: every other source. Network and audio wait on the
   new-dependency decision above.
-- **Control socket.** Built: the requests (`lyr_core::control::Request`, one
-  text line each) and the CLI commands that send them, including `lyr panel`,
-  `lyr dnd` and `lyr clear`, which still report "not implemented". Not built:
-  the socket itself (`interprocess`, a Unix socket or a named pipe), the reply
-  line, single-instance detection, and `lyr event workspace` for AeroSpace
-  (M10). The socket needs the bar's main loop to hand requests to (M1).
+- **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
+  `interprocess`), the reply line, single-instance detection and `lyr quit`,
+  tested on Windows and Linux (WSL), and run end to end on Windows (a second
+  `lyr` refused; `lyr quit` stopped the bar, exit 0, the work area restored).
+  The other requests reach the bar and answer "not implemented yet": `reload`
+  (M3), `toggle`, `panel` (M5), `dnd` and `clear` (M6). Not built:
+  `lyr event workspace` for AeroSpace (M10).
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]` and `[theme]`, the embedded defaults,
   `[platform.*]` layering on both the defaults and the user file, and validation
