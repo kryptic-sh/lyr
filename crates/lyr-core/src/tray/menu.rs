@@ -25,7 +25,7 @@ pub struct Entry {
     pub separator: bool,
     pub toggle: Option<Toggle>,
     /// Its submenu's entries.
-    pub children: Vec<Entry>,
+    pub children: Vec<Self>,
 }
 
 impl Entry {
