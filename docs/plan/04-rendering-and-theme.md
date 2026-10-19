@@ -45,7 +45,12 @@ state + config + theme ──► lyr-core: layout ──► DrawList + hit regio
 - No frame loop. A window repaints when its `DrawList` changed, when it is
   resized or rescaled, or when the compositor asks (exposure).
 - A zone is rebuilt only when one of its modules' state changed, and a window is
-  redrawn only when a zone on it changed.
+  redrawn only when a zone on it changed. Built so far at window grain
+  (`apps/lyr/src/bar.rs`): a bar is redrawn on the clock's tick, a source's
+  update, a resize, or the pointer moving onto another workspace button, and the
+  loop sleeps until the next of those. A frame the swapchain swallowed (rebuilt
+  instead of presented) is drawn again at once. Not yet per zone, and every bar
+  redraws on any source's update.
 - Wayland: a repaint waits for the surface's **frame callback**. Win32 and
   AppKit: repaint directly, at most once per event batch.
 - **Present mode:** FIFO with frame-callback pacing, never a blocking present

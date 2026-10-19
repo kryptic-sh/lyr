@@ -47,10 +47,11 @@ pub struct Drawn {
 }
 
 /// Lays out one bar `width` logical pixels wide, on the output named
-/// `monitor`.
+/// `monitor`, with the pointer over workspace button `hovered`.
 pub fn draw(
     width: f32,
     monitor: Option<&str>,
+    hovered: Option<usize>,
     config: &Config,
     text: &Text,
     data: &Data,
@@ -64,7 +65,7 @@ pub fn draw(
                 Item::Spacer { .. } => None,
             })
             .filter_map(|module| {
-                content(module, config, data, now, monitor).map(|content| draw::Module {
+                content(module, config, data, now, monitor, hovered).map(|content| draw::Module {
                     content,
                     target: module,
                 })
@@ -112,6 +113,7 @@ fn content(
     data: &Data,
     now: &DateTime<FixedOffset>,
     #[cfg_attr(not(target_os = "linux"), allow(unused_variables))] monitor: Option<&str>,
+    #[cfg_attr(not(target_os = "linux"), allow(unused_variables))] hovered: Option<usize>,
 ) -> Option<Content> {
     let theme = &config.theme;
     let label = |text: String, colour| Content::Label {
@@ -149,12 +151,14 @@ fn content(
             let state = data.workspaces.as_ref()?;
             let buttons = shown_workspaces(state, config, monitor)
                 .into_iter()
-                .map(|workspace| draw::Button {
+                .enumerate()
+                .map(|(index, workspace)| draw::Button {
                     text: config
                         .workspaces
                         .format
                         .render(|name| (name == "name").then_some(workspace.name.as_str())),
-                    colour: if state.active() == Some(workspace.id) {
+                    // Active or hovered, as waybar's style colours both.
+                    colour: if state.active() == Some(workspace.id) || hovered == Some(index) {
                         theme.workspace_active
                     } else if workspace.urgent {
                         theme.workspace_urgent.unwrap_or(theme.foreground)

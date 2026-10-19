@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
 use chrono::Local;
@@ -41,6 +42,20 @@ struct Window {
     regions: Regions<Target<Module>>,
     /// The workspaces the last frame's buttons stand for.
     workspaces: Vec<i64>,
+    /// The workspace button the pointer was over when it was last drawn.
+    hovered: Option<usize>,
+    /// Whether it must be drawn again: what it shows changed since.
+    dirty: bool,
+}
+
+impl Window {
+    /// The workspace button the pointer is over now, by its index in the row.
+    fn hovered(&self) -> Option<usize> {
+        match self.pointer.target(&self.regions) {
+            Some(Target::Button(Module::Workspaces, index)) => Some(*index),
+            _ => None,
+        }
+    }
 }
 
 /// Runs the bar until `lyr quit` stops it.
@@ -68,10 +83,22 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
     let mut windows: HashMap<WindowId, Window> = HashMap::new();
     let (updates, commands) = sources::start(shell.waker()).context("starting the sources")?;
     let mut data = Data::default();
+    // When the clock's text next changes, so every bar is redrawn then.
+    let mut next_tick = Instant::now() + tick.until_next(&Local::now().fixed_offset());
 
     loop {
-        let now = Local::now().fixed_offset();
-        shell.wait_events(Some(tick.until_next(&now)));
+        // A bar still to draw (a frame the swapchain swallowed) goes round
+        // again at once.
+        let wait = if windows.values().any(|window| window.dirty) {
+            Duration::ZERO
+        } else {
+            next_tick.saturating_duration_since(Instant::now())
+        };
+        shell.wait_events(Some(wait));
+        if Instant::now() >= next_tick {
+            next_tick = Instant::now() + tick.until_next(&Local::now().fixed_offset());
+            windows.values_mut().for_each(|window| window.dirty = true);
+        }
         let mut quit = false;
         while let Ok(incoming) = requests.try_recv() {
             if incoming.request == Request::Quit {
@@ -93,6 +120,7 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
         }
         while let Ok(update) = updates.try_recv() {
             data.apply(update);
+            windows.values_mut().for_each(|window| window.dirty = true);
         }
         let mut events = Vec::new();
         shell.pump(&mut |event| events.push(event));
@@ -117,6 +145,7 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
                         open.surface.resize(device, scale)?;
                         open.width = width;
                         open.scale = scale;
+                        open.dirty = true;
                     } else {
                         let surface = Surface::open(shell.as_ref(), window, device, scale)
                             .context("opening a bar's surface")?;
@@ -136,6 +165,8 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
                                 pointer: Pointer::default(),
                                 regions: Regions::default(),
                                 workspaces: Vec::new(),
+                                hovered: None,
+                                dirty: true,
                             },
                         );
                     }
@@ -149,7 +180,11 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
                     let Some(window) = event.window().and_then(|id| windows.get_mut(&id)) else {
                         continue;
                     };
-                    for press in window.pointer.handle(event, window.scale) {
+                    let presses = window.pointer.handle(event, window.scale);
+                    if window.hovered() != window.hovered {
+                        window.dirty = true;
+                    }
+                    for press in presses {
                         if let Some(target) = window.pointer.target(&window.regions) {
                             input::act(
                                 target,
@@ -166,18 +201,22 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
             }
         }
         let now = Local::now().fixed_offset();
-        for window in windows.values_mut() {
+        for window in windows.values_mut().filter(|window| window.dirty) {
+            let hovered = window.hovered();
             let drawn = modules::draw(
                 window.width,
                 window.monitor.as_deref(),
+                hovered,
                 &config,
                 &text,
                 &data,
                 &now,
             );
-            window.surface.draw(&translate(&drawn.list, &text))?;
+            let presented = window.surface.draw(&translate(&drawn.list, &text))?;
             window.regions = drawn.regions;
             window.workspaces = drawn.workspaces;
+            window.hovered = hovered;
+            window.dirty = !presented;
         }
     }
 }

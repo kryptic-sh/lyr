@@ -126,15 +126,16 @@ impl Surface {
         Ok(())
     }
 
-    /// Draws `list`, in logical pixels, as the window's next frame.
+    /// Draws `list`, in logical pixels, as the window's next frame. Returns
+    /// whether it was presented: `false` when the swapchain was rebuilt
+    /// instead, and the caller has to draw again.
     ///
     /// # Errors
     ///
     /// When acquiring, recording or presenting fails.
-    pub fn draw(&mut self, list: &DrawList) -> Result<FrameOutcome, Error> {
+    pub fn draw(&mut self, list: &DrawList) -> Result<bool, Error> {
         let Some(frame) = self.presenter.acquire()? else {
-            // The swapchain was rebuilt; the caller draws again.
-            return Ok(FrameOutcome::Reconfigured);
+            return Ok(false);
         };
         let device = self.presenter.device();
         self.ui.begin_frame(device, list, &self.atlas, self.scale)?;
@@ -163,7 +164,8 @@ impl Surface {
         });
         compiled.execute(device, &mut self.pool, encoder.as_mut(), None)?;
         let commands = encoder.finish()?;
-        Ok(self.presenter.submit_and_present(&frame, commands)?)
+        let outcome = self.presenter.submit_and_present(&frame, commands)?;
+        Ok(outcome == FrameOutcome::Presented)
     }
 
     /// Waits for the device and releases everything, in the order the example
