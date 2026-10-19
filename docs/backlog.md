@@ -127,6 +127,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `workspaces.scroll`), and `lyr --stats`. The `WorkspaceBackend` trait waits
   for the Windows backend (M9). Hyprland main's changes for the next release are
   in [plan/06](plan/06-workspaces.md#linux--hyprland).
+- **Render, rest of M1.** `lyr-render` has the GPU-free half: the bar font found
+  with crcbl-font and given the system's fallback faces (`fonts::load`), text
+  measured and drawn as one glyph run per face (`text::Text`), sRGB colours in
+  linear light (`colour::linear`), and lyr's draw list as crcbl-ui commands
+  (`translate`), tested on Windows and Linux (WSL) and mutation-checked.
+  `fonts::load` itself is untested: it depends on what is installed. Not built:
+  presenting (crcbl-app's `Presenter` per bar, crcbl-frame's
+  `UiRenderer::with_ring`, following `crates/crcbl-app/examples/ui_window.rs`),
+  and the main loop that ties shell, sources and frames together. `colour.rs`
+  copies crcbl-ui's private `srgb_to_linear`; if crcbl exports it, lyr drops the
+  copy. Group opacity is approximated until crcbl's opacity groups ship.
 - **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors

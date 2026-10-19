@@ -1,9 +1,12 @@
-//! Rendering for lyr.
+//! Rendering for lyr (`docs/plan/04-rendering-and-theme.md`).
 //!
-//! Will own the crcbl-hal device, per-window swapchains, system font lookup
-//! and loading, and translating draw lists into crcbl's UI pass
-//! (`docs/plan/04-rendering-and-theme.md`).
-//!
-//! Empty in the scaffold: nothing is implemented yet. Rendering lands in
-//! milestone M1 (`docs/plan/15-milestones.md`), once crcbl provides what
-//! `docs/plan/03-surfaces-and-input.md` lists.
+//! Turns `lyr-core`'s draw list into crcbl-ui's commands: the bar's font found
+//! on the system ([`fonts`]), its text measured and drawn ([`text`]), colours
+//! converted to linear light ([`colour`]), and the translation itself
+//! ([`translate`]). Presenting the commands on a window, through
+//! `crcbl-app`'s presenter, comes next in milestone M1.
+
+pub mod colour;
+pub mod fonts;
+pub mod text;
+pub mod translate;

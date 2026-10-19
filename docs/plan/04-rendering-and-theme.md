@@ -21,6 +21,14 @@ state + config + theme ──► lyr-core: layout ──► DrawList + hit regio
   translates it into crcbl's UI draw commands (`DrawCommand::RoundedRect`,
   `Glyphs`, `Image`, …), which have the same shape. Keeping lyr's own type means
   a crcbl API break touches one translation function, not the layout code.
+- **Colours** are written as sRGB, as CSS does, and converted to the linear
+  light crcbl-ui's draw list takes (IEC 61966-2-1's transfer function, as
+  crcbl-ui's own CSS colours are; `lyr_render::colour`).
+- **Opacity:** crcbl-ui 0.5.0 has no opacity group, so a group's opacity is
+  multiplied into each of its items' alpha. That lets a module box's background
+  show faintly through its own text, which CSS `opacity` does not. crcbl is
+  adding `push_opacity` / `pop_opacity` with CSS semantics (its next slice after
+  the AppKit input method, 2026-10-19), and the translation switches to it then.
 - **One device, many surfaces.** A single crcbl-hal device is shared by every
   bar and popup, with one swapchain per window.
 - **Backend choice:** crcbl's runtime selection. lyr prefers Vulkan on Linux,
