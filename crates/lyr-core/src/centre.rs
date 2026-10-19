@@ -10,7 +10,7 @@ use std::time::Instant;
 
 use lyr_config::Theme;
 
-use crate::draw::{DrawList, Item, Size};
+use crate::draw::{self, DrawList, Item, Size};
 use crate::hit::{Rect, Regions};
 use crate::media::{Control, Player, Status};
 use crate::notifications::Store;
@@ -38,8 +38,6 @@ const BUTTON_PADDING: (f32, f32) = (8.0, 4.0);
 const BORDER: f32 = 2.0;
 /// swaync's corner radius.
 const RADIUS: f32 = 8.0;
-/// Between the switch's edge and its knob.
-const KNOB_INSET: f32 = 4.0;
 /// Between two history entries: 4 px above and below each.
 const ENTRY_GAP: f32 = 8.0;
 /// Between two of the history's groups, besides the entries' own gap.
@@ -123,32 +121,7 @@ pub fn draw(
         height: line_height,
     };
     items.push(label("Do Not Disturb", 0.0, y, theme.panel_foreground));
-    items.push(Item::Box {
-        rect: switch,
-        radius: switch.height / 2.0,
-        fill: if store.dnd {
-            theme.switch_on
-        } else {
-            theme.toast_background
-        },
-        border: Some((BORDER, theme.panel_border)),
-    });
-    let knob = switch.height - 2.0 * KNOB_INSET;
-    items.push(Item::Box {
-        rect: Rect {
-            x: if store.dnd {
-                switch.x + switch.width - KNOB_INSET - knob
-            } else {
-                switch.x + KNOB_INSET
-            },
-            y: switch.y + KNOB_INSET,
-            width: knob,
-            height: knob,
-        },
-        radius: knob / 2.0,
-        fill: theme.panel_border,
-        border: None,
-    });
+    items.extend(draw::switch(switch, store.dnd, theme));
     regions.push(switch, Target::Dnd);
     // The bottom of the last thing drawn.
     let mut bottom = switch.y + switch.height;

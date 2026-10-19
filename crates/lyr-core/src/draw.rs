@@ -344,6 +344,45 @@ pub fn tooltip(
     (DrawList { items }, size)
 }
 
+/// Between a switch's edge and its knob: swaync's 4 px.
+const KNOB_INSET: f32 = 4.0;
+/// A switch's border.
+const SWITCH_BORDER: f32 = 2.0;
+
+/// An on/off switch filling `rect`, as swaync draws its do-not-disturb
+/// switch: a pill orange while on, its knob at the end it is set to.
+#[must_use]
+pub fn switch(rect: Rect, on: bool, theme: &Theme) -> [Item; 2] {
+    let knob = rect.height - 2.0 * KNOB_INSET;
+    [
+        Item::Box {
+            rect,
+            radius: rect.height / 2.0,
+            fill: if on {
+                theme.switch_on
+            } else {
+                theme.toast_background
+            },
+            border: Some((SWITCH_BORDER, theme.panel_border)),
+        },
+        Item::Box {
+            rect: Rect {
+                x: if on {
+                    rect.x + rect.width - KNOB_INSET - knob
+                } else {
+                    rect.x + KNOB_INSET
+                },
+                y: rect.y + KNOB_INSET,
+                width: knob,
+                height: knob,
+            },
+            radius: knob / 2.0,
+            fill: theme.panel_border,
+            border: None,
+        },
+    ]
+}
+
 /// A width and height in logical pixels.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Size {
