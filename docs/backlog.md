@@ -67,6 +67,22 @@ implementation follows meanwhile.
 - **Windows: may lyr take `windows-sys`?** (M9.) **Q:** The Windows power
   actions, sources and menus (plan 10, plan 11) need Win32 calls through
   `windows-sys`, new to lyr. Add it when M9 starts?
+- **The `lyr` name on crates.io is taken** (M11). **Q:** `lyr` on crates.io is
+  someone else's (Serial-ATA's lyrics tool, 0.3.0, last published 2024-07-23;
+  checked 2026-10-20), so the app crate cannot be published under it. The
+  library names (`lyr-core`, `lyr-config`, `lyr-render`, `lyr-shell`,
+  `lyr-sources`, `lyr-wm`) are free, and `lyr` and `lyr-bin` are free on the
+  AUR. Options: publish the app as another package (say `lyr-bar`) with its
+  binary still named `lyr`; ask the owner of `lyr` for the name; or do not
+  publish the app to crates.io (the libraries only, with binaries from the
+  release page, the AUR, Homebrew and Scoop).
+- **Release pipeline: build it now, and may it take `clap_complete` and
+  `clap_mangen`?** (M11.) **Q:** crcbl is on crates.io, which was phase 2's hard
+  block (plan 14). Copy tmxr's release jobs and `pkg/` templates now, untried
+  until the first tag, or when the owner decides to cut the first release? The
+  binary's `--completions` and `--man` need `clap_complete` and `clap_mangen`,
+  new to lyr. The org secrets' allowlists and the site entry are the owner's to
+  set.
 - **The dotfiles' standalone tools** (M8). **Q:** When the dotfiles switch to
   lyr, do `wiremix` and `bluetui` stay installed, and do the `krypt menu` names
   stay as wrappers?

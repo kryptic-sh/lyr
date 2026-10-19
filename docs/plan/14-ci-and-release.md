@@ -64,11 +64,13 @@ Before the first tag:
 
 - **Every crcbl crate lyr uses is on crates.io**, at a release that has what lyr
   needs. `publish-crates` fails on a git dependency, so this is a hard block.
-  crcbl 0.5.0 (2026-10-19) has all of it, so this holds while lyr avoids git
-  pins.
+  crcbl 0.6.0 (2026-10-20), which lyr pins, has all of it, so this holds while
+  lyr avoids git pins.
 - lyr is added to the allowlists of the org secrets `AUR_SSH_KEY`,
   `BREW_SSH_KEY` and `SCOOP_SSH_KEY`, and has `CARGO_REGISTRY_TOKEN`.
-- Check that the `lyr` / `lyr-*` names are free on crates.io and the AUR.
+- Names, checked 2026-10-20: `lyr` on crates.io is taken (another project's),
+  the `lyr-*` crate names are free, and `lyr` and `lyr-bin` are free on the AUR.
+  What the app crate is published as is a question in the backlog.
 - Site entry on kryptic-sh.github.io.
 
 ## Phase 3 — later
