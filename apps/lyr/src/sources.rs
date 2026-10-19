@@ -16,7 +16,7 @@ use crcbl_shell::ShellWaker;
 #[derive(Debug)]
 pub enum Update {
     /// The battery, or `None` when there is none to show.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     Battery(Option<lyr_core::battery::Reading>),
     /// The power profiles, or `None` when the daemon lists none.
     #[cfg(target_os = "linux")]
@@ -149,6 +149,9 @@ enum NotificationRequest {
 /// drops what it is sent; it already logged why it stopped.
 #[derive(Debug)]
 pub struct Commands {
+    /// Windows: the battery's change notifications, live while the bar is.
+    #[cfg(windows)]
+    _battery: Option<lyr_sources::battery::windows::Watch>,
     #[cfg(target_os = "linux")]
     focus: tokio::sync::mpsc::UnboundedSender<lyr_wm::hyprland::Workspace>,
     #[cfg(target_os = "linux")]
@@ -319,10 +322,55 @@ pub fn start(
             },
         ))
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(windows)]
+    {
+        let battery = windows::battery(sender, waker);
+        Ok((receiver, Commands { _battery: battery }))
+    }
+    #[cfg(target_os = "macos")]
     {
         drop((sender, waker));
         Ok((receiver, Commands {}))
+    }
+}
+
+/// The sources Windows has so far: the battery.
+#[cfg(windows)]
+mod windows {
+    use std::sync::mpsc;
+
+    use crcbl_shell::ShellWaker;
+    use lyr_sources::battery::windows::{Watch, status};
+
+    use super::Update;
+
+    /// The battery reading now, `None` with no battery or when Windows cannot
+    /// say, which it logs.
+    fn reading() -> Option<lyr_core::battery::Reading> {
+        status()
+            .inspect_err(|error| tracing::warn!("battery: the power status: {error}"))
+            .ok()?
+            .reading()
+    }
+
+    /// Hands the battery to the main loop now and after every change, while
+    /// the returned watch lives. `None` when Windows refuses to report
+    /// changes, which it logs; the first reading is still handed over.
+    pub(super) fn battery(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+    ) -> Option<Watch> {
+        let deliver = move || {
+            // The main loop has gone when this fails: nothing is left to do.
+            let _gone = sender.send(Update::Battery(reading()));
+            if let Some(waker) = &waker {
+                waker.wake();
+            }
+        };
+        deliver();
+        Watch::new(deliver)
+            .inspect_err(|error| tracing::warn!("battery: changes will not show: {error}"))
+            .ok()
     }
 }
 

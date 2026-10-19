@@ -18,6 +18,8 @@ and this project adheres to
   its address and, on Wi-Fi, the network's name and signal), Bluetooth (from
   BlueZ, with a connected device's battery) and the Hyprland workspaces. The
   other modules are not drawn yet.
+- On Windows the battery module shows the battery, from Windows' power status,
+  updated when the power source or the charge changes.
 - Clicking a workspace switches to it, and with `workspaces.scroll = true` the
   wheel steps through them. A module's `[<module>.on]` table binds clicks and
   scrolling to a command (`{ exec = "…" }`) or a built-in action. Of the

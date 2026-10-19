@@ -397,6 +397,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   peer-to-peer connection and mutation-checked; the names are from
   NetworkManager's introspection XML on main (2026-10-20), not checked against
   an installed one. Not built: the nl80211 fallback without NetworkManager.
+- **Windows sources, M9.** Built: the battery (`lyr_sources::battery::windows`):
+  `GetSystemPowerStatus` read at start and again whenever
+  `PowerSettingRegisterNotification` reports a change of power source or
+  remaining charge (`GUID_ACDC_POWER_SOURCE`,
+  `GUID_BATTERY_PERCENTAGE_REMAINING`) to a callback, so nothing polls and no
+  window is needed; the status's mapping (`battery::win32`) follows Microsoft's
+  `SYSTEM_POWER_STATUS` reference, with no draw (shown as 0 W, as waybar shows a
+  missing one) and no time to full. The mapping is tested on every platform and
+  mutation-checked; the registration is tested on this machine, which has no
+  battery, so a real battery's changes have not been seen. Run in the bar on
+  Windows (2026-10-20): it started and quit cleanly with the module hidden. Not
+  built: the other Windows sources (power profile, network, Bluetooth, volume,
+  workspaces) and menus.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace

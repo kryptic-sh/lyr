@@ -84,7 +84,7 @@ impl Data {
 
     pub fn apply(&mut self, update: Update) {
         match update {
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", windows))]
             Update::Battery(reading) => self.battery = reading,
             #[cfg(target_os = "linux")]
             Update::PowerProfile(profiles) => self.power_profile = profiles,
