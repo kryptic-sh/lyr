@@ -288,12 +288,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   around an empty placeholder, so a battery with no power reading shows
   `80% W Discharging`. Measuring text (the widths `layout` takes) needs
   crcbl-ui's font atlas, so it is done by the caller in `lyr-render`.
-- **Sources, M4.** Built: the UPower display device's properties turned into the
-  battery view's reading (`lyr_sources::battery::upower::Device`), tested and
-  mutation-checked. Not built: the D-Bus connection that fills it (zbus, Linux
-  only; testable under WSL against a fake UPower on zbus's peer-to-peer
-  connection, which needs no bus daemon), now unblocked (`futures-util`,
-  approved 2026-10-18), and every other source. Network and audio wait on the
+- **Sources, M4.** Built: the battery source. UPower's display device is read
+  over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
+  each `PropertiesChanged`, with no polling, and turned into the view's reading
+  (`battery::upower::Device`). It is tested under WSL against a fake UPower on
+  zbus's peer-to-peer connection, which needs no bus daemon, and
+  mutation-checked; CI's Linux job runs the same test. Not run against a real
+  UPower. Not built: every other source. Network and audio wait on the
   new-dependency decision above.
 - **Control socket.** Built: the requests (`lyr_core::control::Request`, one
   text line each) and the CLI commands that send them, including `lyr panel`,
