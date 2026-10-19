@@ -100,6 +100,17 @@ implementation follows meanwhile.
   for the released builds (24H2, 26100) and leave the module out on this
   machine; target komorebi or GlazeWM's IPC instead (stable, but only if one of
   them gets used); or leave workspaces out on Windows.
+- **Windows power profile: switch it through an undocumented export?** (M9.)
+  **Q:** Plan 16's question 13 defaults to `PowerSetActiveOverlayScheme`, which
+  neither `windows-sys` nor `windows` binds: it would be an `extern` on
+  `powrprof.dll` with the overlay GUIDs written out from outside sources, and
+  plan 11 has each undocumented API refuse a build missing from its table. The
+  development machine runs Insider build 26300, which such a table would not
+  hold, so the switch would refuse here and could not be seen working (reading
+  the mode back through `PowerGetEffectiveOverlayScheme` would be the check).
+  Build it with a table for the released builds, or keep the module read-only on
+  Windows, as on macOS? Until then a click logs that `cycle_profile` is not
+  implemented.
 
 ## Cross-repo work
 
@@ -400,9 +411,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   added or removed, the rfkill block from the adapter's `PowerState`, and the
   device shown the last to connect, as waybar does
   (`lyr_sources::bluetooth::Tracker`); tested against a fake BlueZ. Not built:
-  the volume and mic sources (the notification daemon is its own entry), which
-  wait on the new-dependency decision above. The network source is built over
-  NetworkManager (`lyr_sources::network::linux::NetworkManager`): the device of
+  the Linux volume and mic sources (the notification daemon is its own entry;
+  Windows' are built, under M9), which wait on the new-dependency decision
+  above. The network source is built over NetworkManager
+  (`lyr_sources::network::linux::NetworkManager`): the device of
   `PrimaryConnection` (the default route, as waybar picks it), else of
   `ActivatingConnection`, its IPv4 address, prefix and gateway, and on Wi-Fi the
   access point's SSID and strength, with the radio blocked when
@@ -510,8 +522,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   back). `lyr dnd` and `lyr clear` act on the notification daemon on Linux and
   answer that lyr is not the daemon elsewhere. `lyr panel clock`,
   `lyr panel bluetooth` and `lyr panel wifi` open their panels;
-  `lyr panel audio` answers "not implemented yet" (M7). Not built:
-  `lyr event workspace` for AeroSpace (M10).
+  `lyr panel audio` answers "not implemented yet" (M7), except on Windows, where
+  it opens the Sound Settings page. Not built: `lyr event workspace` for
+  AeroSpace (M10).
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]`, `[theme]` and every module's table, the
   embedded defaults, `[platform.*]` layering on both the defaults and the user
