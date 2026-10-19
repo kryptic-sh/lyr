@@ -122,11 +122,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   source). The dialect comes from Hyprland itself (`j/status`'s
   `configProvider`, as ironbar reads it), tested against the fake on Linux under
   WSL. Named workspaces get no request in Lua until there is a quoting rule.
-  Click is `focus_request` and scroll is `State::step`, both pure and tested;
-  still to build: wiring them into the bar (M1's window and M3's
-  `workspaces.scroll`), and `lyr --stats`. The `WorkspaceBackend` trait waits
-  for the Windows backend (M9). Hyprland main's changes for the next release are
-  in [plan/06](plan/06-workspaces.md#linux--hyprland).
+  Click is `focus_request` and scroll is `State::step`, both pure and tested.
+  The bar shows the workspaces (`apps/lyr/src/sources.rs` runs the backend and
+  hands its `State` to the main loop); still to build: pointer input reaching
+  `focus_request` and `State::step`, and `lyr --stats`. The `WorkspaceBackend`
+  trait waits for the Windows backend (M9). Hyprland main's changes for the next
+  release are in [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Render, rest of M1.** `lyr-render` has the GPU-free half: the bar font found
   with crcbl-font and given the system's fallback faces (`fonts::load`), text
   measured and drawn as one glyph run per face (`text::Text`), sRGB colours in
@@ -138,17 +139,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `crates/crcbl-app/examples/ui_window.rs` does), and `lyr` with no command now
   runs the main loop (`apps/lyr/src/bar.rs`): the config and font, a bar per
   output, a surface opened on each bar's first resize, and a redraw on the
-  clock's tick. Only the clock is drawn; the other modules wait on their
-  sources. **Run once, on Windows** (2026-10-19, with the owner's go-ahead):
-  Windows 11 at 2560 × 1440, D3D12 on an AMD Radeon RX 7900 XTX as asked, the
-  bar an appbar reserving 50 px. It drew the transparent bar and the clock box
-  with its border, radius and text, as a screenshot showed, and the work area
-  came back when the process was killed. Hack Nerd Font Propo is not installed
-  on that machine, so it drew in the monospace fallback, and lyr said so. Not
-  run on Hyprland, which is M1's real check. `lyr quit` stops it. There is no
-  logging yet (`tracing`; it prints to stderr). `colour.rs` copies crcbl-ui's
-  private `srgb_to_linear`; if crcbl exports it, lyr drops the copy. Group
-  opacity is approximated until crcbl's opacity groups ship.
+  clock's tick, or on a source's update. It draws the clock, and on Linux the
+  battery and workspaces; the other modules wait on their sources. **Run once,
+  on Windows** (2026-10-19, with the owner's go-ahead): Windows 11 at 2560 ×
+  1440, D3D12 on an AMD Radeon RX 7900 XTX as asked, the bar an appbar reserving
+  50 px. It drew the transparent bar and the clock box with its border, radius
+  and text, as a screenshot showed, and the work area came back when the process
+  was killed. Hack Nerd Font Propo is not installed on that machine, so it drew
+  in the monospace fallback, and lyr said so. Not run on Hyprland, which is M1's
+  real check. `lyr quit` stops it. There is no logging yet (`tracing`; it prints
+  to stderr). `colour.rs` copies crcbl-ui's private `srgb_to_linear`; crcbl's
+  next release exports it as `crcbl_ui::style::from_srgb8` (and
+  `crcbl_core::srgb`), and lyr drops the copy then. Group opacity is
+  approximated until crcbl's opacity groups ship.
 - **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors
@@ -185,9 +188,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   each `PropertiesChanged`, with no polling, and turned into the view's reading
   (`battery::upower::Device`). It is tested under WSL against a fake UPower on
   zbus's peer-to-peer connection, which needs no bus daemon, and
-  mutation-checked; CI's Linux job runs the same test. Not run against a real
-  UPower. Not built: every other source. Network and audio wait on the
-  new-dependency decision above.
+  mutation-checked; CI's Linux job runs the same test. The bar runs it, with the
+  Hyprland workspaces, on a tokio runtime of its own thread
+  (`apps/lyr/src/sources.rs`), each update handed to the main loop and the loop
+  woken through crcbl's `ShellWaker`. Not run against a real UPower or Hyprland,
+  which needs the owner's machine. Not built: every other source. Network and
+  audio wait on the new-dependency decision above.
 - **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second

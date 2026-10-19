@@ -6,6 +6,7 @@
 
 mod bar;
 mod control;
+mod sources;
 
 use std::path::PathBuf;
 use std::process::ExitCode;

@@ -881,7 +881,10 @@ dependencies = [
  "lyr-core",
  "lyr-render",
  "lyr-shell",
+ "lyr-sources",
+ "lyr-wm",
  "thiserror",
+ "tokio",
 ]
 
 [[package]]
