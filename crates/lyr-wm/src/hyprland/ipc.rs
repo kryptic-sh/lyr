@@ -8,7 +8,9 @@ use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, Lines};
 use tokio::net::UnixStream;
 
-use super::{Dialect, Event, ParseError, State, Workspace, focus_request, parse_line, snapshot};
+use super::{
+    Dialect, Event, ParseError, State, Workspace, exit_request, focus_request, parse_line, snapshot,
+};
 
 /// How long a request may take before lyr gives up on it. `hyprctl` uses
 /// the same receive timeout.
@@ -147,6 +149,20 @@ impl Hyprland {
             Ok(())
         } else {
             Err(Error::Refused { request, reply })
+        }
+    }
+
+    /// Ends the Hyprland session: the power menu's Log out.
+    pub async fn exit(&self) -> Result<(), Error> {
+        let request = exit_request(self.dialect);
+        let reply = self.request(request).await?;
+        if reply.trim() == OK_REPLY {
+            Ok(())
+        } else {
+            Err(Error::Refused {
+                request: request.to_owned(),
+                reply,
+            })
         }
     }
 
@@ -318,6 +334,7 @@ mod tests {
             "j/activeworkspace" => r#"{"id": 1, "name": "1", "monitor": "DP-1"}"#,
             "j/clients" => "[]",
             "/dispatch hl.dsp.focus({ workspace = 2 })" => "ok",
+            "/dispatch hl.dsp.exit()" => "ok",
             _ => "unknown request",
         }
     }
@@ -383,6 +400,29 @@ mod tests {
         assert!(matches!(
             hyprlang.focus(&two).await,
             Err(Error::Refused { reply, .. }) if reply == "unknown request"
+        ));
+    }
+
+    #[tokio::test]
+    async fn exit_writes_the_dispatch_and_checks_the_reply() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut requests = fake_hyprland(dir.path(), replies, "").await;
+        let lua = Hyprland {
+            socket_dir: dir.path().to_owned(),
+            dialect: Dialect::Lua,
+        };
+        lua.exit().await.expect("ok reply");
+        assert_eq!(
+            requests.recv().await.as_deref(),
+            Some("/dispatch hl.dsp.exit()")
+        );
+        let hyprlang = Hyprland {
+            dialect: Dialect::Hyprlang,
+            ..lua
+        };
+        assert!(matches!(
+            hyprlang.exit().await,
+            Err(Error::Refused { request, .. }) if request == "/dispatch exit"
         ));
     }
 }

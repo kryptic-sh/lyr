@@ -37,9 +37,25 @@ pub fn focus_request(workspace: &Workspace, dialect: Dialect) -> Option<String> 
     }
 }
 
+/// The request that ends the Hyprland session, as the power menu's Log out
+/// does. In Lua it is what the dotfiles' `.menu-power` sends today.
+#[must_use]
+pub const fn exit_request(dialect: Dialect) -> &'static str {
+    match dialect {
+        Dialect::Lua => "/dispatch hl.dsp.exit()",
+        Dialect::Hyprlang => "/dispatch exit",
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Dialect, focus_request};
+    use super::{Dialect, exit_request, focus_request};
+
+    #[test]
+    fn exit_is_spelled_for_each_dialect() {
+        assert_eq!(exit_request(Dialect::Lua), "/dispatch hl.dsp.exit()");
+        assert_eq!(exit_request(Dialect::Hyprlang), "/dispatch exit");
+    }
     use crate::hyprland::Workspace;
 
     fn workspace(id: i64, name: &str) -> Workspace {

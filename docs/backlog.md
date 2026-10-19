@@ -347,10 +347,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   Power off as systemd v262.1's `loginctl` and `systemctl` call logind, with the
   `WithFlags` fallback, the reboot flags (`power::reboot_flags`) and the
   soft-reboot retry, tested against fake new and old loginds and
-  mutation-checked. Not run against a real logind. Not built: Log out (the
-  compositor's exit, through `lyr-wm`), the menu popup itself and its keys, the
-  `open_power_menu` built-in, and the Windows and macOS actions (plan 10 names
-  Win32 APIs that need `windows-sys`, new to lyr).
+  mutation-checked. Log out is `lyr_wm::hyprland::Hyprland::exit`
+  (`hl.dsp.exit()` in Lua, as the dotfiles' `.menu-power` sends, or the `exit`
+  dispatcher), tested against the fake Hyprland. Neither is run against the real
+  thing. Not built: the menu popup itself and its keys, the `open_power_menu`
+  built-in, and the Windows and macOS actions (plan 10 names Win32 APIs that
+  need `windows-sys`, new to lyr).
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a
