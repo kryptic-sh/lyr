@@ -76,6 +76,7 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
                         None => {
                             let surface = Surface::open(shell.as_ref(), window, device, scale)
                                 .context("opening a bar's surface")?;
+                            eprintln!("lyr: drawing on {}", surface.describe());
                             windows.insert(window, Window { surface, width });
                         }
                     }

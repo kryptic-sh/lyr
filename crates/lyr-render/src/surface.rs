@@ -47,6 +47,9 @@ pub struct Surface {
     atlas: FontAtlas,
     /// Device pixels per logical pixel.
     scale: f32,
+    /// The backend asked for and accepted, or `None` when crcbl's own order
+    /// chose (the preferred backend refused, or there is none).
+    asked: Option<GpuBackend>,
 }
 
 impl Surface {
@@ -69,14 +72,15 @@ impl Surface {
             adapter_pin: adapter_pin.as_deref(),
             ..PresenterDesc::default()
         };
-        let presenter = match Presenter::open(shell, window, size, &desc(preferred_backend())) {
-            Ok(presenter) => presenter,
-            // The preferred backend refused: let crcbl walk its own order.
-            Err(_) if preferred_backend().is_some() => {
-                Presenter::open(shell, window, size, &desc(None))?
-            }
-            Err(error) => return Err(error.into()),
-        };
+        let (presenter, asked) =
+            match Presenter::open(shell, window, size, &desc(preferred_backend())) {
+                Ok(presenter) => (presenter, preferred_backend()),
+                // The preferred backend refused: let crcbl walk its own order.
+                Err(_) if preferred_backend().is_some() => {
+                    (Presenter::open(shell, window, size, &desc(None))?, None)
+                }
+                Err(error) => return Err(error.into()),
+            };
         let ui = UiRenderer::with_ring(
             presenter.device(),
             presenter.queue(),
@@ -90,7 +94,25 @@ impl Surface {
             pool: TransientPool::new(),
             atlas: FontAtlas::built_in(),
             scale,
+            asked,
         })
+    }
+
+    /// Which GPU this surface draws on and how it was chosen, for the log:
+    /// the adapter's name, and whether the preferred backend was accepted.
+    #[must_use]
+    pub fn describe(&self) -> String {
+        let adapter = self
+            .presenter
+            .adapter()
+            .map_or_else(|| "an unknown adapter".to_owned(), |info| info.name);
+        match self.asked {
+            Some(backend) => format!("{adapter} ({backend:?}, as asked)"),
+            None if preferred_backend().is_some() => {
+                format!("{adapter} (crcbl's order: the preferred backend refused)")
+            }
+            None => format!("{adapter} (crcbl's order)"),
+        }
     }
 
     /// Follows the window to a new size or scale.

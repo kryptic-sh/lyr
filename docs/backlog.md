@@ -139,12 +139,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   runs the main loop (`apps/lyr/src/bar.rs`): the config and font, a bar per
   output, a surface opened on each bar's first resize, and a redraw on the
   clock's tick. Only the clock is drawn; the other modules wait on their
-  sources. **Not run yet**: the loop and the surface compile and lint, but have
-  not drawn a frame on a real window, so they are unverified; and there is no
-  way to stop the bar but killing it (the control socket's `quit` is not built),
-  nor logging (`tracing`; it prints to stderr). `colour.rs` copies crcbl-ui's
-  private `srgb_to_linear`; if crcbl exports it, lyr drops the copy. Group
-  opacity is approximated until crcbl's opacity groups ship.
+  sources. **Run once, on Windows** (2026-10-19, with the owner's go-ahead):
+  Windows 11 at 2560 × 1440, D3D12 on an AMD Radeon RX 7900 XTX as asked, the
+  bar an appbar reserving 50 px. It drew the transparent bar and the clock box
+  with its border, radius and text, as a screenshot showed, and the work area
+  came back when the process was killed. Hack Nerd Font Propo is not installed
+  on that machine, so it drew in the monospace fallback, and lyr said so. Not
+  run on Hyprland, which is M1's real check. There is no way to stop the bar but
+  killing it (the control socket's `quit` is not built), nor logging (`tracing`;
+  it prints to stderr). `colour.rs` copies crcbl-ui's private `srgb_to_linear`;
+  if crcbl exports it, lyr drops the copy. Group opacity is approximated until
+  crcbl's opacity groups ship.
 - **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors
