@@ -132,12 +132,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   measured and drawn as one glyph run per face (`text::Text`), sRGB colours in
   linear light (`colour::linear`), and lyr's draw list as crcbl-ui commands
   (`translate`), tested on Windows and Linux (WSL) and mutation-checked.
-  `fonts::load` itself is untested: it depends on what is installed. Not built:
-  presenting (crcbl-app's `Presenter` per bar, crcbl-frame's
-  `UiRenderer::with_ring`, following `crates/crcbl-app/examples/ui_window.rs`),
-  and the main loop that ties shell, sources and frames together. `colour.rs`
-  copies crcbl-ui's private `srgb_to_linear`; if crcbl exports it, lyr drops the
-  copy. Group opacity is approximated until crcbl's opacity groups ship.
+  `fonts::load` itself is untested: it depends on what is installed. Presenting
+  is `surface::Surface` (crcbl-app's `Presenter` per bar, D3D12 asked for first
+  on Windows, crcbl-frame's `UiRenderer::with_ring`, as
+  `crates/crcbl-app/examples/ui_window.rs` does), and `lyr` with no command now
+  runs the main loop (`apps/lyr/src/bar.rs`): the config and font, a bar per
+  output, a surface opened on each bar's first resize, and a redraw on the
+  clock's tick. Only the clock is drawn; the other modules wait on their
+  sources. **Not run yet**: the loop and the surface compile and lint, but have
+  not drawn a frame on a real window, so they are unverified; and there is no
+  way to stop the bar but killing it (the control socket's `quit` is not built),
+  nor logging (`tracing`; it prints to stderr). `colour.rs` copies crcbl-ui's
+  private `srgb_to_linear`; if crcbl exports it, lyr drops the copy. Group
+  opacity is approximated until crcbl's opacity groups ship.
 - **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors

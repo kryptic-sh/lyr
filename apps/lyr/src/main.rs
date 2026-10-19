@@ -1,8 +1,11 @@
 //! `lyr` — a desktop status bar.
 //!
-//! Scaffold: the CLI surface is parsed, but no bar exists yet, so every
-//! invocation reports that and exits non-zero. See `docs/plan/` for the design
-//! and `docs/plan/15-milestones.md` for the build order.
+//! With no command it runs the bar ([`bar::run`]). The commands sent to a
+//! running bar over its control socket are parsed but not sent yet: the socket
+//! does not exist, so they report that and exit non-zero. See `docs/plan/` for
+//! the design and `docs/plan/15-milestones.md` for the build order.
+
+mod bar;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -83,11 +86,19 @@ impl PanelArg {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    let what = cli.command.map_or_else(
-        || "the bar".to_owned(),
-        |command| command.request().to_string(),
+    let Some(command) = cli.command else {
+        return match bar::run(cli.config.as_deref()) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("lyr: {error:#}");
+                ExitCode::FAILURE
+            }
+        };
+    };
+    eprintln!(
+        "lyr: {}: not implemented yet (the control socket is not built)",
+        command.request()
     );
-    eprintln!("lyr: {what}: not implemented yet (the bar lands in milestone M1)");
     ExitCode::FAILURE
 }
 

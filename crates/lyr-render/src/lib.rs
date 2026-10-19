@@ -8,5 +8,6 @@
 
 pub mod colour;
 pub mod fonts;
+pub mod surface;
 pub mod text;
 pub mod translate;

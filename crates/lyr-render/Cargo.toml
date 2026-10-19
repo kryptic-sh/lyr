@@ -11,7 +11,11 @@ authors.workspace = true
 readme.workspace = true
 
 [dependencies]
+crcbl-app = "=0.5.0"
 crcbl-font = "=0.5.0"
+crcbl-frame = "=0.5.0"
+crcbl-hal = "=0.5.0"
+crcbl-shell = "=0.5.0"
 crcbl-ui = { version = "=0.5.0", features = ["system-fonts"] }
 glam = "0.34.1"
 lyr-config.workspace = true
