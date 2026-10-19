@@ -127,25 +127,6 @@ implementation follows until they are answered. The ones that block a milestone:
   monitor change in place, every backend), after pikr's work and frame pacing,
   likely in 0.7.0. lyr's bar would use it too, to change height on reload
   without recreating.
-- **crcbl: render on the GPU driving the window's display** (the owner's rule,
-  relayed by pikr on 2026-10-19, shared with pikr): the adapter that drives the
-  output a bar is on, else the low-power one, `CRCBL_ADAPTER` still overriding.
-  lyr takes crcbl's own adapter order today (`Surface::open`, with
-  `crcbl_app::adapter::pin` for the override), so it follows the rule without
-  code of its own: crcbl decided (2026-10-19, relayed by pikr) that a device
-  request takes a power preference; an explicit pick or `CRCBL_ADAPTER` wins, a
-  display driven by a discrete adapter uses it, and otherwise (a hybrid laptop's
-  iGPU panel, or an unknown display) the preference decides. crcbl-app's
-  `Presenter` defaults to low power, so lyr gets the rule by keeping that
-  default. It ships with crcbl's D3D12 start-up work, release not yet named. On
-  this Windows machine lyr drew on the discrete RX 7900 XTX. Check which adapter
-  each bar gets once crcbl ships it. The owner's call (2026-10-20, made for pikr
-  and to be done in lyr as well): on crcbl 0.6.0, pick each bar's GPU with
-  `crcbl_app::adapter::choose` (the display's GPU, then low power, with
-  `CRCBL_ADAPTER` overriding) rather than relying on the `Presenter`'s default.
-  lyr already depends on `crcbl-app`, so it takes no new dependency; read
-  `choose`'s signature in the 0.6.0 source before wiring it into
-  `lyr_render::surface::Surface::open`.
 - **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
   the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
   S8 – S27. pikr's session tracks the move in pikr's own backlog and
@@ -679,5 +660,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   owner's Hyprland is the first real run (M1's check). On Windows the bar has
   run, with tooltips, the power menu, the clock panel and the control socket
   (each entry above says what was seen).
+- The GPU choice (the owner's rule: `CRCBL_ADAPTER`, else the adapter driving
+  the bar's display when it is discrete, else low power) is crcbl-app's
+  `adapter::choose` inside the `Presenter`, with `PowerPreference::LowPower`
+  named in `lyr_render::surface::Surface::open`. Seen on this Windows machine
+  only, where the display's discrete RX 7900 XTX was chosen (crcbl 0.6.0,
+  2026-10-20); a hybrid laptop with its panel on the integrated GPU is untried.
 - The release pipeline (phase 2 of [plan/14](plan/14-ci-and-release.md)) does
   not exist yet.

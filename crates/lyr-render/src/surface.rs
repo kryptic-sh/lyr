@@ -1,6 +1,7 @@
 //! Presenting a draw list on one window: crcbl-app's presenter and
 //! crcbl-frame's UI pass, as `crates/crcbl-app/examples/ui_window.rs` does.
 
+use crcbl_app::adapter::PowerPreference;
 use crcbl_app::backend::GpuBackend;
 use crcbl_app::present::{FrameOutcome, PresentError, Presenter, PresenterDesc};
 use crcbl_frame::{
@@ -66,10 +67,16 @@ impl Surface {
         scale: f32,
     ) -> Result<Self, Error> {
         let adapter_pin = crcbl_app::adapter::pin();
+        // The owner's rule for the GPU: `CRCBL_ADAPTER` when set, then the
+        // adapter driving the bar's display when it is discrete, then low
+        // power. The presenter takes it through `crcbl_app::adapter::choose`
+        // with the display's adapter; low power is named so a change to
+        // crcbl's default cannot wake a discrete GPU for a bar.
         let desc = |backend| PresenterDesc {
             label: "lyr",
             backend,
             adapter_pin: adapter_pin.as_deref(),
+            power_preference: PowerPreference::LowPower,
             ..PresenterDesc::default()
         };
         let (presenter, asked) =
