@@ -110,6 +110,12 @@ impl<T: Clone + PartialEq> ListPopup<T> {
         self.window == window
     }
 
+    /// Its window.
+    #[cfg(test)]
+    pub const fn window(&self) -> WindowId {
+        self.window
+    }
+
     /// Whether the menu opened from the bar `bar`.
     pub fn opened_from(&self, bar: WindowId) -> bool {
         self.bar == bar

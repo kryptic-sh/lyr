@@ -1,7 +1,10 @@
 //! A tray item's menu, as its `com.canonical.dbusmenu` object lays it out:
 //! each entry's properties as the interface documents them (libdbusmenu's
 //! `dbus-menu.xml`, as GNUstep's `libs-dbuskit` carries it, read
-//! 2026-10-20), with their defaults where an entry leaves one out.
+//! 2026-10-20), with their defaults where an entry leaves one out, and
+//! the rows a list menu shows for one.
+
+use crate::list_menu::Row;
 
 /// A toggle's kind and state (`toggle-type` and `toggle-state`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -98,9 +101,73 @@ pub fn toggle(kind: &str, state: i32) -> Option<Toggle> {
     Some(Toggle { radio, on })
 }
 
+/// What a row of an item's menu stands for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Pick {
+    /// The entry with this id, clicked.
+    Entry(i32),
+    /// The submenu of the entry with this id, opened.
+    Open(i32),
+    /// Back to the menu this submenu is in.
+    Back,
+}
+
+/// A toggle's mark before its label: a check mark or a dot when on.
+const CHECKED: &str = "\u{2713} ";
+const CHOSEN: &str = "\u{2022} ";
+/// After a label whose entry opens a submenu.
+const SUBMENU: &str = " \u{203A}";
+/// The row that leaves a submenu.
+const BACK: &str = "\u{2039} Back";
+
+/// The rows of `menu`'s shown entries, for a list menu: a separator as a
+/// separator, an entry that cannot be clicked as a row that cannot be
+/// chosen, and one with children as a way into them. Inside a submenu
+/// (`nested`), a Back row comes first.
+#[must_use]
+pub fn rows(menu: &Entry, nested: bool) -> Vec<Row<Pick>> {
+    let mut rows = Vec::new();
+    if nested {
+        rows.push(Row::new(BACK, Pick::Back));
+    }
+    for entry in menu.shown() {
+        if entry.separator {
+            rows.push(Row {
+                label: String::new(),
+                value: None,
+                separator: true,
+            });
+            continue;
+        }
+        let mark = match entry.toggle {
+            Some(Toggle {
+                radio: false,
+                on: Some(true),
+            }) => CHECKED,
+            Some(Toggle {
+                radio: true,
+                on: Some(true),
+            }) => CHOSEN,
+            _ => "",
+        };
+        let submenu = !entry.children.is_empty();
+        let tail = if submenu { SUBMENU } else { "" };
+        rows.push(Row {
+            label: format!("{mark}{}{tail}", entry.label),
+            value: entry.clickable().then_some(if submenu {
+                Pick::Open(entry.id)
+            } else {
+                Pick::Entry(entry.id)
+            }),
+            separator: false,
+        });
+    }
+    rows
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Entry, Toggle, label, toggle};
+    use super::{Entry, Pick, Toggle, label, rows, toggle};
 
     #[test]
     fn a_label_loses_its_access_key_marks() {
@@ -164,5 +231,70 @@ mod tests {
         assert_eq!(root.find(3).map(|entry| entry.id), Some(3));
         assert_eq!(root.find(0).map(|entry| entry.id), Some(0));
         assert!(root.find(9).is_none());
+    }
+
+    #[test]
+    fn rows_mark_toggles_submenus_and_what_cannot_be_clicked() {
+        let mut root = Entry::new(0);
+        let mut more = Entry {
+            label: "More".to_owned(),
+            ..Entry::new(4)
+        };
+        more.children.push(Entry::new(5));
+        root.children = vec![
+            Entry {
+                label: "Sync".to_owned(),
+                toggle: Some(Toggle {
+                    radio: false,
+                    on: Some(true),
+                }),
+                ..Entry::new(1)
+            },
+            Entry {
+                separator: true,
+                ..Entry::new(2)
+            },
+            Entry {
+                label: "Quit".to_owned(),
+                enabled: false,
+                ..Entry::new(3)
+            },
+            more,
+            Entry {
+                label: "Fast".to_owned(),
+                toggle: Some(Toggle {
+                    radio: true,
+                    on: Some(true),
+                }),
+                ..Entry::new(6)
+            },
+            Entry {
+                label: "Slow".to_owned(),
+                toggle: Some(Toggle {
+                    radio: true,
+                    on: Some(false),
+                }),
+                ..Entry::new(7)
+            },
+        ];
+        let shown: Vec<(String, Option<Pick>, bool)> = rows(&root, false)
+            .into_iter()
+            .map(|row| (row.label, row.value, row.separator))
+            .collect();
+        assert_eq!(
+            shown,
+            [
+                ("\u{2713} Sync".to_owned(), Some(Pick::Entry(1)), false),
+                (String::new(), None, true),
+                ("Quit".to_owned(), None, false),
+                ("More \u{203A}".to_owned(), Some(Pick::Open(4)), false),
+                ("\u{2022} Fast".to_owned(), Some(Pick::Entry(6)), false),
+                ("Slow".to_owned(), Some(Pick::Entry(7)), false),
+            ]
+        );
+        let nested = rows(root.find(4).expect("More"), true);
+        assert_eq!(nested[0].value, Some(Pick::Back));
+        assert_eq!(nested[1].value, Some(Pick::Entry(5)));
+        assert_eq!(rows(&root, false)[0].value, Some(Pick::Entry(1)), "no Back");
     }
 }

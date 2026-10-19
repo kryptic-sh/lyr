@@ -12,6 +12,7 @@
 
 mod events;
 mod requests;
+mod tray;
 mod wifi;
 mod window;
 
@@ -39,6 +40,7 @@ use crate::stats::Stats;
 use crate::toasts::EDGE_MARGIN;
 use crate::toasts::Toasts;
 use crate::tooltips::{Anchor, Look};
+use crate::tray_menu::TrayMenu;
 use crate::wifi_menu::WifiMenu;
 use window::Window;
 
@@ -63,6 +65,8 @@ struct App {
     wifi_menu: Option<WifiMenu>,
     /// The power menu, while it is open.
     power_menu: Option<PowerMenu>,
+    /// A tray item's menu, while it is open.
+    tray_menu: Option<TrayMenu>,
     /// The event batch that last dismissed the power menu: a click outside it
     /// that the bar also receives must not open it again at once.
     menu_dismissed_at: Option<Instant>,
@@ -141,6 +145,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         bluetooth_menu: None,
         wifi_menu: None,
         power_menu: None,
+        tray_menu: None,
         menu_dismissed_at: None,
         hidden: false,
         stats: Stats::new(Instant::now()),
@@ -177,9 +182,17 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             if let Some(menu) = app.wifi_menu.take() {
                 menu.close(shell.as_mut(), false)?;
             }
+            if let Some(menu) = app.tray_menu.take() {
+                menu.close(shell.as_mut(), false)?;
+            }
             return app.close_all(shell.as_mut());
         }
         while let Ok(update) = updates.try_recv() {
+            #[cfg(target_os = "linux")]
+            if let Update::TrayMenu(read) = update {
+                app.open_tray_menu(shell.as_mut(), read)?;
+                continue;
+            }
             app.update(update, Instant::now());
             app.refresh_bluetooth_menu(shell.as_mut())?;
             app.refresh_wifi_menu(shell.as_mut())?;
@@ -214,6 +227,7 @@ impl App {
                 .as_ref()
                 .is_some_and(BluetoothMenu::dirty)
             || self.wifi_menu.as_ref().is_some_and(WifiMenu::dirty)
+            || self.tray_menu.as_ref().is_some_and(TrayMenu::dirty)
         {
             return Duration::ZERO;
         }
@@ -403,6 +417,7 @@ impl App {
             clock_panel,
             bluetooth_menu,
             wifi_menu,
+            tray_menu,
             ..
         } = self;
         let now = Local::now().fixed_offset();
@@ -438,6 +453,9 @@ impl App {
             menu.draw(text)?;
         }
         if let Some(menu) = wifi_menu {
+            menu.draw(text)?;
+        }
+        if let Some(menu) = tray_menu {
             menu.draw(text)?;
         }
         for id in toasts.expire(Instant::now()) {

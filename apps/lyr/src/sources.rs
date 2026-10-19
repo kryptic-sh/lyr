@@ -55,6 +55,44 @@ pub enum Update {
     /// The media players on the session bus.
     #[cfg(target_os = "linux")]
     Players(Vec<lyr_core::media::Player>),
+    /// The tray's items, in the watcher's order.
+    #[cfg(target_os = "linux")]
+    Tray(Vec<lyr_core::tray::Item>),
+    /// A tray item's menu, read for the menu the bar asked to open.
+    #[cfg(target_os = "linux")]
+    TrayMenu(crate::tray_menu::Read),
+}
+
+/// What the bar asks of a tray item, by its bus name and object path.
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+pub enum TrayRequest {
+    /// A click, at this point on the bar.
+    Click {
+        bus_name: String,
+        path: String,
+        click: lyr_core::tray::Click,
+        at: (i32, i32),
+    },
+    /// A wheel step, away from the user when `up`.
+    Scroll {
+        bus_name: String,
+        path: String,
+        up: bool,
+    },
+    /// Its menu, to open under its button; `ContextMenu` when it serves
+    /// none.
+    Menu {
+        path: String,
+        at: (i32, i32),
+        read: crate::tray_menu::Read,
+    },
+    /// The entry `id` of the menu at `menu` was clicked.
+    MenuClicked {
+        bus_name: String,
+        menu: String,
+        id: i32,
+    },
 }
 
 /// What the Bluetooth menu asks of BlueZ, by object path.
@@ -127,6 +165,8 @@ pub struct Commands {
     wifi: tokio::sync::mpsc::UnboundedSender<WifiRequest>,
     #[cfg(target_os = "linux")]
     notices: tokio::sync::mpsc::UnboundedSender<(String, String)>,
+    #[cfg(target_os = "linux")]
+    tray: tokio::sync::mpsc::UnboundedSender<TrayRequest>,
 }
 
 #[cfg(target_os = "linux")]
@@ -156,6 +196,11 @@ impl Commands {
     /// Sends a notice from lyr itself: `summary`, and `body` in markup.
     pub fn notify(&self, summary: String, body: String) {
         let _stopped = self.notices.send((summary, body));
+    }
+
+    /// Asks a tray item what the bar wants of it.
+    pub fn tray(&self, request: TrayRequest) {
+        let _stopped = self.tray.send(request);
     }
 
     /// Asks NetworkManager what the Wi-Fi menu wants.
@@ -225,6 +270,7 @@ pub fn start(
         let (bluetooth, bluetooth_requests) = tokio::sync::mpsc::unbounded_channel();
         let (wifi, wifi_requests) = tokio::sync::mpsc::unbounded_channel();
         let (notices, notice_requests) = tokio::sync::mpsc::unbounded_channel();
+        let (tray, tray_requests) = tokio::sync::mpsc::unbounded_channel();
         linux::start(
             sender,
             linux::Requests {
@@ -236,6 +282,7 @@ pub fn start(
                 bluetooth: bluetooth_requests,
                 wifi: wifi_requests,
                 notices: notice_requests,
+                tray: tray_requests,
             },
             replace_notifications,
             waker,
@@ -251,6 +298,7 @@ pub fn start(
                 bluetooth,
                 wifi,
                 notices,
+                tray,
             },
         ))
     }
@@ -287,7 +335,9 @@ mod linux {
     use lyr_core::notifications::Store;
     use lyr_sources::notifications::linux::{Daemon, serve_session};
 
-    use super::{BluetoothRequest, JoinRequest, NotificationRequest, Update, WifiRequest};
+    use super::{
+        BluetoothRequest, JoinRequest, NotificationRequest, TrayRequest, Update, WifiRequest,
+    };
     use crate::wifi_menu::Joined;
 
     /// Hands `update` to the main loop and wakes it. `false` once the main
@@ -310,6 +360,7 @@ mod linux {
         pub(super) bluetooth: UnboundedReceiver<BluetoothRequest>,
         pub(super) wifi: UnboundedReceiver<WifiRequest>,
         pub(super) notices: UnboundedReceiver<(String, String)>,
+        pub(super) tray: UnboundedReceiver<TrayRequest>,
     }
 
     pub(super) fn start(
@@ -327,6 +378,7 @@ mod linux {
             bluetooth: bluetooth_requests,
             wifi,
             notices: notice_requests,
+            tray: tray_requests,
         } = requests;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -348,6 +400,7 @@ mod linux {
                             replace_notifications,
                             waker.clone(),
                         ),
+                        tray(sender.clone(), tray_requests, waker.clone()),
                         workspaces(sender, focus, waker),
                         power_menu(power),
                         notices(notice_requests),
@@ -442,6 +495,106 @@ mod linux {
             if let Err(error) = watched {
                 tracing::warn!("network: NetworkManager stopped answering: {error}");
             }
+        }
+    }
+
+    /// Hosts the tray: serves the watcher when no other process does,
+    /// registers as a host, sends the items on every change, and carries out
+    /// what the bar asks of them.
+    async fn tray(
+        sender: mpsc::Sender<Update>,
+        mut requests: UnboundedReceiver<TrayRequest>,
+        waker: Option<ShellWaker>,
+    ) {
+        use lyr_core::tray::Click;
+        use lyr_sources::tray::linux::{Listing, session};
+
+        let (host, served) = match session().await {
+            Ok(tray) => tray,
+            Err(error) => {
+                tracing::warn!("tray: the session bus is not reachable: {error}");
+                return;
+            }
+        };
+        match &served {
+            Some(_) => tracing::info!("tray: lyr is the StatusNotifierWatcher"),
+            None => tracing::info!("tray: another process is the StatusNotifierWatcher"),
+        }
+        if let Err(error) = host.register().await {
+            tracing::warn!("tray: registering as a host: {error}");
+        }
+        let follow = async {
+            if let Some(served) = &served
+                && let Err(error) = served.follow_names().await
+            {
+                tracing::warn!("tray: following names stopped: {error}");
+            }
+        };
+        let (listings, mut changed) = watch::channel(Listing::default());
+        let forward = async {
+            let mut reported = Vec::new();
+            while changed.changed().await.is_ok() {
+                let listing = changed.borrow_and_update().clone();
+                // Each item that cannot be read is said once, not on every
+                // change.
+                for unreadable in &listing.unreadable {
+                    if !reported.contains(unreadable) {
+                        tracing::warn!("tray: {unreadable}");
+                    }
+                }
+                reported = listing.unreadable;
+                if !deliver(&sender, waker.as_ref(), Update::Tray(listing.items)) {
+                    break;
+                }
+            }
+        };
+        let act = async {
+            while let Some(request) = requests.recv().await {
+                let done = match request {
+                    TrayRequest::Click {
+                        bus_name,
+                        path,
+                        click,
+                        at,
+                    } => host.click(&bus_name, &path, click, at).await,
+                    TrayRequest::Scroll { bus_name, path, up } => {
+                        host.scroll(&bus_name, &path, up).await
+                    }
+                    TrayRequest::MenuClicked { bus_name, menu, id } => {
+                        host.menu_clicked(&bus_name, &menu, id).await
+                    }
+                    TrayRequest::Menu { path, at, mut read } => {
+                        match host.menu(&read.bus_name, &read.menu).await {
+                            Ok(root) if root.shown().next().is_some() => {
+                                read.root = root;
+                                if !deliver(&sender, waker.as_ref(), Update::TrayMenu(read)) {
+                                    break;
+                                }
+                                Ok(())
+                            }
+                            // No menu after all (Steam names one it does not
+                            // serve), or an empty one: the item's own.
+                            outcome => {
+                                if let Err(error) = outcome {
+                                    tracing::info!(
+                                        "tray: {} has no menu at {}: {error}",
+                                        read.bus_name,
+                                        read.menu
+                                    );
+                                }
+                                host.click(&read.bus_name, &path, Click::Menu, at).await
+                            }
+                        }
+                    }
+                };
+                if let Err(error) = done {
+                    tracing::warn!("tray: {error}");
+                }
+            }
+        };
+        let ((), (), (), watched) = tokio::join!(follow, forward, act, host.watch(&listings));
+        if let Err(error) = watched {
+            tracing::warn!("tray: the watcher stopped answering: {error}");
         }
     }
 

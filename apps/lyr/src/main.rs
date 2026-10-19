@@ -19,6 +19,7 @@ mod sources;
 mod stats;
 mod toasts;
 mod tooltips;
+mod tray_menu;
 mod wifi_menu;
 
 use std::path::PathBuf;

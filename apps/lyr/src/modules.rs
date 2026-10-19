@@ -46,9 +46,18 @@ pub struct Data {
     /// The media players, for the clock panel. Empty where there is no
     /// source for them.
     pub players: Vec<lyr_core::media::Player>,
+    /// The tray's items, in the watcher's order. Empty where there is no
+    /// tray to host.
+    pub tray: Vec<lyr_core::tray::Item>,
 }
 
 impl Data {
+    /// The tray's items the bar shows, in order: a tray button's index is
+    /// its item's place here.
+    pub fn tray_shown(&self) -> impl Iterator<Item = &lyr_core::tray::Item> {
+        self.tray.iter().filter(|item| item.shown())
+    }
+
     /// The pairing agent's question, about its device by name where BlueZ
     /// gives one.
     pub fn bluetooth_question(&self) -> Option<lyr_core::bluetooth_menu::Ask<'_>> {
@@ -106,6 +115,11 @@ impl Data {
             Update::Notifications(store) => self.notifications = Some(store),
             #[cfg(target_os = "linux")]
             Update::Players(players) => self.players = players,
+            #[cfg(target_os = "linux")]
+            Update::Tray(items) => self.tray = items,
+            // The bar opens it.
+            #[cfg(target_os = "linux")]
+            Update::TrayMenu(_) => {}
             // The toasts follow each change; the bell reads the store.
             #[cfg(target_os = "linux")]
             Update::Notification(_) => {}
@@ -229,6 +243,21 @@ fn content(
         Module::Bluetooth => {
             let shown = lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth);
             Some(label(shown.text, theme.foreground))
+        }
+        Module::Tray => {
+            // A letter stands in for each icon until lyr draws images.
+            let buttons: Vec<draw::Button> = data
+                .tray_shown()
+                .map(|item| draw::Button {
+                    text: item.letter(),
+                    colour: if item.status == lyr_core::tray::Status::NeedsAttention {
+                        theme.workspace_urgent.unwrap_or(theme.foreground)
+                    } else {
+                        theme.foreground
+                    },
+                })
+                .collect();
+            (!buttons.is_empty()).then_some(Content::Buttons(buttons))
         }
         #[cfg(target_os = "linux")]
         Module::Notifications => {

@@ -231,6 +231,18 @@ pub async fn serve(connection: &Connection) -> zbus::Result<Option<Served>> {
     }
 }
 
+/// The tray on the session bus: lyr's watcher when no other process has
+/// the name ([`serve`]), and the host on the same connection.
+///
+/// # Errors
+///
+/// When the session bus cannot be reached or does not answer.
+pub async fn session() -> zbus::Result<(Host, Option<Served>)> {
+    let connection = Connection::session().await?;
+    let served = serve(&connection).await?;
+    Ok((Host::on(&connection).await?, served))
+}
+
 /// How the host sees a watcher, lyr's or another's.
 #[zbus::proxy(
     interface = "org.kde.StatusNotifierWatcher",

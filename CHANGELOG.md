@@ -51,6 +51,13 @@ and this project adheres to
   asks Hyprland to exit; on Windows and macOS the entries are not built yet.
   `[power.menu]` sets an entry to a command instead
   (`lock = { exec = "hyprlock" }`).
+- On Linux, the tray: lyr hosts StatusNotifierItems (Steam, Teams and the like),
+  and serves `org.kde.StatusNotifierWatcher` when nothing else does. Each item
+  shows as a button with its title's first letter until lyr draws icons, passive
+  items hidden; a click activates it, a middle click secondary-activates it, the
+  wheel scrolls it, and a right click (or a left one on an item that is only a
+  menu) opens its menu under the button, with submenus, check marks and disabled
+  entries, or its own menu when it serves none.
 - On Linux, the Wi-Fi menu, opened by a click on the network module or
   `lyr panel wifi`, over NetworkManager: a switch for the radio, the networks a
   scan found (one row per name, strongest first, the one in use marked), a fresh

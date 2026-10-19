@@ -573,10 +573,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   underscores taken out, separators and toggles; `Host::menu_clicked` sends
   `clicked`), tested against a fake menu and mutation-checked; an item that
   names a menu it does not serve is an error, on which the caller falls back to
-  `ContextMenu`, as waybar does for Steam. Not built: the module on the bar and
-  its menu popup. Icons wait on images (the decision above); until then an item
-  is drawn as its title's first letter (`Item::letter`), where plan 08 asks for
-  a generic icon.
+  `ContextMenu`, as waybar does for Steam. The module is on the bar
+  (`apps/lyr/src/modules.rs`, `apps/lyr/src/bar/tray.rs`, the source task in
+  `apps/lyr/src/sources.rs`): a button per shown item, in the watcher's order,
+  coloured as urgent while it needs attention; a press goes to the item (a
+  click, a wheel step, or its menu), and a menu opens under the button as a list
+  popup (`apps/lyr/src/tray_menu.rs` over `ListPopup`), a submenu opening in
+  place with a Back row, a click sending `clicked`; with no menu served, the
+  item's `ContextMenu`. The popup is tested on crcbl's headless shell and
+  mutation-checked; the glue joining source and bar is untested, and none of it
+  has met a real item. Wayland gives a window no place on the screen, so
+  `Activate` and `ContextMenu` get the point under the button on the bar, not on
+  the screen. No tooltip per item yet (a module's tooltip is one per module),
+  and no item has a letter's worth of identity beyond its title. Icons wait on
+  images (the decision above); until then an item is drawn as its title's first
+  letter (`Item::letter`), where plan 08 asks for a generic icon.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

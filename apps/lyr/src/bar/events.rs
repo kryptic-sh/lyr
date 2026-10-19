@@ -53,6 +53,13 @@ impl App {
             return self.wifi_event(shell, event);
         }
         if self
+            .tray_menu
+            .as_ref()
+            .is_some_and(|menu| event.window().is_some_and(|window| menu.owns(window)))
+        {
+            return self.tray_menu_event(shell, event);
+        }
+        if self
             .clock_panel
             .as_ref()
             .is_some_and(|panel| event.window().is_some_and(|window| panel.owns(window)))
@@ -149,6 +156,9 @@ impl App {
                     if let Some(menu) = self.power_menu.take_if(|menu| menu.opened_from(window)) {
                         menu.close(shell, true)?;
                     }
+                    if let Some(menu) = self.tray_menu.take_if(|menu| menu.opened_from(window)) {
+                        menu.close(shell, true)?;
+                    }
                 }
             }
             _ => {
@@ -173,10 +183,18 @@ impl App {
                 let mut toggle_panel = false;
                 let mut bluetooth_at = None;
                 let mut wifi_at = None;
+                let mut tray_press = None;
                 for press in presses {
                     let Some(target) = window.pointer.target(&window.regions) else {
                         continue;
                     };
+                    // A tray button is its item's, not a binding's.
+                    if let lyr_core::draw::Target::Button(lyr_config::Module::Tray, index) = *target
+                        && let Some(rect) = window.regions.rect(target)
+                    {
+                        tray_press = Some((rect, index, press));
+                        continue;
+                    }
                     let opens = input::act(
                         target,
                         press,
@@ -236,6 +254,9 @@ impl App {
                     && let Err(why) = self.toggle_bluetooth_menu(shell, left)?
                 {
                     tracing::warn!("open_bluetooth_menu: {why}");
+                }
+                if let Some((rect, index, press)) = tray_press {
+                    self.tray_press(id, rect, index, press);
                 }
                 if let Some(left) = wifi_at
                     && let Err(why) = self.toggle_wifi_menu(shell, left, instant)?
