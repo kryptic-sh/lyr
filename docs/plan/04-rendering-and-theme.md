@@ -11,7 +11,7 @@ state + config + theme ──► lyr-core: layout ──► DrawList + hit regio
                     crcbl UI pass (rects, rounded rects, glyphs, images)
                                    │
                                    ▼
-                    crcbl-hal: Vulkan (Linux, Windows) · D3D12 (Windows fallback) · Metal (macOS)
+                    crcbl-hal: Vulkan (Linux) · D3D12 (Windows) · Metal (macOS)
 ```
 
 - `lyr-core` builds lyr's **own** `DrawList` (`lyr_core::draw`): `Box` (a
@@ -23,11 +23,14 @@ state + config + theme ──► lyr-core: layout ──► DrawList + hit regio
   a crcbl API break touches one translation function, not the layout code.
 - **One device, many surfaces.** A single crcbl-hal device is shared by every
   bar and popup, with one swapchain per window.
-- **Backend choice:** crcbl's runtime selection. lyr prefers Vulkan on Linux and
-  Windows, falls back to D3D12 on Windows, and uses Metal on macOS. There is no
-  software fallback: a machine with no working GPU backend gets a clear error at
-  start-up. pikr's research argued for a software renderer for start-up time. A
-  bar starts once per session, so that matters less here.
+- **Backend choice:** crcbl's runtime selection. lyr prefers Vulkan on Linux,
+  D3D12 on Windows and Metal on macOS. D3D12 comes first on Windows (the owner's
+  choice, 2026-10-18) because only D3D12 gives a Win32 window per-pixel
+  transparency, through DirectComposition, and the bar is transparent; crcbl
+  refuses a transparent Vulkan window there. There is no software fallback: a
+  machine with no working GPU backend gets a clear error at start-up. pikr's
+  research argued for a software renderer for start-up time. A bar starts once
+  per session, so that matters less here.
 
 ## Repaint on change only
 

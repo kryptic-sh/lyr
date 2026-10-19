@@ -11,46 +11,6 @@ implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
   `neli`) block M4's audio and network sources.
-- **A stream crate for D-Bus signals** (blocks every zbus source in M4, M6 and
-  M7). zbus 6 (what `cargo add` resolves today; plan 02's precedent is 5) hands
-  property changes and signals over as `Stream`s, and lyr has no crate to poll
-  one: zbus re-exports `futures_core` only in a hidden macro-support module, and
-  tokio has no `Stream` trait. Options: `futures-util` (the usual
-  `StreamExt::next`; zbus's own tests use it), or `futures-core` alone (the
-  trait, polled with `std::future::poll_fn`; already in the tree through zbus).
-  Recommended: `futures-util`, since every source would otherwise carry its own
-  polling glue. Found 2026-10-18 while wiring the UPower source, which stops at
-  the pure property mapping until this is decided.
-- **A date and time crate** (blocks M1's clock and M5's calendar). The clock
-  formats `%Y/%m/%d %H:%M` in the system time zone, names the zone in its
-  tooltip, and the calendar needs month grids and ISO week numbers. Date
-  arithmetic and time zones are not something to hand-roll. `chrono` is the
-  house precedent (buffr, hodl, hrdr, infr and sqeel use 0.4, mostly with
-  `default-features = false, features = ["clock"]`); naming the IANA zone would
-  also need `iana-time-zone`, which chrono's `clock` feature already pulls in.
-  Recommended: `chrono` with `clock`, as the other repos have it.
-- **`serde_path_to_error` for config errors** (M3). Plan 05 wants every config
-  error to name its key path. An error serde raises while deserializing a table
-  (a bad colour, a bad format string, a wrong type) carries no path in `toml`
-  1.1, so lyr names only the table (`theme: …`). `serde_path_to_error` (dtolnay)
-  wraps the deserializer and reports `theme.border`; it is new to lyr. Options:
-  add it (recommended: one small, widely used crate, and it fixes every such
-  error at once), or keep table-level errors.
-- **The GPU backend on Windows** (blocks M9). The plan prefers Vulkan on Windows
-  with D3D12 as the fallback ([plan/04](plan/04-rendering-and-theme.md)), as the
-  draft asked. Per-pixel transparency on Win32 works only on D3D12, through
-  DirectComposition; Vulkan on Windows refuses a transparent window, and crcbl
-  declined to build Vulkan presenting through DirectComposition, as large when
-  D3D12 is always there. lyr's bar background is transparent and its module
-  boxes are drawn at opacity 0.8 (plan/04's theme table). crcbl plans for a
-  transparent Win32 window made through `GpuContext` to fall through to D3D12,
-  so with Vulkan first the bar would be drawn on D3D12 anyway. That fall-through
-  ("backend fall-through on a refused surface") is on crcbl main at `81085253`,
-  after 0.3.0. Options:
-  - D3D12 first on Windows (recommended): the plan says what will actually run,
-    and every lyr window there takes the same path.
-  - Keep Vulkan first: lyr's transparent windows still end up on D3D12 once
-    crcbl's fall-through lands, and any opaque one on Vulkan.
 
 ## Cross-repo work
 
@@ -322,18 +282,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   sizes waybar's boxes exactly so, and centres a label in a box held open by
   `min-width`, is from the CSS model and GTK's label default, not checked
   against a running waybar. Not built: the modules' actions (click, scroll;
-  M3/M4), the clock view (waits on the `chrono` decision above), images (tray,
-  M8), and clipping text that overflows a box. A format cannot drop the literal
-  text around an empty placeholder, so a battery with no power reading shows
+  M3/M4), the clock view (`chrono`, approved 2026-10-18), images (tray, M8), and
+  clipping text that overflows a box. A format cannot drop the literal text
+  around an empty placeholder, so a battery with no power reading shows
   `80% W Discharging`. Measuring text (the widths `layout` takes) needs
   crcbl-ui's font atlas, so it is done by the caller in `lyr-render`.
 - **Sources, M4.** Built: the UPower display device's properties turned into the
   battery view's reading (`lyr_sources::battery::upower::Device`), tested and
   mutation-checked. Not built: the D-Bus connection that fills it (zbus, Linux
   only; testable under WSL against a fake UPower on zbus's peer-to-peer
-  connection, which needs no bus daemon), waiting on the stream-crate decision
-  above, and every other source. Network and audio wait on the new-dependency
-  decision above.
+  connection, which needs no bus daemon), now unblocked (`futures-util`,
+  approved 2026-10-18), and every other source. Network and audio wait on the
+  new-dependency decision above.
 - **Control socket.** Built: the requests (`lyr_core::control::Request`, one
   text line each) and the CLI commands that send them, including `lyr panel`,
   `lyr dnd` and `lyr clear`, which still report "not implemented". Not built:
@@ -358,10 +318,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   config loads and rendered with `Format::render`, so validation and drawing
   will share one parser. Errors name the key where lyr's own checks find them
   (`layout.right[0]: …`), but an error serde raises inside a table names only
-  the table (`theme: ...`); see the `serde_path_to_error` decision above.
-  `lyr-config` keeps its own copy of the table merge, because `hjkl_config`'s
-  `deep_merge` and `locate` are private in 0.42.2; if hjkl exports them, lyr
-  drops the copy.
+  the table (`theme: ...`) until `serde_path_to_error` (approved 2026-10-18) is
+  wired in. `lyr-config` keeps its own copy of the table merge, because
+  `hjkl_config`'s `deep_merge` and `locate` are private in 0.42.2; if hjkl
+  exports them, lyr drops the copy.
 - **Waybar parity, still to check.** The plan was reviewed against the dotfiles'
   `config.jsonc` and `style.css` (2026-10-16), with waybar's own defaults read
   in its 0.15.0 source. Open: the calendar's `<tt>` monospace look with a

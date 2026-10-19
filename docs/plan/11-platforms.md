@@ -13,7 +13,7 @@ never silently skipped.
 | Reserves space  | yes                                       | yes (shrinks the work area) | **no** (no API); menu bar set to auto-hide |
 | Popups          | `xdg_popup` on the layer surface          | `WS_POPUP` tool window      | child `NSPanel`                            |
 | Panels          | overlay layer surface, on-demand keyboard | `WS_POPUP` tool window      | key-capable `NSPanel`                      |
-| GPU backend     | Vulkan                                    | Vulkan, D3D12 fallback      | Metal                                      |
+| GPU backend     | Vulkan                                    | D3D12                       | Metal                                      |
 | Scale           | fractional-scale-v1                       | per-monitor-v2 DPI          | `backingScaleFactor`                       |
 | Wake from tasks | eventfd                                   | `PostMessageW`              | `CFRunLoop` source                         |
 

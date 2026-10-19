@@ -106,7 +106,7 @@ The config is parsed fully before anything is applied. An unknown key, an
 unknown module name, a module that is unsupported on this platform, or a bad
 colour or format string is an error that names the file, the key path and the
 reason. Today an error found inside a table by serde (a bad colour or format)
-names only the table; the full path waits on a dependency decision (backlog). At
+names only the table, until `serde_path_to_error` (approved) is wired in. At
 start-up an invalid config is fatal. On reload it is logged and the running
 config is kept.
 
