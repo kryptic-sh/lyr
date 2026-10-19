@@ -18,22 +18,45 @@ pub enum Dialect {
     Hyprlang,
 }
 
-/// The request that switches to `workspace`, or `None` when lyr has no safe
-/// way to name that workspace in this dialect.
+/// The request that switches to `workspace`.
 ///
 /// Numbered workspaces are named by id in both dialects. A named workspace
-/// (one with a non-positive id) is `name:NAME` in hyprlang, since a negative
-/// number there means "that many workspaces back". In Lua it is `None`: the
-/// form the dotfiles use takes a number, and splicing a name into a Lua
-/// expression without a quoting rule would let the name run as code.
+/// (one with a non-positive id) is `name:NAME`, since a negative number means
+/// "that many workspaces back". In Lua, `hl.focus`'s `workspace` takes that
+/// string and hands it to the same selector parser hyprlang's `workspace`
+/// does (`hlFocus` and `dsp_changeWorkspace` in Hyprland's
+/// `src/config/lua/bindings/LuaBindingsDispatchers.cpp`, main `12f2425`,
+/// read 2026-10-20); the name goes in a long string ([`lua_long_string`]), so
+/// it cannot run as code.
 #[must_use]
-pub fn focus_request(workspace: &Workspace, dialect: Dialect) -> Option<String> {
+pub fn focus_request(workspace: &Workspace, dialect: Dialect) -> String {
     let id = workspace.id;
     match dialect {
-        Dialect::Lua if id > 0 => Some(format!("/dispatch hl.dsp.focus({{ workspace = {id} }})")),
-        Dialect::Lua => None,
-        Dialect::Hyprlang if id > 0 => Some(format!("/dispatch workspace {id}")),
-        Dialect::Hyprlang => Some(format!("/dispatch workspace name:{}", workspace.name)),
+        Dialect::Lua if id > 0 => format!("/dispatch hl.dsp.focus({{ workspace = {id} }})"),
+        Dialect::Lua => format!(
+            "/dispatch hl.dsp.focus({{ workspace = {} }})",
+            lua_long_string(&format!("name:{}", workspace.name))
+        ),
+        Dialect::Hyprlang if id > 0 => format!("/dispatch workspace {id}"),
+        Dialect::Hyprlang => format!("/dispatch workspace name:{}", workspace.name),
+    }
+}
+
+/// `text` as a Lua long string, `[[…]]` with as many `=` between the brackets
+/// as it takes: Lua reads its content as it is, with no escapes (the Lua 5.4
+/// manual, section 3.1), up to the first closing bracket of its level. The
+/// level is the least whose closing bracket first appears where it is put,
+/// so neither a `]]` in the text nor a `]` at its end can close it early.
+/// A long string skips a line break straight after its opening bracket, so
+/// `text` must not start with one; lyr's always starts with `name:`.
+fn lua_long_string(text: &str) -> String {
+    let mut equals = String::new();
+    loop {
+        let close = format!("]{equals}]");
+        if format!("{text}{close}").find(&close) == Some(text.len()) {
+            return format!("[{equals}[{text}{close}");
+        }
+        equals.push('=');
     }
 }
 
@@ -49,7 +72,7 @@ pub const fn exit_request(dialect: Dialect) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{Dialect, exit_request, focus_request};
+    use super::{Dialect, exit_request, focus_request, lua_long_string};
 
     #[test]
     fn exit_is_spelled_for_each_dialect() {
@@ -71,12 +94,12 @@ mod tests {
     fn numbered_workspaces_are_named_by_id() {
         let three = workspace(3, "3");
         assert_eq!(
-            focus_request(&three, Dialect::Lua).as_deref(),
-            Some("/dispatch hl.dsp.focus({ workspace = 3 })")
+            focus_request(&three, Dialect::Lua),
+            "/dispatch hl.dsp.focus({ workspace = 3 })"
         );
         assert_eq!(
-            focus_request(&three, Dialect::Hyprlang).as_deref(),
-            Some("/dispatch workspace 3")
+            focus_request(&three, Dialect::Hyprlang),
+            "/dispatch workspace 3"
         );
     }
 
@@ -84,9 +107,28 @@ mod tests {
     fn named_workspaces_are_never_sent_as_a_negative_number() {
         let mail = workspace(-1337, "mail");
         assert_eq!(
-            focus_request(&mail, Dialect::Hyprlang).as_deref(),
-            Some("/dispatch workspace name:mail")
+            focus_request(&mail, Dialect::Hyprlang),
+            "/dispatch workspace name:mail"
         );
-        assert_eq!(focus_request(&mail, Dialect::Lua), None);
+        assert_eq!(
+            focus_request(&mail, Dialect::Lua),
+            "/dispatch hl.dsp.focus({ workspace = [[name:mail]] })"
+        );
+    }
+
+    #[test]
+    fn a_lua_long_string_cannot_be_closed_early() {
+        assert_eq!(lua_long_string("name:a"), "[[name:a]]");
+        assert_eq!(
+            lua_long_string("name:a]] os.exit() --"),
+            "[=[name:a]] os.exit() --]=]",
+            "a closing bracket in the name"
+        );
+        assert_eq!(
+            lua_long_string("name:x]"),
+            "[=[name:x]]=]",
+            "a bracket at the end would join the close"
+        );
+        assert_eq!(lua_long_string("name:]=]]"), "[==[name:]=]]]==]");
     }
 }

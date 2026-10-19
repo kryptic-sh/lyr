@@ -46,8 +46,6 @@ pub enum Error {
     Refused { request: String, reply: String },
     #[error("Hyprland reports config provider {provider:?}, which lyr does not know")]
     UnknownConfigProvider { provider: String },
-    #[error("lyr cannot name workspace {name:?} in a Lua dispatch")]
-    Unaddressable { name: String },
     #[error(transparent)]
     Parse(#[from] ParseError),
 }
@@ -140,10 +138,7 @@ impl Hyprland {
 
     /// Switches to `workspace`.
     pub async fn focus(&self, workspace: &Workspace) -> Result<(), Error> {
-        let request =
-            focus_request(workspace, self.dialect).ok_or_else(|| Error::Unaddressable {
-                name: workspace.name.clone(),
-            })?;
+        let request = focus_request(workspace, self.dialect);
         let reply = self.request(&request).await?;
         if reply.trim() == OK_REPLY {
             Ok(())

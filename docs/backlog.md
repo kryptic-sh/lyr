@@ -214,17 +214,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   running Hyprland: the Lua focus request (the framing was read from hyprctl's
   source). The dialect comes from Hyprland itself (`j/status`'s
   `configProvider`, as ironbar reads it), tested against the fake on Linux under
-  WSL. Named workspaces get no request in Lua until there is a quoting rule.
-  Click is `focus_request` and scroll is `State::step`, both pure and tested.
-  The bar shows the workspaces (`apps/lyr/src/sources.rs` runs the backend and
-  hands its `State` to the main loop), and a click on a button or, with
-  `workspaces.scroll`, a wheel step sends the switch through the same task
-  (`apps/lyr/src/input.rs`, `lyr_core::pointer`). Not run against a real
-  Hyprland. `lyr --stats` logs the idle counts (`apps/lyr/src/stats.rs`); on
-  Windows an idle bar showed 3 wake-ups, 2 events and 2 presents over 86 s (the
-  start and one per clock minute). The idle test itself, on Hyprland with every
-  source running, has not been run. The `WorkspaceBackend` trait waits for the
-  Windows backend (M9). Hyprland main's changes for the next release are in
+  WSL. A named workspace is `name:NAME` in Lua too, quoted as a Lua long string
+  (`request::lua_long_string`), after Hyprland's `hlFocus` (main `12f2425`); not
+  run against a real Hyprland. Click is `focus_request` and scroll is
+  `State::step`, both pure and tested. The bar shows the workspaces
+  (`apps/lyr/src/sources.rs` runs the backend and hands its `State` to the main
+  loop), and a click on a button or, with `workspaces.scroll`, a wheel step
+  sends the switch through the same task (`apps/lyr/src/input.rs`,
+  `lyr_core::pointer`). Not run against a real Hyprland. `lyr --stats` logs the
+  idle counts (`apps/lyr/src/stats.rs`); on Windows an idle bar showed 3
+  wake-ups, 2 events and 2 presents over 86 s (the start and one per clock
+  minute). The idle test itself, on Hyprland with every source running, has not
+  been run. The `WorkspaceBackend` trait waits for the Windows backend (M9).
+  Hyprland main's changes for the next release are in
   [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Render, rest of M1.** `lyr-render` has the GPU-free half: the bar font found
   with crcbl-font and given the system's fallback faces (`fonts::load`), text
