@@ -18,6 +18,8 @@ pub struct Data {
     #[cfg(target_os = "linux")]
     pub power_profile: Option<lyr_sources::power_profile::Profiles>,
     #[cfg(target_os = "linux")]
+    pub bluetooth: Option<lyr_core::bluetooth::Reading>,
+    #[cfg(target_os = "linux")]
     pub workspaces: Option<lyr_wm::hyprland::State>,
 }
 
@@ -28,6 +30,8 @@ impl Data {
             Update::Battery(reading) => self.battery = reading,
             #[cfg(target_os = "linux")]
             Update::PowerProfile(profiles) => self.power_profile = profiles,
+            #[cfg(target_os = "linux")]
+            Update::Bluetooth(reading) => self.bluetooth = reading,
             #[cfg(target_os = "linux")]
             Update::Workspaces(state) => self.workspaces = Some(state),
         }
@@ -133,6 +137,11 @@ fn content(
         Module::PowerProfile => {
             let profiles = data.power_profile.as_ref()?;
             let shown = lyr_core::power_profile::view(&profiles.active, &config.power_profile);
+            Some(label(shown.text, theme.foreground))
+        }
+        #[cfg(target_os = "linux")]
+        Module::Bluetooth => {
+            let shown = lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth);
             Some(label(shown.text, theme.foreground))
         }
         #[cfg(target_os = "linux")]

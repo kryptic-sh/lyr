@@ -200,8 +200,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   way (`lyr_sources::power_profile::linux::PowerProfiles`): the daemon found
   under `org.freedesktop.UPower.PowerProfiles` or its older `net.hadess` name,
   followed on `PropertiesChanged`, switched by the `cycle_profile` built-ins,
-  and tested against a fake daemon that has only the old name. Not built: the
-  other sources. Network and audio wait on the new-dependency decision above.
+  and tested against a fake daemon that has only the old name. The bluetooth
+  source too (`lyr_sources::bluetooth::linux::BlueZ`): BlueZ's managed objects
+  read once and again on each `PropertiesChanged` under `/org/bluez` or object
+  added or removed, the rfkill block from the adapter's `PowerState`, and the
+  device shown the last to connect, as waybar does
+  (`lyr_sources::bluetooth::Tracker`); tested against a fake BlueZ. Not built:
+  the network, volume, mic and notification sources. Network and audio wait on
+  the new-dependency decision above.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace

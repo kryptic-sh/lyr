@@ -4,7 +4,7 @@
 //! source is polled.
 //!
 //! Linux has the battery (UPower), the power profile
-//! (power-profiles-daemon) and the workspaces (Hyprland). Other platforms
+//! (power-profiles-daemon), bluetooth (BlueZ) and the workspaces (Hyprland). Other platforms
 //! have no sources yet, and their modules are left out of the bar.
 
 use std::sync::mpsc;
@@ -20,6 +20,9 @@ pub enum Update {
     /// The power profiles, or `None` when the daemon lists none.
     #[cfg(target_os = "linux")]
     PowerProfile(Option<lyr_sources::power_profile::Profiles>),
+    /// Bluetooth, or `None` when there is no adapter.
+    #[cfg(target_os = "linux")]
+    Bluetooth(Option<lyr_core::bluetooth::Reading>),
     /// Hyprland's workspaces.
     #[cfg(target_os = "linux")]
     Workspaces(lyr_wm::hyprland::State),
@@ -72,6 +75,7 @@ mod linux {
 
     use crcbl_shell::ShellWaker;
     use lyr_sources::battery::linux::UPower;
+    use lyr_sources::bluetooth::linux::BlueZ;
     use lyr_sources::power_profile::linux::PowerProfiles;
     use lyr_wm::hyprland::{Hyprland, Workspace};
     use tokio::sync::mpsc::UnboundedReceiver;
@@ -105,6 +109,7 @@ mod linux {
                     tokio::join!(
                         battery(sender.clone(), waker.clone()),
                         power_profile(sender.clone(), profile, waker.clone()),
+                        bluetooth(sender.clone(), waker.clone()),
                         workspaces(sender, focus, waker),
                     );
                 });
@@ -132,6 +137,29 @@ mod linux {
         let (watched, ()) = tokio::join!(upower.watch(&readings), forward);
         if let Err(error) = watched {
             tracing::warn!("battery: UPower stopped answering: {error}");
+        }
+    }
+
+    async fn bluetooth(sender: mpsc::Sender<Update>, waker: Option<ShellWaker>) {
+        let bluez = match BlueZ::system().await {
+            Ok(bluez) => bluez,
+            Err(error) => {
+                tracing::warn!("bluetooth: BlueZ is not reachable: {error}");
+                return;
+            }
+        };
+        let (readings, mut changed) = watch::channel(None);
+        let forward = async {
+            while changed.changed().await.is_ok() {
+                let reading = changed.borrow_and_update().clone();
+                if !deliver(&sender, waker.as_ref(), Update::Bluetooth(reading)) {
+                    break;
+                }
+            }
+        };
+        let (watched, ()) = tokio::join!(bluez.watch(&readings), forward);
+        if let Err(error) = watched {
+            tracing::warn!("bluetooth: BlueZ stopped answering: {error}");
         }
     }
 
