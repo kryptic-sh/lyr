@@ -11,6 +11,12 @@ implementation follows until they are answered. The ones that block a milestone:
 
 - **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
   `neli`) block M4's audio and network sources.
+- **The calendar's first weekday and names from the system locale** (M5) need
+  `libc` on Linux (`nl_langinfo` with `_NL_TIME_FIRST_WEEKDAY`, as waybar reads
+  it) and `windows-sys` on Windows (`GetLocaleInfoEx` with
+  `LOCALE_IFIRSTDAYOFWEEK`); lyr depends on neither directly. The alternative
+  without them is a `clock.first_weekday` config key defaulting to Monday, with
+  English names, which a Sunday-first locale would have to set by hand.
 
 ## Cross-repo work
 
