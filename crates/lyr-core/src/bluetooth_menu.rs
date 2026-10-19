@@ -3,6 +3,11 @@
 //! its devices, and what the menu does to them. The platforms' sources fill
 //! it in (`lyr_sources::bluetooth`).
 
+use lyr_config::Theme;
+
+use crate::draw::{DrawList, Item, Size, switch};
+use crate::hit::{Rect, Regions};
+
 /// The adapter's properties the module uses (`org.bluez.Adapter1`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Adapter {
@@ -49,3 +54,194 @@ pub enum DeviceAction {
     Trust,
     Untrust,
 }
+
+/// What a click in the menu lands on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Target {
+    Switch(Switch),
+    /// The scan toggle.
+    Scan,
+    /// A device's button, by the device's index in the order drawn
+    /// ([`order`]).
+    Device(usize, DeviceAction),
+    /// A device's Forget button.
+    Forget(usize),
+}
+
+/// The menu's padding, around its rows.
+pub const PADDING: f32 = 8.0;
+/// The space between rows, and between a row's buttons.
+pub const GAP: f32 = 6.0;
+/// Around a button's label.
+const BUTTON_PADDING: (f32, f32) = (8.0, 2.0);
+
+/// The devices in the order the menu lists them: paired first, then those a
+/// scan found, each part by name.
+#[must_use]
+pub fn order(devices: &[Device]) -> Vec<&Device> {
+    let mut ordered: Vec<&Device> = devices.iter().collect();
+    ordered.sort_by(|a, b| b.paired.cmp(&a.paired).then_with(|| a.alias.cmp(&b.alias)));
+    ordered
+}
+
+/// One of a device's buttons.
+#[derive(Clone, Copy)]
+enum Button {
+    Action(DeviceAction),
+    Forget,
+}
+
+impl Button {
+    /// What a click on it lands on, for the device at `index`.
+    const fn target(self, index: usize) -> Target {
+        match self {
+            Self::Action(action) => Target::Device(index, action),
+            Self::Forget => Target::Forget(index),
+        }
+    }
+}
+
+/// A device's buttons, left to right: connect or disconnect, pair while it
+/// is not paired, trust or untrust, then Forget.
+fn buttons(device: &Device) -> Vec<(&'static str, Button)> {
+    let mut buttons = vec![if device.connected {
+        ("Disconnect", Button::Action(DeviceAction::Disconnect))
+    } else {
+        ("Connect", Button::Action(DeviceAction::Connect))
+    }];
+    if !device.paired {
+        buttons.push(("Pair", Button::Action(DeviceAction::Pair)));
+    }
+    buttons.push(if device.trusted {
+        ("Untrust", Button::Action(DeviceAction::Untrust))
+    } else {
+        ("Trust", Button::Action(DeviceAction::Trust))
+    });
+    buttons.push(("Forget", Button::Forget));
+    buttons
+}
+
+/// The menu for `adapter` and its `devices`: its draw list, its size, and
+/// what each click lands on, its text measured by `measure` in lines
+/// `line_height` tall.
+#[must_use]
+pub fn draw(
+    adapter: &Adapter,
+    devices: &[Device],
+    measure: &dyn Fn(&str) -> f32,
+    line_height: f32,
+    theme: &Theme,
+) -> (DrawList, Size, Regions<Target>) {
+    let (across, down) = BUTTON_PADDING;
+    let row = line_height + 2.0 * down;
+    let switches = [
+        ("Power", Target::Switch(Switch::Powered), adapter.powered),
+        (
+            "Discoverable",
+            Target::Switch(Switch::Discoverable),
+            adapter.discoverable,
+        ),
+        (
+            "Pairable",
+            Target::Switch(Switch::Pairable),
+            adapter.pairable,
+        ),
+        ("Scan", Target::Scan, adapter.discovering),
+    ];
+    let ordered = order(devices);
+    let name = |device: &Device| match device.battery {
+        Some(battery) => format!("{} {battery}%", device.alias),
+        None => device.alias.clone(),
+    };
+    let label_width = switches
+        .iter()
+        .map(|(label, _, _)| measure(label))
+        .chain(ordered.iter().map(|device| measure(&name(device))))
+        .fold(0.0, f32::max);
+    let button_width = |label: &str| measure(label) + 2.0 * across;
+    let buttons_width = ordered
+        .iter()
+        .map(|device| {
+            buttons(device)
+                .iter()
+                .map(|(label, _)| button_width(label) + GAP)
+                .sum::<f32>()
+        })
+        .fold(2.0 * row, f32::max);
+    let width = 2.0 * PADDING + label_width + GAP + buttons_width;
+    let mut items = Vec::new();
+    let mut regions = Regions::default();
+    let text = |text: String, x: f32, y: f32, colour| Item::Text {
+        rect: Rect {
+            x,
+            y: y + down,
+            width: measure(&text),
+            height: line_height,
+        },
+        text,
+        colour,
+    };
+    let mut y = PADDING;
+    for (label, target, on) in switches {
+        items.push(text(label.to_owned(), PADDING, y, theme.foreground));
+        let rect = Rect {
+            x: width - PADDING - 2.0 * row,
+            y,
+            width: 2.0 * row,
+            height: row,
+        };
+        items.extend(switch(rect, on, theme));
+        regions.push(rect, target);
+        y += row + GAP;
+    }
+    for (index, device) in ordered.iter().enumerate() {
+        y += if index == 0 { GAP } else { 0.0 };
+        let colour = if device.connected {
+            theme.workspace_active
+        } else {
+            theme.foreground
+        };
+        items.push(text(name(device), PADDING, y, colour));
+        let mut x = PADDING + label_width + GAP;
+        for (label, button) in buttons(device) {
+            let rect = Rect {
+                x,
+                y,
+                width: button_width(label),
+                height: row,
+            };
+            items.push(Item::Box {
+                rect,
+                radius: theme.radius as f32,
+                fill: theme.toast_background,
+                border: Some((theme.border_width as f32, theme.panel_border)),
+            });
+            items.push(text(label.to_owned(), x + across, y, theme.foreground));
+            regions.push(rect, button.target(index));
+            x += rect.width + GAP;
+        }
+        y += row + GAP;
+    }
+    let size = Size {
+        width,
+        height: y - GAP + PADDING,
+    };
+    let mut list = DrawList {
+        items: vec![Item::Box {
+            rect: Rect {
+                x: 0.0,
+                y: 0.0,
+                width: size.width,
+                height: size.height,
+            },
+            radius: theme.radius as f32,
+            fill: theme.module_background,
+            border: Some((theme.border_width as f32, theme.border)),
+        }],
+    };
+    list.items.extend(items);
+    (list, size, regions)
+}
+
+#[cfg(test)]
+mod tests;

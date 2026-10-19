@@ -434,9 +434,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   pair, trust and untrust (`device`) and forget (`forget`), tested against a
   recording fake BlueZ and mutation-checked; the reading now carries what the
   menu shows: the adapter's path, discoverable, pairable and discovering, and
-  each device's paired and trusted. Not built: the menu itself, the pairing
-  agent (`org.bluez.Agent1`, for passkeys and PINs), rename, favourites, and the
-  Windows and macOS menus.
+  each device's paired and trusted. The menu's drawing is built
+  (`lyr_core::bluetooth_menu::draw`): the power, discoverable and pairable
+  switches and the scan toggle, then the devices, paired first and by name, each
+  with connect or disconnect, pair while unpaired, trust or untrust, and Forget,
+  in the power menu's box; tested and mutation-checked. Not built: the menu's
+  window and wiring, the pairing agent (`org.bluez.Agent1`, for passkeys and
+  PINs), rename, favourites, and the Windows and macOS menus.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a
