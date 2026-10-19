@@ -27,6 +27,7 @@ use lyr_render::text::Text;
 use lyr_render::translate::translate;
 use lyr_shell::bars::Bars;
 
+use crate::clock_panel::ClockPanel;
 use crate::control;
 use crate::modules::{self, Data};
 use crate::power_menu::PowerMenu;
@@ -49,6 +50,8 @@ struct App {
     data: Data,
     commands: Commands,
     toasts: Toasts,
+    /// The clock panel, while it is open.
+    clock_panel: Option<ClockPanel>,
     /// The power menu, while it is open.
     power_menu: Option<PowerMenu>,
     /// The event batch that last dismissed the power menu: a click outside it
@@ -108,6 +111,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         data: Data::default(),
         commands,
         toasts: Toasts::default(),
+        clock_panel: None,
         power_menu: None,
         menu_dismissed_at: None,
         hidden: false,
@@ -130,6 +134,9 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         }
         if quit {
             app.toasts.close(shell.as_mut())?;
+            if let Some(panel) = app.clock_panel.take() {
+                panel.close(shell.as_mut(), false)?;
+            }
             return app.close_all(shell.as_mut());
         }
         while let Ok(update) = updates.try_recv() {
@@ -159,6 +166,7 @@ impl App {
             .any(|window| window.dirty || window.tooltips.dirty())
             || self.power_menu.as_ref().is_some_and(PowerMenu::dirty)
             || self.toasts.dirty()
+            || self.clock_panel.as_ref().is_some_and(ClockPanel::dirty)
         {
             return Duration::ZERO;
         }
@@ -178,7 +186,9 @@ impl App {
             use lyr_sources::notifications::linux::Change;
             match &update {
                 Update::Notifications(store) => self.toasts.serve(store.clone()),
-                Update::Notification(Change::Notified(id)) => self.toasts.notified(*id, now),
+                Update::Notification(Change::Notified(id)) => {
+                    self.toasts.notified(*id, self.clock_panel.is_some(), now);
+                }
                 Update::Notification(Change::Closed(id, _)) => self.toasts.closed(*id),
                 _ => {}
             }
@@ -186,6 +196,24 @@ impl App {
         #[cfg(not(target_os = "linux"))]
         let _ = now;
         self.data.apply(update);
+    }
+
+    /// Opens the clock panel, or closes it if it is open. Opening it takes
+    /// the toasts down, since it lists them.
+    fn toggle_clock_panel(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {
+        if let Some(panel) = self.clock_panel.take() {
+            return panel.close(shell, false);
+        }
+        let look = Look {
+            theme: &self.config.theme,
+            measure: &|s: &str| self.text.measure(s),
+            line_height: self.text.line_height(),
+        };
+        let today = Local::now().date_naive();
+        self.clock_panel =
+            Some(ClockPanel::open(shell, &look, today).context("opening the clock panel")?);
+        self.toasts.take_down();
+        Ok(())
     }
 
     /// Marks every bar to be drawn again.
@@ -223,6 +251,7 @@ impl App {
             power_menu,
             toasts,
             commands,
+            clock_panel,
             ..
         } = self;
         let now = Local::now().fixed_offset();
@@ -248,6 +277,9 @@ impl App {
         }
         if let Some(menu) = power_menu {
             menu.draw(text)?;
+        }
+        if let Some(panel) = clock_panel {
+            panel.draw(text)?;
         }
         for id in toasts.expire(Instant::now()) {
             commands.close_notification(id, lyr_core::notifications::CloseReason::Expired);

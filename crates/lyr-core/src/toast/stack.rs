@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 use lyr_config::Theme;
 
 use super::{MARGIN, draw};
-use crate::draw::{DrawList, Item, Size};
+use crate::draw::{DrawList, Size};
 use crate::hit::{Rect, Regions};
 use crate::notifications::Store;
 
@@ -153,7 +153,7 @@ impl Stack {
                 0.0
             };
             list.items
-                .extend(toast.items.into_iter().map(|item| shifted(item, top)));
+                .extend(toast.items.into_iter().map(|item| item.offset(0.0, top)));
             regions.push(
                 Rect {
                     x: 0.0,
@@ -169,36 +169,6 @@ impl Stack {
             };
         }
         (list, size, regions)
-    }
-}
-
-/// `item` moved down by `by`.
-fn shifted(item: Item, by: f32) -> Item {
-    let down = |rect: Rect| Rect {
-        y: rect.y + by,
-        ..rect
-    };
-    match item {
-        Item::Box {
-            rect,
-            radius,
-            fill,
-            border,
-        } => Item::Box {
-            rect: down(rect),
-            radius,
-            fill,
-            border,
-        },
-        Item::Text { rect, text, colour } => Item::Text {
-            rect: down(rect),
-            text,
-            colour,
-        },
-        Item::Group { opacity, items } => Item::Group {
-            opacity,
-            items: items.into_iter().map(|item| shifted(item, by)).collect(),
-        },
     }
 }
 

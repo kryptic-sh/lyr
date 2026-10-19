@@ -7,7 +7,7 @@ use anyhow::Context as _;
 use crcbl_shell::Shell;
 use lyr_config::Platform;
 use lyr_core::clock::Tick;
-use lyr_core::control::Request;
+use lyr_core::control::{Panel, Request};
 
 use super::{App, load_text, next_tick};
 use crate::control::{self, Incoming};
@@ -35,6 +35,10 @@ impl App {
                     self.close_all(shell)?;
                 }
                 self.hidden = !self.hidden;
+                incoming.reply(control::OK);
+            }
+            Request::Panel(Panel::Clock) => {
+                self.toggle_clock_panel(shell)?;
                 incoming.reply(control::OK);
             }
             request @ (Request::Dnd | Request::Clear) => {
@@ -103,7 +107,7 @@ impl App {
             tracing::info!("do-not-disturb {}", if store.dnd { "on" } else { "off" });
         } else {
             self.commands.clear_notifications();
-            self.toasts.clear();
+            self.toasts.take_down();
         }
         self.redraw_all();
         control::OK.to_owned()

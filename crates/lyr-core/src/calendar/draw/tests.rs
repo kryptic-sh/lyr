@@ -181,3 +181,30 @@ fn a_year_is_twelve_months_three_across() {
     assert_eq!(find(&list.items, "W00").len(), 1);
     assert!(size.height > 0.0);
 }
+
+#[test]
+fn spaces_are_measured_between_letters() {
+    // A measure that, like a text layout, leaves whitespace at the ends out.
+    let trimmed = |text: &str| measure(text.trim());
+    let theme = theme();
+    let today = date(2026, 10, 19);
+    let (_, spaced) = draw(
+        today,
+        Mode::Month,
+        Weekday::Mon,
+        today,
+        &measure,
+        LINE,
+        &theme,
+    );
+    let (_, trimmed) = draw(
+        today,
+        Mode::Month,
+        Weekday::Mon,
+        today,
+        &trimmed,
+        LINE,
+        &theme,
+    );
+    assert_eq!(trimmed.width, spaced.width);
+}

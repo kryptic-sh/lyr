@@ -14,6 +14,7 @@ use lyr_core::power_menu;
 
 use super::App;
 use super::window::Window;
+use crate::clock_panel::Outcome as ClockOutcome;
 use crate::control;
 use crate::input::{self, Pointer};
 use crate::power_menu::{Outcome, PowerMenu};
@@ -32,6 +33,13 @@ impl App {
             self.bars
                 .handle(shell, &self.config.bar, event)
                 .context("keeping a bar on every output")?;
+        }
+        if self
+            .clock_panel
+            .as_ref()
+            .is_some_and(|panel| event.window().is_some_and(|window| panel.owns(window)))
+        {
+            return self.panel_event(shell, event);
         }
         if event
             .window()
@@ -144,6 +152,7 @@ impl App {
                 }
                 // Applied once the bar is no longer borrowed.
                 let mut toggle_dnd = false;
+                let mut toggle_panel = false;
                 for press in presses {
                     let Some(target) = window.pointer.target(&window.regions) else {
                         continue;
@@ -159,6 +168,10 @@ impl App {
                     );
                     if opens == Some(Builtin::ToggleDnd) {
                         toggle_dnd = !toggle_dnd;
+                        continue;
+                    }
+                    if opens == Some(Builtin::OpenClockPanel) {
+                        toggle_panel = !toggle_panel;
                         continue;
                     }
                     if opens != Some(Builtin::OpenPowerMenu) {
@@ -186,6 +199,9 @@ impl App {
                         .context("opening the power menu")?;
                     }
                 }
+                if toggle_panel {
+                    self.toggle_clock_panel(shell)?;
+                }
                 if toggle_dnd {
                     let reply = self.notifications(Request::Dnd);
                     if reply != control::OK {
@@ -193,6 +209,32 @@ impl App {
                     }
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Applies `event`, which is for the clock panel's window.
+    fn panel_event(&mut self, shell: &mut dyn Shell, event: &ShellEvent) -> anyhow::Result<()> {
+        let Some(panel) = &mut self.clock_panel else {
+            return Ok(());
+        };
+        if let ShellEvent::WindowDestroyed { .. } = event {
+            if let Some(panel) = self.clock_panel.take() {
+                panel.close(shell, true)?;
+            }
+            return Ok(());
+        }
+        let look = Look {
+            theme: &self.config.theme,
+            measure: &|s: &str| self.text.measure(s),
+            line_height: self.text.line_height(),
+        };
+        let today = chrono::Local::now().date_naive();
+        let outcome = panel.event(shell, event, &look, today)?;
+        if outcome != ClockOutcome::Kept
+            && let Some(panel) = self.clock_panel.take()
+        {
+            panel.close(shell, outcome == ClockOutcome::Closed)?;
         }
         Ok(())
     }

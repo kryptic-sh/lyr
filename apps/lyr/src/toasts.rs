@@ -27,8 +27,9 @@ use lyr_shell::bars::NAMESPACE;
 use crate::input::Pointer;
 use crate::tooltips::Look;
 
-/// swaync's `control-center-margin-*`, which the plan gives the toasts too.
-const EDGE_MARGIN: f64 = 16.0;
+/// swaync's `control-center-margin-*`: the clock panel's, and the plan gives
+/// the toasts the same.
+pub const EDGE_MARGIN: f64 = 16.0;
 
 /// The panel showing the stack.
 struct Panel {
@@ -76,12 +77,13 @@ impl Toasts {
         self.store.as_ref()
     }
 
-    /// The notification `id` arrived or was replaced.
+    /// The notification `id` arrived or was replaced; with the clock panel
+    /// open (`panel_open`) it gets no toast.
     #[cfg(any(target_os = "linux", test))]
-    pub fn notified(&mut self, id: u32, now: Instant) {
+    pub fn notified(&mut self, id: u32, panel_open: bool, now: Instant) {
         if let Some(store) = &self.store {
             let store = store.lock().unwrap_or_else(PoisonError::into_inner);
-            self.stack.notified(&store, id, false, now);
+            self.stack.notified(&store, id, panel_open, now);
             self.changed = true;
         }
     }
@@ -92,9 +94,9 @@ impl Toasts {
         self.changed = true;
     }
 
-    /// Every notification closed, as Clear All does.
-    #[cfg(target_os = "linux")]
-    pub fn clear(&mut self) {
+    /// Takes every toast down: on Clear All, and when the clock panel opens,
+    /// since it lists them.
+    pub fn take_down(&mut self) {
         self.stack = lyr_core::toast::stack::Stack::default();
         self.changed = true;
     }

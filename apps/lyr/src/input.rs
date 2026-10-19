@@ -131,7 +131,9 @@ pub fn act(
                 commands.set_profile(next.to_owned());
             }
         }
-        Action::Builtin(builtin @ (Builtin::OpenPowerMenu | Builtin::ToggleDnd)) => {
+        Action::Builtin(
+            builtin @ (Builtin::OpenClockPanel | Builtin::OpenPowerMenu | Builtin::ToggleDnd),
+        ) => {
             return Some(builtin);
         }
         Action::Builtin(builtin) => {

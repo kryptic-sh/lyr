@@ -25,8 +25,8 @@ and this project adheres to
   the running one when the new one is invalid, and `lyr toggle` hides and shows
   the bars. On Linux, while lyr is the notification daemon, `lyr dnd` turns
   do-not-disturb on or off and `lyr clear` dismisses every notification.
-  `lyr panel` reports that it is not implemented yet. A second `lyr` exits when
-  one is already running.
+  `lyr panel clock` opens the clock panel; the other panels are not implemented
+  yet. A second `lyr` exits when one is already running.
 - On Linux lyr is the notification daemon when no other daemon (such as swaync)
   holds the name; `notifications.replace = true` takes it over. Notifications
   show as toasts at the top right, swaync's look, timed out as swaync times
@@ -44,6 +44,10 @@ and this project adheres to
   asks Hyprland to exit; on Windows and macOS the entries are not built yet.
   `[power.menu]` sets an entry to a command instead
   (`lock = { exec = "hyprlock" }`).
+- The clock panel, opened by a click on the clock or `lyr panel clock`: waybar's
+  year calendar, three months across with week numbers and today underlined; a
+  right click switches to the month, scrolling moves through years or months,
+  Escape closes it. Weeks start on Monday for now.
 - `lyr --stats` logs the bar's main-loop wake-ups, the events it applied and the
   frames it presented on each output, once a minute, to check that an idle bar
   stays idle.

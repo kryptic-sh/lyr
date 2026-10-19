@@ -107,7 +107,7 @@ pub fn draw(
         measure,
         line_height,
         cell,
-        gap: measure(" "),
+        gap: spaces(measure, 1),
         week: measure("W00"),
         first,
         today,
@@ -117,7 +117,7 @@ pub fn draw(
         Mode::Year => (1..=12).collect(),
         Mode::Month => vec![shown.month()],
     };
-    let between = measure("   ");
+    let between = spaces(measure, 3);
     let mut items = Vec::new();
     let mut y = 0.0;
     let mut width: f32 = 0.0;
@@ -138,6 +138,13 @@ pub fn draw(
     }
     let size = Size { width, height: y };
     (DrawList { items }, size)
+}
+
+/// The width of `count` spaces, measured between two letters: a font's
+/// measure can leave trailing or lone whitespace out.
+fn spaces(measure: &dyn Fn(&str) -> f32, count: usize) -> f32 {
+    let spaced = format!("a{}a", " ".repeat(count));
+    measure(&spaced) - measure("aa")
 }
 
 /// One month block at `at`: its title, weekday names and weeks.

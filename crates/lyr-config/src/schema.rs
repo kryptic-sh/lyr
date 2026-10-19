@@ -460,6 +460,9 @@ pub struct Theme {
     pub toast_border_critical: Colour,
     /// When it arrived.
     pub toast_time: Colour,
+    /// The clock panel: swaync's `.control-center` in the dotfiles.
+    pub panel_background: Colour,
+    pub panel_border: Colour,
     /// The clock panel's calendar: waybar's calendar format in the dotfiles.
     pub calendar_months: Colour,
     pub calendar_days: Colour,

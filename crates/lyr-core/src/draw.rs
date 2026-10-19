@@ -35,6 +35,41 @@ pub enum Item {
     Group { opacity: f32, items: Vec<Self> },
 }
 
+impl Item {
+    /// The item moved `dx` right and `dy` down, as when one list is drawn
+    /// inside another.
+    #[must_use]
+    pub fn offset(self, dx: f32, dy: f32) -> Self {
+        let moved = |rect: Rect| Rect {
+            x: rect.x + dx,
+            y: rect.y + dy,
+            ..rect
+        };
+        match self {
+            Self::Box {
+                rect,
+                radius,
+                fill,
+                border,
+            } => Self::Box {
+                rect: moved(rect),
+                radius,
+                fill,
+                border,
+            },
+            Self::Text { rect, text, colour } => Self::Text {
+                rect: moved(rect),
+                text,
+                colour,
+            },
+            Self::Group { opacity, items } => Self::Group {
+                opacity,
+                items: items.into_iter().map(|item| item.offset(dx, dy)).collect(),
+            },
+        }
+    }
+}
+
 /// Everything one bar draws, back to front.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DrawList {

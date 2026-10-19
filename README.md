@@ -35,7 +35,8 @@ Linux under Wayland:
   clock and, on Linux, the battery (UPower), power profile
   (power-profiles-daemon), Bluetooth (BlueZ), the notification bell and the
   Hyprland workspaces. Network, volume, mic and the tray are not built yet.
-- Tooltips, and the power menu (its actions are built on Linux only).
+- Tooltips, the power menu (its actions are built on Linux only), and the clock
+  panel's calendar.
 - On Linux, the notification daemon with toasts, when no other daemon (such as
   swaync) holds the name.
 
@@ -48,13 +49,13 @@ yet in [docs/backlog.md](docs/backlog.md).
 `lyr` with no command runs the bar. Every other command talks to the running
 bar:
 
-| Command                 | Does                                                                 |
-| ----------------------- | -------------------------------------------------------------------- |
-| `lyr reload`            | Reloads the config, keeping the running one if it is bad             |
-| `lyr toggle`            | Hides or shows the bars                                              |
-| `lyr quit`              | Stops the bar                                                        |
-| `lyr dnd` / `lyr clear` | Do-not-disturb on or off / dismiss every notification                |
-| `lyr panel <name>`      | Opens a panel (`clock`, `wifi`, `bluetooth`, `audio`); not built yet |
+| Command                 | Does                                                                      |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `lyr reload`            | Reloads the config, keeping the running one if it is bad                  |
+| `lyr toggle`            | Hides or shows the bars                                                   |
+| `lyr quit`              | Stops the bar                                                             |
+| `lyr dnd` / `lyr clear` | Do-not-disturb on or off / dismiss every notification                     |
+| `lyr panel <name>`      | Opens a panel: `clock`; `wifi`, `bluetooth` and `audio` are not built yet |
 
 `lyr -c FILE` uses another config file, and `lyr --stats` logs the bar's
 wake-ups and redraws once a minute. Logs go to `~/.local/state/lyr/logs/lyr.log`

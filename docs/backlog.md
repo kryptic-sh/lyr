@@ -252,26 +252,27 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   is not `resident`), tested and mutation-checked. The toast stack is
   `lyr_core::toast::stack::Stack` (newest on top, timeouts paused under the
   pointer) and a toast's draw list `lyr_core::toast` (swaync's look with the
-  `toast_*` theme keys, its body wrapped at spaces), both tested and
-  mutation-checked. The bar serves it on Linux (`apps/lyr/src/sources.rs`) and
-  leaves notifications to another daemon that has the name, logging which,
-  unless `notifications.replace = true` (read at start; a reload does not hand
-  the name over). Toasts are on screen (`apps/lyr/src/toasts.rs`): one Overlay
-  panel at the top right of the output the user is on, 16 px from the edges and
-  clear of the bar, recreated whenever the stack's size changes (crcbl 0.5.0
-  cannot resize a panel); a click invokes the `default` action when there is one
-  and takes the toast down, a middle click dismisses the notification. Tested on
-  crcbl's headless shell and mutation-checked; **never seen on screen**: Windows
-  has no daemon and WSL has no compositor, so the owner's Hyprland is the first
-  real run. The bell is drawn from the store while lyr is the daemon. A toast
-  shows when it arrived as swaync words it ("Now", "2 mins ago", from
-  `get_relative_time` at v0.12.6), redrawn as the words change; a summary long
-  enough to reach the time is cut short of it (`toast::TIME_GAP`), where swaync
-  ellipsizes. Not built: a toast's close button, action buttons and images,
-  markup, MPRIS, do-not-disturb and Clear All in the panel (`lyr dnd` and
-  `lyr clear` work; on Windows they answer that lyr is not the daemon, run
-  there). A transient notification, kept in no history, closes as expired when
-  its toast times out.
+  `toast_*` theme keys, its body wrapped at spaces) (crcbl-ui is adding UAX #14
+  line breaking, approved 2026-10-19; lyr's wrap can move to it once it is
+  released), both tested and mutation-checked. The bar serves it on Linux
+  (`apps/lyr/src/sources.rs`) and leaves notifications to another daemon that
+  has the name, logging which, unless `notifications.replace = true` (read at
+  start; a reload does not hand the name over). Toasts are on screen
+  (`apps/lyr/src/toasts.rs`): one Overlay panel at the top right of the output
+  the user is on, 16 px from the edges and clear of the bar, recreated whenever
+  the stack's size changes (crcbl 0.5.0 cannot resize a panel); a click invokes
+  the `default` action when there is one and takes the toast down, a middle
+  click dismisses the notification. Tested on crcbl's headless shell and
+  mutation-checked; **never seen on screen**: Windows has no daemon and WSL has
+  no compositor, so the owner's Hyprland is the first real run. The bell is
+  drawn from the store while lyr is the daemon. A toast shows when it arrived as
+  swaync words it ("Now", "2 mins ago", from `get_relative_time` at v0.12.6),
+  redrawn as the words change; a summary long enough to reach the time is cut
+  short of it (`toast::TIME_GAP`), where swaync ellipsizes. Not built: a toast's
+  close button, action buttons and images, markup, MPRIS, do-not-disturb and
+  Clear All in the panel (`lyr dnd` and `lyr clear` work; on Windows they answer
+  that lyr is not the daemon, run there). A transient notification, kept in no
+  history, closes as expired when its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading
@@ -336,8 +337,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   them, so their space is given back on every platform, and shows them by
   creating them again (run on Windows: the work area grew by 50 px and shrank
   back). `lyr dnd` and `lyr clear` act on the notification daemon on Linux and
-  answer that lyr is not the daemon elsewhere. `panel` answers "not implemented
-  yet" (M5). Not built: `lyr event workspace` for AeroSpace (M10).
+  answer that lyr is not the daemon elsewhere. `lyr panel clock` opens the clock
+  panel; the other panels answer "not implemented yet" (M7). Not built:
+  `lyr event workspace` for AeroSpace (M10).
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]`, `[theme]` and every module's table, the
   embedded defaults, `[platform.*]` layering on both the defaults and the user
@@ -429,9 +431,20 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mode three months across, week numbers on the right, today in its colour and
   underlined, with the `calendar_*` theme keys; tested and mutation-checked.
   Until the locale decision above is made, weeks start on Monday and names are
-  English (plan 16, 19). Not built: reading the first weekday and names from the
-  locale, the panel itself (its window, placement and the notification centre
-  below the calendar), and the smaller monospace `calendar_font`.
+  English (plan 16, 19). The panel is up too (`apps/lyr/src/clock_panel.rs`):
+  opened by `open_clock_panel` (a click on the clock or the bell) or
+  `lyr panel clock`, it sits at the top right of the output the user is on, 16
+  px from the edges and clear of the bar, runs the output's height, and is as
+  wide as swaync's 500 px or the year grid, whichever is wider (the year is
+  wider in the fallback font this machine has, so the grid does not fit 500 px
+  there). It takes the keyboard; Escape, losing focus and the same click or
+  binding again close it; a right click switches year and month mode and
+  scrolling moves by one of either. Opening it takes the toasts down, and no
+  toast shows while it is open. Run on Windows: year, month and Escape seen. Not
+  built: the notification centre below the calendar (title, Clear All,
+  do-not-disturb, MPRIS, history), reading the first weekday and names from the
+  locale, the smaller monospace `calendar_font`, redrawing at midnight, and
+  checking what Hyprland does with a click on the bare desktop while it is open.
 - **Undocumented Windows APIs:** virtual desktops
   (`IVirtualDesktopManagerInternal`) and setting the power mode
   (`PowerSetActiveOverlayScheme`) can break with any Windows build.

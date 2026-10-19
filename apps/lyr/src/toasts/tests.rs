@@ -42,7 +42,7 @@ impl Setup {
             summary: summary.to_owned(),
             ..Incoming::default()
         });
-        self.toasts.notified(id, now);
+        self.toasts.notified(id, false, now);
         id
     }
 
@@ -122,7 +122,7 @@ fn a_second_toast_grows_the_panel_and_the_same_size_keeps_it() {
         replaces_id: 1,
         ..Incoming::default()
     });
-    setup.toasts.notified(id, start);
+    setup.toasts.notified(id, false, start);
     assert_eq!(setup.sync(start), Some(grown), "same size, same panel");
 }
 
@@ -174,7 +174,7 @@ fn only_a_transient_toast_that_times_out_is_to_close() {
         transient: true,
         ..Incoming::default()
     });
-    setup.toasts.notified(transient, start);
+    setup.toasts.notified(transient, false, start);
     assert!(setup.toasts.expire(start).is_empty());
     assert_eq!(setup.toasts.expire(start + NORMAL_TIMEOUT), [transient]);
     assert!(setup.store.lock().expect("store").get(kept).is_some());
@@ -189,7 +189,7 @@ fn a_toast_up_for_a_minute_is_redrawn_for_its_new_time() {
         expiry: Some(lyr_core::notifications::Expiry::Never),
         ..Incoming::default()
     });
-    setup.toasts.notified(id, start);
+    setup.toasts.notified(id, false, start);
     setup.sync(start);
     let minute = start + Duration::from_secs(60);
     assert_eq!(setup.toasts.next_wake(), Some(minute));

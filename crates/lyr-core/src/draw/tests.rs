@@ -247,3 +247,54 @@ fn a_tooltip_of_several_lines_is_as_wide_as_its_widest() {
         .collect();
     assert_eq!(lines, [("80%", 8.0), ("Discharging, 2h left", 28.0)]);
 }
+
+#[test]
+fn an_offset_moves_every_item_a_group_holds() {
+    let theme = theme();
+    let rect = Rect {
+        x: 1.0,
+        y: 2.0,
+        width: 3.0,
+        height: 4.0,
+    };
+    let moved = Rect {
+        x: 11.0,
+        y: 22.0,
+        ..rect
+    };
+    let item = Item::Group {
+        opacity: 0.5,
+        items: vec![
+            Item::Box {
+                rect,
+                radius: 0.0,
+                fill: theme.foreground,
+                border: None,
+            },
+            Item::Text {
+                rect,
+                text: "a".to_owned(),
+                colour: theme.foreground,
+            },
+        ],
+    };
+    assert_eq!(
+        item.offset(10.0, 20.0),
+        Item::Group {
+            opacity: 0.5,
+            items: vec![
+                Item::Box {
+                    rect: moved,
+                    radius: 0.0,
+                    fill: theme.foreground,
+                    border: None,
+                },
+                Item::Text {
+                    rect: moved,
+                    text: "a".to_owned(),
+                    colour: theme.foreground,
+                },
+            ],
+        }
+    );
+}
