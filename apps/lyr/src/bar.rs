@@ -128,6 +128,8 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         if Instant::now() >= app.next_tick {
             app.next_tick = next_tick(app.tick);
             app.redraw_all();
+            // Its calendar's today and its history's "2 mins ago" move on.
+            app.refresh_panel();
         }
         let mut quit = false;
         while let Ok(incoming) = requests.try_recv() {
