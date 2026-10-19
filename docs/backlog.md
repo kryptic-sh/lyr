@@ -244,9 +244,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `lyr reload` reloads the config, keeping the running one when the new one is
   invalid or its font will not load, and recreates the bars when `[bar]`
   changed; run end to end on Windows (30 px to 40 px, then a bad `bar.height`
-  refused with the bar still running). The other requests answer "not
-  implemented yet": `toggle`, `panel` (M5), `dnd` and `clear` (M6). Not built:
-  `lyr event workspace` for AeroSpace (M10).
+  refused with the bar still running). `lyr toggle` hides the bars by closing
+  them, so their space is given back on every platform, and shows them by
+  creating them again (run on Windows: the work area grew by 50 px and shrank
+  back). The other requests answer "not implemented yet": `panel` (M5), `dnd`
+  and `clear` (M6). Not built: `lyr event workspace` for AeroSpace (M10).
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]` and `[theme]`, the embedded defaults,
   `[platform.*]` layering on both the defaults and the user file, and validation

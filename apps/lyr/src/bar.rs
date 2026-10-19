@@ -104,6 +104,10 @@ pub fn run(config_path: Option<&Path>) -> anyhow::Result<()> {
     let mut windows: HashMap<WindowId, Window> = HashMap::new();
     let (updates, commands) = sources::start(shell.waker()).context("starting the sources")?;
     let mut data = Data::default();
+    // `lyr toggle` closes the bars rather than unmapping them, so their
+    // space is given back on every platform; while hidden, outputs coming
+    // and going make no bars.
+    let mut hidden = false;
     // When the clock's text next changes, so every bar is redrawn then.
     let mut next_tick = Instant::now() + tick.until_next(&Local::now().fixed_offset());
 
@@ -151,7 +155,7 @@ pub fn run(config_path: Option<&Path>) -> anyhow::Result<()> {
                             if let Some(new_text) = new_text {
                                 text = new_text;
                             }
-                            if new.bar != config.bar {
+                            if new.bar != config.bar && !hidden {
                                 close_all(shell.as_mut(), &mut bars, &mut windows)?;
                                 bars.sync(shell.as_mut(), &new.bar)
                                     .context("creating the bars")?;
@@ -165,6 +169,16 @@ pub fn run(config_path: Option<&Path>) -> anyhow::Result<()> {
                             incoming.reply(control::OK);
                         }
                     }
+                }
+                Request::Toggle => {
+                    if hidden {
+                        bars.sync(shell.as_mut(), &config.bar)
+                            .context("creating the bars")?;
+                    } else {
+                        close_all(shell.as_mut(), &mut bars, &mut windows)?;
+                    }
+                    hidden = !hidden;
+                    incoming.reply(control::OK);
                 }
                 other => {
                     incoming.reply(format!("error: `{other}` is not implemented yet"));
@@ -181,8 +195,10 @@ pub fn run(config_path: Option<&Path>) -> anyhow::Result<()> {
         let mut events = Vec::new();
         shell.pump(&mut |event| events.push(event));
         for event in &events {
-            bars.handle(shell.as_mut(), &config.bar, event)
-                .context("keeping a bar on every output")?;
+            if !hidden {
+                bars.handle(shell.as_mut(), &config.bar, event)
+                    .context("keeping a bar on every output")?;
+            }
             match *event {
                 ShellEvent::Resized {
                     window,
