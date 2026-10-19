@@ -109,6 +109,9 @@ scroll_down = "volume_down"
 [theme]
 font = "Hack Nerd Font Propo"
 font_size = 16
+# The clock panel's calendar, drawn smaller as waybar's <tt><small> draws it.
+# Unset is the bar's font; waybar's <tt> would be "monospace".
+# calendar_font = "monospace"
 foreground = "#cdd6f4"
 bar_background = "#00000000"
 module_background = "#1a1b26"

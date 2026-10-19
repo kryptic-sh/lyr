@@ -48,6 +48,8 @@ pub struct Look<'a> {
     /// (notification markup).
     pub measure_in: &'a dyn Fn(&str, TextStyle) -> f32,
     pub line_height: f32,
+    /// The calendar's, in its own font.
+    pub calendar_line_height: f32,
 }
 
 /// One bar's tooltip.

@@ -69,16 +69,33 @@ struct App {
     stats: Stats,
 }
 
-/// Loads the theme's font, saying what was missing.
+/// Loads the theme's font and the calendar's, saying what was missing.
 fn load_text(config: &Config) -> anyhow::Result<Text> {
-    let font = lyr_render::fonts::load(&config.theme.font).context("loading the bar font")?;
+    let size = config.theme.font_size as f32;
+    let bar = load_family(&config.theme.font).context("loading the bar font")?;
+    let calendar = match &config.theme.calendar_font {
+        Some(family) if *family != config.theme.font => {
+            load_family(family).context("loading the calendar font")?
+        }
+        _ => bar.clone(),
+    };
+    let calendar =
+        Text::new(calendar.font, size * lyr_render::text::SMALL).with_faces(calendar.faces);
+    Ok(Text::new(bar.font, size)
+        .with_faces(bar.faces)
+        .with_calendar(calendar))
+}
+
+/// Loads the font `family`, logging what was missing.
+fn load_family(family: &str) -> anyhow::Result<lyr_render::fonts::Loaded> {
+    let font = lyr_render::fonts::load(family)?;
     if let Some(family) = &font.missing {
         tracing::warn!("font `{family}` is not installed; using a monospace font");
     }
     for (path, reason) in &font.unreadable {
         tracing::warn!("font {} skipped: {reason}", path.display());
     }
-    Ok(Text::new(font.font, config.theme.font_size as f32).with_faces(font.faces))
+    Ok(font)
 }
 
 /// When the clock's text next changes under `tick`.
@@ -226,6 +243,7 @@ impl App {
             measure: &|s: &str| self.text.measure(s),
             measure_in: &|s: &str, style| self.text.measure_in(s, style),
             line_height: self.text.line_height(),
+            calendar_line_height: self.text.calendar_line_height(),
         };
         let store = self
             .data
@@ -251,6 +269,7 @@ impl App {
             measure: &|s: &str| self.text.measure(s),
             measure_in: &|s: &str, style| self.text.measure_in(s, style),
             line_height: self.text.line_height(),
+            calendar_line_height: self.text.calendar_line_height(),
         };
         let today = Local::now().date_naive();
         self.clock_panel =
@@ -279,6 +298,7 @@ impl App {
             measure: &|s: &str| self.text.measure(s),
             measure_in: &|s: &str, style| self.text.measure_in(s, style),
             line_height: self.text.line_height(),
+            calendar_line_height: self.text.calendar_line_height(),
         };
         self.bluetooth_menu = Some(
             BluetoothMenu::open(
@@ -318,6 +338,7 @@ impl App {
             measure: &|s: &str| self.text.measure(s),
             measure_in: &|s: &str, style| self.text.measure_in(s, style),
             line_height: self.text.line_height(),
+            calendar_line_height: self.text.calendar_line_height(),
         };
         menu.refresh(
             shell,
@@ -373,6 +394,7 @@ impl App {
             measure: &|s: &str| text.measure(s),
             measure_in: &|s: &str, style| text.measure_in(s, style),
             line_height: text.line_height(),
+            calendar_line_height: text.calendar_line_height(),
         };
         for (&bar, window) in windows.iter_mut() {
             let anchor = Anchor {

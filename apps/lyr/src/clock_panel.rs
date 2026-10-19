@@ -106,7 +106,7 @@ impl ClockPanel {
             FIRST_WEEKDAY,
             today,
             look.measure_in,
-            look.line_height,
+            look.calendar_line_height,
             look.theme,
         );
         let width = WIDTH.max(calendar.width + 2.0 * (PADDING + BORDER));
@@ -296,7 +296,7 @@ impl ClockPanel {
             FIRST_WEEKDAY,
             contents.today,
             look.measure_in,
-            look.line_height,
+            look.calendar_line_height,
             look.theme,
         );
         let inset = BORDER + PADDING;

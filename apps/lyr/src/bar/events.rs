@@ -203,6 +203,7 @@ impl App {
                             measure: &|s: &str| self.text.measure(s),
                             measure_in: &|s: &str, style| self.text.measure_in(s, style),
                             line_height: self.text.line_height(),
+                            calendar_line_height: self.text.calendar_line_height(),
                         };
                         self.power_menu = PowerMenu::open(
                             shell,
@@ -351,6 +352,7 @@ impl App {
             measure: &|s: &str| self.text.measure(s),
             measure_in: &|s: &str, style| self.text.measure_in(s, style),
             line_height: self.text.line_height(),
+            calendar_line_height: self.text.calendar_line_height(),
         };
         let store = self.data.notification_store().map(|store| {
             store
@@ -434,6 +436,7 @@ impl App {
             measure: &|s: &str| self.text.measure(s),
             measure_in: &|s: &str, style| self.text.measure_in(s, style),
             line_height: self.text.line_height(),
+            calendar_line_height: self.text.calendar_line_height(),
         };
         match menu.event(shell, event, &look)? {
             Outcome::Kept => {}

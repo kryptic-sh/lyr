@@ -43,6 +43,7 @@ fn setup() -> Setup {
             measure: &measure,
             measure_in: &|text, _| measure(text),
             line_height: 20.0,
+            calendar_line_height: 20.0,
         },
         today(),
     )
@@ -66,6 +67,7 @@ impl Setup {
             measure: &measure,
             measure_in: &|text, _| measure(text),
             line_height: 20.0,
+            calendar_line_height: 20.0,
         };
         let mut outcome = Outcome::Kept;
         for event in events.iter().filter(|event| {
@@ -188,6 +190,7 @@ impl Setup {
             measure: &measure,
             measure_in: &|text, _| measure(text),
             line_height: 20.0,
+            calendar_line_height: 20.0,
         };
         self.panel.refresh(
             &look,
@@ -409,4 +412,31 @@ fn an_entry_scrolled_up_under_the_calendar_is_not_hovered() {
         .expect("moved");
     setup.pump();
     assert_eq!(setup.panel.hovered, None);
+}
+
+#[test]
+fn the_calendar_is_laid_out_in_its_own_line_height() {
+    let mut setup = setup();
+    let bottom = |setup: &mut Setup, calendar_line_height| {
+        let look = Look {
+            theme: &setup.theme,
+            measure: &measure,
+            measure_in: &|text, _| measure(text),
+            line_height: 20.0,
+            calendar_line_height,
+        };
+        setup.panel.refresh(
+            &look,
+            &Contents {
+                today: today(),
+                store: None,
+                players: &[],
+                now: Instant::now(),
+            },
+        );
+        setup.panel.calendar_bottom
+    };
+    let tall = bottom(&mut setup, 20.0);
+    let short = bottom(&mut setup, 10.0);
+    assert!(short < tall, "{short} < {tall}");
 }

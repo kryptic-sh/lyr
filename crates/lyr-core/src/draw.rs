@@ -12,20 +12,24 @@ use lyr_config::{Colour, Theme};
 use crate::hit::{Rect, Regions};
 use crate::layout::{Form, Slot, layout};
 
-/// How text is drawn: which of the font's faces, and whether underlined.
+/// How text is drawn: which of the font's faces, whether underlined, and
+/// whether in the calendar's font.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TextStyle {
     pub bold: bool,
     pub italic: bool,
     pub underline: bool,
+    /// In the theme's `calendar_font`, smaller, as waybar's `<tt><small>`.
+    pub calendar: bool,
 }
 
 impl TextStyle {
-    /// Upright, regular and not underlined.
+    /// Upright, regular, not underlined, in the bar's font.
     pub const PLAIN: Self = Self {
         bold: false,
         italic: false,
         underline: false,
+        calendar: false,
     };
 }
 

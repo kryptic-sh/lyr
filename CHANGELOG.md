@@ -58,12 +58,14 @@ and this project adheres to
   keys move through its buttons and Enter presses the outlined one.
 - The clock panel, opened by a click on the clock or `lyr panel clock`: waybar's
   year calendar, three months across with week numbers, in bold and today
-  underlined; a right click switches to the month, scrolling moves through years
-  or months, Escape closes it. Weeks start on Monday for now. On Linux, while
-  lyr is the notification daemon, the notification centre sits below the
-  calendar: Clear All, the do-not-disturb switch, the media players playing
-  (title, artist, previous, play/pause, next) and the history, grouped by app,
-  each entry with a close button while the pointer is over it.
+  underlined, smaller as waybar's `<tt><small>` draws it and in
+  `theme.calendar_font` when that is set; a right click switches to the month,
+  scrolling moves through years or months, Escape closes it. Weeks start on
+  Monday for now. On Linux, while lyr is the notification daemon, the
+  notification centre sits below the calendar: Clear All, the do-not-disturb
+  switch, the media players playing (title, artist, previous, play/pause, next)
+  and the history, grouped by app, each entry with a close button while the
+  pointer is over it.
 - `lyr --stats` logs the bar's main-loop wake-ups, the events it applied and the
   frames it presented on each output, once a minute, to check that an idle bar
   stays idle.

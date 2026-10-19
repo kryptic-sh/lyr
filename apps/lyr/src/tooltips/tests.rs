@@ -73,6 +73,7 @@ impl Setup {
                     measure: &measure,
                     measure_in: &|text, _| measure(text),
                     line_height: 20.0,
+                    calendar_line_height: 20.0,
                 },
                 |_| text.map(str::to_owned),
                 now,

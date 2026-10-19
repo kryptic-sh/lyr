@@ -423,6 +423,10 @@ pub struct Mic {
 pub struct Theme {
     pub font: String,
     pub font_size: u32,
+    /// The calendar's family, which waybar's `<tt>` makes monospace. Unset
+    /// is [`Self::font`].
+    #[serde(default)]
+    pub calendar_font: Option<String>,
     pub foreground: Colour,
     pub bar_background: Colour,
     pub module_background: Colour,

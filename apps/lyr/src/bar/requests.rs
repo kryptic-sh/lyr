@@ -76,6 +76,7 @@ impl App {
             .and_then(|(new, _)| {
                 let new_text = if new.theme.font == self.config.theme.font
                     && new.theme.font_size == self.config.theme.font_size
+                    && new.theme.calendar_font == self.config.theme.calendar_font
                 {
                     None
                 } else {

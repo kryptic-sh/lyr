@@ -404,8 +404,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   0.42.2; if hjkl exports them, lyr drops the copy.
 - **Waybar parity, still to check.** The plan was reviewed against the dotfiles'
   `config.jsonc` and `style.css` (2026-10-16), with waybar's own defaults read
-  in its 0.15.0 source. Open: the calendar's `<tt>` monospace look with a
-  proportional default font (`calendar_font`, M5). The logind calls behind
+  in its 0.15.0 source. The calendar is drawn in `theme.calendar_font` at
+  Pango's `<small>` size (`lyr_render::text::SMALL`, 1/1.2). Open: that key
+  defaults to the bar's proportional font, as plan 10 has it, where waybar's
+  `<tt>` is monospace; whether the default should be `monospace` is for the
+  owner to judge against waybar's look (M5). The logind calls behind
   `systemctl sleep` and the other power entries are in plan 10, read from
   systemd v262.1; the owner's installed systemd is not checked. The
   defaults-parity test (M3) should read the glyphs from `config.jsonc` itself,
@@ -545,8 +548,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   its title, artist and previous, play/pause and next, the standard media
   symbols since Nerd Font codepoints were not checked; a click presses the
   control. Not built: a player's art (lyr draws no images), reading the first
-  weekday and names from the locale, the smaller monospace `calendar_font`, and
-  checking what Hyprland does with a click on the bare desktop while it is open.
+  weekday and names from the locale, and checking what Hyprland does with a
+  click on the bare desktop while it is open.
 - **Undocumented Windows APIs:** virtual desktops
   (`IVirtualDesktopManagerInternal`) and setting the power mode
   (`PowerSetActiveOverlayScheme`) can break with any Windows build.

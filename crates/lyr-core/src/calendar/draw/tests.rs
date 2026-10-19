@@ -228,6 +228,7 @@ fn it_is_all_bold_and_measured_so() {
     assert!(
         list.items
             .iter()
-            .all(|item| matches!(item, Item::Text { style, .. } if style.bold))
+            .all(|item| matches!(item, Item::Text { style, .. } if style.bold && style.calendar)),
+        "in the calendar's font"
     );
 }

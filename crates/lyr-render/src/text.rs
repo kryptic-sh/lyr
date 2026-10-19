@@ -8,13 +8,20 @@ use glam::Vec2;
 use lyr_core::draw::TextStyle;
 use lyr_core::hit::Rect;
 
-/// The bar's font family at the theme's size.
+/// How much smaller the calendar is: Pango's `<small>`, one step down its
+/// scale of 1.2 (`PANGO_SCALE_SMALL`).
+pub const SMALL: f32 = 1.0 / 1.2;
+
+/// The bar's font family at the theme's size, and the calendar's.
 #[derive(Clone, Debug)]
 pub struct Text {
     /// Its faces, the regular one first.
     faces: Vec<Font>,
     size: f32,
     line_height: f32,
+    /// The calendar's, when it is set apart; otherwise the calendar is
+    /// drawn in this.
+    calendar: Option<Box<Self>>,
 }
 
 impl Text {
@@ -26,7 +33,33 @@ impl Text {
             faces: vec![font],
             size,
             line_height,
+            calendar: None,
         }
+    }
+
+    /// This text with `calendar` for the calendar's.
+    #[must_use]
+    pub fn with_calendar(mut self, calendar: Self) -> Self {
+        self.calendar = Some(Box::new(calendar));
+        self
+    }
+
+    /// The text `style` is drawn in.
+    fn in_style(&self, style: TextStyle) -> &Self {
+        match &self.calendar {
+            Some(calendar) if style.calendar => calendar,
+            _ => self,
+        }
+    }
+
+    /// The height of one of the calendar's lines, in logical pixels.
+    #[must_use]
+    pub fn calendar_line_height(&self) -> f32 {
+        let calendar = TextStyle {
+            calendar: true,
+            ..TextStyle::PLAIN
+        };
+        self.in_style(calendar).line_height
     }
 
     /// This text with the family's `faces` besides its regular one (bold,
@@ -77,7 +110,8 @@ impl Text {
     /// spaces at its end are not counted, those at its start are.
     #[must_use]
     pub fn measure_in(&self, text: &str, style: TextStyle) -> f32 {
-        self.layout(text, &self.font(style)).width()
+        let within = self.in_style(style);
+        within.layout(text, &within.font(style)).width()
     }
 
     /// Draws `text` in `style` from `rect`'s left edge, centred in its
@@ -91,14 +125,15 @@ impl Text {
         style: TextStyle,
         colour: [f32; 4],
     ) {
-        let font = self.font(style);
-        let layout = self.layout(text, &font);
+        let within = self.in_style(style);
+        let font = within.font(style);
+        let layout = within.layout(text, &font);
         let origin = Vec2::new(rect.x, rect.y + (rect.height - layout.height()) / 2.0);
         for run in layout.face_runs() {
             list.text_glyphs(
                 origin,
                 run.font,
-                self.size,
+                within.size,
                 colour,
                 run.glyphs,
                 &text[run.text],
@@ -109,7 +144,7 @@ impl Text {
         {
             let (min, max) = underline(
                 &font,
-                self.size,
+                within.size,
                 origin.y + line.baseline,
                 origin.x,
                 layout.width(),
@@ -271,6 +306,73 @@ mod tests {
         assert!(
             fonts[0] != fonts[1] && fonts[1] != fonts[2] && fonts[0] != fonts[2],
             "three faces: {fonts:?}"
+        );
+    }
+
+    #[test]
+    fn the_calendar_draws_in_its_own_smaller_text() {
+        let text = text().with_calendar(Text::new(Font::sans().clone(), 16.0 * super::SMALL));
+        let calendar = TextStyle {
+            calendar: true,
+            ..TextStyle::PLAIN
+        };
+        assert!(text.measure_in("abc", calendar) < text.measure("abc"));
+        assert!(text.calendar_line_height() < text.line_height());
+        let mut list = DrawList::new();
+        text.draw(
+            &mut list,
+            Rect {
+                x: 0.0,
+                y: 0.0,
+                width: 80.0,
+                height: 40.0,
+            },
+            "abc",
+            calendar,
+            [1.0; 4],
+        );
+        let sizes: Vec<f32> = list
+            .commands()
+            .iter()
+            .filter_map(|command| match command {
+                DrawCommand::Glyphs { size, .. } => Some(*size),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(sizes, [16.0 * super::SMALL]);
+        // Its underline is the small size's too.
+        let mut list = DrawList::new();
+        let rect = Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 80.0,
+            height: 40.0,
+        };
+        let underlined = TextStyle {
+            underline: true,
+            ..calendar
+        };
+        text.draw(&mut list, rect, "abc", underlined, [1.0; 4]);
+        let tops: Vec<f32> = list
+            .commands()
+            .iter()
+            .filter_map(|command| match command {
+                DrawCommand::Rect { min, .. } => Some(min.y),
+                _ => None,
+            })
+            .collect();
+        let small = text.calendar.as_deref().expect("a calendar text");
+        let font = &small.faces[0];
+        let layout = small.layout("abc", font);
+        let baseline = (40.0 - layout.height()) / 2.0 + layout.lines()[0].baseline;
+        let line = font.underline().expect("the committed font says");
+        let top = baseline - line.offset * font.metrics().scale(16.0 * super::SMALL);
+        assert_eq!(tops.len(), 1);
+        assert!((tops[0] - top).abs() < 0.001, "{tops:?} {top}");
+        let alone = super::Text::new(Font::sans().clone(), 16.0);
+        assert!(
+            (alone.measure_in("abc", calendar) - alone.measure("abc")).abs() < f32::EPSILON,
+            "without its own, the calendar is the bar's"
         );
     }
 }

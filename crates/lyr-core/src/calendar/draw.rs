@@ -18,9 +18,11 @@ use crate::hit::Rect;
 
 /// Months across in year mode: waybar's `mode-mon-col` in the dotfiles.
 pub const COLUMNS: usize = 3;
-/// The calendar's text: the dotfiles wrap each part in `<b>`.
+/// The calendar's text, in its own font: the dotfiles wrap each part in
+/// `<b>`.
 const BOLD: TextStyle = TextStyle {
     bold: true,
+    calendar: true,
     ..TextStyle::PLAIN
 };
 /// Today's date, also in `<u>`.

@@ -72,6 +72,7 @@ fn setup(devices: &[Device]) -> Setup {
         measure: &measure,
         measure_in: &|text, _| measure(text),
         line_height: 20.0,
+        calendar_line_height: 20.0,
     };
     let menu =
         BluetoothMenu::open(&mut shell, 16.0, &look, &adapter(), devices, None).expect("opened");
@@ -117,6 +118,7 @@ fn a_refresh_keeps_the_window_unless_the_size_changes() {
         measure: &measure,
         measure_in: &|text, _| measure(text),
         line_height: 20.0,
+        calendar_line_height: 20.0,
     };
     setup
         .menu
@@ -191,6 +193,7 @@ fn a_pin_is_typed_with_the_text_input_on_and_sent_with_enter() {
         measure: &measure,
         measure_in: &|text, _| measure(text),
         line_height: 20.0,
+        calendar_line_height: 20.0,
     };
     let ask = Ask {
         device: "Kbd",
@@ -253,6 +256,7 @@ fn a_new_question_of_the_same_size_still_turns_the_text_input_on() {
         measure: &measure,
         measure_in: &|text, _| measure(text),
         line_height: 20.0,
+        calendar_line_height: 20.0,
     };
     let ask = |question| Ask {
         device: "Kbd",
@@ -298,6 +302,7 @@ fn a_paired_device_is_renamed_through_a_field_and_escape_cancels_it() {
         measure: &measure,
         measure_in: &|text, _| measure(text),
         line_height: 20.0,
+        calendar_line_height: 20.0,
     };
     let refresh = |setup: &mut Setup| {
         setup
@@ -378,6 +383,7 @@ fn the_agent_s_question_takes_the_header_from_a_rename() {
         measure: &measure,
         measure_in: &|text, _| measure(text),
         line_height: 20.0,
+        calendar_line_height: 20.0,
     };
     setup.menu.act(Target::Rename(0));
     let ask = Ask {

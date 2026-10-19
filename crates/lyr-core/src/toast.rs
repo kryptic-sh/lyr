@@ -58,6 +58,7 @@ pub const fn text_style(style: Style) -> TextStyle {
         bold: style.bold,
         italic: style.italic,
         underline: style.underline || style.link,
+        ..TextStyle::PLAIN
     }
 }
 

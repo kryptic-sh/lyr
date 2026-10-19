@@ -49,6 +49,7 @@ fn setup() -> Setup {
             measure: &measure,
             measure_in: &|text, _| measure(text),
             line_height: 20.0,
+            calendar_line_height: 20.0,
         },
     )
     .expect("opened")
@@ -72,6 +73,7 @@ impl Setup {
             measure: &measure,
             measure_in: &|text, _| measure(text),
             line_height: 20.0,
+            calendar_line_height: 20.0,
         };
         let mut outcome = Outcome::Kept;
         for event in events.iter().filter(|event| {
