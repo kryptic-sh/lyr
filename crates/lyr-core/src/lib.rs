@@ -26,6 +26,7 @@ pub mod draw;
 pub mod hit;
 pub mod icon;
 pub mod layout;
+pub mod markup;
 pub mod media;
 pub mod network;
 pub mod notifications;
