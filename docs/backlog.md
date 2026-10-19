@@ -460,11 +460,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   an unanswered question `Canceled`, and a typed passkey always `Rejected`,
   since lyr claims no keyboard. The agent is tested against BlueZ's side on a
   peer-to-peer connection, the menu on crcbl's headless shell, both
-  mutation-checked. Not built: the agent's `Cancel` does nothing, so a question
-  BlueZ gave up on stays in the menu until answered (the answer then goes
-  nowhere); the source task's side, which keeps each question's answer by id, is
-  not tested end to end; the PIN field has never had a real input method behind
-  it; rename, favourites, and the Windows and macOS menus.
+  mutation-checked. A question BlueZ gives up on (the agent's `Cancel`) leaves
+  the menu. Not built: the source task's side, which keeps each question's
+  answer by id, is not tested end to end; the PIN field has never had a real
+  input method behind it; rename, favourites, and the Windows and macOS menus.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

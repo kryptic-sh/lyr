@@ -28,6 +28,9 @@ pub enum Update {
     /// id.
     #[cfg(target_os = "linux")]
     BluetoothAsk(u64, String, lyr_core::bluetooth_menu::Question),
+    /// The pairing agent's question is no longer asked.
+    #[cfg(target_os = "linux")]
+    BluetoothCancel,
     /// Hyprland's workspaces.
     #[cfg(target_os = "linux")]
     Workspaces(lyr_wm::hyprland::State),
@@ -211,6 +214,7 @@ mod linux {
     use lyr_sources::battery::linux::UPower;
     use lyr_sources::bluetooth::Snapshot;
     use lyr_sources::bluetooth::linux::BlueZ;
+    use lyr_sources::bluetooth::linux::agent::Asked;
     use lyr_sources::clock::linux::TimeDate;
     use lyr_sources::mpris::linux::Players;
     use lyr_sources::power::linux::Logind;
@@ -339,10 +343,18 @@ mod linux {
         }
         let ask = async {
             let mut next = 0;
-            while let Some(prompt) = asked.recv().await {
-                next += 1;
-                let update = Update::BluetoothAsk(next, prompt.device, prompt.question);
-                pending.borrow_mut().insert(next, prompt.answer);
+            while let Some(asked) = asked.recv().await {
+                let update = match asked {
+                    Asked::Prompt(prompt) => {
+                        next += 1;
+                        pending.borrow_mut().insert(next, prompt.answer);
+                        Update::BluetoothAsk(next, prompt.device, prompt.question)
+                    }
+                    Asked::Cancel => {
+                        pending.borrow_mut().clear();
+                        Update::BluetoothCancel
+                    }
+                };
                 if !deliver(&sender, waker.as_ref(), update) {
                     break;
                 }

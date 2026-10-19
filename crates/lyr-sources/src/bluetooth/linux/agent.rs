@@ -8,7 +8,8 @@
 //! capability (`pin_code_request_callback` in its `src/adapter.c`), while it
 //! asks for a typed passkey only of an agent with a keyboard, which lyr does
 //! not claim; that request is rejected. Each question goes to the bar as a
-//! [`Prompt`], and the D-Bus call waits for the answer.
+//! [`Prompt`], and the D-Bus call waits for the answer, or for BlueZ to give
+//! up on it ([`Asked::Cancel`]).
 
 pub use lyr_core::bluetooth_menu::{Question, Reply};
 use tokio::sync::{mpsc, oneshot};
@@ -28,6 +29,16 @@ pub struct Prompt {
     pub answer: oneshot::Sender<Reply>,
 }
 
+/// What the agent tells the bar.
+#[derive(Debug)]
+pub enum Asked {
+    Prompt(Prompt),
+    /// BlueZ gave up on the question it asked last. It asks one at a time
+    /// and cancels before asking again (`agent_cancel` in its
+    /// `src/agent.c`), so this is always that one.
+    Cancel,
+}
+
 /// The agent's errors, as BlueZ names them.
 #[derive(Debug, zbus::DBusError)]
 #[zbus(prefix = "org.bluez.Error")]
@@ -41,7 +52,7 @@ pub enum AgentError {
 /// The agent: where its questions go.
 #[derive(Debug)]
 pub struct Agent {
-    pub prompts: mpsc::UnboundedSender<Prompt>,
+    pub prompts: mpsc::UnboundedSender<Asked>,
 }
 
 impl Agent {
@@ -54,7 +65,7 @@ impl Agent {
             question,
             answer,
         };
-        if self.prompts.send(prompt).is_err() {
+        if self.prompts.send(Asked::Prompt(prompt)).is_err() {
             return Err(AgentError::Canceled("lyr is exiting".to_owned()));
         }
         match answered.await {
@@ -114,7 +125,10 @@ impl Agent {
         self.confirm(device, Question::AuthorizeService).await
     }
 
-    fn cancel(&self) {}
+    fn cancel(&self) {
+        // Nobody to tell when the bar is exiting.
+        let _exiting = self.prompts.send(Asked::Cancel);
+    }
 }
 
 #[zbus::proxy(

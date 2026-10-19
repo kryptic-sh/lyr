@@ -79,6 +79,8 @@ impl Data {
                 self.bluetooth_ask = Some((id, device, question));
             }
             #[cfg(target_os = "linux")]
+            Update::BluetoothCancel => self.bluetooth_ask = None,
+            #[cfg(target_os = "linux")]
             Update::Bluetooth(snapshot) => {
                 self.bluetooth = snapshot.reading;
                 self.bluetooth_adapter = snapshot.adapter;
@@ -397,5 +399,17 @@ mod bluetooth_tests {
         });
         let ask = data.bluetooth_question().expect("a question");
         assert_eq!((ask.device, ask.question), ("Buds", Question::Confirm(1)));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_question_bluez_gave_up_on_goes() {
+        use crate::sources::Update;
+        let mut data = Data::default();
+        let path = "/org/bluez/hci0/dev_1".to_owned();
+        data.apply(Update::BluetoothAsk(7, path, Question::Pin));
+        assert!(data.bluetooth_question().is_some());
+        data.apply(Update::BluetoothCancel);
+        assert_eq!(data.bluetooth_question(), None);
     }
 }

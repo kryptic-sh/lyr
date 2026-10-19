@@ -108,7 +108,7 @@ impl BlueZ {
     /// When BlueZ refuses it.
     pub async fn register_agent(
         &self,
-        prompts: tokio::sync::mpsc::UnboundedSender<agent::Prompt>,
+        prompts: tokio::sync::mpsc::UnboundedSender<agent::Asked>,
     ) -> zbus::Result<()> {
         agent::register(&self.connection, agent::Agent { prompts }).await
     }
