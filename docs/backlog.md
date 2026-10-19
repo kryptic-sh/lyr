@@ -407,9 +407,20 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   missing one) and no time to full. The mapping is tested on every platform and
   mutation-checked; the registration is tested on this machine, which has no
   battery, so a real battery's changes have not been seen. Run in the bar on
-  Windows (2026-10-20): it started and quit cleanly with the module hidden. Not
-  built: the other Windows sources (power profile, network, Bluetooth, volume,
-  workspaces) and menus.
+  Windows (2026-10-20): it started and quit cleanly with the module hidden. The
+  network too (`lyr_sources::network::windows`): the interface
+  `GetBestInterface` gives for 0.0.0.0 (the default route, which Windows weighs
+  with its metrics), its first IPv4 address, prefix and gateway from
+  `GetAdaptersAddresses`, its `FriendlyName` as `ifname`, and on Wi-Fi the SSID
+  and signal quality from `WlanQueryInterface`; changes come from
+  `NotifyIpInterfaceChange`, `NotifyUnicastIpAddressChange`,
+  `NotifyRouteChange2` and the WLAN service's notifications, read on a thread of
+  lyr's own. The mapping (`network::win32`) is tested everywhere and
+  mutation-checked, the calls on this machine; run in the bar on Windows
+  (2026-10-20), its tooltip read `Ethernet 192.168.68.54/22`. Wi-Fi has not been
+  seen, this machine being wired, and the radio's on-off state is not read
+  (`radio_blocked` is always false). Not built: the other Windows sources (power
+  profile, Bluetooth, volume, workspaces) and menus.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace

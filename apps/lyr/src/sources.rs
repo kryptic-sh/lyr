@@ -21,8 +21,9 @@ pub enum Update {
     /// The power profiles, or `None` when the daemon lists none.
     #[cfg(target_os = "linux")]
     PowerProfile(Option<lyr_sources::power_profile::Profiles>),
-    /// NetworkManager's reading, or `None` before the first.
-    #[cfg(target_os = "linux")]
+    /// The network's reading (NetworkManager's on Linux, IP Helper's on
+    /// Windows), or `None` before the first.
+    #[cfg(any(target_os = "linux", windows))]
     Network(Option<lyr_core::network::Reading>),
     /// What the Wi-Fi menu shows.
     #[cfg(target_os = "linux")]
@@ -149,9 +150,12 @@ enum NotificationRequest {
 /// drops what it is sent; it already logged why it stopped.
 #[derive(Debug)]
 pub struct Commands {
-    /// Windows: the battery's change notifications, live while the bar is.
+    /// Windows: the battery's and the network's change notifications, live
+    /// while the bar is.
     #[cfg(windows)]
     _battery: Option<lyr_sources::battery::windows::Watch>,
+    #[cfg(windows)]
+    _network: Option<lyr_sources::network::windows::Watch>,
     #[cfg(target_os = "linux")]
     focus: tokio::sync::mpsc::UnboundedSender<lyr_wm::hyprland::Workspace>,
     #[cfg(target_os = "linux")]
@@ -324,8 +328,15 @@ pub fn start(
     }
     #[cfg(windows)]
     {
+        let network = windows::network(sender.clone(), waker.clone())?;
         let battery = windows::battery(sender, waker);
-        Ok((receiver, Commands { _battery: battery }))
+        Ok((
+            receiver,
+            Commands {
+                _battery: battery,
+                _network: network,
+            },
+        ))
     }
     #[cfg(target_os = "macos")]
     {
@@ -334,7 +345,7 @@ pub fn start(
     }
 }
 
-/// The sources Windows has so far: the battery.
+/// The sources Windows has so far: the battery and the network.
 #[cfg(windows)]
 mod windows {
     use std::sync::mpsc;
@@ -343,6 +354,48 @@ mod windows {
     use lyr_sources::battery::windows::{Watch, status};
 
     use super::Update;
+
+    /// Hands the network to the main loop now and after every change, read on
+    /// a thread of its own, since a WLAN callback must not call into the WLAN
+    /// API. The returned watch keeps the changes coming; `None` when Windows
+    /// refuses them, which it logs.
+    ///
+    /// # Errors
+    ///
+    /// When the reading thread cannot start.
+    pub(super) fn network(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+    ) -> std::io::Result<Option<lyr_sources::network::windows::Watch>> {
+        use lyr_sources::network::windows::{Watch, read};
+        let (changes, changed) = mpsc::channel::<()>();
+        std::thread::Builder::new()
+            .name("lyr network".to_owned())
+            .spawn(move || {
+                // Once now, then once for each run of changes.
+                loop {
+                    let reading = read()
+                        .inspect_err(|error| tracing::warn!("network: {error}"))
+                        .ok();
+                    if sender.send(Update::Network(reading)).is_err() {
+                        break;
+                    }
+                    if let Some(waker) = &waker {
+                        waker.wake();
+                    }
+                    if changed.recv().is_err() {
+                        break;
+                    }
+                    while changed.try_recv().is_ok() {}
+                }
+            })?;
+        Ok(Watch::new(move || {
+            // The reading thread has gone when this fails: nothing to tell.
+            let _gone = changes.send(());
+        })
+        .inspect_err(|error| tracing::warn!("network: changes will not show: {error}"))
+        .ok())
+    }
 
     /// The battery reading now, `None` with no battery or when Windows cannot
     /// say, which it logs.

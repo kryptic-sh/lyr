@@ -2,13 +2,18 @@
 //! Wi-Fi menu's (`docs/plan/10-popups-and-menus.md#wi-fi-menu`).
 //!
 //! [`linux`] reads NetworkManager over D-Bus into
-//! [`lyr_core::network::Reading`] and [`lyr_core::wifi_menu::Wifi`]. The nl80211 fallback for a
-//! machine without NetworkManager, and Windows and macOS, are not built.
+//! [`lyr_core::network::Reading`] and [`lyr_core::wifi_menu::Wifi`], and
+//! [`windows`] IP Helper and the WLAN API into the reading ([`win32`] turns
+//! what they report into the link, on every platform's tests). The nl80211
+//! fallback for a machine without NetworkManager, and macOS, are not built.
 
 use lyr_core::wifi_menu::Security;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
+pub mod win32;
+#[cfg(windows)]
+pub mod windows;
 
 /// How to join a network.
 #[derive(Clone, Debug, PartialEq, Eq)]
