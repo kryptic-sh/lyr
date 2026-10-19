@@ -1,8 +1,9 @@
 //! The Bluetooth menu (`docs/plan/10-popups-and-menus.md#bluetooth-menu`): a
 //! panel at the top left, under the Bluetooth module where a bar shows one,
 //! taking the keyboard. A click on a switch or a device's button is the
-//! caller's to carry out; `Escape`, losing focus and the same click or
-//! binding again close it.
+//! caller's to carry out, as is Enter on the one the arrow keys have moved
+//! to; `Escape`, losing focus and the same click or binding again close
+//! it.
 //!
 //! It is a panel rather than a popup so `lyr panel bluetooth` can open it:
 //! a Wayland popup's grab needs the serial of the input that opened it. It is
@@ -34,6 +35,8 @@ pub struct BluetoothMenu {
     size: Size,
     list: DrawList,
     regions: Regions<Target>,
+    /// The keyboard's place, by the target's index in the order drawn.
+    focus: Option<usize>,
     pointer: Pointer,
     scale: f32,
     surface: Option<Surface>,
@@ -48,8 +51,10 @@ pub enum Outcome {
     Close,
     /// The window system is closing its window.
     Closed,
-    /// A switch or a device's button was clicked.
+    /// A switch or a device's button was clicked, or chosen with Enter.
     Act(Target),
+    /// The keyboard's place moved: the menu is to be drawn again.
+    Moved,
 }
 
 /// The panel's window, `size` big, `left` from the output's left edge.
@@ -95,6 +100,7 @@ impl BluetoothMenu {
             adapter,
             devices,
             ask,
+            None,
             look.measure,
             look.line_height,
             look.theme,
@@ -105,6 +111,7 @@ impl BluetoothMenu {
             size,
             list,
             regions,
+            focus: None,
             pointer: Pointer::default(),
             scale: 1.0,
             surface: None,
@@ -136,10 +143,13 @@ impl BluetoothMenu {
             adapter,
             devices,
             ask,
+            self.focused(),
             look.measure,
             look.line_height,
             look.theme,
         );
+        let count = regions.targets().count();
+        self.focus = self.focus.filter(|_| count > 0).map(|at| at.min(count - 1));
         if size != self.size {
             if let Some(surface) = self.surface.take() {
                 surface.destroy()?;
@@ -186,6 +196,32 @@ impl BluetoothMenu {
                 state: ButtonState::Pressed,
                 ..
             } => return Ok(Outcome::Close),
+            ShellEvent::Key {
+                key_code: Some(key),
+                state: ButtonState::Pressed,
+                ..
+            } => {
+                let count = self.regions.targets().count();
+                if count == 0 {
+                    return Ok(Outcome::Kept);
+                }
+                match key {
+                    KeyCode::ArrowDown => {
+                        self.focus = Some(self.focus.map_or(0, |at| (at + 1).min(count - 1)));
+                        return Ok(Outcome::Moved);
+                    }
+                    KeyCode::ArrowUp => {
+                        self.focus = Some(self.focus.map_or(0, |at| at.saturating_sub(1)));
+                        return Ok(Outcome::Moved);
+                    }
+                    KeyCode::Enter | KeyCode::NumpadEnter => {
+                        if let Some(target) = self.focused() {
+                            return Ok(Outcome::Act(target));
+                        }
+                    }
+                    _ => {}
+                }
+            }
             _ => {
                 let presses = self.pointer.handle(event, self.scale);
                 if presses.contains(&Press::Left)
@@ -196,6 +232,11 @@ impl BluetoothMenu {
             }
         }
         Ok(Outcome::Kept)
+    }
+
+    /// The target the keyboard is on.
+    fn focused(&self) -> Option<Target> {
+        self.regions.targets().nth(self.focus?).copied()
     }
 
     /// Draws the menu if it has a frame to present.

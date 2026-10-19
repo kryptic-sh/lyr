@@ -132,3 +132,45 @@ fn a_refresh_keeps_the_window_unless_the_size_changes() {
     assert_ne!(second, first, "taller: recreated");
     assert!(setup.shell.title(first).is_err() && setup.shell.title(second).is_ok());
 }
+
+#[test]
+fn the_arrow_keys_move_through_the_targets_and_enter_chooses() {
+    let mut setup = setup(&[]);
+    let window = setup.menu.window;
+    let key = |setup: &mut Setup, key| {
+        setup.shell.key_press(window, key).expect("a key");
+        setup.pump()
+    };
+    assert_eq!(
+        key(&mut setup, KeyCode::Enter),
+        Outcome::Kept,
+        "nothing yet"
+    );
+    assert_eq!(key(&mut setup, KeyCode::ArrowDown), Outcome::Moved);
+    assert_eq!(
+        key(&mut setup, KeyCode::Enter),
+        Outcome::Act(Target::Switch(Switch::Powered)),
+        "the first"
+    );
+    key(&mut setup, KeyCode::ArrowDown);
+    assert_eq!(
+        key(&mut setup, KeyCode::Enter),
+        Outcome::Act(Target::Switch(Switch::Discoverable))
+    );
+    for _ in 0..10 {
+        key(&mut setup, KeyCode::ArrowDown);
+    }
+    assert_eq!(
+        key(&mut setup, KeyCode::Enter),
+        Outcome::Act(Target::Scan),
+        "stops at the last"
+    );
+    for _ in 0..10 {
+        key(&mut setup, KeyCode::ArrowUp);
+    }
+    assert_eq!(
+        key(&mut setup, KeyCode::Enter),
+        Outcome::Act(Target::Switch(Switch::Powered)),
+        "and the first"
+    );
+}

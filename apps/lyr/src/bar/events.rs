@@ -252,6 +252,7 @@ impl App {
                 }
             }
             BluetoothOutcome::Act(target) => self.bluetooth_act(target),
+            BluetoothOutcome::Moved => self.refresh_bluetooth_menu(shell)?,
         }
         Ok(())
     }

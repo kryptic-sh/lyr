@@ -446,16 +446,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   BlueZ, and drawn again as BlueZ changes (recreated when its size changes).
   Tested on crcbl's headless shell and mutation-checked; never run against a
   real BlueZ, and on Windows `lyr panel bluetooth` answers that there is no
-  adapter. Not built: keyboard navigation in it, a PIN or passkey typed in (the
-  pairing agent is built and registered at start, its question shown at the top
-  of the menu with Yes and No, which opens the menu if it is closed; the agent:
-  `bluetooth::linux::agent`, `DisplayYesNo`, a passkey confirmation or an
-  authorization asked as a yes or no and answered `Rejected` or `Canceled`
-  otherwise, a PIN or typed passkey always `Rejected` since lyr has no text
-  input; tested against BlueZ's side on a peer-to-peer connection and
-  mutation-checked), the source task's side, which keeps each question's answer
-  by id, is not tested end to end, rename, favourites, and the Windows and macOS
-  menus.
+  adapter. The arrow keys move an outline through its buttons and switches in
+  the order drawn, and Enter acts on the outlined one. Not built: a PIN or
+  passkey typed in (the pairing agent is built and registered at start, its
+  question shown at the top of the menu with Yes and No, which opens the menu if
+  it is closed; the agent: `bluetooth::linux::agent`, `DisplayYesNo`, a passkey
+  confirmation or an authorization asked as a yes or no and answered `Rejected`
+  or `Canceled` otherwise, a PIN or typed passkey always `Rejected` since lyr
+  has no text input; tested against BlueZ's side on a peer-to-peer connection
+  and mutation-checked), the source task's side, which keeps each question's
+  answer by id, is not tested end to end, rename, favourites, and the Windows
+  and macOS menus.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

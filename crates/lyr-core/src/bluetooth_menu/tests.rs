@@ -79,7 +79,7 @@ fn each_device_has_the_buttons_its_state_calls_for() {
         device("Buds", true, true, true),
         device("Phone", false, false, false),
     ];
-    let (list, _, regions) = draw(&adapter(), &devices, None, &measure, LINE, &theme);
+    let (list, _, regions) = draw(&adapter(), &devices, None, None, &measure, LINE, &theme);
     // Four switch rows, then the devices after a gap.
     let first = PADDING + 4.0 * (ROW + GAP) + GAP;
     let second = first + ROW + GAP;
@@ -107,7 +107,7 @@ fn each_device_has_the_buttons_its_state_calls_for() {
 #[test]
 fn the_switches_show_the_adapter_and_take_clicks() {
     let theme = theme();
-    let (list, size, regions) = draw(&adapter(), &[], None, &measure, LINE, &theme);
+    let (list, size, regions) = draw(&adapter(), &[], None, None, &measure, LINE, &theme);
     let x = size.width - PADDING - 1.0;
     let targets: Vec<_> = (0..4)
         .map(|row| regions.hit(x, PADDING + row as f32 * (ROW + GAP) + 1.0))
@@ -152,7 +152,7 @@ fn the_agent_s_question_comes_first_with_yes_and_no() {
         question: Question::Confirm(42),
     };
     assert_eq!(ask.text(), "Pair with Buds? Passkey 000042");
-    let (list, size, regions) = draw(&adapter(), &[], Some(ask), &measure, LINE, &theme);
+    let (list, size, regions) = draw(&adapter(), &[], Some(ask), None, &measure, LINE, &theme);
     let x = size.width - PADDING - 1.0;
     assert_eq!(
         regions.hit(x, PADDING + 1.0),
@@ -185,4 +185,42 @@ fn the_agent_s_question_comes_first_with_yes_and_no() {
             words
         );
     }
+}
+
+#[test]
+fn the_focused_target_is_outlined_in_the_active_colour() {
+    let theme = theme();
+    let (_, _, plain) = draw(&adapter(), &[], None, None, &measure, LINE, &theme);
+    let targets: Vec<Target> = plain.targets().copied().collect();
+    assert_eq!(
+        targets,
+        [
+            Target::Switch(Switch::Powered),
+            Target::Switch(Switch::Discoverable),
+            Target::Switch(Switch::Pairable),
+            Target::Scan
+        ],
+        "in the order drawn"
+    );
+    let (list, _, regions) = draw(
+        &adapter(),
+        &[],
+        None,
+        Some(Target::Scan),
+        &measure,
+        LINE,
+        &theme,
+    );
+    let Some(Item::Box {
+        rect, fill, border, ..
+    }) = list.items.last()
+    else {
+        panic!("an outline last");
+    };
+    assert_eq!(Some(*rect), regions.rect(&Target::Scan));
+    assert_eq!(*fill, lyr_config::Colour::TRANSPARENT);
+    assert_eq!(
+        border.map(|(_, colour)| colour),
+        Some(theme.workspace_active)
+    );
 }

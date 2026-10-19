@@ -15,6 +15,14 @@ pub struct Colour {
 }
 
 impl Colour {
+    /// Nothing: a box drawn with it shows only its border.
+    pub const TRANSPARENT: Self = Self {
+        r: 0,
+        g: 0,
+        b: 0,
+        a: 0,
+    };
+
     /// Parses `#rrggbb` (opaque) or `#rrggbbaa`.
     ///
     /// # Errors

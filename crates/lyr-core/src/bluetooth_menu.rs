@@ -3,7 +3,7 @@
 //! its devices, and what the menu does to them. The platforms' sources fill
 //! it in (`lyr_sources::bluetooth`).
 
-use lyr_config::Theme;
+use lyr_config::{Colour, Theme};
 
 use crate::draw::{DrawList, Item, Size, switch};
 use crate::hit::{Rect, Regions};
@@ -163,6 +163,7 @@ pub fn draw(
     adapter: &Adapter,
     devices: &[Device],
     ask: Option<Ask<'_>>,
+    focus: Option<Target>,
     measure: &dyn Fn(&str) -> f32,
     line_height: f32,
     theme: &Theme,
@@ -307,6 +308,15 @@ pub fn draw(
         }],
     };
     list.items.extend(items);
+    // The keyboard's place: an outline in the active colour.
+    if let Some(rect) = focus.and_then(|focus| regions.rect(&focus)) {
+        list.items.push(Item::Box {
+            rect,
+            radius: theme.radius as f32,
+            fill: Colour::TRANSPARENT,
+            border: Some((theme.border_width as f32, theme.workspace_active)),
+        });
+    }
     (list, size, regions)
 }
 

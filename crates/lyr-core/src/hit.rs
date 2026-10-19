@@ -59,6 +59,11 @@ impl<T> Regions<T> {
             .map(|(rect, _)| *rect)
     }
 
+    /// Every region's target, in the order they were added.
+    pub fn targets(&self) -> impl Iterator<Item = &T> {
+        self.regions.iter().map(|(_, target)| target)
+    }
+
     /// The topmost region containing `(x, y)`.
     #[must_use]
     pub fn hit(&self, x: f32, y: f32) -> Option<&T> {
