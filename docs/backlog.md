@@ -568,7 +568,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Not yet verified
 
-- Nothing has run beyond the scaffold: the binary parses its command line and
-  reports that no bar exists yet.
+- Nothing has run on Linux under a real compositor: everything Wayland, D-Bus
+  and Hyprland is tested against fakes and crcbl's headless shell, so the
+  owner's Hyprland is the first real run (M1's check). On Windows the bar has
+  run, with tooltips, the power menu, the clock panel and the control socket
+  (each entry above says what was seen).
 - The release pipeline (phase 2 of [plan/14](plan/14-ci-and-release.md)) does
   not exist yet.
