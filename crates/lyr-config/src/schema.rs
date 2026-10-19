@@ -443,4 +443,11 @@ pub struct Theme {
     pub mic: Colour,
     pub tooltip_background: Colour,
     pub tooltip_foreground: Colour,
+    /// A notification toast: swaync's `.notification` in the dotfiles.
+    pub toast_background: Colour,
+    pub toast_foreground: Colour,
+    /// A normal notification's border.
+    pub toast_border: Colour,
+    pub toast_border_low: Colour,
+    pub toast_border_critical: Colour,
 }

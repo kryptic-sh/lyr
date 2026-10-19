@@ -234,7 +234,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   tested against an application on a peer-to-peer connection. The bar does not
   serve it yet: until it draws toasts, taking the name would swallow every
   notification on a desktop with no other daemon. Not built: claiming the name
-  and the check for another daemon owning it, toasts (M5's panels), markup,
+  and the check for another daemon owning it, showing toasts (their windows; a
+  toast's draw list is built in `lyr_core::toast`, swaync's look with the
+  `toast_*` theme keys, its body wrapped at spaces, mutation-checked, but no
+  arrival time, close button, action buttons, images or markup yet), markup,
   images and MPRIS. The bell's view is built (`lyr_core::bell`, with
   `notifications.format` and `notifications.icons`, the dotfiles' three glyphs)
   but not drawn: with the daemon not served there is no history to show, and a
