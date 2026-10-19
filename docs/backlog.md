@@ -342,6 +342,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `font-family: 'Hadk Nerd Font'` names no font, so swaync falls back today (lyr
   defaults to the bar's font), and action buttons are `0.2rem`, about 3 px
   ([plan/09](plan/09-notifications.md#what-swaync-does-today)).
+- **Power menu, M5.** Built: the Linux actions
+  (`lyr_sources::power::linux::Logind`): Lock, Sleep, Hibernate, Reboot and
+  Power off as systemd v262.1's `loginctl` and `systemctl` call logind, with the
+  `WithFlags` fallback, the reboot flags (`power::reboot_flags`) and the
+  soft-reboot retry, tested against fake new and old loginds and
+  mutation-checked. Not run against a real logind. Not built: Log out (the
+  compositor's exit, through `lyr-wm`), the menu popup itself and its keys, the
+  `open_power_menu` built-in, and the Windows and macOS actions (plan 10 names
+  Win32 APIs that need `windows-sys`, new to lyr).
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

@@ -946,6 +946,7 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "lyr-core",
+ "thiserror",
  "tokio",
  "zbus",
 ]

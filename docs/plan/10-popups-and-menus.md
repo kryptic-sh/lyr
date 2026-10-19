@@ -97,14 +97,14 @@ order and with the labels `.menu-power` uses today: Lock, Sleep, Hibernate,
 Shutdown, Logout, Reboot. Each entry is a configured command or a built-in
 action.
 
-| Action    | Linux (logind over D-Bus)          | Windows                       | macOS                                  |
-| --------- | ---------------------------------- | ----------------------------- | -------------------------------------- |
-| Lock      | `loginctl lock-session` (hyprlock) | `LockWorkStation`             | `pmset displaysleepnow` (lock on wake) |
-| Log out   | compositor exit (`hl.dsp.exit()`)  | `ExitWindowsEx(EWX_LOGOFF)`   | System Events `log out` (AppleScript)  |
-| Sleep     | `Manager.Sleep(0)`                 | `SetSuspendState(FALSE, ...)` | `pmset sleepnow`                       |
-| Hibernate | `Manager.HibernateWithFlags(0)`    | `SetSuspendState(TRUE, ...)`  | not offered                            |
-| Reboot    | `Manager.RebootWithFlags(0)`       | `ExitWindowsEx(EWX_REBOOT)`   | System Events `restart`                |
-| Power off | `Manager.PowerOffWithFlags(0)`     | `ExitWindowsEx(EWX_POWEROFF)` | System Events `shut down`              |
+| Action    | Linux (logind over D-Bus)         | Windows                       | macOS                                  |
+| --------- | --------------------------------- | ----------------------------- | -------------------------------------- |
+| Lock      | `Session.Lock` on `session/auto`  | `LockWorkStation`             | `pmset displaysleepnow` (lock on wake) |
+| Log out   | compositor exit (`hl.dsp.exit()`) | `ExitWindowsEx(EWX_LOGOFF)`   | System Events `log out` (AppleScript)  |
+| Sleep     | `Manager.Sleep(0)`                | `SetSuspendState(FALSE, ...)` | `pmset sleepnow`                       |
+| Hibernate | `Manager.HibernateWithFlags(0)`   | `SetSuspendState(TRUE, ...)`  | not offered                            |
+| Reboot    | `Manager.RebootWithFlags(flags)`  | `ExitWindowsEx(EWX_REBOOT)`   | System Events `restart`                |
+| Power off | `Manager.PowerOffWithFlags(0)`    | `ExitWindowsEx(EWX_POWEROFF)` | System Events `shut down`              |
 
 Windows reboot and power-off need the `SE_SHUTDOWN_NAME` privilege enabled on
 the process token first.
@@ -121,8 +121,25 @@ v262.1's `src/systemctl/systemctl-logind.c` (`logind_reboot`) on 2026-10-18:
 - The others are `<Method>WithFlags(t flags)`. On an older logind that answers
   `UnknownMethod`, systemctl calls `<Method>(b interactive)` instead, and lyr
   does the same.
-- `flags` is 0: systemctl's default (`--check-inhibitors=auto`) sets neither the
-  check nor the skip flag, so logind applies its own inhibitor policy.
+- The inhibitor flags are unset: systemctl's default (`--check-inhibitors=auto`)
+  sets neither the check nor the skip flag, so logind applies its own inhibitor
+  policy. So Sleep, Hibernate and Power off pass 0. Reboot is not 0 (this plan
+  said it was until 2026-10-19): `systemctl reboot` adds
+  `SD_LOGIND_REBOOT_VIA_KEXEC` unless `SYSTEMCTL_SKIP_AUTO_KEXEC` is true, and
+  `SD_LOGIND_SOFT_REBOOT_IF_NEXTROOT_SET_UP` when `/run/nextroot` is a mount
+  point and `SYSTEMCTL_SKIP_AUTO_SOFT_REBOOT` is not true, asking again without
+  the latter if logind answers `InvalidArgs`. lyr does the same
+  (`lyr_sources::power::reboot_flags`); it tells a mount point by its device, so
+  a same-device bind mount at `/run/nextroot` is missed where systemd's
+  `path_is_mount_point` would see it.
+- The fallback's `interactive` is true: systemctl defaults `arg_ask_password` to
+  true.
+- Lock is what `loginctl lock-session` with no id calls:
+  `org.freedesktop.login1.Session.Lock()` on
+  `/org/freedesktop/login1/session/auto`, the caller's own session
+  (`src/login/loginctl.c`, `verb_activate`). The screen then locks only if
+  something listens for logind's `Lock` signal (hypridle's `lock_cmd`, from
+  memory of its README, not checked here), as for `loginctl` today.
 
 ## Wi-Fi menu
 
