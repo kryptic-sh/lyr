@@ -1,0 +1,149 @@
+//! The audio menu (`docs/plan/10-popups-and-menus.md#audio-menu`): a panel
+//! at the top left, under the volume or mic module where a bar shows one,
+//! taking the keyboard. A click on a tab shows it; a click on a row's
+//! button, or Enter on the one the arrow keys moved to, is the caller's to
+//! carry out, by the row's id. `Escape`, losing focus and the same click or
+//! binding again close it.
+//!
+//! Its panel is [`MenuPanel`]'s, recreated when its size changes (a stream
+//! starting).
+
+use crcbl_shell::{Shell, ShellEvent, WindowId};
+use lyr_core::audio_menu::{self, Nodes, Step, Tab, Target};
+use lyr_render::text::Text;
+
+use crate::menu_panel::{Event, MenuPanel};
+use crate::tooltips::Look;
+
+/// The open menu.
+pub struct AudioMenu {
+    panel: MenuPanel<Target>,
+    tab: Tab,
+    /// The shown tab's rows' ids, in the order drawn.
+    ids: Vec<String>,
+}
+
+/// What a row's button asks for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Action {
+    Mute,
+    Step(Step),
+    /// Make the device the default.
+    Default,
+}
+
+/// What an event did to the menu.
+#[derive(Debug, PartialEq, Eq)]
+pub enum Outcome {
+    Kept,
+    /// It is to close.
+    Close,
+    /// The window system is closing its window.
+    Closed,
+    /// A row's button was clicked or chosen with Enter: the row is on `tab`,
+    /// named by its id.
+    Act(Tab, String, Action),
+    /// A tab was chosen or the keyboard moved its place: the menu is to be
+    /// drawn again.
+    Redraw,
+}
+
+impl AudioMenu {
+    /// Opens the menu on `tab` of `nodes`, `left` from the output's left
+    /// edge.
+    pub fn open(
+        shell: &mut dyn Shell,
+        left: f64,
+        look: &Look<'_>,
+        nodes: &Nodes,
+        tab: Tab,
+    ) -> anyhow::Result<Self> {
+        let drawn = audio_menu::draw(nodes, tab, None, look.measure, look.line_height, look.theme);
+        Ok(Self {
+            panel: MenuPanel::open(shell, left, drawn)?,
+            tab,
+            ids: ids(nodes, tab),
+        })
+    }
+
+    /// Whether `window` is the menu.
+    pub fn owns(&self, window: WindowId) -> bool {
+        self.panel.owns(window)
+    }
+
+    /// Whether it has a frame to present.
+    pub const fn dirty(&self) -> bool {
+        self.panel.dirty()
+    }
+
+    /// Draws the menu again for `nodes` as they are now, recreating its
+    /// window if its size changed.
+    pub fn refresh(
+        &mut self,
+        shell: &mut dyn Shell,
+        look: &Look<'_>,
+        nodes: &Nodes,
+    ) -> anyhow::Result<()> {
+        self.ids = ids(nodes, self.tab);
+        let drawn = audio_menu::draw(
+            nodes,
+            self.tab,
+            self.panel.focused(),
+            look.measure,
+            look.line_height,
+            look.theme,
+        );
+        self.panel.show(shell, drawn)?;
+        Ok(())
+    }
+
+    /// Applies an event for the menu's window.
+    pub fn event(&mut self, shell: &mut dyn Shell, event: &ShellEvent) -> anyhow::Result<Outcome> {
+        Ok(match self.panel.event(shell, event)? {
+            Event::Kept | Event::Enter => Outcome::Kept,
+            Event::Close => Outcome::Close,
+            Event::Closed => Outcome::Closed,
+            Event::Redraw => Outcome::Redraw,
+            Event::Pick(target) => self.act(target),
+        })
+    }
+
+    /// What choosing `target` does: a tab is shown, with the outline gone
+    /// since its place may not be on the new tab; a row's button is the
+    /// caller's to carry out.
+    fn act(&mut self, target: Target) -> Outcome {
+        let (index, action) = match target {
+            Target::Tab(tab) => {
+                self.tab = tab;
+                self.panel.unfocus();
+                return Outcome::Redraw;
+            }
+            Target::Mute(index) => (index, Action::Mute),
+            Target::Step(index, step) => (index, Action::Step(step)),
+            Target::Default(index) => (index, Action::Default),
+        };
+        match self.ids.get(index) {
+            Some(id) => Outcome::Act(self.tab, id.clone(), action),
+            None => Outcome::Kept,
+        }
+    }
+
+    /// Draws the menu if it has a frame to present.
+    pub fn draw(&mut self, text: &Text) -> anyhow::Result<()> {
+        self.panel.draw(text)
+    }
+
+    /// Closes the menu: its surface, then its window unless the window
+    /// system has closed it already (`window_gone`).
+    pub fn close(self, shell: &mut dyn Shell, window_gone: bool) -> anyhow::Result<()> {
+        self.panel.close(shell, window_gone)
+    }
+}
+
+/// The ids of `tab`'s rows of `nodes`, in the order the menu draws them.
+fn ids(nodes: &Nodes, tab: Tab) -> Vec<String> {
+    nodes.of(tab).iter().map(|node| node.id.clone()).collect()
+}
+
+#[cfg(test)]
+mod tests;

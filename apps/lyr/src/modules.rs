@@ -52,6 +52,8 @@ pub struct Data {
     /// The default output and input, where there is a source for them.
     pub sink: Option<lyr_core::audio::Sink>,
     pub source: Option<lyr_core::audio::Source>,
+    /// What the audio menu lists, where there is a source for it.
+    pub audio_nodes: Option<lyr_core::audio_menu::Nodes>,
 }
 
 impl Data {
@@ -125,6 +127,8 @@ impl Data {
                 self.sink = sink;
                 self.source = source;
             }
+            #[cfg(windows)]
+            Update::AudioNodes(nodes) => self.audio_nodes = Some(nodes),
             // The bar opens it.
             #[cfg(target_os = "linux")]
             Update::TrayMenu(_) => {}

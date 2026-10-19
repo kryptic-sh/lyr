@@ -10,6 +10,7 @@
 //! `requests`, with a window-system event in `events`, and one bar window's
 //! own state is `window`.
 
+mod audio;
 mod events;
 mod requests;
 mod tray;
@@ -30,6 +31,7 @@ use lyr_render::text::Text;
 use lyr_render::translate::translate;
 use lyr_shell::bars::Bars;
 
+use crate::audio_menu::AudioMenu;
 use crate::bluetooth_menu::BluetoothMenu;
 use crate::clock_panel::{ClockPanel, Contents};
 use crate::control;
@@ -63,6 +65,8 @@ struct App {
     bluetooth_menu: Option<BluetoothMenu>,
     /// The Wi-Fi menu, while it is open.
     wifi_menu: Option<WifiMenu>,
+    /// The audio menu, while it is open.
+    audio_menu: Option<AudioMenu>,
     /// The power menu, while it is open.
     power_menu: Option<PowerMenu>,
     /// A tray item's menu, while it is open.
@@ -144,6 +148,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         clock_panel: None,
         bluetooth_menu: None,
         wifi_menu: None,
+        audio_menu: None,
         power_menu: None,
         tray_menu: None,
         menu_dismissed_at: None,
@@ -182,6 +187,9 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             if let Some(menu) = app.wifi_menu.take() {
                 menu.close(shell.as_mut(), false)?;
             }
+            if let Some(menu) = app.audio_menu.take() {
+                menu.close(shell.as_mut(), false)?;
+            }
             if let Some(menu) = app.tray_menu.take() {
                 menu.close(shell.as_mut(), false)?;
             }
@@ -196,6 +204,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             app.update(update, Instant::now());
             app.refresh_bluetooth_menu(shell.as_mut())?;
             app.refresh_wifi_menu(shell.as_mut())?;
+            app.refresh_audio_menu(shell.as_mut())?;
             app.stats.events += 1;
             app.redraw_all();
         }
@@ -206,6 +215,9 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         for event in &events {
             app.event(shell.as_mut(), event, instant)?;
         }
+        // The source reads the streams again while the menu is open.
+        #[cfg(windows)]
+        app.commands.audio_menu(app.audio_menu.is_some());
         app.draw(shell.as_mut())?;
     }
 }
@@ -227,6 +239,7 @@ impl App {
                 .as_ref()
                 .is_some_and(BluetoothMenu::dirty)
             || self.wifi_menu.as_ref().is_some_and(WifiMenu::dirty)
+            || self.audio_menu.as_ref().is_some_and(AudioMenu::dirty)
             || self.tray_menu.as_ref().is_some_and(TrayMenu::dirty)
         {
             return Duration::ZERO;
@@ -424,6 +437,7 @@ impl App {
             clock_panel,
             bluetooth_menu,
             wifi_menu,
+            audio_menu,
             tray_menu,
             ..
         } = self;
@@ -460,6 +474,9 @@ impl App {
             menu.draw(text)?;
         }
         if let Some(menu) = wifi_menu {
+            menu.draw(text)?;
+        }
+        if let Some(menu) = audio_menu {
             menu.draw(text)?;
         }
         if let Some(menu) = tray_menu {

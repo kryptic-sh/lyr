@@ -1,5 +1,6 @@
 //! Windows' Settings pages, which a menu lyr has not built there opens in
-//! its place (`docs/plan/10-popups-and-menus.md#windows-and-macos`).
+//! its place, and which stand in for what Windows has no public API for
+//! (`docs/plan/10-popups-and-menus.md#windows-and-macos`).
 
 /// A Settings page a menu stands in for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -8,7 +9,8 @@ pub enum Page {
     Network,
     /// The Bluetooth menu's.
     Bluetooth,
-    /// The audio menu's.
+    /// The audio menu's Default button's: setting the default device has no
+    /// public API.
     Sound,
 }
 

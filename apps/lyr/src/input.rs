@@ -138,7 +138,8 @@ pub fn act(
             }
         }
         Action::Builtin(
-            builtin @ (Builtin::OpenBluetoothMenu
+            builtin @ (Builtin::OpenAudioMenu
+            | Builtin::OpenBluetoothMenu
             | Builtin::OpenClockPanel
             | Builtin::OpenPowerMenu
             | Builtin::OpenWifiMenu
@@ -150,6 +151,7 @@ pub fn act(
         Action::Builtin(
             builtin @ (Builtin::ToggleMute | Builtin::VolumeUp | Builtin::VolumeDown),
         ) => {
+            use lyr_sources::audio::windows::{Flow, Which};
             // The mic's bindings act on the input, the volume's on the output.
             let input = matches!(
                 target,
@@ -161,16 +163,12 @@ pub fn act(
                 config.volume.scroll_step
             };
             let step = i32::try_from(step).unwrap_or(i32::MAX);
+            let which = Which::Default(if input { Flow::Input } else { Flow::Output });
             match builtin {
-                Builtin::ToggleMute => commands.toggle_mute(input),
-                Builtin::VolumeUp => commands.step_volume(input, step),
-                _ => commands.step_volume(input, -step),
+                Builtin::ToggleMute => commands.toggle_mute(which),
+                Builtin::VolumeUp => commands.step_volume(which, step),
+                _ => commands.step_volume(which, -step),
             }
-        }
-        // Windows has no audio menu yet: its Settings page stands in.
-        #[cfg(windows)]
-        Action::Builtin(Builtin::OpenAudioMenu) => {
-            crate::settings::open(crate::settings::Page::Sound);
         }
         Action::Builtin(builtin) => {
             tracing::warn!("`{}` is not implemented yet", builtin.name());

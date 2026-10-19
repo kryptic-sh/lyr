@@ -40,9 +40,65 @@ pub fn stepped(scalar: f32, delta: i32) -> f32 {
     (scalar + delta as f32 / 100.0).clamp(0.0, 1.0)
 }
 
+/// A stream's name in the audio menu: "System sounds" for Windows' own,
+/// else the name the session gives itself, else its program's file name
+/// without `.exe`. A session's name can be an indirect resource string
+/// (`@%SystemRoot%\System32\...`), which is not a name to show.
+#[must_use]
+pub fn session_name(system_sounds: bool, display: &str, program: Option<&str>) -> String {
+    if system_sounds {
+        return "System sounds".to_owned();
+    }
+    if !display.is_empty() && !display.starts_with('@') {
+        return display.to_owned();
+    }
+    let Some(program) = program else {
+        return "Unknown".to_owned();
+    };
+    // Split on both separators, so the tests run the same everywhere.
+    let file = program.rsplit(['\\', '/']).next().unwrap_or(program);
+    let stem = file.len().checked_sub(".exe".len()).filter(|&end| {
+        file.get(end..)
+            .is_some_and(|extension| extension.eq_ignore_ascii_case(".exe"))
+    });
+    stem.map_or(file, |end| &file[..end]).to_owned()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{percent, port, stepped};
+    use super::{percent, port, session_name, stepped};
+
+    #[test]
+    fn a_stream_is_named_by_itself_else_by_its_program() {
+        assert_eq!(
+            session_name(true, "@%SystemRoot%\\x.dll,-1", None),
+            "System sounds"
+        );
+        assert_eq!(
+            session_name(false, "Spotify", Some("C:\\x\\Spotify.exe")),
+            "Spotify"
+        );
+        assert_eq!(
+            session_name(
+                false,
+                "",
+                Some("C:\\Program Files\\Mozilla Firefox\\firefox.EXE")
+            ),
+            "firefox"
+        );
+        assert_eq!(
+            session_name(false, "@%SystemRoot%\\x.dll,-1", Some("C:\\x\\app.exe")),
+            "app",
+            "a resource string is not a name"
+        );
+        assert_eq!(session_name(false, "", Some("/opt/tool")), "tool");
+        assert_eq!(
+            session_name(false, "", Some("exe")),
+            "exe",
+            "shorter than the extension"
+        );
+        assert_eq!(session_name(false, "", None), "Unknown");
+    }
 
     #[test]
     fn a_form_factor_is_waybar_s_port_kind() {

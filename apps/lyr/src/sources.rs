@@ -24,6 +24,9 @@ pub enum Update {
         Option<lyr_core::audio::Sink>,
         Option<lyr_core::audio::Source>,
     ),
+    /// What the audio menu lists.
+    #[cfg(windows)]
+    AudioNodes(lyr_core::audio_menu::Nodes),
     /// The power profiles, or `None` when there is none to show.
     #[cfg(any(target_os = "linux", windows))]
     PowerProfile(Option<lyr_sources::power_profile::Profiles>),
@@ -166,6 +169,9 @@ pub struct Commands {
     _power_profile: Option<lyr_sources::power_profile::windows::Watch>,
     #[cfg(windows)]
     audio: std::sync::mpsc::Sender<windows::AudioRequest>,
+    /// Whether the audio source was last told the menu is open.
+    #[cfg(windows)]
+    audio_menu: std::cell::Cell<bool>,
     #[cfg(target_os = "linux")]
     focus: tokio::sync::mpsc::UnboundedSender<lyr_wm::hyprland::Workspace>,
     #[cfg(target_os = "linux")]
@@ -266,17 +272,25 @@ impl Commands {
         }
     }
 
-    /// Windows: mutes or unmutes the default output (`input` false) or input.
+    /// Windows: mutes or unmutes what `which` names.
     #[cfg(windows)]
-    pub fn toggle_mute(&self, input: bool) {
-        let _stopped = self.audio.send(windows::AudioRequest::ToggleMute(input));
+    pub fn toggle_mute(&self, which: lyr_sources::audio::windows::Which) {
+        let _stopped = self.audio.send(windows::AudioRequest::ToggleMute(which));
     }
 
-    /// Windows: moves the default output's or input's volume by `delta`
-    /// percent.
+    /// Windows: moves the volume of what `which` names by `delta` percent.
     #[cfg(windows)]
-    pub fn step_volume(&self, input: bool, delta: i32) {
-        let _stopped = self.audio.send(windows::AudioRequest::Step(input, delta));
+    pub fn step_volume(&self, which: lyr_sources::audio::windows::Which, delta: i32) {
+        let _stopped = self.audio.send(windows::AudioRequest::Step(which, delta));
+    }
+
+    /// Windows: tells the audio source whether the menu is open, when that
+    /// changed.
+    #[cfg(windows)]
+    pub fn audio_menu(&self, open: bool) {
+        if self.audio_menu.replace(open) != open {
+            let _stopped = self.audio.send(windows::AudioRequest::Menu(open));
+        }
     }
 
     /// macOS: the power menu's actions are not built yet (M10).
@@ -362,6 +376,7 @@ pub fn start(
                 _network: network,
                 _power_profile: power_profile,
                 audio,
+                audio_menu: std::cell::Cell::new(false),
             },
         ))
     }
@@ -425,18 +440,27 @@ mod windows {
         .ok())
     }
 
-    /// What the bar asks of the audio endpoints: `true` is the input.
+    /// What the bar asks of the audio source.
     #[derive(Debug)]
     pub(super) enum AudioRequest {
+        /// Something changed: read again.
         Changed,
-        ToggleMute(bool),
-        Step(bool, i32),
+        /// The audio menu opened or closed.
+        Menu(bool),
+        ToggleMute(lyr_sources::audio::windows::Which),
+        Step(lyr_sources::audio::windows::Which, i32),
     }
 
-    /// Hands the default output and input to the main loop now and after
-    /// every change, and carries out what the bar asks of them, on a thread
-    /// in COM's multithreaded apartment. A machine whose audio cannot be read
-    /// logs why, and the modules stay out.
+    /// How often the open audio menu's streams and devices are read again: a
+    /// stream starting or a volume other than the defaults' changing has no
+    /// callback wired here.
+    const MENU_REFRESH: std::time::Duration = std::time::Duration::from_secs(1);
+
+    /// Hands the default output and input, and what the audio menu lists, to
+    /// the main loop now and after every change that alters them, and carries
+    /// out what the bar asks of them, on a thread in COM's multithreaded
+    /// apartment. A machine whose audio cannot be read logs why, and the
+    /// modules stay out.
     ///
     /// # Errors
     ///
@@ -445,7 +469,7 @@ mod windows {
         sender: mpsc::Sender<Update>,
         waker: Option<ShellWaker>,
     ) -> std::io::Result<mpsc::Sender<AudioRequest>> {
-        use lyr_sources::audio::windows::{Audio, Flow, Watch, init};
+        use lyr_sources::audio::windows::{Audio, Watch, init};
         let (requests, incoming) = mpsc::channel();
         let changes = requests.clone();
         std::thread::Builder::new()
@@ -469,10 +493,13 @@ mod windows {
                         None
                     }
                 };
-                let flow = |input| if input { Flow::Input } else { Flow::Output };
                 // The endpoints the callbacks are on, to move them when a
                 // default changes.
                 let mut followed = None;
+                let mut menu = false;
+                // What was last handed over, so only a change wakes the loop.
+                let mut sent = None;
+                let mut sent_nodes = None;
                 loop {
                     let sink = audio
                         .sink()
@@ -494,22 +521,57 @@ mod windows {
                         tracing::warn!("audio: following the new endpoint: {error}");
                     }
                     followed = endpoints;
-                    if sender.send(Update::Audio(sink, source)).is_err() {
-                        break;
+                    let mut changed = false;
+                    let readings = Some((sink, source));
+                    if readings != sent {
+                        sent = readings;
+                        if let Some((sink, source)) = sent.clone()
+                            && sender.send(Update::Audio(sink, source)).is_err()
+                        {
+                            break;
+                        }
+                        changed = true;
                     }
-                    if let Some(waker) = &waker {
+                    let nodes = audio
+                        .nodes()
+                        .inspect_err(|error| tracing::warn!("audio: the menu's rows: {error}"))
+                        .ok();
+                    if nodes.is_some() && nodes != sent_nodes {
+                        sent_nodes = nodes;
+                        if let Some(nodes) = sent_nodes.clone()
+                            && sender.send(Update::AudioNodes(nodes)).is_err()
+                        {
+                            break;
+                        }
+                        changed = true;
+                    }
+                    if changed && let Some(waker) = &waker {
                         waker.wake();
                     }
                     // A request changes the volume, which comes back as a
-                    // change; a run of changes reads once.
-                    let Ok(request) = incoming.recv() else {
-                        break;
+                    // change; a run of changes reads once. While the menu is
+                    // open, a quiet second reads again too.
+                    let request = if menu {
+                        match incoming.recv_timeout(MENU_REFRESH) {
+                            Ok(request) => request,
+                            Err(mpsc::RecvTimeoutError::Timeout) => AudioRequest::Changed,
+                            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                        }
+                    } else {
+                        let Ok(request) = incoming.recv() else {
+                            break;
+                        };
+                        request
                     };
                     for request in std::iter::once(request).chain(incoming.try_iter()) {
                         let done = match request {
                             AudioRequest::Changed => Ok(()),
-                            AudioRequest::ToggleMute(input) => audio.toggle_mute(flow(input)),
-                            AudioRequest::Step(input, delta) => audio.step(flow(input), delta),
+                            AudioRequest::Menu(open) => {
+                                menu = open;
+                                Ok(())
+                            }
+                            AudioRequest::ToggleMute(which) => audio.toggle_mute(&which),
+                            AudioRequest::Step(which, delta) => audio.step(&which, delta),
                         };
                         if let Err(error) = done {
                             tracing::warn!("audio: {error}");

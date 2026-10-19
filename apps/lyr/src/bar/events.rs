@@ -53,6 +53,13 @@ impl App {
             return self.wifi_event(shell, event);
         }
         if self
+            .audio_menu
+            .as_ref()
+            .is_some_and(|menu| event.window().is_some_and(|window| menu.owns(window)))
+        {
+            return self.audio_event(shell, event);
+        }
+        if self
             .tray_menu
             .as_ref()
             .is_some_and(|menu| event.window().is_some_and(|window| menu.owns(window)))
@@ -183,6 +190,7 @@ impl App {
                 let mut toggle_panel = false;
                 let mut bluetooth_at = None;
                 let mut wifi_at = None;
+                let mut audio_at = None;
                 let mut tray_press = None;
                 for press in presses {
                     let Some(target) = window.pointer.target(&window.regions) else {
@@ -214,6 +222,23 @@ impl App {
                     }
                     if opens == Some(Builtin::OpenBluetoothMenu) {
                         bluetooth_at = window.regions.rect(target).map(|rect| f64::from(rect.x));
+                        continue;
+                    }
+                    if opens == Some(Builtin::OpenAudioMenu) {
+                        // The mic's opens on the input devices, the
+                        // volume's on the output devices.
+                        let tab = if matches!(
+                            target,
+                            lyr_core::draw::Target::Module(lyr_config::Module::Mic)
+                        ) {
+                            lyr_core::audio_menu::Tab::Input
+                        } else {
+                            lyr_core::audio_menu::Tab::Output
+                        };
+                        audio_at = window
+                            .regions
+                            .rect(target)
+                            .map(|rect| (f64::from(rect.x), tab));
                         continue;
                     }
                     if opens == Some(Builtin::OpenWifiMenu) {
@@ -254,6 +279,11 @@ impl App {
                     && let Err(why) = self.toggle_bluetooth_menu(shell, left)?
                 {
                     tracing::warn!("open_bluetooth_menu: {why}");
+                }
+                if let Some((left, tab)) = audio_at
+                    && let Err(why) = self.toggle_audio_menu(shell, left, tab)?
+                {
+                    tracing::warn!("open_audio_menu: {why}");
                 }
                 if let Some((rect, index, press)) = tray_press {
                     self.tray_press(id, rect, index, press);

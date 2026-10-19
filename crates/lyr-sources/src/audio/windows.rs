@@ -5,7 +5,9 @@
 //! either default endpoint (`IMMNotificationClient`) or of its volume
 //! (`IAudioEndpointVolumeCallback`); its callbacks only signal, and the
 //! caller reads, on a thread that has joined COM's multithreaded apartment
-//! ([`init`]).
+//! ([`init`]). [`menu`] reads what the audio menu lists.
+
+mod menu;
 
 use std::io;
 use std::sync::Arc;
@@ -18,14 +20,14 @@ use windows::Win32::Media::Audio::Endpoints::{
 };
 use windows::Win32::Media::Audio::{
     AUDIO_VOLUME_NOTIFICATION_DATA, DEVICE_STATE, EDataFlow, ERole, IMMDevice, IMMDeviceEnumerator,
-    IMMNotificationClient, IMMNotificationClient_Impl, MMDeviceEnumerator,
+    IMMNotificationClient, IMMNotificationClient_Impl, ISimpleAudioVolume, MMDeviceEnumerator,
     PKEY_AudioEndpoint_FormFactor, eCapture, eConsole, eRender,
 };
 use windows::Win32::System::Com::StructuredStorage::PROPVARIANT;
 use windows::Win32::System::Com::{
     CLSCTX_ALL, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx, CoTaskMemFree, STGM_READ,
 };
-use windows::core::{HRESULT, PCWSTR, implement};
+use windows::core::{HRESULT, HSTRING, PCWSTR, PWSTR, implement};
 
 use super::win32::{percent, port, stepped};
 
@@ -56,6 +58,71 @@ impl Flow {
             Self::Output => eRender,
             Self::Input => eCapture,
         }
+    }
+}
+
+/// What a mute or a step acts on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Which {
+    /// The default endpoint for a flow: the volume or the mic module's.
+    Default(Flow),
+    /// An endpoint, by its id.
+    Device(String),
+    /// A stream on one of `flow`'s endpoints, by its session's instance id.
+    Stream(Flow, String),
+}
+
+/// A volume control: an endpoint's or a stream's.
+enum Control {
+    Endpoint(IAudioEndpointVolume),
+    Stream(ISimpleAudioVolume),
+}
+
+impl Control {
+    /// The scalar volume, 0 – 1, and whether it is muted.
+    fn read(&self) -> io::Result<(f32, bool)> {
+        // SAFETY: plain reads.
+        let read = unsafe {
+            match self {
+                Self::Endpoint(volume) => volume
+                    .GetMasterVolumeLevelScalar()
+                    .and_then(|scalar| Ok((scalar, volume.GetMute()?.as_bool()))),
+                Self::Stream(volume) => volume
+                    .GetMasterVolume()
+                    .and_then(|scalar| Ok((scalar, volume.GetMute()?.as_bool()))),
+            }
+        };
+        read.map_err(io::Error::other)
+    }
+
+    /// The volume as the percent the views show, and whether it is muted.
+    fn shown(&self) -> io::Result<(u32, bool)> {
+        let (scalar, muted) = self.read()?;
+        Ok((percent(scalar), muted))
+    }
+
+    fn set_mute(&self, muted: bool) -> io::Result<()> {
+        // SAFETY: plain values; no event context.
+        let set = unsafe {
+            match self {
+                Self::Endpoint(volume) => volume.SetMute(muted, std::ptr::null()),
+                Self::Stream(volume) => volume.SetMute(muted, std::ptr::null()),
+            }
+        };
+        set.map_err(io::Error::other)
+    }
+
+    fn set_scalar(&self, scalar: f32) -> io::Result<()> {
+        // SAFETY: plain values; no event context.
+        let set = unsafe {
+            match self {
+                Self::Endpoint(volume) => {
+                    volume.SetMasterVolumeLevelScalar(scalar, std::ptr::null())
+                }
+                Self::Stream(volume) => volume.SetMasterVolume(scalar, std::ptr::null()),
+            }
+        };
+        set.map_err(io::Error::other)
     }
 }
 
@@ -95,9 +162,25 @@ impl Audio {
         let Some(device) = self.device(flow)? else {
             return Ok(None);
         };
-        // SAFETY: no activation parameters.
-        let volume = unsafe { device.Activate(CLSCTX_ALL, None) }.map_err(io::Error::other)?;
+        let volume = volume(&device)?;
         Ok(Some((device, volume)))
+    }
+
+    /// The volume control `which` names.
+    fn control(&self, which: &Which) -> io::Result<Control> {
+        match which {
+            Which::Default(flow) => self
+                .endpoint(*flow)?
+                .map(|(_, volume)| Control::Endpoint(volume))
+                .ok_or_else(|| io::Error::other("no endpoint")),
+            Which::Device(id) => {
+                // SAFETY: the id is a string that lives across the call.
+                let device = unsafe { self.enumerator.GetDevice(&HSTRING::from(id.as_str())) }
+                    .map_err(io::Error::other)?;
+                Ok(Control::Endpoint(volume(&device)?))
+            }
+            Which::Stream(flow, id) => Ok(Control::Stream(self.stream(*flow, id)?)),
+        }
     }
 
     /// The default output, as the volume module reads it.
@@ -112,7 +195,7 @@ impl Audio {
         let form_factor = property(&device, &PKEY_AudioEndpoint_FormFactor)
             .and_then(|value| u32::try_from(&value).ok())
             .unwrap_or_default();
-        let (level, muted) = level(&volume)?;
+        let (level, muted) = Control::Endpoint(volume).shown()?;
         Ok(Some(Sink {
             volume: level,
             muted,
@@ -137,7 +220,7 @@ impl Audio {
         let Some((device, volume)) = self.endpoint(Flow::Input)? else {
             return Ok(None);
         };
-        let (level, muted) = level(&volume)?;
+        let (level, muted) = Control::Endpoint(volume).shown()?;
         Ok(Some(Source {
             volume: level,
             muted,
@@ -145,58 +228,33 @@ impl Audio {
         }))
     }
 
-    /// Mutes the default endpoint for `flow`, or unmutes it.
+    /// Mutes what `which` names, or unmutes it.
     ///
     /// # Errors
     ///
-    /// When there is no such endpoint or it refuses.
-    pub fn toggle_mute(&self, flow: Flow) -> io::Result<()> {
-        let (_, volume) = self
-            .endpoint(flow)?
-            .ok_or_else(|| io::Error::other("no endpoint"))?;
-        // SAFETY: plain values; no event context.
-        unsafe {
-            let muted = volume.GetMute().map_err(io::Error::other)?.as_bool();
-            volume
-                .SetMute(!muted, std::ptr::null())
-                .map_err(io::Error::other)
-        }
+    /// When there is no such endpoint or stream, or it refuses.
+    pub fn toggle_mute(&self, which: &Which) -> io::Result<()> {
+        let control = self.control(which)?;
+        let (_, muted) = control.read()?;
+        control.set_mute(!muted)
     }
 
-    /// Moves the default endpoint for `flow`'s volume by `delta` percent.
+    /// Moves the volume of what `which` names by `delta` percent.
     ///
     /// # Errors
     ///
-    /// When there is no such endpoint or it refuses.
-    pub fn step(&self, flow: Flow, delta: i32) -> io::Result<()> {
-        let (_, volume) = self
-            .endpoint(flow)?
-            .ok_or_else(|| io::Error::other("no endpoint"))?;
-        // SAFETY: plain values; no event context.
-        unsafe {
-            let scalar = volume
-                .GetMasterVolumeLevelScalar()
-                .map_err(io::Error::other)?;
-            volume
-                .SetMasterVolumeLevelScalar(stepped(scalar, delta), std::ptr::null())
-                .map_err(io::Error::other)
-        }
+    /// When there is no such endpoint or stream, or it refuses.
+    pub fn step(&self, which: &Which, delta: i32) -> io::Result<()> {
+        let control = self.control(which)?;
+        let (scalar, _) = control.read()?;
+        control.set_scalar(stepped(scalar, delta))
     }
 }
 
-/// An endpoint's volume as a percent, and whether it is muted.
-fn level(volume: &IAudioEndpointVolume) -> io::Result<(u32, bool)> {
-    // SAFETY: plain reads.
-    unsafe {
-        Ok((
-            percent(
-                volume
-                    .GetMasterVolumeLevelScalar()
-                    .map_err(io::Error::other)?,
-            ),
-            volume.GetMute().map_err(io::Error::other)?.as_bool(),
-        ))
-    }
+/// An endpoint's volume control.
+fn volume(device: &IMMDevice) -> io::Result<IAudioEndpointVolume> {
+    // SAFETY: no activation parameters.
+    unsafe { device.Activate(CLSCTX_ALL, None) }.map_err(io::Error::other)
 }
 
 /// A device's property, `None` when it has no such property.
@@ -212,12 +270,18 @@ fn name(device: &IMMDevice) -> String {
 
 /// A device's endpoint id.
 fn id(device: &IMMDevice) -> Option<String> {
-    // SAFETY: the id is a string COM allocated, read once and freed once.
+    // SAFETY: a plain read; `take` frees the string.
+    take(unsafe { device.GetId() }.ok()?)
+}
+
+/// A string COM allocated for the caller, read and then freed.
+fn take(text: PWSTR) -> Option<String> {
+    // SAFETY: COM hands over a terminated string, freed here once, after it
+    // was read.
     unsafe {
-        let id = device.GetId().ok()?;
-        let text = id.to_string().ok();
-        CoTaskMemFree(Some(id.0.cast_const().cast()));
-        text
+        let read = text.to_string().ok();
+        CoTaskMemFree(Some(text.0.cast_const().cast()));
+        read
     }
 }
 
@@ -378,7 +442,7 @@ impl Drop for Watch {
 
 #[cfg(test)]
 mod tests {
-    use super::{Audio, Watch, init};
+    use super::{Audio, Flow, Watch, Which, init};
 
     #[test]
     fn this_machine_s_endpoints_read_and_a_watch_registers() {
@@ -397,6 +461,60 @@ mod tests {
         assert_eq!(
             watch.endpoints.len(),
             usize::from(sink.is_some()) + usize::from(source.is_some())
+        );
+    }
+
+    /// Steps by 0 % through every kind of control, which finds each by its
+    /// id and sets the volume it already has, so the machine's volume stays
+    /// as it was.
+    #[test]
+    fn the_menu_s_nodes_read_and_each_finds_its_control() {
+        init().expect("in the multithreaded apartment");
+        let audio = Audio::new().expect("the enumerator");
+        let nodes = audio.nodes().expect("the nodes read");
+        let sink = audio.sink().expect("the output answers");
+        let defaults = nodes.outputs.iter().filter(|node| node.default).count();
+        assert_eq!(defaults, usize::from(sink.is_some()), "one default output");
+        if let Some(sink) = &sink {
+            let default = nodes.outputs.iter().find(|node| node.default);
+            assert_eq!(default.map(|node| &node.id), Some(&sink.name));
+        }
+        let mut stepped = 0;
+        for (which, before) in nodes
+            .outputs
+            .iter()
+            .chain(&nodes.inputs)
+            .map(|node| (Which::Device(node.id.clone()), node.volume))
+            .chain(
+                nodes
+                    .playback
+                    .iter()
+                    .map(|node| (Which::Stream(Flow::Output, node.id.clone()), node.volume)),
+            )
+        {
+            audio.step(&which, 0).expect("found and set");
+            stepped += 1;
+            let after = audio.nodes().expect("the nodes read");
+            let now = after
+                .outputs
+                .iter()
+                .chain(&after.inputs)
+                .chain(&after.playback)
+                .find(|node| match &which {
+                    Which::Device(id) | Which::Stream(_, id) => node.id == *id,
+                    Which::Default(_) => false,
+                })
+                .map(|node| node.volume);
+            assert_eq!(now, Some(before), "{which:?}");
+        }
+        assert_eq!(
+            stepped,
+            nodes.outputs.len() + nodes.inputs.len() + nodes.playback.len()
+        );
+        assert!(
+            audio
+                .step(&Which::Stream(Flow::Output, "no such stream".to_owned()), 0)
+                .is_err()
         );
     }
 }

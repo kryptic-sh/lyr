@@ -14,6 +14,7 @@
 //! (`docs/plan/15-milestones.md`).
 
 pub mod audio;
+pub mod audio_menu;
 pub mod battery;
 pub mod bell;
 pub mod bluetooth;

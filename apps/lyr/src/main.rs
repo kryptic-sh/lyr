@@ -4,6 +4,7 @@
 //! to the running bar over its control socket ([`control`]). See `docs/plan/`
 //! for the design and `docs/plan/15-milestones.md` for the build order.
 
+mod audio_menu;
 mod bar;
 mod bluetooth_menu;
 mod clock_panel;

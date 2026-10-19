@@ -73,20 +73,26 @@ impl App {
                     Err(why) => incoming.reply(format!("error: {why}")),
                 }
             }
-            // Windows has no audio menu yet: its Settings page stands in.
-            #[cfg(windows)]
             Request::Panel(Panel::Audio) => {
-                crate::settings::open(crate::settings::Page::Sound);
-                incoming.reply(control::OK);
+                // Under the volume module where a bar shows it, else at the
+                // edge.
+                let left = self
+                    .windows
+                    .values()
+                    .find_map(|window| {
+                        window
+                            .regions
+                            .rect(&lyr_core::draw::Target::Module(lyr_config::Module::Volume))
+                    })
+                    .map_or(crate::toasts::EDGE_MARGIN, |rect| f64::from(rect.x));
+                match self.toggle_audio_menu(shell, left, lyr_core::audio_menu::Tab::Output)? {
+                    Ok(()) => incoming.reply(control::OK),
+                    Err(why) => incoming.reply(format!("error: {why}")),
+                }
             }
             request @ (Request::Dnd | Request::Clear) => {
                 let reply = self.notifications(request);
                 incoming.reply(reply);
-            }
-            // The audio menu, which Windows' Settings stands in for there.
-            #[cfg(not(windows))]
-            other => {
-                incoming.reply(format!("error: `{other}` is not implemented yet"));
             }
         }
         Ok(false)

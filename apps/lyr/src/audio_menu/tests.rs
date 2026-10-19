@@ -1,0 +1,140 @@
+use crcbl_shell::{
+    ButtonState, HeadlessShell, KeyCode, PhysicalPoint, PointerButton, Shell, ShellEvent,
+};
+use lyr_config::{Platform, Theme, from_sources};
+use lyr_core::audio_menu::{self, Node, Nodes, Step, Tab, Target};
+
+use super::{Action, AudioMenu, Outcome};
+use crate::tooltips::Look;
+
+/// Every character is 10 px wide.
+fn measure(text: &str) -> f32 {
+    text.chars().count() as f32 * 10.0
+}
+
+const LINE: f32 = 20.0;
+
+fn node(name: &str, default: bool) -> Node {
+    Node {
+        id: name.to_lowercase(),
+        name: name.to_owned(),
+        volume: 50,
+        muted: false,
+        default,
+    }
+}
+
+fn nodes() -> Nodes {
+    Nodes {
+        playback: vec![node("Firefox", false)],
+        recording: Vec::new(),
+        outputs: vec![node("Speakers", true), node("Headphones", false)],
+        inputs: vec![node("Microphone", true)],
+    }
+}
+
+struct Setup {
+    shell: HeadlessShell,
+    theme: Theme,
+    menu: AudioMenu,
+}
+
+impl Setup {
+    /// Clicks the middle of `target` as the menu draws `tab`, and returns
+    /// the last outcome of the events that queued, sizing ones left out
+    /// (they open a GPU surface).
+    fn click(&mut self, tab: Tab, target: Target) -> Outcome {
+        let (_, _, regions) = audio_menu::draw(&nodes(), tab, None, &measure, LINE, &self.theme);
+        let rect = regions.rect(&target).expect("drawn");
+        let at = PhysicalPoint {
+            x: f64::from(rect.x + rect.width / 2.0),
+            y: f64::from(rect.y + rect.height / 2.0),
+        };
+        let window = self.menu.panel.window();
+        self.shell
+            .move_pointer(window, at, (0.0, 0.0))
+            .expect("moved");
+        self.shell
+            .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
+            .expect("clicked");
+        self.pump()
+    }
+
+    fn pump(&mut self) -> Outcome {
+        let mut events = Vec::new();
+        self.shell.pump(&mut |event| events.push(event));
+        let mut outcome = Outcome::Kept;
+        for event in events.iter().filter(|event| {
+            !matches!(
+                event,
+                ShellEvent::Resized { .. } | ShellEvent::ScaleFactorChanged { .. }
+            )
+        }) {
+            outcome = self.menu.event(&mut self.shell, event).expect("applied");
+        }
+        outcome
+    }
+
+    fn refresh(&mut self) {
+        let theme = self.theme.clone();
+        let look = Look {
+            theme: &theme,
+            measure: &measure,
+            measure_in: &|text, _| measure(text),
+            line_height: LINE,
+            calendar_line_height: LINE,
+        };
+        self.menu
+            .refresh(&mut self.shell, &look, &nodes())
+            .expect("refreshed");
+    }
+}
+
+fn setup(tab: Tab) -> Setup {
+    let mut shell = HeadlessShell::new();
+    let theme = from_sources(None, Platform::Windows)
+        .expect("the defaults")
+        .theme;
+    let look = Look {
+        theme: &theme,
+        measure: &measure,
+        measure_in: &|text, _| measure(text),
+        line_height: LINE,
+        calendar_line_height: LINE,
+    };
+    let menu = AudioMenu::open(&mut shell, 16.0, &look, &nodes(), tab).expect("opened");
+    Setup { shell, theme, menu }
+}
+
+#[test]
+fn a_row_s_button_is_the_caller_s_by_its_id_and_escape_closes() {
+    let mut setup = setup(Tab::Output);
+    assert_eq!(
+        setup.click(Tab::Output, Target::Default(1)),
+        Outcome::Act(Tab::Output, "headphones".to_owned(), Action::Default)
+    );
+    assert_eq!(
+        setup.click(Tab::Output, Target::Step(0, Step::Up)),
+        Outcome::Act(Tab::Output, "speakers".to_owned(), Action::Step(Step::Up))
+    );
+    let window = setup.menu.panel.window();
+    setup
+        .shell
+        .key_press(window, KeyCode::Escape)
+        .expect("a key");
+    assert_eq!(setup.pump(), Outcome::Close);
+}
+
+#[test]
+fn a_tab_shows_its_rows() {
+    let mut setup = setup(Tab::Output);
+    assert_eq!(
+        setup.click(Tab::Output, Target::Tab(Tab::Input)),
+        Outcome::Redraw
+    );
+    setup.refresh();
+    assert_eq!(
+        setup.click(Tab::Input, Target::Mute(0)),
+        Outcome::Act(Tab::Input, "microphone".to_owned(), Action::Mute)
+    );
+}

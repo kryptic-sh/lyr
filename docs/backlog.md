@@ -469,14 +469,31 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (2026-10-20): the bar showed the output at 40 % and the input at 100 %. The
   mute and volume clicks have not been run (they change this machine's real
   volume), and a Bluetooth endpoint is not told apart (`Sink::bluetooth` is
-  false). The Wi-Fi, Bluetooth and audio menus open Windows' Settings pages in
-  their place (`apps/lyr/src/settings.rs`, `ms-settings:network`, `:bluetooth`,
-  `:sound` through `cmd /C start`), from their bindings and from `lyr panel`;
-  run on Windows (2026-10-20), `lyr panel audio` and `lyr panel bluetooth`
-  brought up a Settings window, though which page it showed was not seen (it
-  opened behind the terminal). Not built: the other Windows sources (Bluetooth,
-  workspaces, both waiting on the owner's questions above) and the native menus
-  plan 10 names; macOS's `x-apple.systempreferences:` fallbacks wait on M10.
+  false). The Wi-Fi and Bluetooth menus open Windows' Settings pages in their
+  place (`apps/lyr/src/settings.rs`, `ms-settings:network` and `:bluetooth`
+  through `cmd /C start`), from their bindings and from `lyr panel`; run on
+  Windows (2026-10-20), `lyr panel bluetooth` brought up a Settings window,
+  though which page it showed was not seen (it opened behind the terminal). The
+  audio menu is native on Windows (`lyr_core::audio_menu`,
+  `apps/lyr/src/audio_menu.rs`, `lyr_sources::audio::windows::menu`): tabs for
+  playback and recording streams (WASAPI's audio sessions on every active
+  endpoint, named by the session, else its program's file name,
+  `audio::win32::session_name`) and output and input devices, each row with
+  mute, a step down and up by the module's `scroll_step`, and on a device that
+  is not the default a Default button, which opens `ms-settings:sound` since
+  Windows has no public API for setting it. The source re-reads the rows on each
+  endpoint change and once a second while the menu is open, since session
+  changes have no callbacks wired. Run on Windows (2026-10-20):
+  `lyr panel audio` opened it listing this machine's four output devices, the
+  default in the active colour; it opened under the volume module and ran off
+  the screen's right edge, which the panel placement fix that followed
+  addresses. Each control's lookup was tested by a 0 % step on every device and
+  stream; no row's button has been clicked on the real machine, since each
+  changes its real volume. Not built: a slider (plan 10's), wiremix's card
+  configuration tab, and routing a stream to another device (no public API on
+  Windows). Not built: the other Windows sources (Bluetooth, workspaces, both
+  waiting on the owner's questions above) and the native menus plan 10 names;
+  macOS's `x-apple.systempreferences:` fallbacks wait on M10.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace
@@ -522,9 +539,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   back). `lyr dnd` and `lyr clear` act on the notification daemon on Linux and
   answer that lyr is not the daemon elsewhere. `lyr panel clock`,
   `lyr panel bluetooth` and `lyr panel wifi` open their panels;
-  `lyr panel audio` answers "not implemented yet" (M7), except on Windows, where
-  it opens the Sound Settings page. Not built: `lyr event workspace` for
-  AeroSpace (M10).
+  `lyr panel audio` opens the audio menu on Windows and answers that there is no
+  audio source elsewhere (M7). Not built: `lyr event workspace` for AeroSpace
+  (M10).
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]`, `[theme]` and every module's table, the
   embedded defaults, `[platform.*]` layering on both the defaults and the user
