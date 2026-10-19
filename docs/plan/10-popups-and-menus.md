@@ -39,9 +39,15 @@ the empty desktop. M5 tries that first and records what Hyprland does.
 ## Tooltips
 
 Every module has one except notifications, which waybar's config turns off
-(`"tooltip": false`). The text comes from the module's tooltip format, and it
-shows after the platform's hover delay. The theme matches waybar's `tooltip`
-block: background `#1e1e2e`, text `#cdd6f4`.
+(`"tooltip": false`). The text comes from the module's tooltip format. It is
+timed as GTK 3 times waybar's (`gtktooltip.c` at 3.24.43): it shows after 500 ms
+on a module, and for 500 ms after one hides, the next shows after 60 ms, so
+running the pointer along the bar shows each in turn; a click hides it
+(`lyr_core::tooltip`). The theme matches waybar's `tooltip` block: background
+`#1e1e2e`, text `#cdd6f4`; square, with no border, because waybar's
+`* { border: none; border-radius: 0 }` reaches it; and 8 px around the text,
+Adwaita's `tooltip * { padding: 4px }` on both the tooltip's box and its label.
+Adwaita's `text-shadow: 0 1px black` is not carried.
 
 The clock's tooltip is no longer the calendar, which moved into the clock panel.
 It names the time zone and its offset (`Asia/Manila, UTC+08:00`).

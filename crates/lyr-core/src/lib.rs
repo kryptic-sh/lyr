@@ -28,3 +28,4 @@ pub mod network;
 pub mod notifications;
 pub mod pointer;
 pub mod power_profile;
+pub mod tooltip;
