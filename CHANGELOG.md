@@ -18,6 +18,9 @@ and this project adheres to
   its address and, on Wi-Fi, the network's name and signal), Bluetooth (from
   BlueZ, with a connected device's battery) and the Hyprland workspaces. The
   other modules are not drawn yet.
+- On Windows the power-profile module shows Windows' power mode (Best power
+  efficiency, Balanced, Best performance and the rest), updated when it changes;
+  switching it from the bar is not built there yet.
 - On Windows the network module shows the interface with the default route, its
   address and, on Wi-Fi, the network's name and signal, updated as they change.
 - On Windows the battery module shows the battery, from Windows' power status,

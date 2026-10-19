@@ -419,8 +419,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked, the calls on this machine; run in the bar on Windows
   (2026-10-20), its tooltip read `Ethernet 192.168.68.54/22`. Wi-Fi has not been
   seen, this machine being wired, and the radio's on-off state is not read
-  (`radio_blocked` is always false). Not built: the other Windows sources (power
-  profile, Bluetooth, volume, workspaces) and menus.
+  (`radio_blocked` is always false). The power profile too
+  (`lyr_sources::power_profile::windows`): the effective power mode, reported by
+  `PowerRegisterForEffectivePowerModeNotifications` (documented, Windows 10 1809
+  and later) when registered and at each change, mapped onto
+  power-profiles-daemon's three names with Windows' own mode name as the
+  tooltip's driver (`power_profile::win32`); run on Windows (2026-10-20), its
+  tooltip read "Profile: balanced / Driver: Balanced". Switching it, which the
+  clicks do on Linux, is undocumented on Windows (plan 16's question 13) and not
+  built: a click there logs that `cycle_profile` is not implemented. Not built:
+  the other Windows sources (Bluetooth, volume, workspaces) and menus.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace

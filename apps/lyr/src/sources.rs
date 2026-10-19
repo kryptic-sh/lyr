@@ -18,8 +18,8 @@ pub enum Update {
     /// The battery, or `None` when there is none to show.
     #[cfg(any(target_os = "linux", windows))]
     Battery(Option<lyr_core::battery::Reading>),
-    /// The power profiles, or `None` when the daemon lists none.
-    #[cfg(target_os = "linux")]
+    /// The power profiles, or `None` when there is none to show.
+    #[cfg(any(target_os = "linux", windows))]
     PowerProfile(Option<lyr_sources::power_profile::Profiles>),
     /// The network's reading (NetworkManager's on Linux, IP Helper's on
     /// Windows), or `None` before the first.
@@ -156,6 +156,8 @@ pub struct Commands {
     _battery: Option<lyr_sources::battery::windows::Watch>,
     #[cfg(windows)]
     _network: Option<lyr_sources::network::windows::Watch>,
+    #[cfg(windows)]
+    _power_profile: Option<lyr_sources::power_profile::windows::Watch>,
     #[cfg(target_os = "linux")]
     focus: tokio::sync::mpsc::UnboundedSender<lyr_wm::hyprland::Workspace>,
     #[cfg(target_os = "linux")]
@@ -329,12 +331,14 @@ pub fn start(
     #[cfg(windows)]
     {
         let network = windows::network(sender.clone(), waker.clone())?;
+        let power_profile = windows::power_profile(sender.clone(), waker.clone());
         let battery = windows::battery(sender, waker);
         Ok((
             receiver,
             Commands {
                 _battery: battery,
                 _network: network,
+                _power_profile: power_profile,
             },
         ))
     }
@@ -345,7 +349,8 @@ pub fn start(
     }
 }
 
-/// The sources Windows has so far: the battery and the network.
+/// The sources Windows has so far: the battery, the network and the power
+/// profile.
 #[cfg(windows)]
 mod windows {
     use std::sync::mpsc;
@@ -395,6 +400,31 @@ mod windows {
         })
         .inspect_err(|error| tracing::warn!("network: changes will not show: {error}"))
         .ok())
+    }
+
+    /// Hands the effective power mode to the main loop when registered and at
+    /// each change, while the returned watch lives; `None` when Windows refuses
+    /// (before 1809), which it logs, and the module stays out. Switching the
+    /// mode is not built, so the profile has nothing to cycle through.
+    pub(super) fn power_profile(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+    ) -> Option<lyr_sources::power_profile::windows::Watch> {
+        use lyr_sources::power_profile::Profiles;
+        use lyr_sources::power_profile::win32::profile;
+        lyr_sources::power_profile::windows::Watch::new(move |mode| {
+            let profiles = profile(mode).map(|active| Profiles {
+                active,
+                available: Vec::new(),
+            });
+            // The main loop has gone when this fails: nothing is left to do.
+            let _gone = sender.send(Update::PowerProfile(profiles));
+            if let Some(waker) = &waker {
+                waker.wake();
+            }
+        })
+        .inspect_err(|error| tracing::warn!("power profile: {error}"))
+        .ok()
     }
 
     /// The battery reading now, `None` with no battery or when Windows cannot

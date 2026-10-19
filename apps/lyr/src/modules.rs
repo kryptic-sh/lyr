@@ -19,7 +19,7 @@ use crate::sources::Update;
 #[derive(Default)]
 pub struct Data {
     pub battery: Option<Reading>,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     pub power_profile: Option<lyr_sources::power_profile::Profiles>,
     #[cfg(any(target_os = "linux", windows))]
     pub network: Option<lyr_core::network::Reading>,
@@ -86,7 +86,7 @@ impl Data {
         match update {
             #[cfg(any(target_os = "linux", windows))]
             Update::Battery(reading) => self.battery = reading,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", windows))]
             Update::PowerProfile(profiles) => self.power_profile = profiles,
             #[cfg(any(target_os = "linux", windows))]
             Update::Network(reading) => self.network = reading,
@@ -228,7 +228,7 @@ fn content(
             };
             Some(label(shown.text, colour))
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", windows))]
         Module::PowerProfile => {
             let profiles = data.power_profile.as_ref()?;
             let shown = lyr_core::power_profile::view(&profiles.active, &config.power_profile);
@@ -326,7 +326,7 @@ pub fn tooltip(
             Some(clock::view(now, zone(data).as_deref(), &config.clock.format).tooltip)
         }
         Module::Battery => Some(battery::view(data.battery.as_ref()?, &config.battery).tooltip),
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", windows))]
         Module::PowerProfile => Some(
             lyr_core::power_profile::view(
                 &data.power_profile.as_ref()?.active,

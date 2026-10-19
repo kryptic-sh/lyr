@@ -1,13 +1,17 @@
 //! The power-profile module's source (`docs/plan/07-modules.md#power-profile`).
 //!
 //! [`Profiles`] turns power-profiles-daemon's properties into what the view
-//! and the click need, on every platform's tests; [`linux`] reads them over
-//! D-Bus. Windows and macOS come with milestones M9 and M10.
+//! and the click need, and [`win32`] Windows' effective power mode into a
+//! profile, on every platform's tests; [`linux`] reads the daemon over
+//! D-Bus, and [`windows`] the power mode. macOS comes with milestone M10.
 
 use lyr_core::power_profile::Profile;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
+pub mod win32;
+#[cfg(windows)]
+pub mod windows;
 
 /// One entry of the daemon's `Profiles` property: its `Profile` and `Driver`
 /// keys.
