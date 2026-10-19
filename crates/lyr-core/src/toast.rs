@@ -3,8 +3,9 @@
 //! dotfiles' `config.json` and `style.css`.
 //!
 //! Drawn so far: the summary over the body, when it arrived, the border
-//! coloured by urgency. Not yet: the close button, action buttons, images, body
-//! markup (lyr advertises no `body-markup`, so applications send plain text).
+//! coloured by urgency, and a button per action. Not yet: the close button,
+//! images, and body markup (lyr advertises no `body-markup`, so applications
+//! send plain text).
 
 pub mod stack;
 
@@ -27,6 +28,13 @@ pub const RADIUS: f32 = 8.0;
 /// From the border to the text: the toast's 8 px padding and its content's
 /// 7 px inset.
 pub const INSET: f32 = 8.0 + 7.0;
+/// Around an action button's label: swaync's 8 px padding.
+pub const BUTTON_PADDING: f32 = 8.0;
+/// Around an action button: swaync's 4 px margin.
+pub const BUTTON_MARGIN: f32 = 4.0;
+/// The action a click on the body invokes, which gets no button.
+pub const DEFAULT_ACTION: &str = "default";
+
 /// The least space between the summary and the time beside it, which cuts a
 /// long summary short: lyr's own, since swaync ellipsizes instead.
 pub const TIME_GAP: f32 = 8.0;
@@ -75,8 +83,13 @@ pub fn relative_time(elapsed: Duration) -> String {
 
 /// The toast for `content`, which arrived `elapsed` ago, `width` wide (a
 /// toast is [`WIDTH`]; the clock panel's history is as wide as the panel):
-/// its draw list and its size, its text measured by `measure` in lines
+/// its draw list, its size, and its action buttons' rects by the action's
+/// index in `content.actions`, its text measured by `measure` in lines
 /// `line_height` tall.
+///
+/// The buttons share a row under the body, as swaync's do, at the bar's
+/// text size: swaync's `font-size: 0.2rem` is one of the slips plan 09 asks
+/// the owner about.
 #[must_use]
 pub fn draw(
     content: &Incoming,
@@ -85,13 +98,27 @@ pub fn draw(
     measure: impl Fn(&str) -> f32,
     line_height: f32,
     theme: &Theme,
-) -> (DrawList, Size) {
+) -> (DrawList, Size, Vec<(usize, Rect)>) {
     let text_width = width - 2.0 * (BORDER + INSET);
     let mut lines = vec![content.summary.clone()];
     lines.extend(wrap(&content.body, text_width, &measure));
+    let actions: Vec<(usize, &str)> = content
+        .actions
+        .iter()
+        .enumerate()
+        .filter(|(_, (key, _))| key != DEFAULT_ACTION)
+        .map(|(index, (_, label))| (index, label.as_str()))
+        .collect();
+    let button_height = line_height + 2.0 * (BUTTON_PADDING + BORDER);
+    let buttons_height = if actions.is_empty() {
+        0.0
+    } else {
+        button_height + 2.0 * BUTTON_MARGIN
+    };
+    let text_bottom = BORDER + INSET + line_height * lines.len() as f32;
     let size = Size {
         width,
-        height: 2.0 * (BORDER + INSET) + line_height * lines.len() as f32,
+        height: text_bottom + buttons_height + BORDER + INSET,
     };
     let border = match content.urgency {
         Urgency::Low => theme.toast_border_low,
@@ -139,7 +166,39 @@ pub fn draw(
             colour: theme.toast_foreground,
         });
     }
-    (DrawList { items }, size)
+    let mut buttons = Vec::new();
+    if !actions.is_empty() {
+        let count = actions.len() as f32;
+        let button_width = (text_width - (count - 1.0) * 2.0 * BUTTON_MARGIN) / count;
+        let y = text_bottom + BUTTON_MARGIN;
+        for (column, (index, label)) in actions.into_iter().enumerate() {
+            let rect = Rect {
+                x: BORDER + INSET + column as f32 * (button_width + 2.0 * BUTTON_MARGIN),
+                y,
+                width: button_width,
+                height: button_height,
+            };
+            items.push(Item::Box {
+                rect,
+                radius: RADIUS,
+                fill: theme.toast_background,
+                border: Some((BORDER, theme.toast_border)),
+            });
+            let label_width = measure(label).min(rect.width - 2.0 * (BUTTON_PADDING + BORDER));
+            items.push(Item::Text {
+                rect: Rect {
+                    x: rect.x + (rect.width - label_width) / 2.0,
+                    y: rect.y + BORDER + BUTTON_PADDING,
+                    width: label_width,
+                    height: line_height,
+                },
+                text: label.to_owned(),
+                colour: theme.toast_foreground,
+            });
+            buttons.push((index, rect));
+        }
+    }
+    (DrawList { items }, size, buttons)
 }
 
 #[cfg(test)]

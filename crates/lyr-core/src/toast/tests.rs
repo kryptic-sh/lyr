@@ -64,7 +64,7 @@ fn a_toast_stacks_its_summary_over_its_body() {
         body: "file.zip".to_owned(),
         ..Incoming::default()
     };
-    let (list, size) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let (list, size, _) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
     let top = BORDER + INSET;
     assert_eq!((size.width, size.height), (WIDTH, 2.0 * top + 40.0));
     assert_eq!(
@@ -79,7 +79,7 @@ fn a_toast_stacks_its_summary_over_its_body() {
         summary: "Ping".to_owned(),
         ..Incoming::default()
     };
-    let (list, size) = draw(&no_body, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let (list, size, _) = draw(&no_body, Duration::ZERO, WIDTH, measure, 20.0, &theme);
     assert_eq!(texts(&list.items), [("Now", top), ("Ping", top)]);
     assert_eq!(size.height, 2.0 * top + 20.0);
 }
@@ -136,7 +136,7 @@ fn the_time_sits_at_the_right_of_the_summary() {
         summary: "hello".to_owned(),
         ..Incoming::default()
     };
-    let (list, _) = draw(
+    let (list, _, _) = draw(
         &content,
         Duration::from_secs(120),
         WIDTH,
@@ -165,7 +165,7 @@ fn the_summary_stops_short_of_the_time() {
         body: "a body that may use the whole width".to_owned(),
         ..Incoming::default()
     };
-    let (list, _) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let (list, _, _) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
     let width = |wanted: &str| {
         list.items
             .iter()
@@ -179,4 +179,68 @@ fn the_summary_stops_short_of_the_time() {
     // "Now" is 30 px.
     assert_eq!(width("a summary"), text_width - 30.0 - TIME_GAP);
     assert_eq!(width("a body"), text_width);
+}
+
+fn with_actions() -> Incoming {
+    Incoming {
+        summary: "Meeting".to_owned(),
+        actions: [("default", "Open"), ("snooze", "Snooze"), ("join", "Join")]
+            .map(|(key, label)| (key.to_owned(), label.to_owned()))
+            .to_vec(),
+        ..Incoming::default()
+    }
+}
+
+#[test]
+fn each_action_but_the_default_gets_a_button_in_a_row() {
+    let theme = theme();
+    let (list, size, buttons) = draw(
+        &with_actions(),
+        Duration::ZERO,
+        WIDTH,
+        measure,
+        20.0,
+        &theme,
+    );
+    let content = WIDTH - 2.0 * (BORDER + INSET);
+    // Two buttons share the row, 2 * 4 px apart.
+    let width = (content - 8.0) / 2.0;
+    let text_bottom = BORDER + INSET + 20.0;
+    let y = text_bottom + 4.0;
+    let height = 20.0 + 2.0 * (8.0 + BORDER);
+    assert_eq!(
+        buttons
+            .iter()
+            .map(|(index, rect)| (*index, rect.x, rect.y, rect.width, rect.height))
+            .collect::<Vec<_>>(),
+        [
+            (1, BORDER + INSET, y, width, height),
+            (2, BORDER + INSET + width + 8.0, y, width, height)
+        ]
+    );
+    assert_eq!(size.height, text_bottom + height + 8.0 + BORDER + INSET);
+    let labels: Vec<&str> = list
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Text { text, .. } if text == "Snooze" || text == "Join" || text == "Open" => {
+                Some(text.as_str())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(labels, ["Snooze", "Join"], "no button for the default");
+}
+
+#[test]
+fn a_notification_with_only_the_default_action_has_no_buttons() {
+    let theme = theme();
+    let content = Incoming {
+        summary: "x".to_owned(),
+        actions: vec![("default".to_owned(), "Open".to_owned())],
+        ..Incoming::default()
+    };
+    let (_, size, buttons) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    assert!(buttons.is_empty());
+    assert_eq!(size.height, 2.0 * (BORDER + INSET) + 20.0);
 }

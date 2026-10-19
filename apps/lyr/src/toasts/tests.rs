@@ -219,3 +219,30 @@ fn a_toast_up_for_a_minute_is_redrawn_for_its_new_time() {
         Some(start + Duration::from_secs(120))
     );
 }
+
+#[test]
+fn a_click_on_an_action_button_asks_for_that_action() {
+    let mut setup = setup();
+    let start = Instant::now();
+    let id = setup.store.lock().expect("store").notify(
+        Incoming {
+            summary: "Meeting".to_owned(),
+            actions: vec![("join".to_owned(), "Join".to_owned())],
+            ..Incoming::default()
+        },
+        start,
+    );
+    setup.toasts.notified(id, false, start);
+    let window = setup.sync(start).expect("a panel");
+    // Below the summary line, inside the button.
+    let at = PhysicalPoint { x: 30.0, y: 50.0 };
+    setup
+        .shell
+        .move_pointer(window, at, (0.0, 0.0))
+        .expect("moved");
+    setup
+        .shell
+        .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
+        .expect("clicked");
+    assert_eq!(setup.pump(start), Some(Clicked::Action(id, 0)));
+}

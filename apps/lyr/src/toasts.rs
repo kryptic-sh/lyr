@@ -18,7 +18,7 @@ use lyr_core::draw::{DrawList, Size};
 use lyr_core::hit::Regions;
 use lyr_core::notifications::Store;
 use lyr_core::pointer::Press;
-use lyr_core::toast::stack::Stack;
+use lyr_core::toast::stack::{Part, Stack};
 use lyr_render::surface::Surface;
 use lyr_render::text::Text;
 use lyr_render::translate::translate;
@@ -36,7 +36,7 @@ struct Panel {
     window: WindowId,
     size: Size,
     list: DrawList,
-    regions: Regions<u32>,
+    regions: Regions<Part>,
     surface: Option<Surface>,
     scale: f32,
     dirty: bool,
@@ -47,6 +47,8 @@ struct Panel {
 pub enum Clicked {
     /// Invoke the notification's `default` action.
     Invoke(u32),
+    /// Invoke the action at this index in the notification's actions.
+    Action(u32, usize),
     /// Dismiss the notification.
     Dismiss(u32),
 }
@@ -257,13 +259,15 @@ impl Toasts {
             _ => {
                 let presses = self.pointer.handle(event, panel.scale);
                 let target = self.pointer.target(&panel.regions).copied();
-                self.stack.hover(target, now);
-                let Some(id) = target else {
+                let id = target.map(|(Part::Body(id) | Part::Action(id, _))| id);
+                self.stack.hover(id, now);
+                let (Some(target), Some(id)) = (target, id) else {
                     return Ok(None);
                 };
-                let clicked = presses.into_iter().find_map(|press| match press {
-                    Press::Left => Some(Clicked::Invoke(id)),
-                    Press::Middle => Some(Clicked::Dismiss(id)),
+                let clicked = presses.into_iter().find_map(|press| match (press, target) {
+                    (Press::Left, Part::Body(_)) => Some(Clicked::Invoke(id)),
+                    (Press::Left, Part::Action(_, index)) => Some(Clicked::Action(id, index)),
+                    (Press::Middle, _) => Some(Clicked::Dismiss(id)),
                     _ => None,
                 });
                 if clicked.is_some() {

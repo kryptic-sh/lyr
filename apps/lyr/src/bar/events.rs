@@ -266,7 +266,11 @@ impl App {
                 self.toast_clicked(Some(Clicked::Invoke(id)));
                 return;
             }
-            (Target::Notification(id), Press::Middle) => {
+            (Target::Action(id, index), Press::Left) => {
+                self.toast_clicked(Some(Clicked::Action(id, index)));
+                return;
+            }
+            (Target::Notification(id) | Target::Action(id, _), Press::Middle) => {
                 self.toast_clicked(Some(Clicked::Dismiss(id)));
                 return;
             }
@@ -333,19 +337,31 @@ impl App {
     #[cfg(target_os = "linux")]
     fn toast_clicked(&self, clicked: Option<Clicked>) {
         use lyr_core::notifications::CloseReason;
+        use lyr_core::toast::DEFAULT_ACTION;
+        // The action's key, as the notification's store holds it.
+        let key = |id: u32, wanted: &dyn Fn(usize, &str) -> bool| {
+            let store = self.toasts.store()?;
+            let store = store
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            store
+                .get(id)?
+                .content
+                .actions
+                .iter()
+                .enumerate()
+                .find(|(index, (key, _))| wanted(*index, key))
+                .map(|(_, (key, _))| key.clone())
+        };
         match clicked {
             Some(Clicked::Invoke(id)) => {
-                let has_default = self.toasts.store().is_some_and(|store| {
-                    store
-                        .lock()
-                        .unwrap_or_else(std::sync::PoisonError::into_inner)
-                        .get(id)
-                        .is_some_and(|held| {
-                            held.content.actions.iter().any(|(key, _)| key == "default")
-                        })
-                });
-                if has_default {
-                    self.commands.invoke(id, "default".to_owned());
+                if let Some(key) = key(id, &|_, key| key == DEFAULT_ACTION) {
+                    self.commands.invoke(id, key);
+                }
+            }
+            Some(Clicked::Action(id, wanted)) => {
+                if let Some(key) = key(id, &|index, _| index == wanted) {
+                    self.commands.invoke(id, key);
                 }
             }
             Some(Clicked::Dismiss(id)) => {

@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use lyr_config::{Platform, from_sources};
 
-use super::Stack;
+use super::{Part, Stack};
 use crate::draw::Item;
 use crate::notifications::{Expiry, Incoming, LOW_TIMEOUT, NORMAL_TIMEOUT, Store, Urgency};
 use crate::toast::{BORDER, INSET, MARGIN};
@@ -171,8 +171,11 @@ fn the_stack_draws_each_toast_below_the_last() {
             ("older", toast + MARGIN + BORDER + INSET)
         ]
     );
-    assert_eq!(regions.hit(10.0, 1.0), Some(&newer));
-    assert_eq!(regions.hit(10.0, toast + MARGIN + 1.0), Some(&older));
+    assert_eq!(regions.hit(10.0, 1.0), Some(&Part::Body(newer)));
+    assert_eq!(
+        regions.hit(10.0, toast + MARGIN + 1.0),
+        Some(&Part::Body(older))
+    );
     assert_eq!(regions.hit(10.0, toast + 1.0), None, "between them");
     let empty = Stack::default().draw(&store, start, measure, 20.0, &theme);
     assert!(empty.0.items.is_empty() && empty.1.height == 0.0);
@@ -197,4 +200,31 @@ fn a_label_changes_a_whole_minute_after_its_toast_arrived() {
         stack.next_label_change(&store, start + minute * 3 / 2),
         Some(start + 2 * minute)
     );
+}
+
+#[test]
+fn an_action_button_is_its_own_region_on_top_of_the_toast() {
+    let theme = from_sources(None, Platform::Linux)
+        .expect("the defaults")
+        .theme;
+    let measure = |text: &str| text.chars().count() as f32 * 10.0;
+    let start = Instant::now();
+    let mut store = Store::default();
+    let mut stack = Stack::default();
+    let id = store.notify(
+        Incoming {
+            summary: "Meeting".to_owned(),
+            actions: vec![("join".to_owned(), "Join".to_owned())],
+            ..Incoming::default()
+        },
+        start,
+    );
+    stack.notified(&store, id, false, start);
+    let (_, _, regions) = stack.draw(&store, start, measure, 20.0, &theme);
+    let button_y = BORDER + INSET + 20.0 + 4.0 + 1.0;
+    assert_eq!(
+        regions.hit(BORDER + INSET + 1.0, button_y),
+        Some(&Part::Action(id, 0))
+    );
+    assert_eq!(regions.hit(1.0, 1.0), Some(&Part::Body(id)));
 }

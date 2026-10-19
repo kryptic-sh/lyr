@@ -21,6 +21,9 @@ pub enum Target {
     ClearAll,
     Dnd,
     Notification(u32),
+    /// An action button, by the action's index in the notification's
+    /// actions.
+    Action(u32, usize),
 }
 
 /// Above the do-not-disturb row and the history: swaync's `widget-dnd`
@@ -140,7 +143,7 @@ pub fn draw(
         }
         for held in members {
             let elapsed = now.saturating_duration_since(held.received);
-            let (entry, size) =
+            let (entry, size, buttons) =
                 toast::draw(&held.content, elapsed, width, measure, line_height, theme);
             items.extend(entry.items.into_iter().map(|item| item.offset(0.0, y)));
             regions.push(
@@ -152,6 +155,15 @@ pub fn draw(
                 },
                 Target::Notification(held.id),
             );
+            for (index, rect) in buttons {
+                regions.push(
+                    Rect {
+                        y: rect.y + y,
+                        ..rect
+                    },
+                    Target::Action(held.id, index),
+                );
+            }
             bottom = y + size.height;
             y = bottom + ENTRY_GAP;
         }

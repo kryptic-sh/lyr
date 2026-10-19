@@ -12,6 +12,16 @@ use crate::draw::{DrawList, Size};
 use crate::hit::{Rect, Regions};
 use crate::notifications::Store;
 
+/// What a click on the stack lands on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Part {
+    /// A toast, by its notification's id.
+    Body(u32),
+    /// An action button, by the action's index in the notification's
+    /// actions.
+    Action(u32, usize),
+}
+
 /// One toast that is up.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Up {
@@ -113,8 +123,8 @@ impl Stack {
     }
 
     /// The stack drawn from `store` at `now`, newest on top and [`MARGIN`]
-    /// apart: its draw list, its size, and each toast's region. Empty when no
-    /// toast is up.
+    /// apart: its draw list, its size, and each toast's and action button's
+    /// region. Empty when no toast is up.
     #[must_use]
     pub fn draw(
         &self,
@@ -123,7 +133,7 @@ impl Stack {
         measure: impl Fn(&str) -> f32,
         line_height: f32,
         theme: &Theme,
-    ) -> (DrawList, Size, Regions<u32>) {
+    ) -> (DrawList, Size, Regions<Part>) {
         let mut list = DrawList::default();
         let mut regions = Regions::default();
         let mut size = Size {
@@ -132,7 +142,7 @@ impl Stack {
         };
         for notification in self.ids().filter_map(|id| store.get(id)) {
             let elapsed = now.saturating_duration_since(notification.received);
-            let (toast, toast_size) = draw(
+            let (toast, toast_size, buttons) = draw(
                 &notification.content,
                 elapsed,
                 WIDTH,
@@ -154,8 +164,17 @@ impl Stack {
                     width: toast_size.width,
                     height: toast_size.height,
                 },
-                notification.id,
+                Part::Body(notification.id),
             );
+            for (index, rect) in buttons {
+                regions.push(
+                    Rect {
+                        y: rect.y + top,
+                        ..rect
+                    },
+                    Part::Action(notification.id, index),
+                );
+            }
             size = Size {
                 width: size.width.max(toast_size.width),
                 height: top + toast_size.height,

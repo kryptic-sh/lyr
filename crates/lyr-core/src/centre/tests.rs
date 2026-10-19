@@ -131,3 +131,26 @@ fn entries_of_one_app_sit_closer_than_groups() {
         Some(&Target::Notification(first))
     );
 }
+
+#[test]
+fn an_entry_s_action_button_is_its_own_target() {
+    let theme = theme();
+    let now = Instant::now();
+    let mut store = Store::default();
+    let id = store.notify(
+        Incoming {
+            summary: "Meeting".to_owned(),
+            actions: vec![("join".to_owned(), "Join".to_owned())],
+            ..Incoming::default()
+        },
+        now,
+    );
+    let (_, _, regions) = draw(&store, WIDTH, now, &measure, LINE, &theme);
+    let entry = 32.0 + GAP + LINE + GAP;
+    let button_y = entry + BORDER + INSET + LINE + 4.0 + 1.0;
+    assert_eq!(
+        regions.hit(BORDER + INSET + 1.0, button_y),
+        Some(&Target::Action(id, 0))
+    );
+    assert_eq!(regions.hit(1.0, entry), Some(&Target::Notification(id)));
+}
