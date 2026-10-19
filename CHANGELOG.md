@@ -14,6 +14,10 @@ and this project adheres to
   output (a layer-shell panel on Wayland, an appbar on Windows), drawn through
   crcbl, with the clock module, and on Linux the battery (from UPower) and the
   Hyprland workspaces. The other modules are not drawn yet.
+- Clicking a workspace switches to it, and with `workspaces.scroll = true` the
+  wheel steps through them. A module's `[<module>.on]` table binds clicks and
+  scrolling to a command (`{ exec = "…" }`); the built-in actions are not
+  implemented yet.
 - `lyr quit` stops the running bar. `lyr reload`, `lyr toggle`, `lyr panel`,
   `lyr dnd` and `lyr clear` reach it over its control socket and report that
   they are not implemented yet. A second `lyr` exits when one is already

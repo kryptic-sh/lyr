@@ -124,10 +124,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   WSL. Named workspaces get no request in Lua until there is a quoting rule.
   Click is `focus_request` and scroll is `State::step`, both pure and tested.
   The bar shows the workspaces (`apps/lyr/src/sources.rs` runs the backend and
-  hands its `State` to the main loop); still to build: pointer input reaching
-  `focus_request` and `State::step`, and `lyr --stats`. The `WorkspaceBackend`
-  trait waits for the Windows backend (M9). Hyprland main's changes for the next
-  release are in [plan/06](plan/06-workspaces.md#linux--hyprland).
+  hands its `State` to the main loop), and a click on a button or, with
+  `workspaces.scroll`, a wheel step sends the switch through the same task
+  (`apps/lyr/src/input.rs`, `lyr_core::pointer`). Not run against a real
+  Hyprland. Still to build: `lyr --stats`. The `WorkspaceBackend` trait waits
+  for the Windows backend (M9). Hyprland main's changes for the next release are
+  in [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Render, rest of M1.** `lyr-render` has the GPU-free half: the bar font found
   with crcbl-font and given the system's fallback faces (`fonts::load`), text
   measured and drawn as one glyph run per face (`text::Text`), sRGB colours in
@@ -194,6 +196,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   woken through crcbl's `ShellWaker`. Not run against a real UPower or Hyprland,
   which needs the owner's machine. Not built: every other source. Network and
   audio wait on the new-dependency decision above.
+- **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
+  against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
+  action by the module's bindings (`lyr_core::pointer::action`): a workspace
+  button focuses its workspace, `{ exec = … }` runs through `sh -c` or `cmd /C`
+  (`apps/lyr/src/exec.rs`), and the built-ins say they are not implemented yet.
+  Touchpad scrolling makes one step per 50 device pixels (`PIXELS_PER_STEP`,
+  lyr's own choice; crcbl leaves it to the application). Scrolling away from the
+  user steps to the previous workspace. Not tried with a real click: the tests
+  cover the resolution and the step arithmetic, and the Windows run had no
+  pointer input. Not built: hover (the active-or-hovered workspace colour) and
+  tooltips (M5).
 - **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second

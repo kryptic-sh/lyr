@@ -6,6 +6,9 @@
 
 mod bar;
 mod control;
+mod exec;
+mod input;
+mod modules;
 mod sources;
 
 use std::path::PathBuf;

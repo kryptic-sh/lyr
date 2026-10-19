@@ -1,57 +1,46 @@
-//! Running the bar: the main loop that keeps a bar on every output and draws
-//! it (`docs/plan/02-architecture.md`).
+//! Running the bar: the main loop that keeps a bar on every output, draws it
+//! and answers the pointer (`docs/plan/02-architecture.md`).
 //!
 //! It draws the modules that have data: the clock everywhere, and on Linux
-//! the battery and the workspaces once their sources report ([`sources`]). A
-//! module with no data yet is left out rather than drawn empty.
-//!
-//! [`sources`]: crate::sources
+//! the battery and the workspaces once their sources report
+//! ([`crate::sources`]). A module with no data yet is left out rather than
+//! drawn empty.
 
 use std::collections::HashMap;
 use std::path::Path;
 
 use anyhow::Context as _;
-use chrono::{DateTime, FixedOffset, Local};
+use chrono::Local;
 use crcbl_shell::{ShellEvent, WindowId};
-use lyr_config::{Config, Item, Module, Platform};
-use lyr_core::battery::{self, Level, Reading};
-use lyr_core::clock::{self, Tick};
+use lyr_config::{Module, Platform};
+use lyr_core::clock::Tick;
 use lyr_core::control::Request;
-use lyr_core::draw::{self, Bar, Content};
+use lyr_core::draw::Target;
+use lyr_core::hit::Regions;
 use lyr_render::surface::Surface;
 use lyr_render::text::Text;
 use lyr_render::translate::translate;
 use lyr_shell::bars::Bars;
 
 use crate::control;
-use crate::sources::{self, Update};
+use crate::input::{self, Pointer};
+use crate::modules::{self, Data};
+use crate::sources;
 
-/// One bar window's surface and the size it was last drawn at.
+/// One bar window: its surface, its size, and what it drew last.
 struct Window {
     surface: Surface,
     /// Logical pixels.
     width: f32,
+    /// Device pixels per logical pixel.
+    scale: f32,
     /// The output it is on, by name, for a per-output workspace list.
     monitor: Option<String>,
-}
-
-/// The sources' latest states.
-#[derive(Default)]
-struct Data {
-    battery: Option<Reading>,
-    #[cfg(target_os = "linux")]
-    workspaces: Option<lyr_wm::hyprland::State>,
-}
-
-impl Data {
-    fn apply(&mut self, update: Update) {
-        match update {
-            #[cfg(target_os = "linux")]
-            Update::Battery(reading) => self.battery = reading,
-            #[cfg(target_os = "linux")]
-            Update::Workspaces(state) => self.workspaces = Some(state),
-        }
-    }
+    pointer: Pointer,
+    /// The input regions of the last frame.
+    regions: Regions<Target<Module>>,
+    /// The workspaces the last frame's buttons stand for.
+    workspaces: Vec<i64>,
 }
 
 /// Runs the bar until `lyr quit` stops it.
@@ -77,7 +66,7 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
     bars.sync(shell.as_mut(), &config.bar)
         .context("creating the bars")?;
     let mut windows: HashMap<WindowId, Window> = HashMap::new();
-    let updates = sources::start(shell.waker()).context("starting the sources")?;
+    let (updates, commands) = sources::start(shell.waker()).context("starting the sources")?;
     let mut data = Data::default();
 
     loop {
@@ -124,29 +113,31 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
                     let device = (size.width, size.height);
                     let scale = scale_factor as f32;
                     let width = size.width as f32 / scale;
-                    match windows.get_mut(&window) {
-                        Some(open) => {
-                            open.surface.resize(device, scale)?;
-                            open.width = width;
-                        }
-                        None => {
-                            let surface = Surface::open(shell.as_ref(), window, device, scale)
-                                .context("opening a bar's surface")?;
-                            eprintln!("lyr: drawing on {}", surface.describe());
-                            let monitor = bars
-                                .windows()
-                                .find(|&(_, bar)| bar == window)
-                                .and_then(|(monitor, _)| shell.monitor(monitor))
-                                .map(|info| info.name.clone());
-                            windows.insert(
-                                window,
-                                Window {
-                                    surface,
-                                    width,
-                                    monitor,
-                                },
-                            );
-                        }
+                    if let Some(open) = windows.get_mut(&window) {
+                        open.surface.resize(device, scale)?;
+                        open.width = width;
+                        open.scale = scale;
+                    } else {
+                        let surface = Surface::open(shell.as_ref(), window, device, scale)
+                            .context("opening a bar's surface")?;
+                        eprintln!("lyr: drawing on {}", surface.describe());
+                        let monitor = bars
+                            .windows()
+                            .find(|&(_, bar)| bar == window)
+                            .and_then(|(monitor, _)| shell.monitor(monitor))
+                            .map(|info| info.name.clone());
+                        windows.insert(
+                            window,
+                            Window {
+                                surface,
+                                width,
+                                scale,
+                                monitor,
+                                pointer: Pointer::default(),
+                                regions: Regions::default(),
+                                workspaces: Vec::new(),
+                            },
+                        );
                     }
                 }
                 ShellEvent::WindowDestroyed { window } => {
@@ -154,112 +145,39 @@ pub fn run(config: Option<&Path>) -> anyhow::Result<()> {
                         gone.surface.destroy()?;
                     }
                 }
-                _ => {}
+                _ => {
+                    let Some(window) = event.window().and_then(|id| windows.get_mut(&id)) else {
+                        continue;
+                    };
+                    for press in window.pointer.handle(event, window.scale) {
+                        if let Some(target) = window.pointer.target(&window.regions) {
+                            input::act(
+                                target,
+                                press,
+                                &config,
+                                &data,
+                                &window.workspaces,
+                                window.monitor.as_deref(),
+                                &commands,
+                            );
+                        }
+                    }
+                }
             }
         }
         let now = Local::now().fixed_offset();
         for window in windows.values_mut() {
-            draw_bar(window, &config, &text, &data, &now)?;
+            let drawn = modules::draw(
+                window.width,
+                window.monitor.as_deref(),
+                &config,
+                &text,
+                &data,
+                &now,
+            );
+            window.surface.draw(&translate(&drawn.list, &text))?;
+            window.regions = drawn.regions;
+            window.workspaces = drawn.workspaces;
         }
-    }
-}
-
-/// Lays out and draws one bar at `now`.
-fn draw_bar(
-    window: &mut Window,
-    config: &Config,
-    text: &Text,
-    data: &Data,
-    now: &DateTime<FixedOffset>,
-) -> anyhow::Result<()> {
-    let modules = |items: &[Item]| -> Vec<draw::Module<Module>> {
-        items
-            .iter()
-            .filter_map(|item| match item {
-                Item::Named(name) => Module::from_name(name),
-                Item::Spacer { .. } => None,
-            })
-            .filter_map(|module| {
-                content(module, config, data, now, window.monitor.as_deref()).map(|content| {
-                    draw::Module {
-                        content,
-                        target: module,
-                    }
-                })
-            })
-            .collect()
-    };
-    let (left, center, right) = (
-        modules(&config.layout.left),
-        modules(&config.layout.center),
-        modules(&config.layout.right),
-    );
-    let bar = Bar {
-        width: window.width,
-        height: config.bar.height as f32,
-        left: &left,
-        center: &center,
-        right: &right,
-    };
-    let (list, _regions) = draw::build(&bar, &config.theme, |s| text.measure(s));
-    window.surface.draw(&translate(&list, text))?;
-    Ok(())
-}
-
-/// What `module` shows now, or `None` when it has no data to show.
-fn content(
-    module: Module,
-    config: &Config,
-    data: &Data,
-    now: &DateTime<FixedOffset>,
-    #[cfg_attr(not(target_os = "linux"), allow(unused_variables))] monitor: Option<&str>,
-) -> Option<Content> {
-    let theme = &config.theme;
-    let label = |text: String, colour| Content::Label {
-        text,
-        compact: None,
-        colour,
-    };
-    match module {
-        Module::Clock => Some(label(
-            clock::view(now, "", &config.clock.format).text,
-            theme.foreground,
-        )),
-        Module::Battery => {
-            let shown = battery::view(data.battery.as_ref()?, &config.battery);
-            let colour = match shown.level {
-                Some(Level::Critical) => theme.battery_critical,
-                Some(Level::Warning) => theme.battery_warning,
-                None => theme.foreground,
-            };
-            Some(label(shown.text, colour))
-        }
-        #[cfg(target_os = "linux")]
-        Module::Workspaces => {
-            let state = data.workspaces.as_ref()?;
-            let shown = |workspace: &&lyr_wm::hyprland::Workspace| {
-                config.workspaces.all_outputs
-                    || monitor.is_some_and(|monitor| workspace.monitor.as_deref() == Some(monitor))
-            };
-            let buttons = state
-                .workspaces()
-                .filter(shown)
-                .map(|workspace| draw::Button {
-                    text: config
-                        .workspaces
-                        .format
-                        .render(|name| (name == "name").then_some(workspace.name.as_str())),
-                    colour: if state.active() == Some(workspace.id) {
-                        theme.workspace_active
-                    } else if workspace.urgent {
-                        theme.workspace_urgent.unwrap_or(theme.foreground)
-                    } else {
-                        theme.foreground
-                    },
-                })
-                .collect();
-            Some(Content::Buttons(buttons))
-        }
-        _ => None,
     }
 }

@@ -21,15 +21,45 @@ pub enum Update {
     Workspaces(lyr_wm::hyprland::State),
 }
 
+/// Something the bar asks a source to do.
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+pub enum Command {
+    /// Switch to this workspace.
+    Focus(lyr_wm::hyprland::Workspace),
+}
+
+/// Where the bar sends [`Command`]s.
+#[derive(Debug)]
+pub struct Commands {
+    #[cfg(target_os = "linux")]
+    sender: tokio::sync::mpsc::UnboundedSender<Command>,
+}
+
+#[cfg(target_os = "linux")]
+impl Commands {
+    /// Sends `command`. A source that has stopped drops it; it already said
+    /// why it stopped.
+    pub fn send(&self, command: Command) {
+        let _stopped = self.sender.send(command);
+    }
+}
+
 /// Starts every source this platform has. A source that cannot start, or
 /// stops, says why on stderr and its module stays out of the bar.
-pub fn start(waker: Option<ShellWaker>) -> std::io::Result<mpsc::Receiver<Update>> {
+pub fn start(waker: Option<ShellWaker>) -> std::io::Result<(mpsc::Receiver<Update>, Commands)> {
     let (sender, receiver) = mpsc::channel();
     #[cfg(target_os = "linux")]
-    linux::start(sender, waker)?;
+    {
+        let (commands, incoming) = tokio::sync::mpsc::unbounded_channel();
+        linux::start(sender, incoming, waker)?;
+        Ok((receiver, Commands { sender: commands }))
+    }
     #[cfg(not(target_os = "linux"))]
-    drop((sender, waker));
-    Ok(receiver)
+    {
+        drop((sender, waker));
+        Ok((receiver, Commands {}))
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -41,7 +71,7 @@ mod linux {
     use lyr_wm::hyprland::Hyprland;
     use tokio::sync::watch;
 
-    use super::Update;
+    use super::{Command, Update};
 
     /// Hands `update` to the main loop and wakes it. `false` once the main
     /// loop has gone.
@@ -55,6 +85,7 @@ mod linux {
 
     pub(super) fn start(
         sender: mpsc::Sender<Update>,
+        commands: tokio::sync::mpsc::UnboundedReceiver<Command>,
         waker: Option<ShellWaker>,
     ) -> std::io::Result<()> {
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -66,7 +97,7 @@ mod linux {
                 runtime.block_on(async move {
                     tokio::join!(
                         battery(sender.clone(), waker.clone()),
-                        workspaces(sender, waker),
+                        workspaces(sender, commands, waker),
                     );
                 });
             })?;
@@ -96,18 +127,34 @@ mod linux {
         }
     }
 
-    async fn workspaces(sender: mpsc::Sender<Update>, waker: Option<ShellWaker>) {
+    async fn workspaces(
+        sender: mpsc::Sender<Update>,
+        mut commands: tokio::sync::mpsc::UnboundedReceiver<Command>,
+        waker: Option<ShellWaker>,
+    ) {
         let run = async {
             let hyprland = Hyprland::from_env().await?;
             let (mut state, mut events) = hyprland.subscribe().await?;
             if !deliver(&sender, waker.as_ref(), Update::Workspaces(state.clone())) {
                 return Ok(());
             }
-            while let Some(event) = events.next().await? {
-                if state.apply(event)
-                    && !deliver(&sender, waker.as_ref(), Update::Workspaces(state.clone()))
-                {
-                    break;
+            loop {
+                tokio::select! {
+                    event = events.next() => {
+                        let Some(event) = event? else { break };
+                        if state.apply(event)
+                            && !deliver(&sender, waker.as_ref(), Update::Workspaces(state.clone()))
+                        {
+                            break;
+                        }
+                    }
+                    Some(Command::Focus(workspace)) = commands.recv() => {
+                        // A refused switch changes nothing on screen, which
+                        // is the truth; it is only logged.
+                        if let Err(error) = hyprland.focus(&workspace).await {
+                            eprintln!("lyr: workspaces: {error}");
+                        }
+                    }
                 }
             }
             Ok::<_, lyr_wm::hyprland::Error>(())
