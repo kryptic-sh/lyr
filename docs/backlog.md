@@ -113,12 +113,13 @@ implementation follows until they are answered. The ones that block a milestone:
   `ShellCaps::FRAME_CALLBACK` set where the compositor really paces (Wayland,
   and AppKit if it has a real signal); elsewhere `FrameReady` comes at the next
   pump, so lyr has one code path. A window destroyed with a frame pending gets
-  no `FrameReady`. It is not in 0.6.0: crcbl reports it built for the next
-  release, with crcbl-app's own loop waiting for `FrameReady` as a follow-up.
-  lyr's loop then becomes: on a change mark the bar dirty; with no frame
-  pending, present and request one; on `FrameReady`, present again if still
-  dirty ([plan/04](plan/04-rendering-and-theme.md#repaint-on-change-only)).
-  crcbl declined a finite acquire timeout, which would turn the hang into a busy
+  no `FrameReady`. It is not in 0.6.0; crcbl reports it on its main (2026-10-20)
+  for the next release, with crcbl-app's own loop waiting for `FrameReady` as a
+  follow-up. lyr's loop then becomes: on a change mark the bar dirty; with no
+  frame pending, present and request one; on `FrameReady`, present again if
+  still dirty
+  ([plan/04](plan/04-rendering-and-theme.md#repaint-on-change-only)). crcbl
+  declined a finite acquire timeout, which would turn the hang into a busy
   retry.
 - **crcbl: changing a panel in place.** crcbl-shell 0.5.0 sets a panel's size
   and margins only when it is created, so lyr's toast stack, whose height
@@ -276,8 +277,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   wrapped at spaces) (crcbl-ui 0.6.0 has UAX #14 line breaking, but only inside
   `TextLayout`, which lays out one font, and its break finder `font::breaks` is
   crate-private; lyr's bodies mix bold, italic and plain spans, so lyr asked
-  crcbl on 2026-10-20 to export the break opportunities, and keeps breaking at
-  spaces until it does), both tested and mutation-checked. The bar serves it on
+  crcbl on 2026-10-20 to export the break opportunities; crcbl made
+  `crcbl_ui::font::breaks` public on its main for the next release
+  (`paragraphs(text)` and `soft_breaks(paragraph) -> Vec<usize>`, UAX #14
+  opportunities at cluster starts), and lyr keeps breaking at spaces until that
+  release is published), both tested and mutation-checked. The bar serves it on
   Linux (`apps/lyr/src/sources.rs`) and leaves notifications to another daemon
   that has the name, logging which, unless `notifications.replace = true` (read
   at start; a reload does not hand the name over). Toasts are on screen
