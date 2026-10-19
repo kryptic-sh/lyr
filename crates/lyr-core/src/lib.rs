@@ -17,6 +17,7 @@ pub mod audio;
 pub mod battery;
 pub mod bell;
 pub mod bluetooth;
+pub mod bluetooth_menu;
 pub mod calendar;
 pub mod centre;
 pub mod clock;

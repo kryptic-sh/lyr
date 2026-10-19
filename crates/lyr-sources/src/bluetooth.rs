@@ -5,56 +5,10 @@
 //! come with milestones M9 and M10.
 
 use lyr_core::bluetooth::{Device as Shown, Reading, State};
+pub use lyr_core::bluetooth_menu::{Adapter, Device, DeviceAction, Switch};
 
 #[cfg(target_os = "linux")]
 pub mod linux;
-
-/// The adapter's properties the module uses (`org.bluez.Adapter1`).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Adapter {
-    /// Its object path, which identifies it.
-    pub path: String,
-    pub powered: bool,
-    /// The menu's switches, and whether a scan is running.
-    pub discoverable: bool,
-    pub pairable: bool,
-    pub discovering: bool,
-    /// `PowerState`, which BlueZ marks experimental and may not send;
-    /// `off-blocked` is an rfkill block.
-    pub power_state: Option<String>,
-}
-
-/// A device's properties the module uses (`org.bluez.Device1`, and
-/// `org.bluez.Battery1` when the device reports its battery).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Device {
-    /// Its object path, which identifies it.
-    pub path: String,
-    pub alias: String,
-    pub connected: bool,
-    /// Paired with this machine; a device a scan found is not.
-    pub paired: bool,
-    pub trusted: bool,
-    pub battery: Option<u8>,
-}
-
-/// One of the adapter's switches in the Bluetooth menu.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Switch {
-    Powered,
-    Discoverable,
-    Pairable,
-}
-
-/// What the Bluetooth menu does to a device.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DeviceAction {
-    Connect,
-    Disconnect,
-    Pair,
-    Trust,
-    Untrust,
-}
 
 /// The connected devices in the order they connected, so the module shows
 /// the latest, as waybar's `connected_devices_.back()` does.
