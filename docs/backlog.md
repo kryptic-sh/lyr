@@ -86,6 +86,9 @@ implementation follows until they are answered. The ones that block a milestone:
   callback, or can block in FIFO `vkQueuePresentKHR` on an output that is off
   (hypridle DPMS), is unverified
   ([plan/04](plan/04-rendering-and-theme.md#repaint-on-change-only)).
+  crcbl-shell 0.5.0 has no frame-callback event for lyr to pace on. Asked crcbl
+  on 2026-10-19 whether the path can block and, if it can, for a
+  `FrameReady`-style event on every backend; waiting on the answer.
 - **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
   the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
   S8 – S27. pikr's session tracks the move in pikr's own backlog and
@@ -154,14 +157,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   in the monospace fallback, and lyr said so. Not run on Hyprland, which is M1's
   real check. `lyr quit` stops it. It repaints only when something it shows
   changed (plan 04), but not yet paced by Wayland's frame callback, which plan
-  04 requires for an output that is off (hypridle's DPMS). It logs through
-  `tracing` to `~/.local/state/lyr/logs/lyr.log` and to stderr
-  (`apps/lyr/src/log.rs`, `RUST_LOG` to filter), capped at `log::MAX_BYTES` by
-  moving it to `lyr.log.1` (tested on Windows and Linux, not watched rotating in
-  a running bar). `colour.rs` copies crcbl-ui's private `srgb_to_linear`;
-  crcbl's next release exports it as `crcbl_ui::style::from_srgb8` (and
-  `crcbl_core::srgb`), and lyr drops the copy then. Group opacity is
-  approximated until crcbl's opacity groups ship.
+  04 requires for an output that is off (hypridle's DPMS); see "crcbl: Wayland
+  present path". It logs through `tracing` to `~/.local/state/lyr/logs/lyr.log`
+  and to stderr (`apps/lyr/src/log.rs`, `RUST_LOG` to filter), capped at
+  `log::MAX_BYTES` by moving it to `lyr.log.1` (tested on Windows and Linux, not
+  watched rotating in a running bar). `colour.rs` copies crcbl-ui's private
+  `srgb_to_linear`; crcbl's next release exports it as
+  `crcbl_ui::style::from_srgb8` (and `crcbl_core::srgb`), and lyr drops the copy
+  then. Group opacity is approximated until crcbl's opacity groups ship.
 - **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors
