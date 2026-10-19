@@ -48,8 +48,9 @@ and this project adheres to
 - A click on the power button opens the power menu (Lock, Sleep, Hibernate,
   Shutdown, Logout, Reboot), driven by the arrow keys and Enter or the pointer.
   On Linux each entry asks logind as `systemctl` and `loginctl` do, and Logout
-  asks Hyprland to exit; on Windows and macOS the entries are not built yet.
-  `[power.menu]` sets an entry to a command instead
+  asks Hyprland to exit; on Windows each entry is its Win32 call (locking,
+  sleep, hibernate, log out, reboot, shut down); on macOS the entries are not
+  built yet. `[power.menu]` sets an entry to a command instead
   (`lock = { exec = "hyprlock" }`).
 - `lyr import-waybar FILE` prints a waybar `config.jsonc` as a lyr config: the
   bar's settings, the layout and the modules lyr has, with what it could not

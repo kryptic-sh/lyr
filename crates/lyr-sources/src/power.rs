@@ -1,11 +1,57 @@
 //! The power menu's actions (`docs/plan/10-popups-and-menus.md#power-menu`).
 //!
-//! [`reboot_flags`] chooses the flags `systemctl reboot` would, on every
-//! platform's tests; [`linux`] makes logind's calls as systemctl makes them.
-//! Windows and macOS come with milestones M9 and M10.
+//! [`reboot_flags`] chooses the flags `systemctl reboot` would, and
+//! [`windows_call`] the Win32 call each entry is, on every platform's tests;
+//! [`linux`] makes logind's calls as systemctl makes them, and [`windows`]
+//! the Win32 ones. macOS comes with milestone M10.
+
+use lyr_core::power_menu::Entry;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
+#[cfg(windows)]
+pub mod windows;
+
+/// How `ExitWindowsEx` ends the session.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Exit {
+    LogOff,
+    Reboot,
+    PowerOff,
+}
+
+impl Exit {
+    /// Whether the process token needs `SE_SHUTDOWN_NAME` enabled first: a
+    /// reboot and a power-off do, a log-off does not.
+    #[must_use]
+    pub const fn needs_privilege(self) -> bool {
+        matches!(self, Self::Reboot | Self::PowerOff)
+    }
+}
+
+/// The Win32 call a power menu entry is (plan 10's table).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WindowsCall {
+    /// `LockWorkStation`.
+    Lock,
+    /// `SetSuspendState`, hibernating or sleeping.
+    Suspend { hibernate: bool },
+    /// `ExitWindowsEx`.
+    Exit(Exit),
+}
+
+/// The Win32 call `entry` is.
+#[must_use]
+pub const fn windows_call(entry: Entry) -> WindowsCall {
+    match entry {
+        Entry::Lock => WindowsCall::Lock,
+        Entry::Sleep => WindowsCall::Suspend { hibernate: false },
+        Entry::Hibernate => WindowsCall::Suspend { hibernate: true },
+        Entry::Logout => WindowsCall::Exit(Exit::LogOff),
+        Entry::Reboot => WindowsCall::Exit(Exit::Reboot),
+        Entry::Shutdown => WindowsCall::Exit(Exit::PowerOff),
+    }
+}
 
 /// logind's `SD_LOGIND_REBOOT_VIA_KEXEC`: reboot into a loaded kexec kernel
 /// when there is one (`src/basic/login-util.h` at systemd v262.1).
@@ -47,7 +93,33 @@ pub fn reboot_flags(
 
 #[cfg(test)]
 mod tests {
-    use super::{REBOOT_VIA_KEXEC, SOFT_REBOOT_IF_NEXTROOT_SET_UP, reboot_flags};
+    use lyr_core::power_menu::Entry;
+
+    use super::{
+        Exit, REBOOT_VIA_KEXEC, SOFT_REBOOT_IF_NEXTROOT_SET_UP, WindowsCall, reboot_flags,
+        windows_call,
+    };
+
+    #[test]
+    fn each_entry_is_its_win32_call() {
+        assert_eq!(windows_call(Entry::Lock), WindowsCall::Lock);
+        assert_eq!(
+            windows_call(Entry::Sleep),
+            WindowsCall::Suspend { hibernate: false }
+        );
+        assert_eq!(
+            windows_call(Entry::Hibernate),
+            WindowsCall::Suspend { hibernate: true }
+        );
+        assert_eq!(windows_call(Entry::Logout), WindowsCall::Exit(Exit::LogOff));
+        assert_eq!(windows_call(Entry::Reboot), WindowsCall::Exit(Exit::Reboot));
+        assert_eq!(
+            windows_call(Entry::Shutdown),
+            WindowsCall::Exit(Exit::PowerOff)
+        );
+        assert!(Exit::Reboot.needs_privilege() && Exit::PowerOff.needs_privilege());
+        assert!(!Exit::LogOff.needs_privilege());
+    }
 
     #[test]
     fn a_reboot_takes_a_loaded_kexec_kernel_unless_told_not_to() {

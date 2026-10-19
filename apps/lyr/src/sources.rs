@@ -233,7 +233,24 @@ impl Commands {
 
 #[cfg(not(target_os = "linux"))]
 impl Commands {
-    /// Windows and macOS: the power menu's actions are not built yet.
+    /// Windows: carries out a power menu entry through Win32, on a thread of
+    /// its own, since `SetSuspendState` returns only once the machine wakes.
+    #[cfg(windows)]
+    pub fn power(&self, entry: lyr_core::power_menu::Entry) {
+        let spawned = std::thread::Builder::new()
+            .name("lyr power".to_owned())
+            .spawn(move || {
+                if let Err(error) = lyr_sources::power::windows::carry_out(entry) {
+                    tracing::warn!("power menu: {}: {error}", entry.label());
+                }
+            });
+        if let Err(error) = spawned {
+            tracing::warn!("power menu: {}: no thread: {error}", entry.label());
+        }
+    }
+
+    /// macOS: the power menu's actions are not built yet (M10).
+    #[cfg(target_os = "macos")]
     pub fn power(&self, entry: lyr_core::power_menu::Entry) {
         tracing::warn!(
             "power menu: {} is not built on this platform yet",

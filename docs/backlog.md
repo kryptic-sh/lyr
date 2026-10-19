@@ -21,12 +21,12 @@ implementation follows meanwhile.
   Should lyr also support machines without it, through a new rtnetlink crate
   (`rtnetlink` or `neli`) and a 30 s nl80211 read for the signal (plan 07), or
   leave the module out there?
-- **Calendar locale: may lyr take `libc` and `windows-sys`?** (M5.) **Q:** Read
-  the first weekday and day and month names from the system locale, as waybar
-  does (`nl_langinfo` with `_NL_TIME_FIRST_WEEKDAY` on Linux, `GetLocaleInfoEx`
-  with `LOCALE_IFIRSTDAYOFWEEK` on Windows; lyr depends on neither directly), or
-  add a `clock.first_weekday` config key defaulting to Monday, with English
-  names, which a Sunday-first locale sets by hand?
+- **Calendar locale: may lyr take `libc`?** (M5.) **Q:** Read the first weekday
+  and day and month names from the system locale, as waybar does (`nl_langinfo`
+  with `_NL_TIME_FIRST_WEEKDAY` on Linux, which needs `libc`, not on plan 02's
+  list; on Windows `GetLocaleInfoEx` with `LOCALE_IFIRSTDAYOFWEEK` through
+  `windows-sys`, which is), or add a `clock.first_weekday` config key defaulting
+  to Monday, with English names, which a Sunday-first locale sets by hand?
 - **Week numbers: waybar's or ISO?** (M5.) **Q:** The calendar numbers weeks as
   waybar does for a Monday start (`%W`), since the dotfiles do not set
   `iso8601`. ISO weeks (`%V`) are a one-line change. Keep `%W`?
@@ -64,9 +64,6 @@ implementation follows meanwhile.
   that file, which is at `~/Projects/mxaddict/dotfiles` on the owner's machine
   and not on CI. Check a copy into lyr as a test fixture, or read a path from
   the environment and skip the test on CI?
-- **Windows: may lyr take `windows-sys`?** (M9.) **Q:** The Windows power
-  actions, sources and menus (plan 10, plan 11) need Win32 calls through
-  `windows-sys`, new to lyr. Add it when M9 starts?
 - **The `lyr` name on crates.io is taken** (M11). **Q:** `lyr` on crates.io is
   someone else's (Serial-ATA's lyrics tool, 0.3.0, last published 2024-07-23;
   checked 2026-10-20), so the app crate cannot be published under it. The
@@ -513,10 +510,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   on Windows since the change. Keys injected with `SendKeys` arrive with no
   scancode, so crcbl names no key for them; `keybd_event` with scancodes works.
   `[power.menu]` sets an entry to a command (`{ exec = … }`), which runs instead
-  of lyr's action. Not built: the Windows and macOS actions (plan 10 names Win32
-  APIs that need `windows-sys`, new to lyr), and checking what Hyprland does
-  with an outside click (M5's open question for panels applies to this grab
-  popup too).
+  of lyr's action. The Windows actions are built (`lyr_sources::power::windows`:
+  `LockWorkStation`, `SetSuspendState`, and `ExitWindowsEx` after enabling
+  `SeShutdownPrivilege` for a reboot or a power-off, run on a thread of their
+  own), through `windows-sys`, which plan 02 lists as house precedent and which
+  was already in lyr's build through `interprocess`; enabling the privilege is
+  tested on this machine by reading the token back, but no entry has been run,
+  since each locks, suspends, logs off or shuts the machine down. Not built: the
+  macOS actions, and checking what Hyprland does with an outside click (M5's
+  open question for panels applies to this grab popup too).
 - **Bluetooth menu, M7.** Built: its actions on Linux
   (`lyr_sources::bluetooth::linux::BlueZ`): the adapter's power, discoverable
   and pairable switches (`set`), the scan (`scan`), and connect, disconnect,

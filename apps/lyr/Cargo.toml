@@ -39,5 +39,8 @@ lyr-sources.workspace = true
 lyr-wm.workspace = true
 tokio = { version = "1.53.3", features = ["rt", "sync", "time", "net", "macros"] }
 
+[target.'cfg(windows)'.dependencies]
+lyr-sources.workspace = true
+
 [dev-dependencies]
 tempfile = "3.27.0"
