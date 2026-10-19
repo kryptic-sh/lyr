@@ -222,12 +222,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   present path". It logs through `tracing` to `~/.local/state/lyr/logs/lyr.log`
   and to stderr (`apps/lyr/src/log.rs`, `RUST_LOG` to filter), capped at
   `log::MAX_BYTES` by moving it to `lyr.log.1` (tested on Windows and Linux, not
-  watched rotating in a running bar). `colour.rs` copies crcbl-ui's private
-  `srgb_to_linear`. crcbl's main (41859726, 2026-10-19, unreleased, for 0.6.0)
-  exports it as `crcbl_ui::style::from_srgb8` and has opacity groups
-  (`DrawList::push_opacity`/`pop_opacity`); lyr drops the copy and stops
-  approximating group opacity once 0.6.0 is published (lyr depends on released
-  crcbl only). crcbl's CI had not verified the opacity layer on Metal then.
+  watched rotating in a running bar). Colours go through crcbl-ui's
+  `style::from_srgb8`, and a module's opacity is a crcbl-ui opacity group
+  (`DrawList::push_opacity`), faded as one layer as CSS `opacity` is (crcbl
+  0.6.0); neither has been seen on screen since the change. crcbl's CI had not
+  verified the opacity layer on Metal when it reported it.
 - **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors

@@ -9,23 +9,19 @@ use lyr_core::draw::{DrawList as Bar, Item};
 use crate::colour::linear;
 use crate::text::Text;
 
-/// `bar` as crcbl-ui draw commands, its text drawn in `text`.
-///
-/// A group's opacity is multiplied into each of its items' alpha. That
-/// differs from CSS `opacity`, which fades the group as one layer: here a
-/// box's background shows faintly through its own text. crcbl-ui has no
-/// opacity group in 0.5.0; crcbl is adding `push_opacity` / `pop_opacity`,
-/// and this switches to it then.
+/// `bar` as crcbl-ui draw commands, its text drawn in `text`. A group is
+/// one of crcbl-ui's opacity groups, faded as one layer as CSS `opacity`
+/// fades it.
 #[must_use]
 pub fn translate(bar: &Bar, text: &Text) -> DrawList {
     let mut list = DrawList::new();
     for item in &bar.items {
-        push(&mut list, item, 1.0, text);
+        push(&mut list, item, text);
     }
     list
 }
 
-fn push(list: &mut DrawList, item: &Item, opacity: f32, text: &Text) {
+fn push(list: &mut DrawList, item: &Item, text: &Text) {
     match item {
         Item::Box {
             rect,
@@ -36,10 +32,10 @@ fn push(list: &mut DrawList, item: &Item, opacity: f32, text: &Text) {
             Vec2::new(rect.x, rect.y),
             Vec2::new(rect.x + rect.width, rect.y + rect.height),
             CornerRadii::uniform(*radius),
-            linear(*fill, opacity),
+            linear(*fill),
             border.map_or(Border::NONE, |(width, colour)| Border {
                 width,
-                color: linear(colour, opacity),
+                color: linear(colour),
             }),
         ),
         Item::Text {
@@ -54,16 +50,15 @@ fn push(list: &mut DrawList, item: &Item, opacity: f32, text: &Text) {
                 Vec2::new(rect.x, rect.y),
                 Vec2::new(rect.x + rect.width, rect.y + rect.height),
             );
-            text.draw(list, *rect, string, *style, linear(*colour, opacity));
+            text.draw(list, *rect, string, *style, linear(*colour));
             list.pop_clip().expect("the clip pushed just above");
         }
-        Item::Group {
-            opacity: group,
-            items,
-        } => {
+        Item::Group { opacity, items } => {
+            list.push_opacity(*opacity);
             for item in items {
-                push(list, item, opacity * group, text);
+                push(list, item, text);
             }
+            list.pop_opacity().expect("the group pushed just above");
         }
         Item::Clip { rect, items } => {
             list.push_clip(
@@ -71,7 +66,7 @@ fn push(list: &mut DrawList, item: &Item, opacity: f32, text: &Text) {
                 Vec2::new(rect.x + rect.width, rect.y + rect.height),
             );
             for item in items {
-                push(list, item, opacity, text);
+                push(list, item, text);
             }
             list.pop_clip().expect("the clip pushed just above");
         }
@@ -130,41 +125,58 @@ mod tests {
     }
 
     #[test]
-    fn a_groups_opacity_reaches_every_item_inside_it() {
+    fn a_group_is_an_opacity_layer_around_its_items() {
         let bar = Bar {
-            items: vec![Item::Group {
-                opacity: 0.5,
-                items: vec![
-                    Item::Box {
-                        rect: RECT,
-                        radius: 0.0,
-                        fill: colour("#ffffff"),
-                        border: None,
-                    },
-                    Item::Group {
-                        opacity: 0.5,
-                        items: vec![Item::Text {
+            items: vec![
+                Item::Group {
+                    opacity: 0.5,
+                    items: vec![
+                        Item::Box {
                             rect: RECT,
-                            text: "a".to_owned(),
-                            colour: colour("#ffffff"),
-                            style: TextStyle::PLAIN,
-                        }],
-                    },
-                ],
-            }],
+                            radius: 0.0,
+                            fill: colour("#ffffff"),
+                            border: None,
+                        },
+                        Item::Group {
+                            opacity: 0.5,
+                            items: vec![Item::Text {
+                                rect: RECT,
+                                text: "a".to_owned(),
+                                colour: colour("#ffffff"),
+                                style: TextStyle::PLAIN,
+                            }],
+                        },
+                    ],
+                },
+                // After the group, and outside it.
+                Item::Box {
+                    rect: RECT,
+                    radius: 0.0,
+                    fill: colour("#ffffff"),
+                    border: None,
+                },
+            ],
         };
         let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0));
-        let alphas: Vec<f32> = list
-            .commands()
+        let count = list.commands().len();
+        let groups: Vec<(std::ops::Range<usize>, f32)> = list
+            .opacity_groups()
             .iter()
-            .map(|command| match command {
-                DrawCommand::RoundedRect { color, .. } | DrawCommand::Glyphs { color, .. } => {
-                    color[3]
-                }
-                other => panic!("unexpected {other:?}"),
-            })
+            .map(|group| (group.commands.clone(), group.opacity))
             .collect();
-        assert_eq!(alphas, [0.5, 0.25], "nested groups multiply");
+        assert_eq!(
+            groups,
+            [(0..count - 1, 0.5), (1..count - 1, 0.5)],
+            "the outer group holds the box and the inner one, which holds the text"
+        );
+        assert!(
+            list.commands().iter().all(|command| match command {
+                DrawCommand::RoundedRect { color, .. } | DrawCommand::Glyphs { color, .. } =>
+                    (color[3] - 1.0).abs() < f32::EPSILON,
+                _ => true,
+            }),
+            "the items keep their own alpha"
+        );
     }
 
     #[test]
