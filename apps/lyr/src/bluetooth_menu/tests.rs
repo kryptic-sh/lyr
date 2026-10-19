@@ -82,10 +82,10 @@ fn setup(devices: &[Device]) -> Setup {
 #[test]
 fn a_click_on_a_switch_is_the_caller_s_and_escape_closes() {
     let mut setup = setup(&[]);
-    let window = setup.menu.window;
+    let window = setup.menu.panel.window();
     // The power switch, at the right of the first row.
     let at = PhysicalPoint {
-        x: f64::from(setup.menu.size.width - PADDING - 2.0),
+        x: f64::from(setup.menu.panel.size().width - PADDING - 2.0),
         y: f64::from(PADDING + 2.0),
     };
     setup
@@ -107,7 +107,7 @@ fn a_click_on_a_switch_is_the_caller_s_and_escape_closes() {
 #[test]
 fn a_refresh_keeps_the_window_unless_the_size_changes() {
     let mut setup = setup(&[device("Buds")]);
-    let first = setup.menu.window;
+    let first = setup.menu.panel.window();
     let renamed = [Device {
         alias: "Bud2".to_owned(),
         ..device("Buds")
@@ -124,7 +124,7 @@ fn a_refresh_keeps_the_window_unless_the_size_changes() {
         .menu
         .refresh(&mut setup.shell, &look, &adapter(), &renamed, None)
         .expect("refreshed");
-    assert_eq!(setup.menu.window, first, "the same size");
+    assert_eq!(setup.menu.panel.window(), first, "the same size");
     setup
         .menu
         .refresh(
@@ -135,7 +135,7 @@ fn a_refresh_keeps_the_window_unless_the_size_changes() {
             None,
         )
         .expect("refreshed");
-    let second = setup.menu.window;
+    let second = setup.menu.panel.window();
     assert_ne!(second, first, "taller: recreated");
     assert!(setup.shell.title(first).is_err() && setup.shell.title(second).is_ok());
 }
@@ -143,7 +143,7 @@ fn a_refresh_keeps_the_window_unless_the_size_changes() {
 #[test]
 fn the_arrow_keys_move_through_the_targets_and_enter_chooses() {
     let mut setup = setup(&[]);
-    let window = setup.menu.window;
+    let window = setup.menu.panel.window();
     let key = |setup: &mut Setup, key| {
         setup.shell.key_press(window, key).expect("a key");
         setup.pump()
@@ -185,7 +185,7 @@ fn the_arrow_keys_move_through_the_targets_and_enter_chooses() {
 #[test]
 fn a_pin_is_typed_with_the_text_input_on_and_sent_with_enter() {
     let mut setup = setup(&[]);
-    let window = setup.menu.window;
+    let window = setup.menu.panel.window();
     assert_eq!(setup.shell.text_input(window).expect("a window"), None);
     let theme = setup.theme.clone();
     let look = Look {
@@ -204,7 +204,7 @@ fn a_pin_is_typed_with_the_text_input_on_and_sent_with_enter() {
         .menu
         .refresh(&mut setup.shell, &look, &adapter(), &[], Some(ask))
         .expect("refreshed");
-    let window = setup.menu.window;
+    let window = setup.menu.panel.window();
     assert_eq!(
         setup.shell.text_input(window).expect("a window"),
         Some(TextPurpose::Pin)
@@ -240,7 +240,7 @@ fn a_pin_is_typed_with_the_text_input_on_and_sent_with_enter() {
         .menu
         .refresh(&mut setup.shell, &look, &adapter(), &[], None)
         .expect("refreshed");
-    let window = setup.menu.window;
+    let window = setup.menu.panel.window();
     assert_eq!(setup.shell.text_input(window).expect("a window"), None);
     assert!(setup.menu.typed.is_empty(), "the question went");
 }
@@ -273,7 +273,7 @@ fn a_new_question_of_the_same_size_still_turns_the_text_input_on() {
             Some(ask(Question::Authorize)),
         )
         .expect("refreshed");
-    let window = setup.menu.window;
+    let window = setup.menu.panel.window();
     assert_eq!(setup.shell.text_input(window).expect("a window"), None);
     setup
         .menu
@@ -285,7 +285,7 @@ fn a_new_question_of_the_same_size_still_turns_the_text_input_on() {
             Some(ask(Question::Pin)),
         )
         .expect("refreshed");
-    assert_eq!(setup.menu.window, window, "the same size");
+    assert_eq!(setup.menu.panel.window(), window, "the same size");
     assert_eq!(
         setup.shell.text_input(window).expect("a window"),
         Some(TextPurpose::Pin)
@@ -309,12 +309,12 @@ fn a_paired_device_is_renamed_through_a_field_and_escape_cancels_it() {
             .menu
             .refresh(&mut setup.shell, &look, &adapter(), &devices, None)
             .expect("refreshed");
-        let window = setup.menu.window;
+        let window = setup.menu.panel.window();
         setup.shell.text_input(window).expect("a window")
     };
     assert_eq!(setup.menu.act(Target::Rename(0)), Outcome::Redraw);
     assert_eq!(refresh(&mut setup), Some(TextPurpose::Normal));
-    let window = setup.menu.window;
+    let window = setup.menu.panel.window();
     setup
         .shell
         .commit_text(window, "Desk speakers")
@@ -336,7 +336,7 @@ fn a_paired_device_is_renamed_through_a_field_and_escape_cancels_it() {
     assert_eq!(refresh(&mut setup), None, "sent: the field goes");
     setup.menu.act(Target::Rename(0));
     refresh(&mut setup);
-    let window = setup.menu.window;
+    let window = setup.menu.panel.window();
     setup
         .shell
         .key_press(window, KeyCode::Escape)
@@ -362,7 +362,7 @@ fn a_paired_device_is_renamed_through_a_field_and_escape_cancels_it() {
         .menu
         .refresh(&mut setup.shell, &look, &adapter(), &[], None)
         .expect("refreshed");
-    let window = setup.menu.window;
+    let window = setup.menu.panel.window();
     assert_eq!(
         (
             setup.menu.renaming.as_ref(),
@@ -396,7 +396,7 @@ fn the_agent_s_question_takes_the_header_from_a_rename() {
         .refresh(&mut setup.shell, &look, &adapter(), &devices, Some(ask))
         .expect("refreshed");
     assert_eq!(setup.menu.renaming, None);
-    let window = setup.menu.window;
+    let window = setup.menu.panel.window();
     assert_eq!(setup.shell.text_input(window).expect("a window"), None);
     assert_eq!(
         setup.menu.act(Target::Answer(true)),

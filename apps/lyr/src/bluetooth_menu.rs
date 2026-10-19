@@ -7,40 +7,21 @@
 //! input; `Escape` (once a rename is cancelled), losing focus and the same
 //! click or binding again close it.
 //!
-//! It is a panel rather than a popup so `lyr panel bluetooth` can open it:
-//! a Wayland popup's grab needs the serial of the input that opened it. It is
-//! recreated when its size changes (a scan finding a device), since crcbl
-//! 0.5.0 cannot resize a panel.
+//! Its panel is [`MenuPanel`]'s, recreated when its size changes (a scan
+//! finding a device).
 
-use crcbl_shell::{
-    ButtonState, CloseReply, KeyCode, LogicalSize, Margins, PanelAnchor, PanelDesc, PanelKeyboard,
-    PanelLayer, Reserve, Shell, ShellEvent, TextPurpose, WindowDesc, WindowId, WindowRole,
-};
+use crcbl_shell::{ButtonState, KeyCode, Shell, ShellEvent, TextPurpose, WindowId};
 use lyr_core::bluetooth_menu::{
     self, Adapter, Ask, Device, Header, PIN_LENGTH, Question, Reply, Target, order,
 };
-use lyr_core::draw::{DrawList, Size};
-use lyr_core::hit::Regions;
-use lyr_core::pointer::Press;
-use lyr_render::surface::Surface;
 use lyr_render::text::Text;
-use lyr_render::translate::translate;
-use lyr_shell::bars::NAMESPACE;
 
-use crate::input::Pointer;
-use crate::toasts::EDGE_MARGIN;
+use crate::menu_panel::{Event, MenuPanel};
 use crate::tooltips::Look;
 
 /// The open menu.
 pub struct BluetoothMenu {
-    window: WindowId,
-    /// From the output's left edge.
-    left: f64,
-    size: Size,
-    list: DrawList,
-    regions: Regions<Target>,
-    /// The keyboard's place, by the target's index in the order drawn.
-    focus: Option<usize>,
+    panel: MenuPanel<Target>,
     /// The devices' paths, in the order drawn.
     paths: Vec<String>,
     /// The device being renamed, by its path, until the name is sent or
@@ -50,10 +31,6 @@ pub struct BluetoothMenu {
     showing: Option<Showing>,
     /// What has been typed into the header's field.
     typed: String,
-    pointer: Pointer,
-    scale: f32,
-    surface: Option<Surface>,
-    dirty: bool,
 }
 
 /// What the menu's header shows.
@@ -83,34 +60,6 @@ pub enum Outcome {
     Redraw,
 }
 
-/// The panel's window, `size` big, `left` from the output's left edge.
-fn create(shell: &mut dyn Shell, size: Size, left: f64) -> anyhow::Result<WindowId> {
-    Ok(shell.create_window(&WindowDesc {
-        title: NAMESPACE,
-        app_id: NAMESPACE,
-        size: LogicalSize {
-            width: f64::from(size.width),
-            height: f64::from(size.height),
-        },
-        transparent: true,
-        role: WindowRole::Panel(PanelDesc {
-            namespace: NAMESPACE,
-            monitor: None,
-            layer: PanelLayer::Overlay,
-            anchor: PanelAnchor::TOP | PanelAnchor::LEFT,
-            reserve: Reserve::None,
-            margins: Margins {
-                top: EDGE_MARGIN,
-                right: 0.0,
-                bottom: 0.0,
-                left,
-            },
-            keyboard: PanelKeyboard::Exclusive,
-        }),
-        ..WindowDesc::default()
-    })?)
-}
-
 impl BluetoothMenu {
     /// Opens the menu for `adapter` and its `devices`, `left` from the
     /// output's left edge.
@@ -122,7 +71,7 @@ impl BluetoothMenu {
         devices: &[Device],
         ask: Option<Ask<'_>>,
     ) -> anyhow::Result<Self> {
-        let (list, size, regions) = bluetooth_menu::draw(
+        let drawn = bluetooth_menu::draw(
             adapter,
             devices,
             ask.map(Header::Ask),
@@ -132,20 +81,11 @@ impl BluetoothMenu {
             look.theme,
         );
         let menu = Self {
-            window: create(shell, size, left)?,
-            left,
-            size,
-            list,
-            regions,
-            focus: None,
+            panel: MenuPanel::open(shell, left, drawn)?,
             paths: paths(devices),
             renaming: None,
             showing: ask.map(|ask| Showing::Ask(ask.device.to_owned(), ask.question)),
             typed: String::new(),
-            pointer: Pointer::default(),
-            scale: 1.0,
-            surface: None,
-            dirty: false,
         };
         menu.take_typing(shell)?;
         Ok(menu)
@@ -162,7 +102,7 @@ impl BluetoothMenu {
 
     /// Has the window system's text input on while the header has a field.
     fn take_typing(&self, shell: &mut dyn Shell) -> anyhow::Result<()> {
-        Ok(shell.set_text_input(self.window, self.field())?)
+        self.panel.set_typing(shell, self.field())
     }
 
     /// Brings the header up to date with the agent's question `ask` and
@@ -209,12 +149,12 @@ impl BluetoothMenu {
 
     /// Whether `window` is the menu.
     pub fn owns(&self, window: WindowId) -> bool {
-        self.window == window
+        self.panel.owns(window)
     }
 
     /// Whether it has a frame to present.
-    pub fn dirty(&self) -> bool {
-        self.dirty
+    pub const fn dirty(&self) -> bool {
+        self.panel.dirty()
     }
 
     /// Draws the menu again for `adapter` and `devices` as they are now,
@@ -229,61 +169,27 @@ impl BluetoothMenu {
     ) -> anyhow::Result<()> {
         let new_header = self.follow(ask, devices);
         self.paths = paths(devices);
-        let (list, size, regions) = bluetooth_menu::draw(
+        let drawn = bluetooth_menu::draw(
             adapter,
             devices,
             self.header(ask, devices),
-            self.focused(),
+            self.panel.focused(),
             look.measure,
             look.line_height,
             look.theme,
         );
-        let count = regions.targets().count();
-        self.focus = self.focus.filter(|_| count > 0).map(|at| at.min(count - 1));
-        let resized = size != self.size;
-        if resized {
-            if let Some(surface) = self.surface.take() {
-                surface.destroy()?;
-            }
-            shell.destroy_window(self.window)?;
-            self.window = create(shell, size, self.left)?;
-            self.size = size;
-        }
-        if resized || new_header {
+        if self.panel.show(shell, drawn)? || new_header {
             self.take_typing(shell)?;
         }
-        self.list = list;
-        self.regions = regions;
-        self.dirty = true;
         Ok(())
     }
 
     /// Applies an event for the menu's window.
     pub fn event(&mut self, shell: &mut dyn Shell, event: &ShellEvent) -> anyhow::Result<Outcome> {
-        if event.window() != Some(self.window) {
+        if !event.window().is_some_and(|window| self.panel.owns(window)) {
             return Ok(Outcome::Kept);
         }
         match *event {
-            ShellEvent::Resized {
-                size, scale_factor, ..
-            }
-            | ShellEvent::ScaleFactorChanged {
-                size, scale_factor, ..
-            } => {
-                let device = (size.width, size.height);
-                self.scale = scale_factor as f32;
-                match &mut self.surface {
-                    Some(surface) => surface.resize(device, self.scale)?,
-                    None => {
-                        self.surface = Some(Surface::open(shell, self.window, device, self.scale)?);
-                    }
-                }
-                self.dirty = true;
-            }
-            ShellEvent::CloseRequested { window } => {
-                shell.reply_close_request(window, CloseReply::Close)?;
-                return Ok(Outcome::Closed);
-            }
             ShellEvent::Key {
                 key_code: Some(KeyCode::Escape),
                 state: ButtonState::Pressed,
@@ -292,12 +198,6 @@ impl BluetoothMenu {
                 self.renaming = None;
                 return Ok(Outcome::Redraw);
             }
-            ShellEvent::Focus { focused: false, .. }
-            | ShellEvent::Key {
-                key_code: Some(KeyCode::Escape),
-                state: ButtonState::Pressed,
-                ..
-            } => return Ok(Outcome::Close),
             ShellEvent::TextCommit { ref text, .. } if self.field().is_some() => {
                 let room = match self.field() {
                     Some(TextPurpose::Pin) => PIN_LENGTH - self.typed.chars().count(),
@@ -315,45 +215,18 @@ impl BluetoothMenu {
                 self.typed.pop();
                 return Ok(Outcome::Redraw);
             }
-            ShellEvent::Key {
-                key_code: Some(key),
-                state: ButtonState::Pressed,
-                ..
-            } => {
-                let count = self.regions.targets().count();
-                if count == 0 {
-                    return Ok(Outcome::Kept);
-                }
-                match key {
-                    KeyCode::ArrowDown => {
-                        self.focus = Some(self.focus.map_or(0, |at| (at + 1).min(count - 1)));
-                        return Ok(Outcome::Redraw);
-                    }
-                    KeyCode::ArrowUp => {
-                        self.focus = Some(self.focus.map_or(0, |at| at.saturating_sub(1)));
-                        return Ok(Outcome::Redraw);
-                    }
-                    // With nothing chosen, Enter sends what was typed.
-                    KeyCode::Enter | KeyCode::NumpadEnter => match self.focused() {
-                        Some(target) => return Ok(self.act(target)),
-                        None if self.field().is_some() => {
-                            return Ok(self.act(Target::Answer(true)));
-                        }
-                        None => {}
-                    },
-                    _ => {}
-                }
-            }
-            _ => {
-                let presses = self.pointer.handle(event, self.scale);
-                if presses.contains(&Press::Left)
-                    && let Some(&target) = self.pointer.target(&self.regions)
-                {
-                    return Ok(self.act(target));
-                }
-            }
+            _ => {}
         }
-        Ok(Outcome::Kept)
+        Ok(match self.panel.event(shell, event)? {
+            Event::Kept => Outcome::Kept,
+            Event::Close => Outcome::Close,
+            Event::Closed => Outcome::Closed,
+            Event::Redraw => Outcome::Redraw,
+            Event::Pick(target) => self.act(target),
+            // With nothing chosen, Enter sends what was typed.
+            Event::Enter if self.field().is_some() => self.act(Target::Answer(true)),
+            Event::Enter => Outcome::Kept,
+        })
     }
 
     /// What choosing `target` does: a rename started, sent or cancelled,
@@ -386,29 +259,15 @@ impl BluetoothMenu {
         }
     }
 
-    /// The target the keyboard is on.
-    fn focused(&self) -> Option<Target> {
-        self.regions.targets().nth(self.focus?).copied()
-    }
-
     /// Draws the menu if it has a frame to present.
     pub fn draw(&mut self, text: &Text) -> anyhow::Result<()> {
-        if let (true, Some(surface)) = (self.dirty, &mut self.surface) {
-            self.dirty = !surface.draw(&translate(&self.list, text))?;
-        }
-        Ok(())
+        self.panel.draw(text)
     }
 
     /// Closes the menu: its surface, then its window unless the window
     /// system has closed it already (`window_gone`).
     pub fn close(self, shell: &mut dyn Shell, window_gone: bool) -> anyhow::Result<()> {
-        if let Some(surface) = self.surface {
-            surface.destroy()?;
-        }
-        if !window_gone {
-            shell.destroy_window(self.window)?;
-        }
-        Ok(())
+        self.panel.close(shell, window_gone)
     }
 }
 

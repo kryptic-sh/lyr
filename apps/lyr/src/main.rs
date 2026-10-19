@@ -11,6 +11,7 @@ mod control;
 mod exec;
 mod input;
 mod log;
+mod menu_panel;
 mod modules;
 mod power_menu;
 mod sources;
