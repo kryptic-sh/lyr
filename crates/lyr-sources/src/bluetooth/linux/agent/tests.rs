@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 use zbus::connection::Builder;
 use zbus::{Connection, Guid, ObjectPath};
 
-use super::{Agent, PATH, Prompt, Question};
+use super::{Agent, PATH, Prompt, Question, Reply};
 
 const DEVICE: &str = "/org/bluez/hci0/dev_AA_BB_CC_DD_EE_FF";
 
@@ -14,6 +14,7 @@ trait BlueZSide {
     fn request_confirmation(&self, device: &ObjectPath<'_>, passkey: u32) -> zbus::Result<()>;
     fn request_authorization(&self, device: &ObjectPath<'_>) -> zbus::Result<()>;
     fn request_pin_code(&self, device: &ObjectPath<'_>) -> zbus::Result<String>;
+    fn request_passkey(&self, device: &ObjectPath<'_>) -> zbus::Result<u32>;
 }
 
 async fn agent() -> (
@@ -56,7 +57,7 @@ async fn a_confirmed_passkey_lets_pairing_go_on() {
             (prompt.device.as_str(), prompt.question),
             (DEVICE, Question::Confirm(123_456))
         );
-        prompt.answer.send(true).expect("answered");
+        prompt.answer.send(Reply::Yes).expect("answered");
     };
     let (asked_bluez, ()) = tokio::join!(bluez.request_confirmation(&device, 123_456), answer);
     asked_bluez.expect("confirmed");
@@ -69,7 +70,7 @@ async fn a_declined_or_unanswered_question_is_rejected_or_canceled() {
     let decline = async {
         let prompt = asked.recv().await.expect("a prompt");
         assert_eq!(prompt.question, Question::Authorize);
-        prompt.answer.send(false).expect("answered");
+        prompt.answer.send(Reply::No).expect("answered");
     };
     let (declined, ()) = tokio::join!(bluez.request_authorization(&device), decline);
     assert_eq!(
@@ -87,10 +88,36 @@ async fn a_declined_or_unanswered_question_is_rejected_or_canceled() {
 }
 
 #[tokio::test]
-async fn a_pin_is_rejected_since_lyr_cannot_take_one() {
+async fn a_pin_typed_in_goes_to_bluez() {
+    let (bluez, mut asked, _server) = agent().await;
+    let device = ObjectPath::try_from(DEVICE).expect("a path");
+    let answer = async {
+        let prompt = asked.recv().await.expect("a prompt");
+        assert_eq!(prompt.question, Question::Pin);
+        prompt
+            .answer
+            .send(Reply::Pin("0042".to_owned()))
+            .expect("answered");
+    };
+    let (pin, ()) = tokio::join!(bluez.request_pin_code(&device), answer);
+    assert_eq!(pin.expect("a PIN"), "0042");
+    let yes = async {
+        let prompt = asked.recv().await.expect("a prompt");
+        prompt.answer.send(Reply::Yes).expect("answered");
+    };
+    let (no_pin, ()) = tokio::join!(bluez.request_pin_code(&device), yes);
+    assert_eq!(
+        error_name(&no_pin.expect_err("rejected")).as_deref(),
+        Some("org.bluez.Error.Rejected"),
+        "a yes is no PIN"
+    );
+}
+
+#[tokio::test]
+async fn a_typed_passkey_is_rejected_since_lyr_claims_no_keyboard() {
     let (bluez, _asked, _server) = agent().await;
     let device = ObjectPath::try_from(DEVICE).expect("a path");
-    let error = bluez.request_pin_code(&device).await.expect_err("rejected");
+    let error = bluez.request_passkey(&device).await.expect_err("rejected");
     assert_eq!(
         error_name(&error).as_deref(),
         Some("org.bluez.Error.Rejected")

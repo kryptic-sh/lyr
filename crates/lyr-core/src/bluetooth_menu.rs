@@ -64,6 +64,21 @@ pub enum Question {
     Authorize,
     /// May the device connect to a service?
     AuthorizeService,
+    /// What is the device's PIN? Asked of a device that pairs the legacy way.
+    Pin,
+}
+
+/// The longest PIN BlueZ takes; it refuses an empty one too
+/// (`pincode_reply` in its `src/agent.c`).
+pub const PIN_LENGTH: usize = 16;
+
+/// The answer to the pairing agent's question.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Reply {
+    Yes,
+    No,
+    /// The PIN typed in.
+    Pin(String),
 }
 
 /// A question waiting at the top of the menu, about the device named
@@ -72,6 +87,8 @@ pub enum Question {
 pub struct Ask<'a> {
     pub device: &'a str,
     pub question: Question,
+    /// What has been typed for a [`Question::Pin`].
+    pub typed: &'a str,
 }
 
 impl Ask<'_> {
@@ -83,6 +100,7 @@ impl Ask<'_> {
             Question::Confirm(passkey) => format!("Pair with {device}? Passkey {passkey:06}"),
             Question::Authorize => format!("Let {device} pair?"),
             Question::AuthorizeService => format!("Let {device} connect?"),
+            Question::Pin => format!("PIN for {device}"),
         }
     }
 }
@@ -204,9 +222,17 @@ pub fn draw(
                 .sum::<f32>()
         })
         .fold(2.0 * row, f32::max);
-    let answers = [("Yes", true), ("No", false)];
+    let pin = ask.is_some_and(|ask| ask.question == Question::Pin);
+    let answers = if pin {
+        [("OK", true), ("Cancel", false)]
+    } else {
+        [("Yes", true), ("No", false)]
+    };
+    // The PIN's field holds the longest PIN, so typing never resizes it.
+    let field_width = measure(&"0".repeat(PIN_LENGTH)) + 2.0 * across;
     let ask_width = ask.map_or(0.0, |ask| {
         measure(&ask.text())
+            + if pin { GAP + field_width } else { 0.0 }
             + answers
                 .iter()
                 .map(|(label, _)| GAP + button_width(label))
@@ -229,6 +255,21 @@ pub fn draw(
     // The agent's question first, where it cannot be missed.
     if let Some(ask) = ask {
         items.push(text(ask.text(), PADDING, y, theme.workspace_active));
+        if pin {
+            let x = PADDING + measure(&ask.text()) + GAP;
+            items.push(Item::Box {
+                rect: Rect {
+                    x,
+                    y,
+                    width: field_width,
+                    height: row,
+                },
+                radius: theme.radius as f32,
+                fill: theme.module_background,
+                border: Some((theme.border_width as f32, theme.workspace_active)),
+            });
+            items.push(text(ask.typed.to_owned(), x + across, y, theme.foreground));
+        }
         let mut x = width - PADDING;
         for (label, answer) in answers.iter().rev() {
             x -= button_width(label);

@@ -1,8 +1,11 @@
 use crcbl_shell::{
     ButtonState, HeadlessShell, KeyCode, PhysicalPoint, PointerButton, Shell, ShellEvent,
+    TextPurpose,
 };
 use lyr_config::{Platform, Theme, from_sources};
-use lyr_core::bluetooth_menu::{Adapter, Device, PADDING, Switch, Target};
+use lyr_core::bluetooth_menu::{
+    Adapter, Ask, Device, PADDING, PIN_LENGTH, Question, Reply, Switch, Target,
+};
 
 use super::{BluetoothMenu, Outcome};
 use crate::tooltips::Look;
@@ -146,7 +149,7 @@ fn the_arrow_keys_move_through_the_targets_and_enter_chooses() {
         Outcome::Kept,
         "nothing yet"
     );
-    assert_eq!(key(&mut setup, KeyCode::ArrowDown), Outcome::Moved);
+    assert_eq!(key(&mut setup, KeyCode::ArrowDown), Outcome::Redraw);
     assert_eq!(
         key(&mut setup, KeyCode::Enter),
         Outcome::Act(Target::Switch(Switch::Powered)),
@@ -172,5 +175,111 @@ fn the_arrow_keys_move_through_the_targets_and_enter_chooses() {
         key(&mut setup, KeyCode::Enter),
         Outcome::Act(Target::Switch(Switch::Powered)),
         "and the first"
+    );
+}
+
+#[test]
+fn a_pin_is_typed_with_the_text_input_on_and_sent_with_enter() {
+    let mut setup = setup(&[]);
+    let window = setup.menu.window;
+    assert_eq!(setup.shell.text_input(window).expect("a window"), None);
+    let theme = setup.theme.clone();
+    let look = Look {
+        theme: &theme,
+        measure: &measure,
+        line_height: 20.0,
+    };
+    let ask = Ask {
+        device: "Kbd",
+        question: Question::Pin,
+        typed: "",
+    };
+    setup
+        .menu
+        .refresh(&mut setup.shell, &look, &adapter(), &[], Some(ask))
+        .expect("refreshed");
+    let window = setup.menu.window;
+    assert_eq!(
+        setup.shell.text_input(window).expect("a window"),
+        Some(TextPurpose::Pin)
+    );
+    setup
+        .shell
+        .key_press(window, KeyCode::Enter)
+        .expect("a key");
+    assert_eq!(setup.pump(), Outcome::Kept, "nothing typed: no answer");
+    setup.shell.commit_text(window, "12\u{8}3").expect("typed");
+    assert_eq!(setup.pump(), Outcome::Redraw);
+    setup
+        .shell
+        .key_press(window, KeyCode::Backspace)
+        .expect("a key");
+    assert_eq!(setup.pump(), Outcome::Redraw);
+    setup
+        .shell
+        .key_press(window, KeyCode::Enter)
+        .expect("a key");
+    assert_eq!(
+        setup.pump(),
+        Outcome::Answer(Reply::Pin("12".to_owned())),
+        "no control characters, and Backspace took the 3"
+    );
+    setup
+        .shell
+        .commit_text(window, &"9".repeat(PIN_LENGTH + 4))
+        .expect("typed");
+    setup.pump();
+    assert_eq!(setup.menu.typed.chars().count(), PIN_LENGTH, "at most");
+    setup
+        .menu
+        .refresh(&mut setup.shell, &look, &adapter(), &[], None)
+        .expect("refreshed");
+    let window = setup.menu.window;
+    assert_eq!(setup.shell.text_input(window).expect("a window"), None);
+    assert!(setup.menu.typed.is_empty(), "the question went");
+}
+
+#[test]
+fn a_new_question_of_the_same_size_still_turns_the_text_input_on() {
+    // A long name holds the width, so the menu keeps its size and window.
+    let devices = [device(&"A".repeat(60))];
+    let mut setup = setup(&devices);
+    let theme = setup.theme.clone();
+    let look = Look {
+        theme: &theme,
+        measure: &measure,
+        line_height: 20.0,
+    };
+    let ask = |question| Ask {
+        device: "Kbd",
+        question,
+        typed: "",
+    };
+    setup
+        .menu
+        .refresh(
+            &mut setup.shell,
+            &look,
+            &adapter(),
+            &devices,
+            Some(ask(Question::Authorize)),
+        )
+        .expect("refreshed");
+    let window = setup.menu.window;
+    assert_eq!(setup.shell.text_input(window).expect("a window"), None);
+    setup
+        .menu
+        .refresh(
+            &mut setup.shell,
+            &look,
+            &adapter(),
+            &devices,
+            Some(ask(Question::Pin)),
+        )
+        .expect("refreshed");
+    assert_eq!(setup.menu.window, window, "the same size");
+    assert_eq!(
+        setup.shell.text_input(window).expect("a window"),
+        Some(TextPurpose::Pin)
     );
 }

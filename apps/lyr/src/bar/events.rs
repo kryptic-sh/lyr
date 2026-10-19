@@ -252,7 +252,12 @@ impl App {
                 }
             }
             BluetoothOutcome::Act(target) => self.bluetooth_act(target),
-            BluetoothOutcome::Moved => self.refresh_bluetooth_menu(shell)?,
+            BluetoothOutcome::Answer(reply) => {
+                self.bluetooth_answer(reply);
+                // The question goes from the menu.
+                self.refresh_bluetooth_menu(shell)?;
+            }
+            BluetoothOutcome::Redraw => self.refresh_bluetooth_menu(shell)?,
         }
         Ok(())
     }
@@ -263,12 +268,6 @@ impl App {
         use lyr_core::bluetooth_menu::{Switch, Target, order};
 
         use crate::sources::BluetoothRequest;
-        if let Target::Answer(yes) = target {
-            if let Some((id, _, _)) = self.data.bluetooth_ask.take() {
-                self.commands.bluetooth(BluetoothRequest::Answer(id, yes));
-            }
-            return;
-        }
         let Some(adapter) = &self.data.bluetooth_adapter else {
             return;
         };
@@ -300,9 +299,22 @@ impl App {
         self.commands.bluetooth(request);
     }
 
+    /// Answers the pairing agent's question.
+    #[cfg(target_os = "linux")]
+    fn bluetooth_answer(&mut self, reply: lyr_core::bluetooth_menu::Reply) {
+        if let Some((id, _, _)) = self.data.bluetooth_ask.take() {
+            self.commands
+                .bluetooth(crate::sources::BluetoothRequest::Answer(id, reply));
+        }
+    }
+
     /// Windows and macOS: the menu has no adapter to open on yet.
     #[cfg(not(target_os = "linux"))]
     fn bluetooth_act(&mut self, _target: lyr_core::bluetooth_menu::Target) {}
+
+    /// Windows and macOS: there is no pairing agent to answer.
+    #[cfg(not(target_os = "linux"))]
+    fn bluetooth_answer(&mut self, _reply: lyr_core::bluetooth_menu::Reply) {}
 
     /// Applies `event`, which is for the clock panel's window.
     fn panel_event(&mut self, shell: &mut dyn Shell, event: &ShellEvent) -> anyhow::Result<()> {

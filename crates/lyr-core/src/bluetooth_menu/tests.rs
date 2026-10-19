@@ -150,6 +150,7 @@ fn the_agent_s_question_comes_first_with_yes_and_no() {
     let ask = Ask {
         device: "Buds",
         question: Question::Confirm(42),
+        typed: "",
     };
     assert_eq!(ask.text(), "Pair with Buds? Passkey 000042");
     let (list, size, regions) = draw(&adapter(), &[], Some(ask), None, &measure, LINE, &theme);
@@ -179,12 +180,53 @@ fn the_agent_s_question_comes_first_with_yes_and_no() {
         assert_eq!(
             Ask {
                 device: "Buds",
-                question
+                question,
+                typed: "",
             }
             .text(),
             words
         );
     }
+}
+
+#[test]
+fn a_pin_is_typed_into_a_field_with_ok_and_cancel() {
+    let theme = theme();
+    let ask = Ask {
+        device: "Kbd",
+        question: Question::Pin,
+        typed: "0042",
+    };
+    assert_eq!(ask.text(), "PIN for Kbd");
+    let (list, size, regions) = draw(&adapter(), &[], Some(ask), None, &measure, LINE, &theme);
+    // The question, then a field as wide as the longest PIN with its
+    // padding, then OK and Cancel.
+    let field = PADDING + 110.0 + GAP;
+    let field_width = 16.0 * 10.0 + 16.0;
+    assert_eq!(
+        size.width,
+        2.0 * PADDING + 110.0 + GAP + field_width + GAP + 36.0 + GAP + 76.0
+    );
+    assert!(list.items.iter().any(|item| matches!(
+        item,
+        Item::Box { rect, .. } if rect.x == field && rect.width == field_width
+    )));
+    assert!(list.items.iter().any(
+        |item| matches!(item, Item::Text { text, rect, .. } if text == "0042" && rect.x == field + 8.0)
+    ));
+    let labels: Vec<&str> = list
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Text { text, rect, .. } if rect.y < PADDING + ROW && rect.x > field + 8.0 => {
+                Some(text.as_str())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(labels, ["Cancel", "OK"], "drawn right to left");
+    let x = size.width - PADDING - 1.0;
+    assert_eq!(regions.hit(x, PADDING + 1.0), Some(&Target::Answer(false)));
 }
 
 #[test]

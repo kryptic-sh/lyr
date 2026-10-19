@@ -447,16 +447,24 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   Tested on crcbl's headless shell and mutation-checked; never run against a
   real BlueZ, and on Windows `lyr panel bluetooth` answers that there is no
   adapter. The arrow keys move an outline through its buttons and switches in
-  the order drawn, and Enter acts on the outlined one. Not built: a PIN or
-  passkey typed in (the pairing agent is built and registered at start, its
-  question shown at the top of the menu with Yes and No, which opens the menu if
-  it is closed; the agent: `bluetooth::linux::agent`, `DisplayYesNo`, a passkey
-  confirmation or an authorization asked as a yes or no and answered `Rejected`
-  or `Canceled` otherwise, a PIN or typed passkey always `Rejected` since lyr
-  has no text input; tested against BlueZ's side on a peer-to-peer connection
-  and mutation-checked), the source task's side, which keeps each question's
-  answer by id, is not tested end to end, rename, favourites, and the Windows
-  and macOS menus.
+  the order drawn, and Enter acts on the outlined one. The pairing agent
+  (`bluetooth::linux::agent`) is built and registered at start as
+  `DisplayYesNo`; its question shows at the top of the menu, which opens if it
+  is closed. A passkey confirmation or an authorization is asked with Yes and
+  No, and a PIN (BlueZ asks for one of a device that pairs the legacy way,
+  whatever the capability: `pin_code_request_callback` in its `src/adapter.c`,
+  read on master) is typed into a field with OK and Cancel, through crcbl's text
+  input as `TextPurpose::Pin`: at most `PIN_LENGTH` characters, Backspace, Enter
+  sends it, and nothing typed sends nothing. The PIN is drawn as typed, not
+  masked, as GNOME's and Windows' pairing dialogs show it. A No is `Rejected`,
+  an unanswered question `Canceled`, and a typed passkey always `Rejected`,
+  since lyr claims no keyboard. The agent is tested against BlueZ's side on a
+  peer-to-peer connection, the menu on crcbl's headless shell, both
+  mutation-checked. Not built: the agent's `Cancel` does nothing, so a question
+  BlueZ gave up on stays in the menu until answered (the answer then goes
+  nowhere); the source task's side, which keeps each question's answer by id, is
+  not tested end to end; the PIN field has never had a real input method behind
+  it; rename, favourites, and the Windows and macOS menus.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

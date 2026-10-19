@@ -56,6 +56,7 @@ impl Data {
         Some(lyr_core::bluetooth_menu::Ask {
             device,
             question: *question,
+            typed: "",
         })
     }
 

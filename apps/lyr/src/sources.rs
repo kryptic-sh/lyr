@@ -54,8 +54,8 @@ pub enum BluetoothRequest {
     Device(String, lyr_core::bluetooth_menu::DeviceAction),
     /// The adapter's path, then the device's.
     Forget(String, String),
-    /// Yes or no to the pairing agent's question with this id.
-    Answer(u64, bool),
+    /// The answer to the pairing agent's question with this id.
+    Answer(u64, lyr_core::bluetooth_menu::Reply),
 }
 
 /// What the bar asks of the notification daemon.
@@ -350,10 +350,10 @@ mod linux {
         };
         let act = async {
             while let Some(request) = requests.recv().await {
-                if let BluetoothRequest::Answer(id, yes) = request {
+                if let BluetoothRequest::Answer(id, reply) = request {
                     // BlueZ has given up on a question it no longer waits on.
                     if let Some(answer) = pending.borrow_mut().remove(&id) {
-                        let _gone = answer.send(yes);
+                        let _gone = answer.send(reply);
                     }
                     continue;
                 }

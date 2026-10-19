@@ -2,8 +2,9 @@
 //! panel at the top left, under the Bluetooth module where a bar shows one,
 //! taking the keyboard. A click on a switch or a device's button is the
 //! caller's to carry out, as is Enter on the one the arrow keys have moved
-//! to; `Escape`, losing focus and the same click or binding again close
-//! it.
+//! to, and so is the answer to the pairing agent's question, a PIN typed
+//! into it through the window system's text input; `Escape`, losing focus
+//! and the same click or binding again close it.
 //!
 //! It is a panel rather than a popup so `lyr panel bluetooth` can open it:
 //! a Wayland popup's grab needs the serial of the input that opened it. It is
@@ -12,9 +13,9 @@
 
 use crcbl_shell::{
     ButtonState, CloseReply, KeyCode, LogicalSize, Margins, PanelAnchor, PanelDesc, PanelKeyboard,
-    PanelLayer, Reserve, Shell, ShellEvent, WindowDesc, WindowId, WindowRole,
+    PanelLayer, Reserve, Shell, ShellEvent, TextPurpose, WindowDesc, WindowId, WindowRole,
 };
-use lyr_core::bluetooth_menu::{self, Adapter, Ask, Device, Target};
+use lyr_core::bluetooth_menu::{self, Adapter, Ask, Device, PIN_LENGTH, Question, Reply, Target};
 use lyr_core::draw::{DrawList, Size};
 use lyr_core::hit::Regions;
 use lyr_core::pointer::Press;
@@ -37,6 +38,10 @@ pub struct BluetoothMenu {
     regions: Regions<Target>,
     /// The keyboard's place, by the target's index in the order drawn.
     focus: Option<usize>,
+    /// The pairing agent's question shown, by the device's name.
+    asked: Option<(String, Question)>,
+    /// The PIN typed so far.
+    typed: String,
     pointer: Pointer,
     scale: f32,
     surface: Option<Surface>,
@@ -53,8 +58,10 @@ pub enum Outcome {
     Closed,
     /// A switch or a device's button was clicked, or chosen with Enter.
     Act(Target),
-    /// The keyboard's place moved: the menu is to be drawn again.
-    Moved,
+    /// The pairing agent's question was answered.
+    Answer(Reply),
+    /// The keyboard moved its place or typed: the menu is to be drawn again.
+    Redraw,
 }
 
 /// The panel's window, `size` big, `left` from the output's left edge.
@@ -105,18 +112,33 @@ impl BluetoothMenu {
             look.line_height,
             look.theme,
         );
-        Ok(Self {
+        let menu = Self {
             window: create(shell, size, left)?,
             left,
             size,
             list,
             regions,
             focus: None,
+            asked: ask.map(|ask| (ask.device.to_owned(), ask.question)),
+            typed: String::new(),
             pointer: Pointer::default(),
             scale: 1.0,
             surface: None,
             dirty: false,
-        })
+        };
+        menu.take_typing(shell)?;
+        Ok(menu)
+    }
+
+    /// Whether a PIN is being asked for.
+    fn asks_pin(&self) -> bool {
+        matches!(self.asked, Some((_, Question::Pin)))
+    }
+
+    /// Has the window system's text input on while a PIN is asked for.
+    fn take_typing(&self, shell: &mut dyn Shell) -> anyhow::Result<()> {
+        let field = self.asks_pin().then_some(TextPurpose::Pin);
+        Ok(shell.set_text_input(self.window, field)?)
     }
 
     /// Whether `window` is the menu.
@@ -139,6 +161,16 @@ impl BluetoothMenu {
         devices: &[Device],
         ask: Option<Ask<'_>>,
     ) -> anyhow::Result<()> {
+        let asked = ask.map(|ask| (ask.device.to_owned(), ask.question));
+        let new_question = asked != self.asked;
+        if new_question {
+            self.asked = asked;
+            self.typed.clear();
+        }
+        let ask = ask.map(|ask| Ask {
+            typed: &self.typed,
+            ..ask
+        });
         let (list, size, regions) = bluetooth_menu::draw(
             adapter,
             devices,
@@ -150,13 +182,17 @@ impl BluetoothMenu {
         );
         let count = regions.targets().count();
         self.focus = self.focus.filter(|_| count > 0).map(|at| at.min(count - 1));
-        if size != self.size {
+        let resized = size != self.size;
+        if resized {
             if let Some(surface) = self.surface.take() {
                 surface.destroy()?;
             }
             shell.destroy_window(self.window)?;
             self.window = create(shell, size, self.left)?;
             self.size = size;
+        }
+        if resized || new_question {
+            self.take_typing(shell)?;
         }
         self.list = list;
         self.regions = regions;
@@ -196,6 +232,20 @@ impl BluetoothMenu {
                 state: ButtonState::Pressed,
                 ..
             } => return Ok(Outcome::Close),
+            ShellEvent::TextCommit { ref text, .. } if self.asks_pin() => {
+                let room = PIN_LENGTH - self.typed.chars().count();
+                self.typed
+                    .extend(text.chars().filter(|c| !c.is_control()).take(room));
+                return Ok(Outcome::Redraw);
+            }
+            ShellEvent::Key {
+                key_code: Some(KeyCode::Backspace),
+                state: ButtonState::Pressed,
+                ..
+            } if self.asks_pin() => {
+                self.typed.pop();
+                return Ok(Outcome::Redraw);
+            }
             ShellEvent::Key {
                 key_code: Some(key),
                 state: ButtonState::Pressed,
@@ -208,17 +258,18 @@ impl BluetoothMenu {
                 match key {
                     KeyCode::ArrowDown => {
                         self.focus = Some(self.focus.map_or(0, |at| (at + 1).min(count - 1)));
-                        return Ok(Outcome::Moved);
+                        return Ok(Outcome::Redraw);
                     }
                     KeyCode::ArrowUp => {
                         self.focus = Some(self.focus.map_or(0, |at| at.saturating_sub(1)));
-                        return Ok(Outcome::Moved);
+                        return Ok(Outcome::Redraw);
                     }
-                    KeyCode::Enter | KeyCode::NumpadEnter => {
-                        if let Some(target) = self.focused() {
-                            return Ok(Outcome::Act(target));
-                        }
-                    }
+                    // With nothing chosen, Enter sends the PIN typed.
+                    KeyCode::Enter | KeyCode::NumpadEnter => match self.focused() {
+                        Some(target) => return Ok(self.act(target)),
+                        None if self.asks_pin() => return Ok(self.act(Target::Answer(true))),
+                        None => {}
+                    },
                     _ => {}
                 }
             }
@@ -227,11 +278,24 @@ impl BluetoothMenu {
                 if presses.contains(&Press::Left)
                     && let Some(&target) = self.pointer.target(&self.regions)
                 {
-                    return Ok(Outcome::Act(target));
+                    return Ok(self.act(target));
                 }
             }
         }
         Ok(Outcome::Kept)
+    }
+
+    /// What choosing `target` does: an answer to the pairing agent, which
+    /// for a PIN is what was typed (nothing yet answers nothing), or the
+    /// caller's to carry out.
+    fn act(&self, target: Target) -> Outcome {
+        match (target, self.asks_pin()) {
+            (Target::Answer(false), _) => Outcome::Answer(Reply::No),
+            (Target::Answer(true), false) => Outcome::Answer(Reply::Yes),
+            (Target::Answer(true), true) if self.typed.is_empty() => Outcome::Kept,
+            (Target::Answer(true), true) => Outcome::Answer(Reply::Pin(self.typed.clone())),
+            (target, _) => Outcome::Act(target),
+        }
     }
 
     /// The target the keyboard is on.

@@ -2,12 +2,15 @@
 //! `doc/org.bluez.Agent.rst`), so pairing questions are answered in the
 //! Bluetooth menu (`docs/plan/10-popups-and-menus.md#bluetooth-menu`).
 //!
-//! It registers as `DisplayYesNo`: lyr has no text input yet, so it can
-//! confirm a passkey and authorize a device or a service, but cannot type a
-//! PIN or a passkey; BlueZ's requests for those are rejected. Each question
-//! goes to the bar as a [`Prompt`], and the D-Bus call waits for the answer.
+//! It registers as `DisplayYesNo`: it confirms a passkey, authorizes a
+//! device or a service, and takes a PIN typed into the menu. BlueZ asks for
+//! a PIN of a device that pairs the legacy way whatever the agent's
+//! capability (`pin_code_request_callback` in its `src/adapter.c`), while it
+//! asks for a typed passkey only of an agent with a keyboard, which lyr does
+//! not claim; that request is rejected. Each question goes to the bar as a
+//! [`Prompt`], and the D-Bus call waits for the answer.
 
-pub use lyr_core::bluetooth_menu::Question;
+pub use lyr_core::bluetooth_menu::{Question, Reply};
 use tokio::sync::{mpsc, oneshot};
 use zbus::{Connection, ObjectPath, OwnedObjectPath};
 
@@ -22,7 +25,7 @@ pub const CAPABILITY: &str = "DisplayYesNo";
 pub struct Prompt {
     pub device: String,
     pub question: Question,
-    pub answer: oneshot::Sender<bool>,
+    pub answer: oneshot::Sender<Reply>,
 }
 
 /// The agent's errors, as BlueZ names them.
@@ -42,8 +45,9 @@ pub struct Agent {
 }
 
 impl Agent {
-    /// Asks `question` about `device` and waits for the answer.
-    async fn ask(&self, device: OwnedObjectPath, question: Question) -> Result<(), AgentError> {
+    /// Asks `question` about `device` and waits for the answer, a No being
+    /// BlueZ's `Rejected`.
+    async fn ask(&self, device: OwnedObjectPath, question: Question) -> Result<Reply, AgentError> {
         let (answer, answered) = oneshot::channel();
         let prompt = Prompt {
             device: device.to_string(),
@@ -54,9 +58,17 @@ impl Agent {
             return Err(AgentError::Canceled("lyr is exiting".to_owned()));
         }
         match answered.await {
-            Ok(true) => Ok(()),
-            Ok(false) => Err(AgentError::Rejected("declined in lyr".to_owned())),
+            Ok(Reply::No) => Err(AgentError::Rejected("declined in lyr".to_owned())),
+            Ok(reply) => Ok(reply),
             Err(_) => Err(AgentError::Canceled("not answered".to_owned())),
+        }
+    }
+
+    /// Asks a yes or no `question` about `device`.
+    async fn confirm(&self, device: OwnedObjectPath, question: Question) -> Result<(), AgentError> {
+        match self.ask(device, question).await? {
+            Reply::Yes => Ok(()),
+            Reply::No | Reply::Pin(_) => Err(AgentError::Rejected("not a yes".to_owned())),
         }
     }
 }
@@ -65,15 +77,18 @@ impl Agent {
 impl Agent {
     fn release(&self) {}
 
-    fn request_pin_code(&self, _device: OwnedObjectPath) -> Result<String, AgentError> {
-        Err(AgentError::Rejected("lyr cannot take a PIN yet".to_owned()))
+    async fn request_pin_code(&self, device: OwnedObjectPath) -> Result<String, AgentError> {
+        match self.ask(device, Question::Pin).await? {
+            Reply::Pin(pin) => Ok(pin),
+            Reply::Yes | Reply::No => Err(AgentError::Rejected("no PIN typed".to_owned())),
+        }
     }
 
     fn display_pin_code(&self, _device: OwnedObjectPath, _pincode: String) {}
 
     fn request_passkey(&self, _device: OwnedObjectPath) -> Result<u32, AgentError> {
         Err(AgentError::Rejected(
-            "lyr cannot take a passkey yet".to_owned(),
+            "lyr has no keyboard capability".to_owned(),
         ))
     }
 
@@ -84,11 +99,11 @@ impl Agent {
         device: OwnedObjectPath,
         passkey: u32,
     ) -> Result<(), AgentError> {
-        self.ask(device, Question::Confirm(passkey)).await
+        self.confirm(device, Question::Confirm(passkey)).await
     }
 
     async fn request_authorization(&self, device: OwnedObjectPath) -> Result<(), AgentError> {
-        self.ask(device, Question::Authorize).await
+        self.confirm(device, Question::Authorize).await
     }
 
     async fn authorize_service(
@@ -96,7 +111,7 @@ impl Agent {
         device: OwnedObjectPath,
         _uuid: String,
     ) -> Result<(), AgentError> {
-        self.ask(device, Question::AuthorizeService).await
+        self.confirm(device, Question::AuthorizeService).await
     }
 
     fn cancel(&self) {}
