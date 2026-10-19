@@ -1,19 +1,25 @@
 //! `org.freedesktop.Notifications` at `/org/freedesktop/Notifications`, as
 //! the Desktop Notifications Specification 1.3 defines it.
 //!
-//! The bar does not serve it yet: until lyr draws toasts, taking the name
-//! would swallow every notification on a desktop with no other daemon.
+//! [`serve`] takes the name only when no other daemon has it, unless told to
+//! replace it (`docs/plan/09-notifications.md#when-another-daemon-owns-the-name`):
+//! switching from swaync to lyr is then a dotfiles change, not a race at
+//! start-up.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use lyr_core::notifications::{CloseReason, Expiry, Incoming, Store, Urgency};
 use tokio::sync::mpsc::UnboundedSender;
-use zbus::OwnedVariant;
+use zbus::fdo::{DBusProxy, RequestNameFlags, RequestNameReply};
+use zbus::names::BusName;
 use zbus::object_server::SignalEmitter;
+use zbus::{Connection, OwnedVariant};
 
 /// The object path the spec puts the daemon at.
 pub const PATH: &str = "/org/freedesktop/Notifications";
+/// The bus name the spec gives the daemon.
+pub const NAME: &str = "org.freedesktop.Notifications";
 
 /// What changed in the store, for the bar to redraw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -145,6 +151,122 @@ impl Daemon {
         id: u32,
         activation_token: String,
     ) -> zbus::Result<()>;
+}
+
+/// Why lyr is not serving notifications.
+#[derive(Debug, thiserror::Error)]
+pub enum ServeError {
+    #[error("{owner} (pid {}) owns {NAME}, so lyr leaves notifications to it", .pid.map_or_else(|| "unknown".to_owned(), |pid| pid.to_string()))]
+    Owned { owner: String, pid: Option<u32> },
+    #[error(transparent)]
+    Bus(#[from] zbus::Error),
+}
+
+/// Serves the daemon on the session bus `connection` and takes [`NAME`]:
+/// only when no other daemon has it, or from whoever has it with
+/// `replace`. lyr lets another daemon replace it in turn.
+///
+/// # Errors
+///
+/// [`ServeError::Owned`] when another daemon keeps the name; the object is
+/// taken down again.
+pub async fn serve(
+    connection: &Connection,
+    daemon: Daemon,
+    replace: bool,
+) -> Result<Served, ServeError> {
+    let served = Served::at(connection, daemon).await?;
+    let mut flags = RequestNameFlags::DO_NOT_QUEUE | RequestNameFlags::ALLOW_REPLACEMENT;
+    if replace {
+        flags |= RequestNameFlags::REPLACE_EXISTING;
+    }
+    match connection.request_name_with_flags(NAME, flags).await? {
+        RequestNameReply::PrimaryOwner | RequestNameReply::AlreadyOwner => Ok(served),
+        RequestNameReply::InQueue | RequestNameReply::Exists => {
+            connection.object_server().remove::<Daemon, _>(PATH).await?;
+            let dbus = DBusProxy::new(connection).await?;
+            let name = BusName::try_from(NAME)?;
+            let owner = dbus.get_name_owner(name).await.map_err(zbus::Error::from)?;
+            let pid = dbus
+                .get_connection_unix_process_id(owner.clone().into())
+                .await
+                .ok();
+            Err(ServeError::Owned {
+                owner: owner.to_string(),
+                pid,
+            })
+        }
+    }
+}
+
+/// The daemon as served: what lyr's side does to a notification, with the
+/// signals the spec asks for.
+#[derive(Clone, Debug)]
+pub struct Served {
+    connection: Connection,
+    store: Arc<Mutex<Store>>,
+}
+
+impl Served {
+    /// Serves `daemon` at [`PATH`] on `connection`, without taking a name: a
+    /// peer-to-peer connection has none to take.
+    ///
+    /// # Errors
+    ///
+    /// When the object cannot be served.
+    pub async fn at(connection: &Connection, daemon: Daemon) -> zbus::Result<Self> {
+        let store = daemon.store.clone();
+        connection.object_server().at(PATH, daemon).await?;
+        Ok(Self {
+            connection: connection.clone(),
+            store,
+        })
+    }
+
+    fn emitter(&self) -> zbus::Result<SignalEmitter<'_>> {
+        SignalEmitter::new(&self.connection, PATH)
+    }
+
+    /// Closes `id` for `reason` and signals it. Returns whether lyr held it.
+    ///
+    /// # Errors
+    ///
+    /// When the signal cannot be sent.
+    pub async fn close(&self, id: u32, reason: CloseReason) -> zbus::Result<bool> {
+        let held = self
+            .store
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .close(id)
+            .is_some();
+        if held {
+            Daemon::notification_closed(&self.emitter()?, id, reason as u32).await?;
+        }
+        Ok(held)
+    }
+
+    /// Invokes the action `key` of `id`, as a click does, then closes it
+    /// unless it is `resident`, as the spec's hint asks.
+    ///
+    /// # Errors
+    ///
+    /// When a signal cannot be sent.
+    pub async fn invoke(&self, id: u32, key: &str) -> zbus::Result<()> {
+        let resident = self
+            .store
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(id)
+            .map(|held| held.content.resident);
+        let Some(resident) = resident else {
+            return Ok(());
+        };
+        Daemon::action_invoked(&self.emitter()?, id, key.to_owned()).await?;
+        if !resident {
+            self.close(id, CloseReason::Dismissed).await?;
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

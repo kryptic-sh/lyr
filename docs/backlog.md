@@ -238,17 +238,25 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (`lyr_sources::notifications::linux::Daemon`): `Notify` with its hints,
   `CloseNotification` with its signal and the spec's empty error,
   `GetServerInformation` (spec 1.3), and no capabilities until each works,
-  tested against an application on a peer-to-peer connection. The bar does not
-  serve it yet: until it draws toasts, taking the name would swallow every
-  notification on a desktop with no other daemon. Not built: claiming the name
-  and the check for another daemon owning it, showing toasts (their windows; a
-  toast's draw list is built in `lyr_core::toast`, swaync's look with the
-  `toast_*` theme keys, its body wrapped at spaces, mutation-checked, but no
-  arrival time, close button, action buttons, images or markup yet), markup,
-  images and MPRIS. The bell's view is built (`lyr_core::bell`, with
-  `notifications.format` and `notifications.icons`, the dotfiles' three glyphs)
-  but not drawn: with the daemon not served there is no history to show, and a
-  module with no data is left out.
+  tested against an application on a peer-to-peer connection. Claiming the name
+  is `notifications::linux::serve`: `DO_NOT_QUEUE`, so a name another daemon
+  holds comes back as `Exists` and lyr takes its object down and names the owner
+  and its pid, or `REPLACE_EXISTING` when told to replace; it allows being
+  replaced in turn. Not run against a real bus (the tests use peer-to-peer
+  connections, which have no names). `Served::close` and `Served::invoke` are
+  lyr's side, with their signals (an invoked action closes a notification that
+  is not `resident`), tested and mutation-checked. The toast stack is
+  `lyr_core::toast::stack::Stack` (newest on top, timeouts paused under the
+  pointer) and a toast's draw list `lyr_core::toast` (swaync's look with the
+  `toast_*` theme keys, its body wrapped at spaces), both tested and
+  mutation-checked. The bar does not serve the daemon yet: until toasts are on
+  screen, taking the name would swallow every notification on a desktop with no
+  other daemon. Not built: the toast windows, `notifications.replace`, a toast's
+  arrival time, close button, action buttons and images, markup, and MPRIS. The
+  bell's view is built (`lyr_core::bell`, with `notifications.format` and
+  `notifications.icons`, the dotfiles' three glyphs) but not drawn: with the
+  daemon not served there is no history to show, and a module with no data is
+  left out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading

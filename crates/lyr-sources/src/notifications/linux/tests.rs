@@ -9,7 +9,7 @@ use tokio::sync::mpsc;
 use zbus::connection::Builder;
 use zbus::{Connection, Guid, OwnedVariant};
 
-use super::{Change, Daemon, PATH};
+use super::{Change, Daemon, PATH, Served};
 
 /// How an application sees the daemon.
 #[zbus::proxy(
@@ -35,6 +35,8 @@ trait Notifications {
     fn get_server_information(&self) -> zbus::Result<(String, String, String, String)>;
     #[zbus(signal)]
     fn notification_closed(&self, id: u32, reason: u32) -> zbus::Result<()>;
+    #[zbus(signal)]
+    fn action_invoked(&self, id: u32, action_key: String) -> zbus::Result<()>;
 }
 
 struct Running {
@@ -156,5 +158,118 @@ async fn the_server_says_what_it_is_and_claims_no_capabilities_yet() {
             .await
             .expect("answered")
             .is_empty()
+    );
+}
+
+/// The daemon served through [`Served`], and an application's proxy.
+async fn served() -> (Served, NotificationsProxy<'static>, Connection) {
+    let (sender, _changes) = mpsc::unbounded_channel();
+    let (server, client) = UnixStream::pair().expect("socket pair");
+    let server = Builder::unix_stream(server)
+        .server(Guid::generate())
+        .p2p()
+        .build();
+    let client = Builder::unix_stream(client).p2p().build();
+    let (server, client) = tokio::try_join!(server, client).expect("connected");
+    let served = Served::at(
+        &server,
+        Daemon {
+            store: Arc::new(Mutex::new(Store::default())),
+            changes: sender,
+        },
+    )
+    .await
+    .expect("served");
+    let proxy = NotificationsProxy::new(&client).await.expect("proxy");
+    (served, proxy, server)
+}
+
+#[tokio::test]
+async fn lyr_closing_a_notification_signals_its_reason() {
+    let (served, client, _server) = served().await;
+    let mut closed = client
+        .receive_notification_closed()
+        .await
+        .expect("subscribed");
+    let id = client
+        .notify("app", 0, "", "x", "", &[], HashMap::new(), -1)
+        .await
+        .expect("notified");
+    assert!(
+        served
+            .close(id, CloseReason::Expired)
+            .await
+            .expect("closed")
+    );
+    let signal = tokio::time::timeout(Duration::from_secs(5), closed.next())
+        .await
+        .expect("a signal within 5 s")
+        .expect("open");
+    let args = signal.args().expect("arguments");
+    assert_eq!((args.id, args.reason), (id, CloseReason::Expired as u32));
+    assert!(
+        !served
+            .close(id, CloseReason::Expired)
+            .await
+            .expect("answered")
+    );
+    assert!(
+        tokio::time::timeout(Duration::from_millis(200), closed.next())
+            .await
+            .is_err(),
+        "no signal for an id lyr no longer holds"
+    );
+}
+
+#[tokio::test]
+async fn invoking_an_action_signals_it_and_closes_unless_resident() {
+    let (served, client, _server) = served().await;
+    let mut invoked = client.receive_action_invoked().await.expect("subscribed");
+    let mut closed = client
+        .receive_notification_closed()
+        .await
+        .expect("subscribed");
+    let actions = ["default", "Open"];
+    let resident = HashMap::from([("resident", OwnedVariant::from(true))]);
+    let kept = client
+        .notify("app", 0, "", "kept", "", &actions, resident, -1)
+        .await
+        .expect("notified");
+    let gone = client
+        .notify("app", 0, "", "gone", "", &actions, HashMap::new(), -1)
+        .await
+        .expect("notified");
+    let within = Duration::from_secs(5);
+    served.invoke(kept, "default").await.expect("invoked");
+    served.invoke(gone, "default").await.expect("invoked");
+    for id in [kept, gone] {
+        let signal = tokio::time::timeout(within, invoked.next())
+            .await
+            .expect("a signal within 5 s")
+            .expect("open");
+        let args = signal.args().expect("arguments");
+        assert_eq!((args.id, args.action_key.as_str()), (id, "default"));
+    }
+    let signal = tokio::time::timeout(within, closed.next())
+        .await
+        .expect("a signal within 5 s")
+        .expect("open");
+    let args = signal.args().expect("arguments");
+    assert_eq!(
+        (args.id, args.reason),
+        (gone, CloseReason::Dismissed as u32)
+    );
+    assert!(
+        !served
+            .close(gone, CloseReason::Closed)
+            .await
+            .expect("answered")
+    );
+    assert!(
+        served
+            .close(kept, CloseReason::Closed)
+            .await
+            .expect("answered"),
+        "resident"
     );
 }
