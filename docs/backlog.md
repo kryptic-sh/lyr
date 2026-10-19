@@ -423,10 +423,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   scrolling by a month or a year, tested against chrono's `%W` and `%U` for
   every day of 2020 – 2030 and mutation-checked. The week numbers follow waybar,
   not ISO, because the dotfiles do not set `iso8601`; ISO would be `%V`, a
-  one-line change, if the owner prefers it. Not built: the first weekday from
-  the system locale (`nl_langinfo` on Linux, `LOCALE_IFIRSTDAYOFWEEK` on
-  Windows, as waybar reads it), localised month and weekday names, and the panel
-  itself.
+  one-line change, if the owner prefers it. The calendar is drawn too
+  (`lyr_core::calendar::draw`): waybar's month blocks on a grid of cells as wide
+  as the widest day or weekday name, so a proportional font still lines up, year
+  mode three months across, week numbers on the right, today in its colour and
+  underlined, with the `calendar_*` theme keys; tested and mutation-checked.
+  Until the locale decision above is made, weeks start on Monday and names are
+  English (plan 16, 19). Not built: reading the first weekday and names from the
+  locale, the panel itself (its window, placement and the notification centre
+  below the calendar), and the smaller monospace `calendar_font`.
 - **Undocumented Windows APIs:** virtual desktops
   (`IVirtualDesktopManagerInternal`) and setting the power mode
   (`PowerSetActiveOverlayScheme`) can break with any Windows build.
