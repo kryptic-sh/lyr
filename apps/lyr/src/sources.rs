@@ -4,7 +4,7 @@
 //! source is polled.
 //!
 //! Linux has the battery (UPower), the power profile
-//! (power-profiles-daemon), bluetooth (BlueZ), the time zone (timedate1) and
+//! (power-profiles-daemon), the network (NetworkManager), bluetooth (BlueZ), the time zone (timedate1) and
 //! the workspaces (Hyprland). Other platforms have no sources yet, and their
 //! modules are left out of the bar.
 
@@ -21,6 +21,9 @@ pub enum Update {
     /// The power profiles, or `None` when the daemon lists none.
     #[cfg(target_os = "linux")]
     PowerProfile(Option<lyr_sources::power_profile::Profiles>),
+    /// NetworkManager's reading, or `None` before the first.
+    #[cfg(target_os = "linux")]
+    Network(Option<lyr_core::network::Reading>),
     /// BlueZ: the module's reading and the menu's adapter and devices.
     #[cfg(target_os = "linux")]
     Bluetooth(lyr_sources::bluetooth::Snapshot),
@@ -219,6 +222,7 @@ mod linux {
     use lyr_sources::bluetooth::linux::agent::{Asked, Questions};
     use lyr_sources::clock::linux::TimeDate;
     use lyr_sources::mpris::linux::Players;
+    use lyr_sources::network::linux::NetworkManager;
     use lyr_sources::power::linux::Logind;
     use lyr_sources::power_profile::linux::PowerProfiles;
     use lyr_wm::hyprland::{Hyprland, Workspace};
@@ -275,6 +279,7 @@ mod linux {
                 runtime.block_on(async move {
                     tokio::join!(
                         battery(sender.clone(), waker.clone()),
+                        network(sender.clone(), waker.clone()),
                         power_profile(sender.clone(), profile, waker.clone()),
                         bluetooth(sender.clone(), bluetooth_requests, waker.clone()),
                         clock(sender.clone(), waker.clone()),
@@ -313,6 +318,29 @@ mod linux {
         let (watched, ()) = tokio::join!(upower.watch(&readings), forward);
         if let Err(error) = watched {
             tracing::warn!("battery: UPower stopped answering: {error}");
+        }
+    }
+
+    async fn network(sender: mpsc::Sender<Update>, waker: Option<ShellWaker>) {
+        let network = match NetworkManager::system().await {
+            Ok(network) => network,
+            Err(error) => {
+                tracing::warn!("network: NetworkManager is not reachable: {error}");
+                return;
+            }
+        };
+        let (readings, mut changed) = watch::channel(None);
+        let forward = async {
+            while changed.changed().await.is_ok() {
+                let reading = changed.borrow_and_update().clone();
+                if !deliver(&sender, waker.as_ref(), Update::Network(reading)) {
+                    break;
+                }
+            }
+        };
+        let (watched, ()) = tokio::join!(network.watch(&readings), forward);
+        if let Err(error) = watched {
+            tracing::warn!("network: NetworkManager stopped answering: {error}");
         }
     }
 

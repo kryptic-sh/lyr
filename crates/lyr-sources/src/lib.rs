@@ -6,7 +6,7 @@
 //! polling (`docs/plan/07-modules.md`).
 //!
 //! So far it holds the battery ([`battery`]), Bluetooth ([`bluetooth`]),
-//! clock ([`clock`]) and power-profile ([`power_profile`]) sources and the
+//! clock ([`clock`]), network ([`network`]) and power-profile ([`power_profile`]) sources and the
 //! notification daemon ([`notifications`]), with their Linux backends, and
 //! the power menu's actions ([`power`]), which are not a module's source but
 //! sit with the other system-bus clients. The rest land in milestones M4 and M6 to M8
@@ -16,6 +16,7 @@ pub mod battery;
 pub mod bluetooth;
 pub mod clock;
 pub mod mpris;
+pub mod network;
 pub mod notifications;
 pub mod power;
 pub mod power_profile;

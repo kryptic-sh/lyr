@@ -14,8 +14,10 @@ and this project adheres to
   output (a layer-shell panel on Wayland, an appbar on Windows), drawn through
   crcbl, with the power button and the clock module, and on Linux the battery
   (from UPower), the power profile (from power-profiles-daemon; a click cycles
-  it), Bluetooth (from BlueZ, with a connected device's battery) and the
-  Hyprland workspaces. The other modules are not drawn yet.
+  it), the network (from NetworkManager: the interface with the default route,
+  its address and, on Wi-Fi, the network's name and signal), Bluetooth (from
+  BlueZ, with a connected device's battery) and the Hyprland workspaces. The
+  other modules are not drawn yet.
 - Clicking a workspace switches to it, and with `workspaces.scroll = true` the
   wheel steps through them. A module's `[<module>.on]` table binds clicks and
   scrolling to a command (`{ exec = "…" }`) or a built-in action. Of the

@@ -48,6 +48,38 @@ pub struct Link {
     pub signal_strength: u8,
 }
 
+/// What a source read: the interface with the default route, if any, and
+/// whether rfkill blocks the Wi-Fi radio.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Reading {
+    pub link: Option<Link>,
+    pub radio_blocked: bool,
+}
+
+impl Reading {
+    /// The link's state, as waybar's `getNetworkState` decides it: with no
+    /// interface, disabled while the radio is blocked and disconnected
+    /// otherwise; then linked until it has an address, and Wi-Fi when it has
+    /// an SSID.
+    #[must_use]
+    pub fn state(&self) -> State {
+        match &self.link {
+            None if self.radio_blocked => State::Disabled,
+            None => State::Disconnected,
+            Some(link) if link.ipaddr.is_empty() => State::Linked,
+            Some(link) if link.essid.is_empty() => State::Ethernet,
+            Some(_) => State::Wifi,
+        }
+    }
+
+    /// The view of this reading under `config`.
+    #[must_use]
+    pub fn view(&self, config: &Config) -> View {
+        let none = Link::default();
+        view(self.state(), self.link.as_ref().unwrap_or(&none), config)
+    }
+}
+
 /// What the module draws.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct View {
@@ -96,7 +128,7 @@ pub fn view(state: State, link: &Link, config: &Config) -> View {
 mod tests {
     use lyr_config::{Format, Network, Platform, from_sources};
 
-    use super::{Link, State, view};
+    use super::{Link, Reading, State, view};
 
     fn defaults() -> Network {
         from_sources(None, Platform::Linux)
@@ -143,5 +175,30 @@ mod tests {
         assert_eq!(tooltip(State::Wifi), "wlan0 192.168.1.20/24 home (71%)");
         assert_eq!(tooltip(State::Ethernet), "wlan0 192.168.1.20/24");
         assert_eq!(tooltip(State::Disconnected), "YOU IN THE WOODS?");
+    }
+
+    #[test]
+    fn a_reading_s_state_follows_waybar() {
+        let reading = |link: Option<Link>, radio_blocked| Reading {
+            link,
+            radio_blocked,
+        };
+        assert_eq!(reading(None, false).state(), State::Disconnected);
+        assert_eq!(reading(None, true).state(), State::Disabled);
+        assert_eq!(reading(Some(link()), true).state(), State::Wifi);
+        let wired = Link {
+            essid: String::new(),
+            ..link()
+        };
+        assert_eq!(reading(Some(wired), false).state(), State::Ethernet);
+        let waiting = Link {
+            ipaddr: String::new(),
+            ..link()
+        };
+        assert_eq!(reading(Some(waiting), false).state(), State::Linked);
+        assert_eq!(
+            reading(None, false).view(&defaults()).tooltip,
+            "YOU IN THE WOODS?"
+        );
     }
 }

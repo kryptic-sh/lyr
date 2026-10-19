@@ -22,6 +22,8 @@ pub struct Data {
     #[cfg(target_os = "linux")]
     pub power_profile: Option<lyr_sources::power_profile::Profiles>,
     #[cfg(target_os = "linux")]
+    pub network: Option<lyr_core::network::Reading>,
+    #[cfg(target_os = "linux")]
     pub bluetooth: Option<lyr_core::bluetooth::Reading>,
     /// The adapter and devices, for the Bluetooth menu. Empty where there
     /// is no source for them.
@@ -74,6 +76,8 @@ impl Data {
             Update::Battery(reading) => self.battery = reading,
             #[cfg(target_os = "linux")]
             Update::PowerProfile(profiles) => self.power_profile = profiles,
+            #[cfg(target_os = "linux")]
+            Update::Network(reading) => self.network = reading,
             #[cfg(target_os = "linux")]
             Update::BluetoothAsk(id, device, question) => {
                 self.bluetooth_ask = Some((id, device, question));
@@ -209,6 +213,11 @@ fn content(
             Some(label(shown.text, theme.foreground))
         }
         #[cfg(target_os = "linux")]
+        Module::Network => {
+            let shown = data.network.as_ref()?.view(&config.network);
+            Some(label(shown.text, theme.foreground))
+        }
+        #[cfg(target_os = "linux")]
         Module::Bluetooth => {
             let shown = lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth);
             Some(label(shown.text, theme.foreground))
@@ -271,6 +280,8 @@ pub fn tooltip(
             )
             .tooltip,
         ),
+        #[cfg(target_os = "linux")]
+        Module::Network => Some(data.network.as_ref()?.view(&config.network).tooltip),
         #[cfg(target_os = "linux")]
         Module::Bluetooth => {
             Some(lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth).tooltip)

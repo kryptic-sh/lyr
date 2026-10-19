@@ -100,12 +100,14 @@ itself; that is not an error.
   The view is `lyr_core::network::view`.
 - Click opens the Wi-Fi menu ([10](10-popups-and-menus.md#wi-fi-menu)), where
   waybar ran `krypt menu wifi`.
-- Linux: link and address changes come from rtnetlink (pushed). **WiFi signal
-  strength is not pushed by rtnetlink.** NetworkManager's D-Bus API pushes
-  `Strength` changes. The dotfiles' `.menu-wifi` drives `nmcli`, so the daemon
-  is NetworkManager, which the Wi-Fi menu needs anyway. On a machine without it,
-  lyr falls back to an nl80211 read **every 30 s** while connected to WiFi (the
-  only interval in the plan), and the Wi-Fi menu is left out.
+- Linux: the interface, its address and the Wi-Fi network come from
+  NetworkManager's D-Bus API (pushed, `Strength` included), the device of its
+  `PrimaryConnection`, which holds the default route waybar follows. rtnetlink
+  would push links and addresses without it, but not the Wi-Fi signal. The
+  dotfiles' `.menu-wifi` drives `nmcli`, so the daemon is NetworkManager, which
+  the Wi-Fi menu needs anyway. On a machine without it, lyr falls back to an
+  nl80211 read **every 30 s** while connected to WiFi (the only interval in the
+  plan), and the Wi-Fi menu is left out.
 - Windows: `NotifyIpInterfaceChange` for links and addresses,
   `WlanRegisterNotification` (signal-quality changes) for WiFi.
 - macOS: `SCDynamicStore` notifications for links and addresses, CoreWLAN for

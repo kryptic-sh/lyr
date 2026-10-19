@@ -9,8 +9,11 @@ The provisional decisions in
 [plan/16-open-questions.md](plan/16-open-questions.md) are the defaults the
 implementation follows until they are answered. The ones that block a milestone:
 
-- **New dependencies** `libpulse-binding` and an rtnetlink crate (`rtnetlink` or
-  `neli`) block M4's audio and network sources.
+- **New dependencies** `libpulse-binding` blocks M4's audio sources. An
+  rtnetlink crate (`rtnetlink` or `neli`) is now needed only for the network
+  module on a machine without NetworkManager (plan 07's fallback), since the
+  network source reads NetworkManager over zbus; whether to build that fallback
+  at all is part of the same question.
 - **The calendar's first weekday and names from the system locale** (M5) need
   `libc` on Linux (`nl_langinfo` with `_NL_TIME_FIRST_WEEKDAY`, as waybar reads
   it) and `windows-sys` on Windows (`GetLocaleInfoEx` with
@@ -344,8 +347,20 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   added or removed, the rfkill block from the adapter's `PowerState`, and the
   device shown the last to connect, as waybar does
   (`lyr_sources::bluetooth::Tracker`); tested against a fake BlueZ. Not built:
-  the network, volume and mic sources (the notification daemon is its own
-  entry). Network and audio wait on the new-dependency decision above.
+  the volume and mic sources (the notification daemon is its own entry), which
+  wait on the new-dependency decision above. The network source is built over
+  NetworkManager (`lyr_sources::network::linux::NetworkManager`): the device of
+  `PrimaryConnection` (the default route, as waybar picks it), else of
+  `ActivatingConnection`, its IPv4 address, prefix and gateway, and on Wi-Fi the
+  access point's SSID and strength, with the radio blocked when
+  `WirelessEnabled` or `WirelessHardwareEnabled` is false; the state is waybar's
+  `getNetworkState` (`lyr_core::network::Reading::state`), without its carrier
+  test, since NetworkManager's chosen device has one. It re-reads on
+  `PropertiesChanged` from the objects the reading came from only, so a scan's
+  access-point updates cost nothing. Tested against a fake NetworkManager on a
+  peer-to-peer connection and mutation-checked; the names are from
+  NetworkManager's introspection XML on main (2026-10-20), not checked against
+  an installed one. Not built: the nl80211 fallback without NetworkManager.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace
