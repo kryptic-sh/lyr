@@ -28,6 +28,7 @@ pub mod icon;
 pub mod layout;
 pub mod markup;
 pub mod media;
+pub mod menu;
 pub mod network;
 pub mod notifications;
 pub mod pointer;

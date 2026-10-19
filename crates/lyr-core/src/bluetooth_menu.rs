@@ -3,10 +3,12 @@
 //! its devices, and what the menu does to them. The platforms' sources fill
 //! it in (`lyr_sources::bluetooth`).
 
-use lyr_config::{Colour, Theme};
+use lyr_config::Theme;
 
-use crate::draw::{DrawList, Item, Size, TextStyle, switch};
+use crate::draw::{DrawList, Size, switch};
 use crate::hit::{Rect, Regions};
+use crate::menu::{self, button_width};
+pub use crate::menu::{GAP, PADDING};
 
 /// The adapter's properties the module uses (`org.bluez.Adapter1`).
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -157,13 +159,6 @@ pub enum Target {
     Forget(usize),
 }
 
-/// The menu's padding, around its rows.
-pub const PADDING: f32 = 8.0;
-/// The space between rows, and between a row's buttons.
-pub const GAP: f32 = 6.0;
-/// Around a button's label.
-const BUTTON_PADDING: (f32, f32) = (8.0, 2.0);
-
 /// The devices in the order the menu lists them: paired first, then those a
 /// scan found, each part by name.
 #[must_use]
@@ -229,8 +224,8 @@ pub fn draw(
     line_height: f32,
     theme: &Theme,
 ) -> (DrawList, Size, Regions<Target>) {
-    let (across, down) = BUTTON_PADDING;
-    let row = line_height + 2.0 * down;
+    let across = menu::BUTTON_PADDING.0;
+    let row = menu::row(line_height);
     let switches = [
         ("Power", Target::Switch(Switch::Powered), adapter.powered),
         (
@@ -255,7 +250,7 @@ pub fn draw(
         .map(|(label, _, _)| measure(label))
         .chain(ordered.iter().map(|device| measure(&name(device))))
         .fold(0.0, f32::max);
-    let button_width = |label: &str| measure(label) + 2.0 * across;
+    let button_width = |label: &str| button_width(label, measure);
     let buttons_width = ordered
         .iter()
         .map(|device| {
@@ -289,17 +284,8 @@ pub fn draw(
     let width = 2.0 * PADDING + (label_width + GAP + buttons_width).max(header_width);
     let mut items = Vec::new();
     let mut regions = Regions::default();
-    let text = |text: String, x: f32, y: f32, colour| Item::Text {
-        rect: Rect {
-            x,
-            y: y + down,
-            width: measure(&text),
-            height: line_height,
-        },
-        text,
-        colour,
-        style: TextStyle::PLAIN,
-    };
+    let text =
+        |text: String, x: f32, y: f32, colour| menu::text(text, x, y, measure, line_height, colour);
     let mut y = PADDING;
     // The header first, where it cannot be missed.
     if let Some(header) = header {
@@ -311,28 +297,7 @@ pub fn draw(
                 width: field_width,
                 height: row,
             };
-            items.push(Item::Box {
-                rect: field,
-                radius: theme.radius as f32,
-                fill: theme.module_background,
-                border: Some((theme.border_width as f32, theme.workspace_active)),
-            });
-            // Its end shows, where the typing is.
-            let inside = field_width - 2.0 * across;
-            let scrolled = (measure(typed) - inside).max(0.0);
-            items.push(Item::Clip {
-                rect: Rect {
-                    x: field.x + across,
-                    width: inside,
-                    ..field
-                },
-                items: vec![text(
-                    typed.to_owned(),
-                    field.x + across - scrolled,
-                    y,
-                    theme.foreground,
-                )],
-            });
+            items.extend(menu::field(field, typed, measure, line_height, theme));
         }
         let mut x = width - PADDING;
         for (label, answer) in answers.iter().rev() {
@@ -343,13 +308,7 @@ pub fn draw(
                 width: button_width(label),
                 height: row,
             };
-            items.push(Item::Box {
-                rect,
-                radius: theme.radius as f32,
-                fill: theme.toast_background,
-                border: Some((theme.border_width as f32, theme.panel_border)),
-            });
-            items.push(text((*label).to_owned(), x + across, y, theme.foreground));
+            items.extend(menu::button(rect, label, measure, line_height, theme));
             regions.push(rect, Target::Answer(*answer));
             x -= GAP;
         }
@@ -383,13 +342,7 @@ pub fn draw(
                 width: button_width(label),
                 height: row,
             };
-            items.push(Item::Box {
-                rect,
-                radius: theme.radius as f32,
-                fill: theme.toast_background,
-                border: Some((theme.border_width as f32, theme.panel_border)),
-            });
-            items.push(text(label.to_owned(), x + across, y, theme.foreground));
+            items.extend(menu::button(rect, label, measure, line_height, theme));
             regions.push(rect, button.target(index));
             x += rect.width + GAP;
         }
@@ -399,30 +352,8 @@ pub fn draw(
         width,
         height: y - GAP + PADDING,
     };
-    let mut list = DrawList {
-        items: vec![Item::Box {
-            rect: Rect {
-                x: 0.0,
-                y: 0.0,
-                width: size.width,
-                height: size.height,
-            },
-            radius: theme.radius as f32,
-            fill: theme.module_background,
-            border: Some((theme.border_width as f32, theme.border)),
-        }],
-    };
-    list.items.extend(items);
-    // The keyboard's place: an outline in the active colour.
-    if let Some(rect) = focus.and_then(|focus| regions.rect(&focus)) {
-        list.items.push(Item::Box {
-            rect,
-            radius: theme.radius as f32,
-            fill: Colour::TRANSPARENT,
-            border: Some((theme.border_width as f32, theme.workspace_active)),
-        });
-    }
-    (list, size, regions)
+    let focus = focus.and_then(|focus| regions.rect(&focus));
+    (menu::frame(size, items, focus, theme), size, regions)
 }
 
 #[cfg(test)]
