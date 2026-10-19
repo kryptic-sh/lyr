@@ -711,7 +711,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Post-MVP
 
-- **`lyr import-waybar`**: convert `config.jsonc` + `style.css` to TOML.
 - **Window title module: built, not run.** `window` (`lyr_core::window`, and
   `lyr_wm::hyprland::State::active_window`) follows Hyprland's
   `activewindow>>CLASS,TITLE` event, seeded at start from `j/activeworkspace`'s
@@ -720,6 +719,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `tooltip_format` is set. Not in the default layout. Tested and
   mutation-checked against recorded lines, not against a running Hyprland.
   waybar's `rewrite` rules, `separate-outputs` and app icon are not carried.
+- **`lyr import-waybar`: the config half.** `lyr import-waybar FILE`
+  (`lyr_config::waybar`) prints a waybar `config.jsonc` as a lyr config: the
+  bar's settings, the layout and every module lyr has, keys renamed from kebab
+  case, `on-*` as `{ exec = … }` bindings, glyphs written as escapes; each key
+  is tried against lyr's own schema, and what it refuses, like waybar's own bar
+  keys and modules lyr lacks, is listed at the top. Tested and mutation-checked
+  on a cut-down config; run on the dotfiles' real `config.jsonc` (2026-10-20),
+  whose every carried glyph, format and icon table matched lyr's
+  `defaults.toml`, the differences being waybar's `on-click` commands, which
+  lyr's built-ins replace. Not built: `style.css` to `[theme]`, which would mean
+  mapping waybar's selectors onto lyr's theme keys.
 - **sway and niri workspace backends**, and komorebi or GlazeWM on Windows.
 
 ## Not yet verified

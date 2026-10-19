@@ -49,9 +49,23 @@ struct Cli {
     command: Option<Command>,
 }
 
-/// Commands sent to a running bar over its control socket.
+/// What `lyr` was asked to do.
 #[derive(Debug, Subcommand, PartialEq, Eq)]
 enum Command {
+    #[command(flatten)]
+    Bar(BarCommand),
+    /// Print a waybar config.jsonc as a lyr config.toml. What lyr cannot
+    /// carry is listed at the top; waybar's style.css is not read.
+    ImportWaybar {
+        /// The waybar config, such as ~/.config/waybar/config.jsonc.
+        #[arg(value_name = "FILE")]
+        config: PathBuf,
+    },
+}
+
+/// Commands sent to a running bar over its control socket.
+#[derive(Debug, Subcommand, PartialEq, Eq)]
+enum BarCommand {
     /// Reload the config file.
     Reload,
     /// Hide or show the bars.
@@ -69,7 +83,7 @@ enum Command {
     Clear,
 }
 
-impl Command {
+impl BarCommand {
     /// The request this command sends to the running bar.
     const fn request(&self) -> Request {
         match self {
@@ -103,6 +117,23 @@ impl PanelArg {
     }
 }
 
+/// `lyr import-waybar`: prints `config` converted, or says why it cannot.
+fn import_waybar(config: &std::path::Path) -> ExitCode {
+    let converted = std::fs::read_to_string(config)
+        .map_err(|error| error.to_string())
+        .and_then(|text| lyr_config::waybar::import(&text).map_err(|error| error.to_string()));
+    match converted {
+        Ok(imported) => {
+            print!("{}", imported.toml);
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("lyr: import-waybar: {}: {error}", config.display());
+            ExitCode::FAILURE
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let Some(command) = cli.command else {
@@ -116,6 +147,10 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         };
+    };
+    let command = match command {
+        Command::Bar(command) => command,
+        Command::ImportWaybar { config } => return import_waybar(&config),
     };
     let request = command.request();
     let reply = control::path().and_then(|path| control::send(path, request));
@@ -154,16 +189,27 @@ mod cli_tests {
     #[test]
     fn control_commands_parse() {
         let cli = Cli::parse_from(["lyr", "reload"]);
-        assert_eq!(cli.command, Some(Command::Reload));
+        assert_eq!(cli.command, Some(Command::Bar(BarCommand::Reload)));
+        let cli = Cli::parse_from(["lyr", "import-waybar", "config.jsonc"]);
+        assert_eq!(
+            cli.command,
+            Some(Command::ImportWaybar {
+                config: PathBuf::from("config.jsonc")
+            })
+        );
+    }
+
+    /// The request a command line sends to the running bar, if it sends one.
+    fn request_of(args: &[&str]) -> Option<Request> {
+        match Cli::parse_from(args).command? {
+            Command::Bar(command) => Some(command.request()),
+            Command::ImportWaybar { .. } => None,
+        }
     }
 
     #[test]
     fn each_command_sends_its_request() {
-        let request = |args: &[&str]| {
-            Cli::parse_from(args)
-                .command
-                .map(|command| command.request().to_string())
-        };
+        let request = |args: &[&str]| request_of(args).map(|request| request.to_string());
         assert_eq!(
             request(&["lyr", "panel", "wifi"]).as_deref(),
             Some("panel wifi")
@@ -176,9 +222,8 @@ mod cli_tests {
     #[test]
     fn every_panel_can_be_named_on_the_command_line() {
         for panel in Panel::ALL {
-            let cli = Cli::parse_from(["lyr", "panel", panel.name()]);
             assert_eq!(
-                cli.command.map(|c| c.request()),
+                request_of(&["lyr", "panel", panel.name()]),
                 Some(Request::Panel(panel))
             );
         }

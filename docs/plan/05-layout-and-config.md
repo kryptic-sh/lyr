@@ -160,4 +160,6 @@ The dotfiles change in M8 ([15](15-milestones.md)):
 - A `.config/lyr/config.toml` is only needed for differences from the defaults.
   With the defaults being the waybar port, that file starts empty.
 
-A `lyr import-waybar` converter (JSON + CSS to TOML) is a backlog item, not MVP.
+`lyr import-waybar FILE` converts a waybar `config.jsonc` to a lyr config,
+listing what it cannot carry; reading `style.css` into `[theme]` is a backlog
+item.

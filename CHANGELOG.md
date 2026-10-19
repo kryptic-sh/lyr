@@ -51,6 +51,9 @@ and this project adheres to
   asks Hyprland to exit; on Windows and macOS the entries are not built yet.
   `[power.menu]` sets an entry to a command instead
   (`lock = { exec = "hyprlock" }`).
+- `lyr import-waybar FILE` prints a waybar `config.jsonc` as a lyr config: the
+  bar's settings, the layout and the modules lyr has, with what it could not
+  carry listed at the top. waybar's `style.css` is not read.
 - A `window` module, not in the default layout: the focused window's title on
   Hyprland, as waybar's `hyprland/window` shows it, with `{title}` and `{class}`
   placeholders and `max_length`.

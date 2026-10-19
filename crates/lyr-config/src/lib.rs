@@ -15,6 +15,7 @@ mod actions;
 mod colour;
 mod format;
 mod schema;
+pub mod waybar;
 
 use std::path::{Path, PathBuf};
 
