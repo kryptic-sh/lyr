@@ -105,7 +105,7 @@ impl ClockPanel {
             Mode::Year,
             FIRST_WEEKDAY,
             today,
-            look.measure,
+            look.measure_in,
             look.line_height,
             look.theme,
         );
@@ -295,7 +295,7 @@ impl ClockPanel {
             self.mode,
             FIRST_WEEKDAY,
             contents.today,
-            look.measure,
+            look.measure_in,
             look.line_height,
             look.theme,
         );

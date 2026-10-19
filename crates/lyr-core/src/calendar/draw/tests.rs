@@ -3,7 +3,7 @@ use lyr_config::{Platform, Theme, from_sources};
 
 use super::draw;
 use crate::calendar::Mode;
-use crate::draw::Item;
+use crate::draw::{Item, TextStyle};
 use crate::hit::Rect;
 
 fn theme() -> Theme {
@@ -14,7 +14,7 @@ fn theme() -> Theme {
 
 /// Every character is 10 px wide, so a cell ("31", "Mo") is 20 px, a gap 10,
 /// the week column ("W00") 30, and a month block 7 * 20 + 7 * 10 + 30 = 240.
-fn measure(text: &str) -> f32 {
+fn measure(text: &str, _: TextStyle) -> f32 {
     text.chars().count() as f32 * 10.0
 }
 
@@ -109,22 +109,16 @@ fn today_is_coloured_and_underlined() {
         LINE,
         &theme,
     );
-    let [Item::Text { rect, colour, .. }] = find(&list.items, "19")[..] else {
+    let [Item::Text { colour, style, .. }] = find(&list.items, "19")[..] else {
         panic!("one 19");
     };
     assert_eq!(*colour, theme.calendar_today);
-    let underline = list.items.iter().find_map(|item| match item {
-        Item::Box { rect, fill, .. } => Some((*rect, *fill)),
-        _ => None,
-    });
-    let (line, fill) = underline.expect("an underline");
-    assert_eq!(fill, theme.calendar_today);
-    assert_eq!((line.x, line.width), (rect.x, rect.width));
-    assert_eq!(line.y + line.height, rect.y + rect.height);
-    let [Item::Text { colour, .. }] = find(&list.items, "18")[..] else {
+    assert!(style.bold && style.underline);
+    let [Item::Text { colour, style, .. }] = find(&list.items, "18")[..] else {
         panic!("one 18");
     };
     assert_eq!(*colour, theme.calendar_days);
+    assert!(style.bold && !style.underline);
     // Another year's 19 October is not today.
     let (list, _) = draw(
         date(2025, 10, 1),
@@ -139,7 +133,7 @@ fn today_is_coloured_and_underlined() {
         !list
             .items
             .iter()
-            .any(|item| matches!(item, Item::Box { .. }))
+            .any(|item| matches!(item, Item::Text { style, .. } if style.underline))
     );
 }
 
@@ -185,7 +179,7 @@ fn a_year_is_twelve_months_three_across() {
 #[test]
 fn spaces_are_measured_between_letters() {
     // A measure that, like a text layout, leaves whitespace at the ends out.
-    let trimmed = |text: &str| measure(text.trim());
+    let trimmed = |text: &str, style| measure(text.trim(), style);
     let theme = theme();
     let today = date(2026, 10, 19);
     let (_, spaced) = draw(
@@ -207,4 +201,33 @@ fn spaces_are_measured_between_letters() {
         &theme,
     );
     assert_eq!(trimmed.width, spaced.width);
+}
+
+#[test]
+fn it_is_all_bold_and_measured_so() {
+    let theme = theme();
+    let today = date(2026, 10, 19);
+    // A measure that sees only bold text.
+    let bold_only = |text: &str, style: TextStyle| {
+        if style.bold {
+            measure(text, style)
+        } else {
+            0.0
+        }
+    };
+    let (list, size) = draw(
+        today,
+        Mode::Year,
+        Weekday::Mon,
+        today,
+        &bold_only,
+        LINE,
+        &theme,
+    );
+    assert_eq!(size.width, 3.0 * 240.0 + 2.0 * 30.0, "measured in bold");
+    assert!(
+        list.items
+            .iter()
+            .all(|item| matches!(item, Item::Text { style, .. } if style.bold))
+    );
 }

@@ -512,41 +512,41 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   one-line change, if the owner prefers it. The calendar is drawn too
   (`lyr_core::calendar::draw`): waybar's month blocks on a grid of cells as wide
   as the widest day or weekday name, so a proportional font still lines up, year
-  mode three months across, week numbers on the right, today in its colour and
-  underlined, with the `calendar_*` theme keys; tested and mutation-checked.
-  Until the locale decision above is made, weeks start on Monday and names are
-  English (plan 16, 19). The panel is up too (`apps/lyr/src/clock_panel.rs`):
-  opened by `open_clock_panel` (a click on the clock or the bell) or
-  `lyr panel clock`, it sits at the top right of the output the user is on, 16
-  px from the edges and clear of the bar, runs the output's height, and is as
-  wide as swaync's 500 px or the year grid, whichever is wider (the year is
-  wider in the fallback font this machine has, so the grid does not fit 500 px
-  there). It takes the keyboard; Escape, losing focus and the same click or
-  binding again close it; a right click switches year and month mode and
-  scrolling moves by one of either. Opening it takes the toasts down, and no
-  toast shows while it is open. Run on Windows: year, month and Escape seen.
-  While lyr is the notification daemon the notification centre is below the
-  calendar (`lyr_core::centre`): the title with Clear All, the do-not-disturb
-  switch and the history in swaync's order, each entry drawn as a toast; Clear
-  All and the switch act as `lyr clear` and `lyr dnd`, an entry as a toast does,
-  and the panel redraws on every change (lyr's own closures now report a change
-  as an application's do). The title and switch label are at the bar's text
-  size, not swaync's 2rem. The media players' source is built
-  (`lyr_sources::mpris::linux::Players`): every `org.mpris.MediaPlayer2.*` name
-  on the session bus, its title, artists and playback status, re-read on
-  `NameOwnerChanged` or any player's `PropertiesChanged`, and Previous,
-  PlayPause and Next; reading and the controls tested against a fake player and
-  mutation-checked, finding players by name not (it needs a bus). A centre
-  taller than the panel scrolls, three lines a wheel step, cut at the calendar
-  by a clip (`draw::Item::Clip`). While open, the panel is drawn again on each
-  clock tick, so the calendar's today and the history's times move on (no
-  wake-up of its own). The panel shows them too, between the switch and the
-  history (swaync's order): a card per player with its title, artist and
-  previous, play/pause and next, the standard media symbols since Nerd Font
-  codepoints were not checked; a click presses the control. Not built: a
-  player's art (lyr draws no images), reading the first weekday and names from
-  the locale, the smaller monospace `calendar_font`, and checking what Hyprland
-  does with a click on the bare desktop while it is open.
+  mode three months across, week numbers on the right, all in bold and today in
+  its colour and underlined, as the dotfiles' calendar format marks them up,
+  with the `calendar_*` theme keys; tested and mutation-checked. Until the
+  locale decision above is made, weeks start on Monday and names are English
+  (plan 16, 19). The panel is up too (`apps/lyr/src/clock_panel.rs`): opened by
+  `open_clock_panel` (a click on the clock or the bell) or `lyr panel clock`, it
+  sits at the top right of the output the user is on, 16 px from the edges and
+  clear of the bar, runs the output's height, and is as wide as swaync's 500 px
+  or the year grid, whichever is wider (the year is wider in the fallback font
+  this machine has, so the grid does not fit 500 px there). It takes the
+  keyboard; Escape, losing focus and the same click or binding again close it; a
+  right click switches year and month mode and scrolling moves by one of either.
+  Opening it takes the toasts down, and no toast shows while it is open. Run on
+  Windows: year, month and Escape seen. While lyr is the notification daemon the
+  notification centre is below the calendar (`lyr_core::centre`): the title with
+  Clear All, the do-not-disturb switch and the history in swaync's order, each
+  entry drawn as a toast; Clear All and the switch act as `lyr clear` and
+  `lyr dnd`, an entry as a toast does, and the panel redraws on every change
+  (lyr's own closures now report a change as an application's do). The title and
+  switch label are at the bar's text size, not swaync's 2rem. The media players'
+  source is built (`lyr_sources::mpris::linux::Players`): every
+  `org.mpris.MediaPlayer2.*` name on the session bus, its title, artists and
+  playback status, re-read on `NameOwnerChanged` or any player's
+  `PropertiesChanged`, and Previous, PlayPause and Next; reading and the
+  controls tested against a fake player and mutation-checked, finding players by
+  name not (it needs a bus). A centre taller than the panel scrolls, three lines
+  a wheel step, cut at the calendar by a clip (`draw::Item::Clip`). While open,
+  the panel is drawn again on each clock tick, so the calendar's today and the
+  history's times move on (no wake-up of its own). The panel shows them too,
+  between the switch and the history (swaync's order): a card per player with
+  its title, artist and previous, play/pause and next, the standard media
+  symbols since Nerd Font codepoints were not checked; a click presses the
+  control. Not built: a player's art (lyr draws no images), reading the first
+  weekday and names from the locale, the smaller monospace `calendar_font`, and
+  checking what Hyprland does with a click on the bare desktop while it is open.
 - **Undocumented Windows APIs:** virtual desktops
   (`IVirtualDesktopManagerInternal`) and setting the power mode
   (`PowerSetActiveOverlayScheme`) can break with any Windows build.

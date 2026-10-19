@@ -6,6 +6,8 @@
 //! of cells, each as wide as the widest day or weekday name in the calendar's
 //! font, so the columns line up in a proportional font too. Names are English
 //! and weeks start on the first weekday the caller gives (plan 16, 19).
+//! Everything is bold and today underlined, as the dotfiles' calendar format
+//! marks them up.
 
 use chrono::{Datelike, NaiveDate, Weekday};
 use lyr_config::{Colour, Theme};
@@ -16,8 +18,16 @@ use crate::hit::Rect;
 
 /// Months across in year mode: waybar's `mode-mon-col` in the dotfiles.
 pub const COLUMNS: usize = 3;
-/// The underline under today's date.
-const UNDERLINE: f32 = 1.0;
+/// The calendar's text: the dotfiles wrap each part in `<b>`.
+const BOLD: TextStyle = TextStyle {
+    bold: true,
+    ..TextStyle::PLAIN
+};
+/// Today's date, also in `<u>`.
+const TODAY: TextStyle = TextStyle {
+    underline: true,
+    ..BOLD
+};
 
 const MONTHS: [&str; 12] = [
     "January",
@@ -70,7 +80,13 @@ impl Grid<'_> {
     }
 
     /// Text right-aligned in the cell at `column` of the block at `x`.
-    fn cell_text(&self, x: f32, y: f32, column: usize, text: &str, colour: Colour) -> Item {
+    fn cell_text(
+        &self,
+        (x, y): (f32, f32),
+        column: usize,
+        text: &str,
+        (colour, style): (Colour, TextStyle),
+    ) -> Item {
         let width = (self.measure)(text);
         let right = x + (column as f32 + 1.0) * self.cell + column as f32 * self.gap;
         Item::Text {
@@ -82,7 +98,7 @@ impl Grid<'_> {
             },
             text: text.to_owned(),
             colour,
-            style: TextStyle::PLAIN,
+            style,
         }
     }
 }
@@ -96,10 +112,11 @@ pub fn draw(
     mode: Mode,
     first: Weekday,
     today: NaiveDate,
-    measure: &dyn Fn(&str) -> f32,
+    measure: &dyn Fn(&str, TextStyle) -> f32,
     line_height: f32,
     theme: &Theme,
 ) -> (DrawList, Size) {
+    let measure = &|text: &str| measure(text, BOLD);
     let cell = (1..=31)
         .map(|day| measure(&day.to_string()))
         .chain(weekdays(first).map(|day| measure(short(day))))
@@ -174,35 +191,23 @@ fn block(
         },
         text: title,
         colour: theme.calendar_months,
-        style: TextStyle::PLAIN,
+        style: BOLD,
     });
     for (column, day) in weekdays(first).into_iter().enumerate() {
-        items.push(grid.cell_text(x, y + lh, column, short(day), theme.calendar_weekdays));
+        let weekday = (theme.calendar_weekdays, BOLD);
+        items.push(grid.cell_text((x, y + lh), column, short(day), weekday));
     }
     for (row, week) in weeks.iter().enumerate() {
         let row_y = y + lh * (row + 2) as f32;
         for (column, day) in week.days.iter().enumerate() {
             let Some(day) = day else { continue };
             let is_today = (today.year(), today.month(), today.day()) == (year, number, *day);
-            let colour = if is_today {
-                theme.calendar_today
+            let look = if is_today {
+                (theme.calendar_today, TODAY)
             } else {
-                theme.calendar_days
+                (theme.calendar_days, BOLD)
             };
-            let text = grid.cell_text(x, row_y, column, &day.to_string(), colour);
-            if is_today && let Item::Text { rect, .. } = &text {
-                items.push(Item::Box {
-                    rect: Rect {
-                        y: rect.y + rect.height - UNDERLINE,
-                        height: UNDERLINE,
-                        ..*rect
-                    },
-                    radius: 0.0,
-                    fill: theme.calendar_today,
-                    border: None,
-                });
-            }
-            items.push(text);
+            items.push(grid.cell_text((x, row_y), column, &day.to_string(), look));
         }
         let number = format!("W{:02}", week.number);
         let week_x = x + 7.0 * grid.cell + 7.0 * grid.gap;
@@ -215,7 +220,7 @@ fn block(
             },
             text: number,
             colour: theme.calendar_weeks,
-            style: TextStyle::PLAIN,
+            style: BOLD,
         });
     }
 }
