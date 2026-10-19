@@ -6,6 +6,8 @@
 //! NetworkManager's introspection XML (`introspection/` on its main branch,
 //! read 2026-10-20).
 //!
+//! The Wi-Fi menu's reading and actions are in [`wifi`].
+//!
 //! lyr reads the objects that make up the reading once, and again whenever
 //! one of them sends `PropertiesChanged`. Signals from other objects, such
 //! as the access points a scan updates, are ignored.
@@ -17,7 +19,9 @@ use lyr_core::network::{Link, Reading};
 use tokio::sync::watch;
 use zbus::message::Type;
 use zbus::proxy::CacheProperties;
-use zbus::{Connection, MatchRule, MessageStream, OwnedObjectPath, OwnedVariant};
+use zbus::{
+    Connection, MatchRule, MessageStream, ObjectPath, OwnedObjectPath, OwnedVariant, Variant,
+};
 
 /// NetworkManager's root object.
 const ROOT: &str = "/org/freedesktop/NetworkManager";
@@ -32,12 +36,27 @@ const DEVICE_TYPE_WIFI: u32 = 2;
     default_path = "/org/freedesktop/NetworkManager"
 )]
 trait Manager {
+    fn get_devices(&self) -> zbus::Result<Vec<OwnedObjectPath>>;
+    fn activate_connection(
+        &self,
+        connection: &ObjectPath<'_>,
+        device: &ObjectPath<'_>,
+        specific_object: &ObjectPath<'_>,
+    ) -> zbus::Result<OwnedObjectPath>;
+    fn add_and_activate_connection(
+        &self,
+        connection: HashMap<&str, HashMap<&str, Variant<'_>>>,
+        device: &ObjectPath<'_>,
+        specific_object: &ObjectPath<'_>,
+    ) -> zbus::Result<(OwnedObjectPath, OwnedObjectPath)>;
     #[zbus(property)]
     fn primary_connection(&self) -> zbus::Result<OwnedObjectPath>;
     #[zbus(property)]
     fn activating_connection(&self) -> zbus::Result<OwnedObjectPath>;
     #[zbus(property)]
     fn wireless_enabled(&self) -> zbus::Result<bool>;
+    #[zbus(property)]
+    fn set_wireless_enabled(&self, on: bool) -> zbus::Result<()>;
     #[zbus(property)]
     fn wireless_hardware_enabled(&self) -> zbus::Result<bool>;
 }
@@ -62,6 +81,12 @@ trait Device {
     fn device_type(&self) -> zbus::Result<u32>;
     #[zbus(property)]
     fn ip4_config(&self) -> zbus::Result<OwnedObjectPath>;
+    #[zbus(property)]
+    fn state(&self) -> zbus::Result<u32>;
+    /// `StateChanged`, named apart from `State`'s change stream.
+    #[zbus(signal, name = "StateChanged")]
+    fn device_state_changed(&self, new_state: u32, old_state: u32, reason: u32)
+    -> zbus::Result<()>;
 }
 
 #[zbus::proxy(
@@ -69,6 +94,10 @@ trait Device {
     default_service = "org.freedesktop.NetworkManager"
 )]
 trait Wireless {
+    fn get_all_access_points(&self) -> zbus::Result<Vec<OwnedObjectPath>>;
+    fn request_scan(&self, options: HashMap<&str, Variant<'_>>) -> zbus::Result<()>;
+    #[zbus(property)]
+    fn last_scan(&self) -> zbus::Result<i64>;
     #[zbus(property)]
     fn active_access_point(&self) -> zbus::Result<OwnedObjectPath>;
 }
@@ -93,6 +122,12 @@ trait AccessPoint {
     fn ssid(&self) -> zbus::Result<Vec<u8>>;
     #[zbus(property)]
     fn strength(&self) -> zbus::Result<u8>;
+    #[zbus(property)]
+    fn flags(&self) -> zbus::Result<u32>;
+    #[zbus(property)]
+    fn wpa_flags(&self) -> zbus::Result<u32>;
+    #[zbus(property)]
+    fn rsn_flags(&self) -> zbus::Result<u32>;
 }
 
 /// NetworkManager on one connection.
@@ -255,6 +290,8 @@ impl NetworkManager {
         Ok(())
     }
 }
+
+pub mod wifi;
 
 #[cfg(test)]
 mod tests;

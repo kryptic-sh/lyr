@@ -3,6 +3,8 @@
 //! drawing the menu. The platforms' sources fill it in
 //! (`lyr_sources::network`).
 
+use std::time::Duration;
+
 use lyr_config::Theme;
 
 use crate::draw::{DrawList, Size, switch};
@@ -88,6 +90,69 @@ pub fn password_fits(security: Security, password: &str) -> bool {
     }
 }
 
+/// How old a scan may be for the list to be used without a fresh one: the
+/// cutoff `nmcli --rescan auto` uses.
+pub const FRESH_SCAN: Duration = Duration::from_secs(30);
+
+/// Whether a scan that ended `last_scan` after boot is fresh `now` after
+/// boot. `None` is a device that never scanned.
+#[must_use]
+pub fn scan_is_fresh(last_scan: Option<Duration>, now: Duration) -> bool {
+    last_scan.is_some_and(|last| now.saturating_sub(last) < FRESH_SCAN)
+}
+
+/// NetworkManager's `NM_DEVICE_STATE_REASON_*` codes the menu tells apart.
+const REASON_IP_CONFIG_UNAVAILABLE: u32 = 5;
+const REASON_NO_SECRETS: u32 = 7;
+const REASON_SUPPLICANT_TIMEOUT: u32 = 11;
+const REASON_SSID_NOT_FOUND: u32 = 53;
+
+/// Why joining failed, in words, from the device's state reason.
+#[must_use]
+pub fn failure_text(ssid: &str, reason: u32) -> String {
+    match reason {
+        // NetworkManager reports a wrong password and an association
+        // timeout alike.
+        REASON_NO_SECRETS => format!("Wrong password for {ssid}, or it did not answer"),
+        REASON_SUPPLICANT_TIMEOUT => format!("{ssid} did not answer in time"),
+        REASON_SSID_NOT_FOUND => format!("{ssid} was not found"),
+        REASON_IP_CONFIG_UNAVAILABLE => format!("{ssid} gave no address"),
+        _ => format!("Joining {ssid} failed (reason {reason})"),
+    }
+}
+
+/// What to do with a profile after joining with it failed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Recovery {
+    /// Keep it, and offer to replace its password.
+    NewPassword,
+    /// Delete it, so the next attempt starts afresh.
+    Delete,
+    /// Keep it as it is.
+    Keep,
+}
+
+/// What to do after joining a network secured with `security` failed for
+/// `reason`, with a profile that was `saved` before, or made for this
+/// attempt: a saved profile is kept, and offered a new password when the
+/// secrets failed; a new one is deleted when its secrets failed, or when it
+/// is open, and kept otherwise (a DHCP timeout says nothing against it).
+#[must_use]
+pub fn recovery(saved: bool, security: Security, reason: u32) -> Recovery {
+    let secrets = reason == REASON_NO_SECRETS;
+    if saved {
+        if secrets && security.needs_password() {
+            Recovery::NewPassword
+        } else {
+            Recovery::Keep
+        }
+    } else if secrets || security == Security::Open {
+        Recovery::Delete
+    } else {
+        Recovery::Keep
+    }
+}
+
 /// One access point a scan found.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AccessPoint {
@@ -163,6 +228,53 @@ pub struct Radio {
     /// False while a hardware switch blocks the radio, which the menu's
     /// switch cannot lift.
     pub hardware_enabled: bool,
+}
+
+/// A saved Wi-Fi client profile.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Profile {
+    /// Its object path, which identifies it.
+    pub path: String,
+    pub ssid: String,
+}
+
+/// What the Wi-Fi menu shows.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Wifi {
+    /// The Wi-Fi device's object path; `None` when there is none.
+    pub device: Option<String>,
+    pub radio: Radio,
+    /// False while the device is unmanaged, or unavailable while its
+    /// supplicant is down, when it cannot scan.
+    pub available: bool,
+    /// When the last scan ended, since boot; `None` if it never scanned.
+    pub last_scan: Option<Duration>,
+    pub points: Vec<AccessPoint>,
+    /// The access point in use.
+    pub active: Option<String>,
+    pub profiles: Vec<Profile>,
+}
+
+impl Wifi {
+    /// The menu's rows.
+    #[must_use]
+    pub fn networks(&self) -> Vec<Network> {
+        let known: Vec<String> = self
+            .profiles
+            .iter()
+            .map(|profile| profile.ssid.clone())
+            .collect();
+        networks(&self.points, self.active.as_deref(), &known)
+    }
+
+    /// The saved profiles that join `ssid`.
+    #[must_use]
+    pub fn profiles_for(&self, ssid: &str) -> Vec<&Profile> {
+        self.profiles
+            .iter()
+            .filter(|profile| profile.ssid == ssid)
+            .collect()
+    }
 }
 
 /// Whether the list can be trusted.

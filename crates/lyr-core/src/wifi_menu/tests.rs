@@ -1,8 +1,10 @@
 use lyr_config::{Platform, Theme, from_sources};
 
+use std::time::Duration;
+
 use super::{
-    AccessPoint, Header, Network, Radio, Scan, Security, Shown, Target, draw, networks,
-    password_fits,
+    AccessPoint, Header, Network, Profile, Radio, Recovery, Scan, Security, Shown, Target, Wifi,
+    draw, failure_text, networks, password_fits, recovery, scan_is_fresh,
 };
 use crate::draw::Item;
 use crate::menu::{GAP, PADDING};
@@ -294,4 +296,79 @@ fn the_focus_is_outlined() {
         Some(Item::Box { rect, border: Some((_, colour)), .. })
             if *rect == join && *colour == theme.workspace_active
     ));
+}
+
+#[test]
+fn a_scan_is_fresh_for_thirty_seconds() {
+    let at = |seconds| Duration::from_secs(seconds);
+    assert!(scan_is_fresh(Some(at(100)), at(129)));
+    assert!(!scan_is_fresh(Some(at(100)), at(130)));
+    assert!(!scan_is_fresh(None, at(1)), "never scanned");
+    assert!(
+        scan_is_fresh(Some(at(100)), at(99)),
+        "a scan read after now is fresh"
+    );
+}
+
+#[test]
+fn a_failure_is_worded_by_its_reason() {
+    assert!(failure_text("home", 7).starts_with("Wrong password for home"));
+    assert_eq!(failure_text("home", 11), "home did not answer in time");
+    assert_eq!(failure_text("home", 53), "home was not found");
+    assert_eq!(failure_text("home", 5), "home gave no address");
+    assert_eq!(failure_text("home", 99), "Joining home failed (reason 99)");
+}
+
+#[test]
+fn a_failed_profile_is_kept_offered_a_password_or_deleted() {
+    const NO_SECRETS: u32 = 7;
+    const NO_ADDRESS: u32 = 5;
+    assert_eq!(
+        recovery(true, Security::Psk, NO_SECRETS),
+        Recovery::NewPassword
+    );
+    assert_eq!(
+        recovery(true, Security::Sae, NO_SECRETS),
+        Recovery::NewPassword
+    );
+    assert_eq!(recovery(true, Security::Owe, NO_SECRETS), Recovery::Keep);
+    assert_eq!(recovery(true, Security::Psk, NO_ADDRESS), Recovery::Keep);
+    assert_eq!(recovery(true, Security::Open, NO_ADDRESS), Recovery::Keep);
+    assert_eq!(recovery(false, Security::Psk, NO_SECRETS), Recovery::Delete);
+    assert_eq!(
+        recovery(false, Security::Open, NO_ADDRESS),
+        Recovery::Delete
+    );
+    assert_eq!(recovery(false, Security::Psk, NO_ADDRESS), Recovery::Keep);
+    assert_eq!(recovery(false, Security::Owe, NO_ADDRESS), Recovery::Keep);
+}
+
+#[test]
+fn a_network_is_known_by_its_profile_s_ssid() {
+    let wifi = Wifi {
+        points: vec![AccessPoint {
+            path: "/ap/1".to_owned(),
+            ssid: "home".to_owned(),
+            strength: 60,
+            security: Security::Psk,
+        }],
+        profiles: vec![
+            Profile {
+                path: "/settings/1".to_owned(),
+                ssid: "home".to_owned(),
+            },
+            Profile {
+                path: "/settings/2".to_owned(),
+                ssid: "cafe".to_owned(),
+            },
+        ],
+        ..Wifi::default()
+    };
+    assert!(wifi.networks()[0].known);
+    let paths: Vec<&str> = wifi
+        .profiles_for("home")
+        .iter()
+        .map(|profile| profile.path.as_str())
+        .collect();
+    assert_eq!(paths, ["/settings/1"]);
 }
