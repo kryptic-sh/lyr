@@ -4,8 +4,9 @@
 //! source is polled.
 //!
 //! Linux has the battery (UPower), the power profile
-//! (power-profiles-daemon), bluetooth (BlueZ) and the workspaces (Hyprland). Other platforms
-//! have no sources yet, and their modules are left out of the bar.
+//! (power-profiles-daemon), bluetooth (BlueZ), the time zone (timedate1) and
+//! the workspaces (Hyprland). Other platforms have no sources yet, and their
+//! modules are left out of the bar.
 
 use std::sync::mpsc;
 
@@ -26,6 +27,9 @@ pub enum Update {
     /// Hyprland's workspaces.
     #[cfg(target_os = "linux")]
     Workspaces(lyr_wm::hyprland::State),
+    /// The system time zone's name, or `None` when none is set.
+    #[cfg(target_os = "linux")]
+    Zone(Option<String>),
 }
 
 /// Where the bar sends what it asks of a source. A source that has stopped
@@ -109,6 +113,7 @@ mod linux {
     use lyr_core::power_menu::Entry;
     use lyr_sources::battery::linux::UPower;
     use lyr_sources::bluetooth::linux::BlueZ;
+    use lyr_sources::clock::linux::TimeDate;
     use lyr_sources::power::linux::Logind;
     use lyr_sources::power_profile::linux::PowerProfiles;
     use lyr_wm::hyprland::{Hyprland, Workspace};
@@ -145,6 +150,7 @@ mod linux {
                         battery(sender.clone(), waker.clone()),
                         power_profile(sender.clone(), profile, waker.clone()),
                         bluetooth(sender.clone(), waker.clone()),
+                        clock(sender.clone(), waker.clone()),
                         workspaces(sender, focus, waker),
                         power_menu(power),
                     );
@@ -196,6 +202,29 @@ mod linux {
         let (watched, ()) = tokio::join!(bluez.watch(&readings), forward);
         if let Err(error) = watched {
             tracing::warn!("bluetooth: BlueZ stopped answering: {error}");
+        }
+    }
+
+    async fn clock(sender: mpsc::Sender<Update>, waker: Option<ShellWaker>) {
+        let timedate = match TimeDate::system().await {
+            Ok(timedate) => timedate,
+            Err(error) => {
+                tracing::warn!("clock: timedate1 is not reachable: {error}");
+                return;
+            }
+        };
+        let (zones, mut changed) = watch::channel(None);
+        let forward = async {
+            while changed.changed().await.is_ok() {
+                let zone = changed.borrow_and_update().clone();
+                if !deliver(&sender, waker.as_ref(), Update::Zone(zone)) {
+                    break;
+                }
+            }
+        };
+        let (watched, ()) = tokio::join!(timedate.watch(&zones), forward);
+        if let Err(error) = watched {
+            tracing::warn!("clock: timedate1 stopped answering: {error}");
         }
     }
 

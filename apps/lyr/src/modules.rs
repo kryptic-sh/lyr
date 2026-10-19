@@ -21,6 +21,9 @@ pub struct Data {
     pub bluetooth: Option<lyr_core::bluetooth::Reading>,
     #[cfg(target_os = "linux")]
     pub workspaces: Option<lyr_wm::hyprland::State>,
+    /// The system time zone's name, from timedate1.
+    #[cfg(target_os = "linux")]
+    pub zone: Option<String>,
 }
 
 impl Data {
@@ -34,6 +37,8 @@ impl Data {
             Update::Bluetooth(reading) => self.bluetooth = reading,
             #[cfg(target_os = "linux")]
             Update::Workspaces(state) => self.workspaces = Some(state),
+            #[cfg(target_os = "linux")]
+            Update::Zone(zone) => self.zone = zone,
         }
     }
 }
@@ -187,7 +192,9 @@ pub fn tooltip(
 ) -> Option<String> {
     match module {
         Module::Power => Some(config.power.tooltip_format.render(|_| None)),
-        Module::Clock => Some(clock::view(now, zone().as_deref(), &config.clock.format).tooltip),
+        Module::Clock => {
+            Some(clock::view(now, zone(data).as_deref(), &config.clock.format).tooltip)
+        }
         Module::Battery => Some(battery::view(data.battery.as_ref()?, &config.battery).tooltip),
         #[cfg(target_os = "linux")]
         Module::PowerProfile => Some(
@@ -205,15 +212,19 @@ pub fn tooltip(
     }
 }
 
-/// The system time zone's name, such as `Asia/Manila`: `TZ` when it names
-/// one, else where `/etc/localtime` links into the zoneinfo database, which
-/// is what systemd's `timedatectl` reports.
+/// The time zone lyr's clock is in, by name, such as `Asia/Manila`: `TZ`
+/// when it is set, since the clock follows it; else the system's, from
+/// timedate1 when it answered, or where `/etc/localtime` links into the
+/// zoneinfo database, which is what timedated itself reads.
 #[cfg(target_os = "linux")]
-fn zone() -> Option<String> {
-    match std::env::var("TZ") {
-        Ok(tz) => zone_name(&tz),
-        Err(_) => zone_name(std::fs::read_link("/etc/localtime").ok()?.to_str()?),
+fn zone(data: &Data) -> Option<String> {
+    if let Ok(tz) = std::env::var("TZ") {
+        return zone_name(&tz);
     }
+    if let Some(zone) = &data.zone {
+        return Some(zone.clone());
+    }
+    zone_name(std::fs::read_link("/etc/localtime").ok()?.to_str()?)
 }
 
 /// The zone named by a `TZ` value or a zoneinfo path: a leading `:` (POSIX
@@ -229,7 +240,7 @@ fn zone_name(tz: &str) -> Option<String> {
 /// Windows and macOS: the zone's name is not read yet, so the tooltip shows
 /// the offset alone.
 #[cfg(not(target_os = "linux"))]
-fn zone() -> Option<String> {
+fn zone(_data: &Data) -> Option<String> {
     None
 }
 

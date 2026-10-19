@@ -208,11 +208,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `min-width`, is from the CSS model and GTK's label default, not checked
   against a running waybar. The click and scroll actions are resolved by
   `pointer::action` (see "Pointer input"). The clock's tooltip names the zone on
-  Linux from `TZ` or the `/etc/localtime` link, read each time the tooltip opens
-  (`apps/lyr/src/modules.rs`); Windows and macOS show the offset alone. Not
-  built: following `timedate1`'s `PropertiesChanged` so a zone change redraws
-  the clock at once (plan 07; until then it shows on the next tick, if chrono's
-  `Local` picks the change up, which is not checked), images (tray, M8), and
+  Linux from `TZ` (which the clock follows), else timedate1's `Timezone`, else
+  the `/etc/localtime` link (`apps/lyr/src/modules.rs`); Windows and macOS show
+  the offset alone. timedate1 is followed on `PropertiesChanged`
+  (`lyr_sources::clock::linux::TimeDate`, tested against a fake timedated and
+  mutation-checked, not run against a real one), so a zone change redraws the
+  bar at once. The clock's text takes the new zone because chrono 0.4.45's
+  `Local` re-reads `/etc/localtime` when its mtime changes, checking at most
+  once a second (`src/offset/local/unix.rs`); a change within a second of the
+  last draw shows on the next tick instead. Not built: images (tray, M8), and
   clipping text that overflows a box. A format cannot drop the literal text
   around an empty placeholder, so a battery with no power reading shows
   `80% W Discharging`. Measuring text (the widths `layout` takes) needs

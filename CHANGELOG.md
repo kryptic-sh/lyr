@@ -25,6 +25,8 @@ and this project adheres to
   the bars. `lyr panel`, `lyr dnd` and `lyr clear` reach it over its control
   socket and report that they are not implemented yet. A second `lyr` exits when
   one is already running.
+- On Linux a change of time zone (`timedatectl set-timezone`) redraws the clock
+  at once.
 - Tooltips on the power button, clock (the time zone and its offset), battery,
   power profile and Bluetooth modules, shown after half a second on a module and
   quickly when moving from one to the next, as waybar's GTK tooltips are.
