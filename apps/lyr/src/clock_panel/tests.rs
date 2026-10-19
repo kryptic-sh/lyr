@@ -251,3 +251,53 @@ fn without_the_daemon_there_is_no_centre() {
         .expect("clicked");
     assert_eq!(setup.pump(), Outcome::Kept);
 }
+
+#[test]
+fn a_tall_history_scrolls_by_three_lines_and_no_further_than_it_goes() {
+    let mut setup = setup();
+    let mut store = Store::default();
+    for summary in 0..20 {
+        store.notify(
+            lyr_core::notifications::Incoming {
+                app_name: format!("app {summary}"),
+                summary: summary.to_string(),
+                ..lyr_core::notifications::Incoming::default()
+            },
+            Instant::now(),
+        );
+    }
+    setup.store = Some(store);
+    setup.lay_out(1000.0);
+    assert!(setup.panel.scroll_max > 0.0, "taller than the panel");
+    let window = setup.panel.window;
+    let at = PhysicalPoint {
+        x: 50.0,
+        y: f64::from(setup.panel.centre_view.y + 10.0),
+    };
+    setup
+        .shell
+        .move_pointer(window, at, (0.0, 0.0))
+        .expect("moved");
+    let wheel = |setup: &mut Setup, y: f32| {
+        setup
+            .shell
+            .scroll(window, ScrollDelta::Lines { x: 0.0, y }, Some(at))
+            .expect("scrolled");
+        setup.pump();
+    };
+    wheel(&mut setup, -1.0);
+    assert_eq!(setup.panel.scroll, 60.0, "three 20 px lines down");
+    assert_eq!(
+        setup.panel.centre_origin.1,
+        setup.panel.centre_view.y - 60.0,
+        "clicks follow the scroll"
+    );
+    wheel(&mut setup, 1.0);
+    wheel(&mut setup, 1.0);
+    assert_eq!(setup.panel.scroll, 0.0, "no further than the top");
+    for _ in 0..1000 {
+        wheel(&mut setup, -1.0);
+    }
+    assert_eq!(setup.panel.scroll, setup.panel.scroll_max, "nor the bottom");
+    assert_eq!(setup.panel.mode, Mode::Year, "the calendar did not move");
+}

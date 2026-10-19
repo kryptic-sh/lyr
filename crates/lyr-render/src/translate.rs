@@ -64,6 +64,16 @@ fn push(list: &mut DrawList, item: &Item, opacity: f32, text: &Text) {
                 push(list, item, opacity * group, text);
             }
         }
+        Item::Clip { rect, items } => {
+            list.push_clip(
+                Vec2::new(rect.x, rect.y),
+                Vec2::new(rect.x + rect.width, rect.y + rect.height),
+            );
+            for item in items {
+                push(list, item, opacity, text);
+            }
+            list.pop_clip().expect("the clip pushed just above");
+        }
     }
 }
 
@@ -189,5 +199,33 @@ mod tests {
             panic!("one box");
         };
         assert_eq!(**clip, ClipRect::NONE);
+    }
+
+    #[test]
+    fn a_clip_cuts_what_it_holds() {
+        let bar = Bar {
+            items: vec![Item::Clip {
+                rect: RECT,
+                items: vec![Item::Box {
+                    rect: Rect {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 100.0,
+                        height: 100.0,
+                    },
+                    radius: 0.0,
+                    fill: colour("#ffffff"),
+                    border: None,
+                }],
+            }],
+        };
+        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0));
+        let [clip] = list.clips() else {
+            panic!("one command");
+        };
+        assert_eq!(
+            (clip.min.x, clip.min.y, clip.max.x, clip.max.y),
+            (10.0, 10.0, 60.0, 40.0)
+        );
     }
 }

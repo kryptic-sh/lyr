@@ -298,3 +298,36 @@ fn an_offset_moves_every_item_a_group_holds() {
         }
     );
 }
+
+#[test]
+fn an_offset_moves_a_clip_with_what_it_holds() {
+    let theme = theme();
+    let rect = Rect {
+        x: 1.0,
+        y: 2.0,
+        width: 3.0,
+        height: 4.0,
+    };
+    let moved = Rect {
+        x: 6.0,
+        y: 9.0,
+        ..rect
+    };
+    let boxed = |rect| Item::Box {
+        rect,
+        radius: 0.0,
+        fill: theme.foreground,
+        border: None,
+    };
+    assert_eq!(
+        Item::Clip {
+            rect,
+            items: vec![boxed(rect)],
+        }
+        .offset(5.0, 7.0),
+        Item::Clip {
+            rect: moved,
+            items: vec![boxed(moved)],
+        }
+    );
+}

@@ -33,6 +33,8 @@ pub enum Item {
     /// Items drawn together and then faded as one, like CSS `opacity`, so a
     /// box's text does not show its background through itself.
     Group { opacity: f32, items: Vec<Self> },
+    /// Items cut at `rect`'s edges: a scrolled list inside a panel.
+    Clip { rect: Rect, items: Vec<Self> },
 }
 
 impl Item {
@@ -64,6 +66,10 @@ impl Item {
             },
             Self::Group { opacity, items } => Self::Group {
                 opacity,
+                items: items.into_iter().map(|item| item.offset(dx, dy)).collect(),
+            },
+            Self::Clip { rect, items } => Self::Clip {
+                rect: moved(rect),
                 items: items.into_iter().map(|item| item.offset(dx, dy)).collect(),
             },
         }

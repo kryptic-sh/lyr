@@ -44,6 +44,8 @@ const BORDER: f32 = 2.0;
 const RADIUS: f32 = 8.0;
 /// Until the locale is read (plan 16, 19).
 const FIRST_WEEKDAY: Weekday = Weekday::Mon;
+/// Lines the centre scrolls per wheel step.
+const SCROLL_LINES: f32 = 3.0;
 
 /// The open clock panel.
 pub struct ClockPanel {
@@ -60,6 +62,11 @@ pub struct ClockPanel {
     /// The centre's clicks, in its own coordinates, and where it sits.
     centre: Regions<Target>,
     centre_origin: (f32, f32),
+    /// The part of the panel the centre shows in, below the calendar.
+    centre_view: Rect,
+    /// How far the centre is scrolled up, and how far it can go.
+    scroll: f32,
+    scroll_max: f32,
     pointer: Pointer,
     surface: Option<Surface>,
     dirty: bool,
@@ -137,6 +144,14 @@ impl ClockPanel {
             calendar_bottom: 0.0,
             centre: Regions::default(),
             centre_origin: (0.0, 0.0),
+            centre_view: Rect {
+                x: 0.0,
+                y: 0.0,
+                width: 0.0,
+                height: 0.0,
+            },
+            scroll: 0.0,
+            scroll_max: 0.0,
             pointer: Pointer::default(),
             surface: None,
             dirty: false,
@@ -198,8 +213,21 @@ impl ClockPanel {
                         continue;
                     };
                     if y >= self.calendar_bottom {
+                        let step = SCROLL_LINES * look.line_height;
+                        let scrolled = match press {
+                            Press::ScrollUp => Some(self.scroll - step),
+                            Press::ScrollDown => Some(self.scroll + step),
+                            _ => None,
+                        };
+                        if let Some(scroll) = scrolled {
+                            self.scroll = scroll;
+                            self.rebuild(look, contents);
+                            continue;
+                        }
                         let (ox, oy) = self.centre_origin;
-                        if let Some(&target) = self.centre.hit(x - ox, y - oy) {
+                        if self.centre_view.contains(x, y)
+                            && let Some(&target) = self.centre.hit(x - ox, y - oy)
+                        {
                             return Ok(Outcome::Centre(target, press));
                         }
                         continue;
@@ -267,7 +295,7 @@ impl ClockPanel {
         self.centre = Regions::default();
         if let Some(store) = contents.store {
             let top = self.calendar_bottom + centre::GAP;
-            let (list, _, regions) = centre::draw(
+            let (list, centre_size, regions) = centre::draw(
                 store,
                 contents.players,
                 self.size.width - 2.0 * inset,
@@ -276,11 +304,25 @@ impl ClockPanel {
                 look.line_height,
                 look.theme,
             );
-            self.list
-                .items
-                .extend(list.items.into_iter().map(|item| item.offset(inset, top)));
+            self.centre_view = Rect {
+                x: inset,
+                y: top,
+                width: self.size.width - 2.0 * inset,
+                height: (self.size.height - inset - top).max(0.0),
+            };
+            self.scroll_max = (centre_size.height - self.centre_view.height).max(0.0);
+            self.scroll = self.scroll.clamp(0.0, self.scroll_max);
+            let origin = (inset, top - self.scroll);
+            self.list.items.push(Item::Clip {
+                rect: self.centre_view,
+                items: list
+                    .items
+                    .into_iter()
+                    .map(|item| item.offset(origin.0, origin.1))
+                    .collect(),
+            });
             self.centre = regions;
-            self.centre_origin = (inset, top);
+            self.centre_origin = origin;
         }
         self.dirty = true;
     }
