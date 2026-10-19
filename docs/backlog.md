@@ -289,8 +289,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   added or removed, the rfkill block from the adapter's `PowerState`, and the
   device shown the last to connect, as waybar does
   (`lyr_sources::bluetooth::Tracker`); tested against a fake BlueZ. Not built:
-  the network, volume, mic and notification sources. Network and audio wait on
-  the new-dependency decision above.
+  the network, volume and mic sources (the notification daemon is its own
+  entry). Network and audio wait on the new-dependency decision above.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace

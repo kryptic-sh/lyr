@@ -24,7 +24,7 @@ pub enum Item {
         border: Option<(f32, Colour)>,
     },
     /// A line of text starting at `rect`'s left edge and centred in its
-    /// height.
+    /// height, cut at `rect`'s edges where it runs past them.
     Text {
         rect: Rect,
         text: String,

@@ -46,7 +46,16 @@ fn push(list: &mut DrawList, item: &Item, opacity: f32, text: &Text) {
             rect,
             text: string,
             colour,
-        } => text.draw(list, *rect, string, linear(*colour, opacity)),
+        } => {
+            // Text that runs past its rect is cut there, not over its
+            // neighbours.
+            list.push_clip(
+                Vec2::new(rect.x, rect.y),
+                Vec2::new(rect.x + rect.width, rect.y + rect.height),
+            );
+            text.draw(list, *rect, string, linear(*colour, opacity));
+            list.pop_clip().expect("the clip pushed just above");
+        }
         Item::Group {
             opacity: group,
             items,
@@ -60,7 +69,7 @@ fn push(list: &mut DrawList, item: &Item, opacity: f32, text: &Text) {
 
 #[cfg(test)]
 mod tests {
-    use crcbl_ui::draw_list::DrawCommand;
+    use crcbl_ui::draw_list::{ClipRect, DrawCommand};
     use crcbl_ui::font::Font;
     use lyr_config::Colour;
     use lyr_core::draw::{DrawList as Bar, Item};
@@ -144,5 +153,41 @@ mod tests {
             })
             .collect();
         assert_eq!(alphas, [0.5, 0.25], "nested groups multiply");
+    }
+
+    #[test]
+    fn text_is_clipped_to_its_rect_and_boxes_are_not() {
+        let bar = Bar {
+            items: vec![
+                Item::Text {
+                    rect: RECT,
+                    text: "a long line of text".to_owned(),
+                    colour: colour("#ffffff"),
+                },
+                Item::Box {
+                    rect: RECT,
+                    radius: 0.0,
+                    fill: colour("#ffffff"),
+                    border: None,
+                },
+            ],
+        };
+        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0));
+        let (glyphs, boxes): (Vec<_>, Vec<_>) = list
+            .commands()
+            .iter()
+            .zip(list.clips())
+            .partition(|(command, _)| matches!(command, DrawCommand::Glyphs { .. }));
+        assert!(!glyphs.is_empty(), "the text drew");
+        for (_, clip) in glyphs {
+            assert_eq!(
+                (clip.min.x, clip.min.y, clip.max.x, clip.max.y),
+                (10.0, 10.0, 60.0, 40.0)
+            );
+        }
+        let [(_, clip)] = boxes.as_slice() else {
+            panic!("one box");
+        };
+        assert_eq!(**clip, ClipRect::NONE);
     }
 }

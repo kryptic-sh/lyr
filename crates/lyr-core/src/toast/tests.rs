@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use lyr_config::{Platform, Theme, from_sources};
 
-use super::{BORDER, INSET, WIDTH, draw, relative_time, wrap};
+use super::{BORDER, INSET, TIME_GAP, WIDTH, draw, relative_time, wrap};
 use crate::draw::Item;
 use crate::notifications::{Incoming, Urgency};
 
@@ -148,4 +148,28 @@ fn the_time_sits_at_the_right_of_the_summary() {
     assert_eq!(time.0.x + time.0.width, WIDTH - BORDER - INSET);
     assert_eq!(time.0.y, BORDER + INSET);
     assert_eq!(time.1, theme.toast_time);
+}
+
+#[test]
+fn the_summary_stops_short_of_the_time() {
+    let theme = theme();
+    let content = Incoming {
+        summary: "a summary long enough to run into the time".to_owned(),
+        body: "a body that may use the whole width".to_owned(),
+        ..Incoming::default()
+    };
+    let (list, _) = draw(&content, Duration::ZERO, measure, 20.0, &theme);
+    let width = |wanted: &str| {
+        list.items
+            .iter()
+            .find_map(|item| match item {
+                Item::Text { text, rect, .. } if text.starts_with(wanted) => Some(rect.width),
+                _ => None,
+            })
+            .expect("drawn")
+    };
+    let text_width = WIDTH - 2.0 * (BORDER + INSET);
+    // "Now" is 30 px.
+    assert_eq!(width("a summary"), text_width - 30.0 - TIME_GAP);
+    assert_eq!(width("a body"), text_width);
 }

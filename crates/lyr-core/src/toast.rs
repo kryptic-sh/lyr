@@ -27,6 +27,9 @@ pub const RADIUS: f32 = 8.0;
 /// From the border to the text: the toast's 8 px padding and its content's
 /// 7 px inset.
 pub const INSET: f32 = 8.0 + 7.0;
+/// The least space between the summary and the time beside it, which cuts a
+/// long summary short: lyr's own, since swaync ellipsizes instead.
+pub const TIME_GAP: f32 = 8.0;
 
 /// `text` broken into lines no wider than `width`, at spaces, keeping its own
 /// line breaks. A word wider than `width` gets a line of its own and runs
@@ -117,11 +120,16 @@ pub fn draw(
         colour: theme.toast_time,
     });
     for (index, text) in lines.into_iter().enumerate() {
+        let width = if index == 0 {
+            (text_width - time_width - TIME_GAP).max(0.0)
+        } else {
+            text_width
+        };
         items.push(Item::Text {
             rect: Rect {
                 x: BORDER + INSET,
                 y: BORDER + INSET + line_height * index as f32,
-                width: text_width,
+                width,
                 height: line_height,
             },
             text,
