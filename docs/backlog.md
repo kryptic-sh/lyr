@@ -317,9 +317,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   first move after a leave, so nothing re-arms it once the popup cancels it).
   Its test with an ordinary parent window did not reproduce the bug; trying a
   panel parent, as lyr's bar is, is next in crcbl's backlog, so the fix has no
-  release yet. Not done: a tooltip whose module moves while it is open keeps its
-  old place. A tooltip of several lines (a format with line breaks) is drawn a
-  row per line.
+  release yet. A tooltip follows its module when the module moves (repositioned
+  where the window system can, opened again elsewhere). A tooltip of several
+  lines (a format with line breaks) is drawn a row per line.
 - **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second

@@ -6,11 +6,11 @@ use std::time::Instant;
 
 use crcbl_shell::{
     LogicalPoint, LogicalRect, LogicalSize, PopupDesc, PopupInput, PopupPlacement, Shell,
-    WindowDesc, WindowId, WindowRole,
+    ShellCaps, WindowDesc, WindowId, WindowRole,
 };
 use lyr_config::{Module, Position, Theme};
-use lyr_core::draw::{self, DrawList, Target};
-use lyr_core::hit::Regions;
+use lyr_core::draw::{self, DrawList, Size, Target};
+use lyr_core::hit::{Rect, Regions};
 use lyr_core::tooltip::Tooltip;
 use lyr_render::surface::Surface;
 use lyr_render::text::Text;
@@ -23,6 +23,9 @@ struct Popup {
     module: Module,
     text: String,
     list: DrawList,
+    /// The module box it was placed against, and its own size.
+    anchor: Rect,
+    size: Size,
     /// Opened on the window's first resize.
     surface: Option<Surface>,
     /// Whether it must be drawn: it has not presented since it was sized.
@@ -107,6 +110,7 @@ impl Tooltips {
             == wanted
                 .as_ref()
                 .map(|(module, text)| (*module, text.as_str()))
+            && !self.moved(shell, anchor.regions)?
         {
             return Ok(());
         }
@@ -121,22 +125,10 @@ impl Tooltips {
         let window = shell.create_window(&WindowDesc {
             title: NAMESPACE,
             app_id: NAMESPACE,
-            size: LogicalSize {
-                width: f64::from(size.width),
-                height: f64::from(size.height),
-            },
+            size: logical_size(size),
             role: WindowRole::Popup(PopupDesc {
                 parent: anchor.bar,
-                anchor: LogicalRect {
-                    origin: LogicalPoint {
-                        x: f64::from(rect.x),
-                        y: f64::from(rect.y),
-                    },
-                    size: LogicalSize {
-                        width: f64::from(rect.width),
-                        height: f64::from(rect.height),
-                    },
-                },
+                anchor: logical_rect(rect),
                 // Away from the screen edge the bar is on.
                 placement: match anchor.position {
                     Position::Top => PopupPlacement::Below,
@@ -151,10 +143,37 @@ impl Tooltips {
             module,
             text,
             list,
+            anchor: rect,
+            size,
             surface: None,
             dirty: false,
         });
         Ok(())
+    }
+
+    /// Whether the open popup's module box has moved and the popup cannot
+    /// follow it, so it is to be opened again. It follows by being
+    /// repositioned where the window system can.
+    fn moved(
+        &mut self,
+        shell: &mut dyn Shell,
+        regions: &Regions<Target<Module>>,
+    ) -> anyhow::Result<bool> {
+        let Some(popup) = &mut self.popup else {
+            return Ok(false);
+        };
+        let Some(rect) = regions.rect(&Target::Module(popup.module)) else {
+            return Ok(false);
+        };
+        if rect == popup.anchor {
+            return Ok(false);
+        }
+        if !shell.caps().contains(ShellCaps::POPUP_REPOSITION) {
+            return Ok(true);
+        }
+        shell.reposition_popup(popup.window, logical_rect(rect), logical_size(popup.size))?;
+        popup.anchor = rect;
+        Ok(false)
     }
 
     /// The popup was sized: opens its surface, or resizes it, to draw at
@@ -205,6 +224,28 @@ impl Tooltips {
             surface.destroy()?;
         }
         Ok(())
+    }
+}
+
+/// `rect` in crcbl's logical units.
+fn logical_rect(rect: Rect) -> LogicalRect {
+    LogicalRect {
+        origin: LogicalPoint {
+            x: f64::from(rect.x),
+            y: f64::from(rect.y),
+        },
+        size: logical_size(Size {
+            width: rect.width,
+            height: rect.height,
+        }),
+    }
+}
+
+/// `size` in crcbl's logical units.
+fn logical_size(size: Size) -> LogicalSize {
+    LogicalSize {
+        width: f64::from(size.width),
+        height: f64::from(size.height),
     }
 }
 

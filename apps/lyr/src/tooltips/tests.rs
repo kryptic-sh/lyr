@@ -157,3 +157,75 @@ fn closing_destroys_the_popup() {
     tooltips.close(&mut setup.shell).expect("closed");
     assert!(!setup.open(popup) && !tooltips.owns(popup));
 }
+
+/// Moves the clock's box `by` pixels across.
+fn move_clock(setup: &mut Setup, by: f32) {
+    let mut regions = Regions::default();
+    regions.push(
+        Rect {
+            x: 900.0 + by,
+            y: 10.0,
+            width: 150.0,
+            height: 38.0,
+        },
+        Target::Module(Module::Clock),
+    );
+    setup.regions = regions;
+}
+
+#[test]
+fn a_tooltip_follows_its_module_when_it_moves() {
+    let mut setup = setup();
+    let mut tooltips = Tooltips::default();
+    let start = Instant::now();
+    tooltips.hover(Some(&Target::Module(Module::Clock)), start);
+    let shown = start + HOVER_DELAY;
+    let popup = setup
+        .sync(&mut tooltips, Some("UTC+08:00"), shown)
+        .expect("a popup");
+    move_clock(&mut setup, -40.0);
+    assert_eq!(
+        setup.sync(&mut tooltips, Some("UTC+08:00"), shown),
+        Some(popup),
+        "repositioned, not reopened"
+    );
+    assert_eq!(
+        tooltips.popup.as_ref().map(|popup| popup.anchor.x),
+        Some(860.0)
+    );
+}
+
+#[test]
+fn without_repositioning_a_moved_tooltip_is_opened_again() {
+    let mut setup = setup();
+    let caps = HeadlessShell::new()
+        .caps()
+        .difference(crcbl_shell::ShellCaps::POPUP_REPOSITION);
+    setup.shell = HeadlessShell::new().with_caps(caps);
+    setup.bar = setup
+        .shell
+        .create_window(&WindowDesc {
+            title: "lyr",
+            app_id: "lyr",
+            ..WindowDesc::default()
+        })
+        .expect("a bar");
+    let mut tooltips = Tooltips::default();
+    let start = Instant::now();
+    tooltips.hover(Some(&Target::Module(Module::Clock)), start);
+    let shown = start + HOVER_DELAY;
+    let popup = setup
+        .sync(&mut tooltips, Some("UTC+08:00"), shown)
+        .expect("a popup");
+    assert_eq!(
+        setup.sync(&mut tooltips, Some("UTC+08:00"), shown),
+        Some(popup),
+        "unmoved, kept"
+    );
+    move_clock(&mut setup, -40.0);
+    let again = setup
+        .sync(&mut tooltips, Some("UTC+08:00"), shown)
+        .expect("a popup");
+    assert_ne!(again, popup);
+    assert!(!setup.open(popup) && setup.open(again));
+}
