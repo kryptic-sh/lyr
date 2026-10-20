@@ -95,8 +95,9 @@ and events are framed the same, events with the type's high bit set.
   `["workspace","window","output","shutdown"]`. Any workspace or output event
   re-reads both replies, and a window event does only for the changes that can
   move focus or retitle it (`focus`, `title`, `close`, `new`). The state is
-  handed on only when it differs from the last. A `shutdown` event, or the
-  socket closing, ends the stream.
+  handed on only when it differs from the last. A `shutdown` event, the socket
+  closing, or a re-read finding sway's socket gone (sway sends workspace and
+  output events while it quits, seen in CI) ends the stream.
 - **Switching:** `RUN_COMMAND` (type 0) with
   `workspace --no-auto-back-and-forth "NAME"`, so a click on the shown workspace
   does not bounce back where `workspace_auto_back_and_forth` is on. sway keeps

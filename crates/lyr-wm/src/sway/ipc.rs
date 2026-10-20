@@ -36,6 +36,8 @@ pub enum Error {
     Framing { path: PathBuf },
     #[error("sway closed {path} before replying")]
     Closed { path: PathBuf },
+    #[error("sway's socket {path} is gone: sway has exited")]
+    Gone { path: PathBuf },
     #[error("sway's reply to `{request}` is not the JSON lyr expects: {source}")]
     Json {
         request: String,
@@ -185,10 +187,15 @@ impl Sway {
     async fn connect(&self) -> Result<UnixStream, Error> {
         UnixStream::connect(&self.socket)
             .await
-            .map_err(|source| Error::Io {
-                what: "connecting to",
-                path: self.socket.clone(),
-                source,
+            .map_err(|source| match source.kind() {
+                io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused => Error::Gone {
+                    path: self.socket.clone(),
+                },
+                _ => Error::Io {
+                    what: "connecting to",
+                    path: self.socket.clone(),
+                    source,
+                },
             })
     }
 
@@ -303,7 +310,13 @@ impl Events {
             if !reread {
                 continue;
             }
-            let state = self.sway.state().await?;
+            // sway sends workspace and output events while it quits, after
+            // its socket is gone (seen in CI's sway e2e job), so a re-read
+            // that finds no socket is the end of the stream.
+            let state = match self.sway.state().await {
+                Err(Error::Gone { .. }) => return Ok(None),
+                state => state?,
+            };
             if state != self.last {
                 self.last = state.clone();
                 return Ok(Some(state));
@@ -326,8 +339,8 @@ mod tests {
         GET_TREE, GET_WORKSPACES, HEADER_LENGTH, Header, RUN_COMMAND, SHUTDOWN_EVENT, SUBSCRIBE,
         Unquotable, WINDOW_EVENT, WORKSPACE_EVENT, frame,
     };
-    use super::{Error, Sway};
-    use crate::Workspace;
+    use super::{Error, Events, Sway};
+    use crate::{State, Workspace};
 
     /// Workspace 1 focused, before any event.
     const BEFORE: &str = r#"[
@@ -521,6 +534,24 @@ mod tests {
             at(&path).focus(&two).await,
             Err(Error::Closed { .. })
         ));
+    }
+
+    #[tokio::test]
+    async fn an_event_after_sway_is_gone_ends_the_stream() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let gone = at(&dir.path().join("removed.sock"));
+        assert!(matches!(gone.exit().await, Err(Error::Gone { .. })));
+        let (mut sway_end, stream) = UnixStream::pair().expect("a pair");
+        sway_end
+            .write_all(&frame(WORKSPACE_EVENT, r#"{"change": "empty"}"#))
+            .await
+            .expect("an event");
+        let mut events = Events {
+            stream,
+            sway: gone,
+            last: State::default(),
+        };
+        assert!(matches!(events.next().await, Ok(None)));
     }
 
     #[tokio::test]
