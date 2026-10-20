@@ -2,9 +2,9 @@
 //! playback and recording streams and the output and input devices, a tab
 //! each, every row with its mute, its volume as a slider stepped down and up,
 //! on a device "make default", and on a stream that can move the device it
-//! plays on, which a click moves on to the next. The platforms' sources fill it in
-//! (`lyr_sources::audio`). wiremix's fifth tab, card configuration, waits on
-//! a source that has cards (Linux).
+//! plays on, which a click moves on to the next; wiremix's fifth tab sets
+//! cards' profiles and devices' ports where the source lists them (Linux).
+//! The platforms' sources fill it in (`lyr_sources::audio`).
 
 use lyr_config::Theme;
 
@@ -20,8 +20,9 @@ pub enum Tab {
     Recording,
     Output,
     Input,
-    /// The sound cards' profiles, where the platform has cards.
-    Cards,
+    /// The sound cards' profiles and the devices' ports, where the platform
+    /// has them.
+    Configuration,
 }
 
 impl Tab {
@@ -31,7 +32,7 @@ impl Tab {
         Self::Recording,
         Self::Output,
         Self::Input,
-        Self::Cards,
+        Self::Configuration,
     ];
 
     /// Its label.
@@ -42,7 +43,7 @@ impl Tab {
             Self::Recording => "Recording",
             Self::Output => "Output devices",
             Self::Input => "Input devices",
-            Self::Cards => "Configuration",
+            Self::Configuration => "Configuration",
         }
     }
 
@@ -58,7 +59,7 @@ impl Tab {
             Self::Playback => "Nothing is playing",
             Self::Recording => "Nothing is recording",
             Self::Output | Self::Input => "No devices",
-            Self::Cards => "No cards",
+            Self::Configuration => "Nothing to configure",
         }
     }
 }
@@ -80,37 +81,49 @@ pub struct Node {
     pub device: Option<String>,
 }
 
-/// A sound card and the profile it runs, such as "Analog Stereo Output +
-/// Mono Input".
+/// What a configuration row chooses.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Kind {
+    /// A sound card's profile, such as "Analog Stereo Output + Mono Input".
+    Profile,
+    /// An output device's port, such as "Headphones" or "Speaker".
+    OutputPort,
+    /// An input device's port.
+    InputPort,
+}
+
+/// A row of the configuration tab: a card or a device, and the option of
+/// its kind it has chosen among those available.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Card {
-    /// What identifies it to its source.
+pub struct Setting {
+    /// What identifies the card or device to its source.
     pub id: String,
     pub name: String,
-    /// Its available profiles, by id and description, in the source's
-    /// order.
-    pub profiles: Vec<(String, String)>,
-    /// The active profile's id.
+    pub kind: Kind,
+    /// The options available, by id and description, in the order a click
+    /// steps through them.
+    pub options: Vec<(String, String)>,
+    /// The chosen option's id.
     pub active: String,
 }
 
-impl Card {
-    /// The active profile's description, else its id.
+impl Setting {
+    /// The chosen option's description, else its id.
     #[must_use]
-    pub fn profile(&self) -> &str {
-        self.profiles
+    pub fn chosen(&self) -> &str {
+        self.options
             .iter()
             .find(|(id, _)| *id == self.active)
             .map_or(&self.active, |(_, description)| description)
     }
 
-    /// The profile after the active one, wrapping; `None` when there is no
+    /// The option after the chosen one, wrapping; `None` when there is no
     /// other.
     #[must_use]
-    pub fn next_profile(&self) -> Option<&str> {
-        let at = self.profiles.iter().position(|(id, _)| *id == self.active);
-        let next = at.map_or(0, |at| (at + 1) % self.profiles.len());
-        let (id, _) = self.profiles.get(next)?;
+    pub fn next(&self) -> Option<&str> {
+        let at = self.options.iter().position(|(id, _)| *id == self.active);
+        let next = at.map_or(0, |at| (at + 1) % self.options.len());
+        let (id, _) = self.options.get(next)?;
         (*id != self.active).then_some(id.as_str())
     }
 }
@@ -122,13 +135,13 @@ pub struct Nodes {
     pub recording: Vec<Node>,
     pub outputs: Vec<Node>,
     pub inputs: Vec<Node>,
-    /// The sound cards, or `None` where the platform has none to configure,
-    /// which hides their tab.
-    pub cards: Option<Vec<Card>>,
+    /// The configuration tab's rows, cards' profiles and devices' ports, or
+    /// `None` where the platform has nothing to configure, which hides it.
+    pub settings: Option<Vec<Setting>>,
 }
 
 impl Nodes {
-    /// The rows `tab` shows; the cards' tab has none of these.
+    /// The rows `tab` shows; the configuration tab has none of these.
     #[must_use]
     pub fn of(&self, tab: Tab) -> &[Node] {
         match tab {
@@ -136,16 +149,16 @@ impl Nodes {
             Tab::Recording => &self.recording,
             Tab::Output => &self.outputs,
             Tab::Input => &self.inputs,
-            Tab::Cards => &[],
+            Tab::Configuration => &[],
         }
     }
 
-    /// The tabs to show: every one, but the cards' only where there are
-    /// cards to configure.
+    /// The tabs to show: every one, but the configuration tab only where
+    /// there is something to configure.
     pub fn tabs(&self) -> impl Iterator<Item = Tab> + '_ {
         Tab::ALL
             .into_iter()
-            .filter(|&tab| tab != Tab::Cards || self.cards.is_some())
+            .filter(|&tab| tab != Tab::Configuration || self.settings.is_some())
     }
 }
 
@@ -169,8 +182,8 @@ pub enum Target {
     Default(usize),
     /// A stream's device: a click moves it to the next of its flow.
     Route(usize),
-    /// A card's profile: a click moves it to the next.
-    Profile(usize),
+    /// A configuration row's choice: a click moves it to the next option.
+    Setting(usize),
 }
 
 /// The step buttons' labels.
@@ -261,14 +274,14 @@ pub fn draw(
         })
         .sum::<f32>()
         + GAP * (nodes.tabs().count() - 1) as f32;
-    let cards = match (tab, &nodes.cards) {
-        (Tab::Cards, Some(cards)) => &cards[..],
+    let settings = match (tab, &nodes.settings) {
+        (Tab::Configuration, Some(settings)) => &settings[..],
         _ => &[],
     };
     let name_width = rows
         .iter()
         .map(|node| measure(&node.name))
-        .chain(cards.iter().map(|card| measure(&card.name)))
+        .chain(settings.iter().map(|setting| measure(&setting.name)))
         .fold(measure(tab.empty()), f32::max);
     // Each column as wide as its widest label, so the rows line up.
     let mute_width = button_width("Unmute");
@@ -291,17 +304,17 @@ pub fn draw(
     let devices = match tab {
         Tab::Playback => &nodes.outputs[..],
         Tab::Recording => &nodes.inputs[..],
-        Tab::Output | Tab::Input | Tab::Cards => &[],
+        Tab::Output | Tab::Input | Tab::Configuration => &[],
     };
     let route_width = rows
         .iter()
         .filter_map(|node| device_name(node, devices))
         .map(|name| GAP + button_width(name))
         .fold(0.0, f32::max);
-    let controls_width = if tab == Tab::Cards {
-        cards
+    let controls_width = if tab == Tab::Configuration {
+        settings
             .iter()
-            .map(|card| button_width(card.profile()))
+            .map(|setting| button_width(setting.chosen()))
             .fold(0.0, f32::max)
     } else {
         controls_width + route_width
@@ -341,20 +354,20 @@ pub fn draw(
         } + GAP;
     }
     y += row + 2.0 * GAP;
-    if rows.is_empty() && cards.is_empty() {
+    if rows.is_empty() && settings.is_empty() {
         items.push(text(tab.empty().to_owned(), PADDING, y, theme.foreground));
         y += row + GAP;
     }
-    for (index, card) in cards.iter().enumerate() {
-        items.push(text(card.name.clone(), PADDING, y, theme.foreground));
+    for (index, setting) in settings.iter().enumerate() {
+        items.push(text(setting.name.clone(), PADDING, y, theme.foreground));
         let x = PADDING + name_width + GAP;
         button(
             &mut items,
             &mut regions,
             x,
             y,
-            card.profile(),
-            Target::Profile(index),
+            setting.chosen(),
+            Target::Setting(index),
         );
         y += row + GAP;
     }

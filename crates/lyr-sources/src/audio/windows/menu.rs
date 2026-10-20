@@ -40,7 +40,7 @@ impl Audio {
             outputs: self.device_nodes(Flow::Output)?,
             inputs: self.device_nodes(Flow::Input)?,
             // Windows has no cards to configure.
-            cards: None,
+            settings: None,
         })
     }
 

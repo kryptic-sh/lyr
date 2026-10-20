@@ -101,8 +101,9 @@ impl App {
             Tab::Playback => Which::Stream(Flow::Output, id),
             Tab::Recording => Which::Stream(Flow::Input, id),
             Tab::Output | Tab::Input => Which::Device(id),
-            // Windows lists no cards, so the menu never shows their tab.
-            Tab::Cards => return,
+            // Windows lists nothing to configure, so the menu never shows
+            // that tab.
+            Tab::Configuration => return,
         };
         let step = if matches!(tab, Tab::Recording | Tab::Input) {
             self.config.mic.scroll_step
@@ -116,9 +117,9 @@ impl App {
             Action::Step(Step::Down) => self.commands.step_volume(which, -step),
             Action::Set(percent) => self.commands.set_volume(which, percent),
             Action::Default => crate::settings::open(crate::settings::Page::Sound),
-            // Its streams carry no device and it has no cards, so the menu
-            // draws neither button.
-            Action::Route | Action::Profile => {}
+            // Its streams carry no device and it lists nothing to configure,
+            // so the menu draws neither button.
+            Action::Route | Action::Setting => {}
         }
     }
 
@@ -132,8 +133,9 @@ impl App {
         let flow = match tab {
             Tab::Output | Tab::Playback => Flow::Output,
             Tab::Input | Tab::Recording => Flow::Input,
-            // macOS lists no cards, so the menu never shows their tab.
-            Tab::Cards => return,
+            // macOS lists nothing to configure, so the menu never shows that
+            // tab.
+            Tab::Configuration => return,
         };
         let Ok(device) = id.parse::<u32>() else {
             tracing::warn!("audio menu: `{id}` is not a CoreAudio device");
@@ -152,9 +154,9 @@ impl App {
             Action::Step(Step::Down) => self.commands.step_volume(which, -step),
             Action::Set(percent) => self.commands.set_volume(which, percent),
             Action::Default => self.commands.set_default(flow, device),
-            // Its streams carry no device and it has no cards, so the menu
-            // draws neither button.
-            Action::Route | Action::Profile => {}
+            // Its streams carry no device and it lists nothing to configure,
+            // so the menu draws neither button.
+            Action::Route | Action::Setting => {}
         }
     }
 
@@ -172,7 +174,7 @@ impl App {
         let devices = match tab {
             Tab::Playback => &nodes.outputs,
             Tab::Recording => &nodes.inputs,
-            Tab::Output | Tab::Input | Tab::Cards => return None,
+            Tab::Output | Tab::Input | Tab::Configuration => return None,
         };
         let at = devices.iter().position(|device| device.id == current)?;
         let next = &devices.get(at + 1).unwrap_or(&devices[0]).id;
@@ -190,17 +192,18 @@ impl App {
         let flow = match tab {
             Tab::Playback | Tab::Output => Flow::Output,
             Tab::Recording | Tab::Input => Flow::Input,
-            Tab::Cards => {
-                // A card's only control is its profile.
+            Tab::Configuration => {
+                // A row's only control is its choice: a card's profile or a
+                // device's port.
                 let next = self
                     .data
                     .audio_nodes
                     .as_ref()
-                    .and_then(|nodes| nodes.cards.as_ref())
-                    .and_then(|cards| cards.iter().find(|card| card.id == id))
-                    .and_then(|card| card.next_profile());
-                if let (Action::Profile, Some(profile)) = (action, next) {
-                    self.commands.set_card_profile(id, profile.to_owned());
+                    .and_then(|nodes| nodes.settings.as_ref())
+                    .and_then(|settings| settings.iter().find(|setting| setting.id == id))
+                    .and_then(|setting| Some((setting.kind, setting.next()?)));
+                if let (Action::Setting, Some((kind, option))) = (action, next) {
+                    self.commands.choose(kind, id, option.to_owned());
                 }
                 return;
             }
@@ -234,8 +237,8 @@ impl App {
                     self.commands.move_stream(flow, index, next);
                 }
             }
-            // On the cards' tab, handled above.
-            Action::Profile => {}
+            // On the configuration tab, handled above.
+            Action::Setting => {}
         }
     }
 }

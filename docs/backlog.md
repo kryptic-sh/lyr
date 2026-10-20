@@ -34,10 +34,15 @@ implementation follows meanwhile.
   profile as a button, and a click moves a card to its next available profile,
   best first by PulseAudio's priority (`set-card-profile`); seen in a nested
   Hyprland (2026-10-20), a keyboard Enter moved the Intel card (none of whose
-  sinks was in use) to its next profile, which was then set back with `pactl`.
-  The tab shows only where a source lists cards (`Nodes::cards`, `None` on
-  Windows and macOS). Not built: choosing a device's port on that tab, and
-  wiremix's dropdowns in place of the cycling buttons. Worth knowing: PipeWire's
+  sinks was in use) to its next profile, which was then set back with `pactl`. A
+  device with more than one usable port is a row of that tab too, its port
+  stepped through the same way (`set-sink-port`, `set-source-port`; ports
+  reported "not available" left out unless active); each row is an
+  `audio_menu::Setting` of its `Kind`. The ports are tested on `pactl`-shaped
+  JSON only: every device on the owner's machine has one port, so no real port
+  has been switched. The tab shows only where a source lists settings
+  (`Nodes::settings`, `None` on Windows and macOS). Not built: wiremix's
+  dropdowns in place of the cycling buttons. Worth knowing: PipeWire's
   stream-restore remembers a stream's mute and device per application, so a test
   that mutes or moves a probe stream changes what that application next starts
   with; the probe's were put back. Keep `pactl`, or take `libpulse-binding`

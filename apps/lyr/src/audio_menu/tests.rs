@@ -32,7 +32,7 @@ fn nodes() -> Nodes {
         recording: Vec::new(),
         outputs: vec![node("Speakers", true), node("Headphones", false)],
         inputs: vec![node("Microphone", true)],
-        cards: None,
+        settings: None,
     }
 }
 

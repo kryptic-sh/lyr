@@ -1,6 +1,8 @@
 use lyr_config::{Platform, Theme, from_sources};
 
-use super::{Card, GAP, MAX_PERCENT, Node, Nodes, PADDING, Step, Tab, Target, draw, level_at};
+use super::{
+    GAP, Kind, MAX_PERCENT, Node, Nodes, PADDING, Setting, Step, Tab, Target, draw, level_at,
+};
 use crate::draw::Item;
 
 fn theme() -> Theme {
@@ -38,7 +40,7 @@ fn nodes() -> Nodes {
             node("Headphones", 100, true, false),
         ],
         inputs: vec![node("Microphone", 100, false, true)],
-        cards: None,
+        settings: None,
     }
 }
 
@@ -245,11 +247,12 @@ fn a_stream_that_can_move_shows_its_device_by_name() {
     assert_eq!(regions.rect(&Target::Route(0)), None);
 }
 
-fn card(active: &str) -> Card {
-    Card {
+fn card(active: &str) -> Setting {
+    Setting {
         id: "card".to_owned(),
         name: "Headset".to_owned(),
-        profiles: vec![
+        kind: Kind::Profile,
+        options: vec![
             ("stereo".to_owned(), "Stereo".to_owned()),
             ("mono".to_owned(), "Mono".to_owned()),
             ("off".to_owned(), "Off".to_owned()),
@@ -260,32 +263,28 @@ fn card(active: &str) -> Card {
 
 #[test]
 fn a_card_steps_through_its_profiles_and_wraps() {
-    assert_eq!(card("stereo").profile(), "Stereo");
-    assert_eq!(card("stereo").next_profile(), Some("mono"));
-    assert_eq!(card("off").next_profile(), Some("stereo"), "wraps");
-    assert_eq!(
-        card("gone").next_profile(),
-        Some("stereo"),
-        "from the first"
-    );
+    assert_eq!(card("stereo").chosen(), "Stereo");
+    assert_eq!(card("stereo").next(), Some("mono"));
+    assert_eq!(card("off").next(), Some("stereo"), "wraps");
+    assert_eq!(card("gone").next(), Some("stereo"), "from the first");
     let mut only = card("stereo");
-    only.profiles.truncate(1);
-    assert_eq!(only.next_profile(), None, "no other");
+    only.options.truncate(1);
+    assert_eq!(only.next(), None, "no other");
 }
 
 #[test]
-fn the_cards_tab_shows_only_where_there_are_cards() {
+fn the_configuration_tab_shows_only_where_there_is_something_to_set() {
     let (_, _, regions) = draw(&nodes(), Tab::Output, None, &measure, LINE, &theme());
     assert_eq!(
-        regions.rect(&Target::Tab(Tab::Cards)),
+        regions.rect(&Target::Tab(Tab::Configuration)),
         None,
-        "no cards here"
+        "nothing to configure here"
     );
     let mut with = nodes();
-    with.cards = Some(vec![card("stereo")]);
+    with.settings = Some(vec![card("stereo")]);
     let (_, _, regions) = draw(&with, Tab::Output, None, &measure, LINE, &theme());
-    assert!(regions.rect(&Target::Tab(Tab::Cards)).is_some());
-    let (list, _, regions) = draw(&with, Tab::Cards, None, &measure, LINE, &theme());
-    assert!(regions.rect(&Target::Profile(0)).is_some());
+    assert!(regions.rect(&Target::Tab(Tab::Configuration)).is_some());
+    let (list, _, regions) = draw(&with, Tab::Configuration, None, &measure, LINE, &theme());
+    assert!(regions.rect(&Target::Setting(0)).is_some());
     assert_eq!(texts_at(&list.items, FIRST), ["Headset", "Stereo"]);
 }

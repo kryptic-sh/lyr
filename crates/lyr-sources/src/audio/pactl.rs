@@ -14,7 +14,7 @@ use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use lyr_core::audio::{Sink, Source};
-use lyr_core::audio_menu::{Card, Node, Nodes};
+use lyr_core::audio_menu::{Kind, Node, Nodes, Setting};
 use serde::Deserialize;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -108,7 +108,19 @@ struct Device {
     monitor_source: String,
     active_port: Option<String>,
     #[serde(default)]
+    ports: Vec<PortJson>,
+    #[serde(default)]
     properties: HashMap<String, serde_json::Value>,
+}
+
+/// A device's port, as `pactl --format=json list` writes it.
+#[derive(Deserialize)]
+struct PortJson {
+    name: String,
+    description: String,
+    /// `"available"`, `"not available"` or `"availability unknown"`.
+    #[serde(default)]
+    availability: String,
 }
 
 /// `pa_cvolume_avg` (the channels' mean, in integers) as a percent of
@@ -229,27 +241,53 @@ impl CardJson {
     /// Its row: named by its description, its available profiles best
     /// first by PulseAudio's priority (a JSON object keeps no order), the
     /// active one listed even if marked unavailable.
-    fn card(self) -> Card {
+    fn setting(self) -> Setting {
         let mut profiles: Vec<_> = self
             .profiles
             .into_iter()
             .filter(|(id, profile)| profile.available || *id == self.active_profile)
             .collect();
         profiles.sort_by(|(a, x), (b, y)| y.priority.cmp(&x.priority).then_with(|| a.cmp(b)));
-        Card {
+        Setting {
+            kind: Kind::Profile,
             name: self
                 .properties
                 .get("device.description")
                 .and_then(serde_json::Value::as_str)
                 .map_or_else(|| self.name.clone(), str::to_owned),
             id: self.name,
-            profiles: profiles
+            options: profiles
                 .into_iter()
                 .map(|(id, profile)| (id, profile.description))
                 .collect(),
             active: self.active_profile,
         }
     }
+}
+
+/// The port settings of `devices`, of `kind`: each device but monitors with
+/// more than one port to choose, its ports in `pactl`'s order, those it
+/// reports as not available left out unless active.
+fn ports(devices: &[Device], kind: Kind) -> impl Iterator<Item = Setting> + '_ {
+    devices
+        .iter()
+        .filter(|device| !monitor(device))
+        .filter_map(move |device| {
+            let active = device.active_port.clone()?;
+            let options: Vec<_> = device
+                .ports
+                .iter()
+                .filter(|port| port.availability != "not available" || port.name == active)
+                .map(|port| (port.name.clone(), port.description.clone()))
+                .collect();
+            (options.len() > 1).then(|| Setting {
+                id: device.name.clone(),
+                name: device.description.clone(),
+                kind,
+                options,
+                active,
+            })
+        })
 }
 
 /// Whether a source is a sink's monitor, which the menu leaves out as
@@ -309,10 +347,12 @@ pub fn nodes(
         recording: streams(source_outputs, &sources)?,
         outputs: devices(&sinks, &info.default_sink_name),
         inputs: devices(&sources, &info.default_source_name),
-        cards: Some(
+        settings: Some(
             serde_json::from_str::<Vec<CardJson>>(cards)?
                 .into_iter()
-                .map(CardJson::card)
+                .map(CardJson::setting)
+                .chain(ports(&sinks, Kind::OutputPort))
+                .chain(ports(&sources, Kind::InputPort))
                 .collect(),
         ),
     })
@@ -493,13 +533,19 @@ pub async fn move_stream(flow: Flow, index: u32, name: &str) -> io::Result<()> {
     pactl(&[command, &index.to_string(), name]).await.map(drop)
 }
 
-/// Switches the card `card` to its profile `profile`.
+/// Chooses `option` for the card or device `id`: its profile or its port,
+/// as `kind` says.
 ///
 /// # Errors
 ///
 /// When `pactl` fails.
-pub async fn set_profile(card: &str, profile: &str) -> io::Result<()> {
-    pactl(&["set-card-profile", card, profile]).await.map(drop)
+pub async fn choose(kind: Kind, id: &str, option: &str) -> io::Result<()> {
+    let command = match kind {
+        Kind::Profile => "set-card-profile",
+        Kind::OutputPort => "set-sink-port",
+        Kind::InputPort => "set-source-port",
+    };
+    pactl(&[command, id, option]).await.map(drop)
 }
 
 /// Makes the device `name` of `flow` the default.

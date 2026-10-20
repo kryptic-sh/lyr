@@ -44,8 +44,9 @@ and this project adheres to
   and input devices through `pactl`, each with mute, a slider to 150 %
   (wiremix's scale) and steps, a device's Default button makes it the default, a
   stream's device button moves it to the next device, and a Configuration tab
-  moves a sound card to its next profile; a right click on the volume or mic
-  module, or `lyr panel audio`, opens it.
+  moves a sound card to its next profile and a device with several ports to its
+  next port; a right click on the volume or mic module, or `lyr panel audio`,
+  opens it.
 - On Windows the volume and mic modules show the default output and input, their
   level and mute, updated as they change, and their click and scroll bindings
   mute and step them; an output on Bluetooth (by its device's bus) takes the

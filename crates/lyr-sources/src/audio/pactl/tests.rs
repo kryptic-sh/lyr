@@ -165,13 +165,13 @@ const CARDS: &str = r#"[{"index":730,"name":"alsa_card.usb-SteelSeries_Arctis_No
 #[test]
 fn cards_list_their_available_profiles_best_first() {
     let listed = nodes(INFO, SINKS, SOURCES, "[]", "[]", CARDS).expect("read");
-    let cards = listed.cards.expect("cards on Linux");
+    let cards = listed.settings.expect("cards on Linux");
     let [card] = &cards[..] else {
         panic!("one card: {cards:?}");
     };
     assert_eq!(card.id, "alsa_card.usb-SteelSeries_Arctis_Nova_7-00");
     assert_eq!(card.name, "Arctis Nova 7", "its description");
-    let ids: Vec<_> = card.profiles.iter().map(|(id, _)| id.as_str()).collect();
+    let ids: Vec<_> = card.options.iter().map(|(id, _)| id.as_str()).collect();
     assert_eq!(
         ids,
         [
@@ -181,11 +181,47 @@ fn cards_list_their_available_profiles_best_first() {
         ],
         "by priority, the unavailable one left out"
     );
-    assert_eq!(card.profile(), "Analog Stereo Output + Mono Input");
-    assert_eq!(card.next_profile(), Some("output:analog-stereo"));
+    assert_eq!(card.kind, lyr_core::audio_menu::Kind::Profile);
+    assert_eq!(card.chosen(), "Analog Stereo Output + Mono Input");
+    assert_eq!(card.next(), Some("output:analog-stereo"));
 }
 
 #[test]
 fn card_events_count() {
     assert!(shows("Event 'change' on card #730"));
+}
+
+#[test]
+fn a_device_with_ports_to_choose_is_a_setting() {
+    use lyr_core::audio_menu::Kind;
+
+    // A laptop's analog sink, as `pactl` writes one with three ports.
+    let sinks = r#"[{"index":5,"name":"alsa_output.pci.analog-stereo","description":"Built-in Audio",
+        "mute":false,"volume":{"mono":{"value":65536}},"monitor_source":"alsa_output.pci.analog-stereo.monitor",
+        "active_port":"analog-output-speaker","properties":{"device.class":"sound"},
+        "ports":[
+          {"name":"analog-output-speaker","description":"Speakers","availability":"availability unknown"},
+          {"name":"analog-output-headphones","description":"Headphones","availability":"available"},
+          {"name":"analog-output-lineout","description":"Line Out","availability":"not available"}]}]"#;
+    let info =
+        r#"{"default_sink_name":"alsa_output.pci.analog-stereo","default_source_name":"none"}"#;
+    let listed = nodes(info, sinks, "[]", "[]", "[]", "[]").expect("read");
+    let settings = listed.settings.expect("settings on Linux");
+    let [port] = &settings[..] else {
+        panic!("one port setting: {settings:?}");
+    };
+    assert_eq!(port.kind, Kind::OutputPort);
+    assert_eq!(port.id, "alsa_output.pci.analog-stereo");
+    assert_eq!(port.name, "Built-in Audio");
+    assert_eq!(port.chosen(), "Speakers");
+    let ids: Vec<_> = port.options.iter().map(|(id, _)| id.as_str()).collect();
+    assert_eq!(
+        ids,
+        ["analog-output-speaker", "analog-output-headphones"],
+        "the unplugged line out left out"
+    );
+    assert_eq!(port.next(), Some("analog-output-headphones"));
+    // A device with one port has nothing to choose.
+    let single = nodes(INFO, SINKS, SOURCES, "[]", "[]", "[]").expect("read");
+    assert_eq!(single.settings, Some(Vec::new()));
 }
