@@ -24,6 +24,29 @@ pub enum Request {
     Dnd,
     /// Clear the notification history.
     Clear,
+    /// Something outside lyr changed what a source reads.
+    Event(Event),
+}
+
+/// What an external hook tells the bar has changed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Event {
+    /// The workspaces or the focused window, from AeroSpace's
+    /// `on-focus-changed` (`docs/plan/06-workspaces.md`).
+    Workspace,
+}
+
+impl Event {
+    /// Every event, in the order help text lists them.
+    pub const ALL: [Self; 1] = [Self::Workspace];
+
+    /// The event's name in a request and on the command line.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Workspace => "workspace",
+        }
+    }
 }
 
 /// A panel `lyr panel` can open.
@@ -60,6 +83,7 @@ impl fmt::Display for Request {
             Self::Panel(panel) => write!(f, "panel {}", panel.name()),
             Self::Dnd => f.write_str("dnd"),
             Self::Clear => f.write_str("clear"),
+            Self::Event(event) => write!(f, "event {}", event.name()),
         }
     }
 }
@@ -97,6 +121,14 @@ impl FromStr for Request {
                     .ok_or_else(unknown)?;
                 Self::Panel(panel)
             }
+            Some("event") => {
+                let name = words.next().ok_or_else(unknown)?;
+                let event = Event::ALL
+                    .into_iter()
+                    .find(|event| event.name() == name)
+                    .ok_or_else(unknown)?;
+                Self::Event(event)
+            }
             _ => return Err(unknown()),
         };
         match words.next() {
@@ -108,7 +140,7 @@ impl FromStr for Request {
 
 #[cfg(test)]
 mod tests {
-    use super::{Panel, Request};
+    use super::{Event, Panel, Request};
 
     #[test]
     fn every_request_survives_the_wire() {
@@ -120,6 +152,7 @@ mod tests {
             Request::Clear,
         ];
         all.extend(Panel::ALL.map(Request::Panel));
+        all.extend(Event::ALL.map(Request::Event));
         for request in all {
             assert_eq!(request.to_string().parse(), Ok(request), "{request}");
         }
@@ -132,6 +165,18 @@ mod tests {
     }
 
     #[test]
+    fn an_event_request_names_the_event() {
+        assert_eq!(
+            Request::Event(Event::Workspace).to_string(),
+            "event workspace"
+        );
+        assert_eq!(
+            "event workspace".parse(),
+            Ok(Request::Event(Event::Workspace))
+        );
+    }
+
+    #[test]
     fn anything_else_is_refused() {
         for line in [
             "",
@@ -139,6 +184,9 @@ mod tests {
             "panel tray",
             "reload now",
             "panel wifi x",
+            "event",
+            "event window",
+            "event workspace now",
             "Reload",
             " quit",
         ] {

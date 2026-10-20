@@ -181,7 +181,7 @@ pub fn act(
         Action::Builtin(builtin) => {
             tracing::warn!("`{}` is not implemented yet", builtin.name());
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         Action::FocusWorkspace(index) => {
             let workspace = workspaces.get(index).and_then(|id| {
                 data.workspaces
@@ -193,7 +193,7 @@ pub fn act(
                 commands.focus(workspace.clone());
             }
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         Action::StepWorkspace(direction) => {
             use lyr_core::pointer::Direction;
             use lyr_wm::Step;
@@ -209,7 +209,7 @@ pub fn act(
                 commands.focus(workspace.clone());
             }
         }
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
         Action::FocusWorkspace(_) | Action::StepWorkspace(_) => {}
     }
     None

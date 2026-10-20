@@ -29,7 +29,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use lyr_core::control::{Panel, Request};
+use lyr_core::control::{Event, Panel, Request};
 
 /// Command-line interface: `lyr [-c config] [command]`.
 #[derive(Debug, Parser)]
@@ -84,6 +84,12 @@ enum BarCommand {
     Dnd,
     /// Clear the notification history.
     Clear,
+    /// Tell the bar something outside it changed, as AeroSpace's
+    /// on-focus-changed does with `exec-and-forget lyr event workspace`.
+    Event {
+        #[arg(value_enum)]
+        event: EventArg,
+    },
 }
 
 impl BarCommand {
@@ -96,6 +102,21 @@ impl BarCommand {
             Self::Panel { panel } => Request::Panel(panel.panel()),
             Self::Dnd => Request::Dnd,
             Self::Clear => Request::Clear,
+            Self::Event { event } => Request::Event(event.event()),
+        }
+    }
+}
+
+/// The events `lyr event` takes, as command-line values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, ValueEnum)]
+enum EventArg {
+    Workspace,
+}
+
+impl EventArg {
+    const fn event(self) -> Event {
+        match self {
+            Self::Workspace => Event::Workspace,
         }
     }
 }
@@ -231,6 +252,17 @@ mod cli_tests {
             );
         }
         assert!(Cli::try_parse_from(["lyr", "panel", "tray"]).is_err());
+    }
+
+    #[test]
+    fn every_event_can_be_named_on_the_command_line() {
+        for event in Event::ALL {
+            assert_eq!(
+                request_of(&["lyr", "event", event.name()]),
+                Some(Request::Event(event))
+            );
+        }
+        assert!(Cli::try_parse_from(["lyr", "event", "window"]).is_err());
     }
 
     #[test]

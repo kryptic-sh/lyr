@@ -509,8 +509,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   signal is read only on those changes, since no notification follows it; plan
   07 has waybar re-reading it on an interval. `scdynamic` is tested and
   mutation-checked everywhere; CI's Mac reads the store and starts and stops the
-  watch, and no Mac on Wi-Fi has run it. Not built: Bluetooth on macOS, the
-  audio menu and the other menus.
+  watch, and no Mac on Wi-Fi has run it. The workspaces are AeroSpace's
+  (`lyr_wm::aerospace`): `list-workspaces` and `list-windows --focused` as JSON,
+  read on a thread at start, on each `lyr event workspace` (AeroSpace's
+  `on-focus-changed`, plan 06) and after a click's
+  `aerospace workspace -- NAME`; the parsing and arguments are tested and
+  mutation-checked on every platform, from AeroSpace v0.21.3-Beta's docs and its
+  `formatToJson.swift`. No AeroSpace has run it: CI's Mac has none, and its
+  process calls run nowhere in the tests. A window's title changing alone tells
+  lyr nothing, so the window module can lag it. Not built: Bluetooth on macOS,
+  the audio menu and the other menus.
 - **Windows sources, M9.** Built: the battery (`lyr_sources::battery::windows`):
   `GetSystemPowerStatus` read at start and again whenever
   `PowerSettingRegisterNotification` reports a change of power source or
@@ -651,8 +659,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   answer that lyr is not the daemon elsewhere. `lyr panel clock`,
   `lyr panel bluetooth` and `lyr panel wifi` open their panels;
   `lyr panel audio` opens the audio menu on Windows and answers that there is no
-  audio source elsewhere (M7). Not built: `lyr event workspace` for AeroSpace
-  (M10).
+  audio source elsewhere (M7). `lyr event workspace` has the macOS bar read
+  AeroSpace's workspaces again, and answers with an error elsewhere.
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]`, `[theme]` and every module's table, the
   embedded defaults, `[platform.*]` layering on both the defaults and the user

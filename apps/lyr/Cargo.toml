@@ -39,5 +39,8 @@ workspace = true
 lyr-wm.workspace = true
 tokio = { version = "1.53.3", features = ["rt", "sync", "time", "net", "macros"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+lyr-wm.workspace = true
+
 [dev-dependencies]
 tempfile = "3.27.0"

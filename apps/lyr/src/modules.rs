@@ -33,7 +33,7 @@ pub struct Data {
     /// The pairing agent's question waiting for an answer: its id, the
     /// device's path, and the question.
     pub bluetooth_ask: Option<(u64, String, lyr_core::bluetooth_menu::Question)>,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     pub workspaces: Option<lyr_wm::State>,
     /// The system time zone's name, from timedate1.
     #[cfg(target_os = "linux")]
@@ -110,7 +110,7 @@ impl Data {
                 self.bluetooth_adapter = snapshot.adapter;
                 self.bluetooth_devices = snapshot.devices;
             }
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
             Update::Workspaces(state) => self.workspaces = Some(state),
             #[cfg(target_os = "linux")]
             Update::Zone(zone) => self.zone = zone,
@@ -187,7 +187,7 @@ pub fn draw(
     };
     let (list, regions) = draw::build(&bar, &config.theme, |s| text.measure(s));
     // The same order the workspace buttons were made in.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     let workspaces = data
         .workspaces
         .as_ref()
@@ -198,7 +198,7 @@ pub fn draw(
                 .collect()
         })
         .unwrap_or_default();
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     let workspaces = Vec::new();
     Drawn {
         list,
@@ -254,7 +254,7 @@ fn content(
             let shown = lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth);
             Some(label(shown.text, theme.foreground))
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         Module::Window => {
             let (class, title) = data.workspaces.as_ref()?.active_window()?;
             let shown = lyr_core::window::view(class, title, &config.window)?;
@@ -304,7 +304,7 @@ fn content(
             lyr_core::bell::stateless(&config.notifications),
             theme.foreground,
         )),
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         Module::Workspaces => {
             let state = data.workspaces.as_ref()?;
             let buttons = shown_workspaces(state, config, monitor)
@@ -366,7 +366,7 @@ pub fn tooltip(
             .tooltip,
         ),
         Module::Network => Some(data.network.as_ref()?.view(&config.network).tooltip),
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         Module::Window => {
             let (class, title) = data.workspaces.as_ref()?.active_window()?;
             Some(lyr_core::window::view(class, title, &config.window)?.tooltip)
@@ -422,7 +422,7 @@ fn zone(_data: &Data) -> Option<String> {
 
 /// The workspaces a bar on `monitor` lists: every one, or with
 /// `all_outputs = false` its own output's.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 pub fn shown_workspaces<'a>(
     state: &'a lyr_wm::State,
     config: &Config,

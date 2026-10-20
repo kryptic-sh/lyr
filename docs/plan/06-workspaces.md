@@ -159,10 +159,26 @@ one. The dotfiles have no config for either.
 macOS has **no public API** for Spaces: not for listing them, switching or
 watching changes. The private CGS/SkyLight calls yabai uses need SIP partly
 disabled for switching. Provisional default: no native backend. Ship an
-**AeroSpace** backend instead (its CLI lists workspaces and switches between
-them, and its `exec-on-workspace-change` hook can push events to lyr over its
-control socket, see [02](02-architecture.md#control-socket)). Without AeroSpace
-the module is left out on macOS. See [16](16-open-questions.md).
+**AeroSpace** backend instead. Without AeroSpace the module is left out on
+macOS. See [16](16-open-questions.md).
+
+`lyr_wm::aerospace` (read at AeroSpace v0.21.3-Beta) runs the `aerospace`
+command: `list-workspaces --all --json --format` with the workspace, whether it
+is focused and its monitor, and `list-windows --focused --json --format` with
+the app's name and the window's title for the window module. The buttons keep
+AeroSpace's order, each numbered by its place, the focused one active. A click
+runs `aerospace workspace -- NAME`, each argument passed as is, so no name is
+quoted and none is read as an option. AeroSpace pushes nothing to a bar, so its
+config tells lyr when to read again over the control socket
+([02](02-architecture.md#control-socket)):
+
+```toml
+on-focus-changed = ['exec-and-forget lyr event workspace']
+```
+
+`on-focus-changed` runs whenever the focused window or workspace changes, which
+covers both modules; a window's title changing alone runs nothing, so the window
+module can lag a title until the next focus change.
 
 ## Multi-monitor
 

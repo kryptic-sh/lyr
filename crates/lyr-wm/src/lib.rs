@@ -5,10 +5,12 @@
 //! (`docs/plan/06-workspaces.md`).
 //!
 //! So far it holds the Hyprland ([`hyprland`]), sway ([`sway`]) and niri
-//! ([`niri`]) backends. Each produces the same [`State`], the buttons the
+//! ([`niri`]) backends, and on macOS AeroSpace's (`aerospace`). Each produces the same [`State`], the buttons the
 //! workspace module draws, and on Unix `Compositor` picks the one the
 //! session runs under.
 
+#[cfg(unix)]
+pub mod aerospace;
 #[cfg(unix)]
 mod compositor;
 pub mod hyprland;

@@ -51,6 +51,12 @@ and this project adheres to
   dBm), updated when the system's network state changes. Without Location
   permission macOS withholds the name, and the link still shows as Wi-Fi; with
   the Wi-Fi radio off and no link, it shows as disabled.
+- On macOS the workspaces and window modules follow AeroSpace: its workspaces in
+  its order, the focused one active, and the focused window's app and title; a
+  click switches through `aerospace workspace`. AeroSpace's config runs
+  `lyr event workspace` from `on-focus-changed` to have lyr read them again.
+- `lyr event workspace` tells the running bar that something outside it changed
+  the workspaces; only macOS acts on it.
 - Clicking a workspace switches to it, and with `workspaces.scroll = true` the
   wheel steps through them. A module's `[<module>.on]` table binds clicks and
   scrolling to a command (`{ exec = "…" }`) or a built-in action. Of the

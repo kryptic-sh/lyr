@@ -72,8 +72,9 @@ Windows), modelled on tmxr's `interprocess` use. It is used by:
   which the Hyprland bindings run ([09](09-notifications.md),
   [10](10-popups-and-menus.md));
 - external hooks pushing events in, such as AeroSpace's
-  `exec-on-workspace-change = ['lyr', 'event', 'workspace']`
-  ([06](06-workspaces.md#macos--spaces));
+  `on-focus-changed = ['exec-and-forget lyr event workspace']`
+  ([06](06-workspaces.md#macos--spaces)), which lyr answers with an error
+  elsewhere, since Linux compositors push their own changes;
 - single-instance detection: a second `lyr` exits with a message rather than
   drawing a second set of bars.
 

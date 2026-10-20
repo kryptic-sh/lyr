@@ -7,7 +7,7 @@ use anyhow::Context as _;
 use crcbl_shell::Shell;
 use lyr_config::{Module, Platform};
 use lyr_core::clock::Tick;
-use lyr_core::control::{Panel, Request};
+use lyr_core::control::{Event, Panel, Request};
 
 use super::{App, load_text, next_tick};
 use crate::control::{self, Incoming};
@@ -66,6 +66,17 @@ impl App {
             request @ (Request::Dnd | Request::Clear) => {
                 let reply = self.notifications(request);
                 incoming.reply(reply);
+            }
+            Request::Event(Event::Workspace) => {
+                // AeroSpace pushes nothing, so its hook asks for a read;
+                // Linux compositors push their own changes.
+                #[cfg(target_os = "macos")]
+                {
+                    self.commands.refresh_workspaces();
+                    incoming.reply(control::OK);
+                }
+                #[cfg(not(target_os = "macos"))]
+                incoming.reply("error: workspace events are read from AeroSpace, on macOS only");
             }
         }
         Ok(false)

@@ -51,8 +51,8 @@ pub enum Update {
     /// The pairing agent's question is no longer asked.
     #[cfg(target_os = "linux")]
     BluetoothCancel,
-    /// The compositor's workspaces.
-    #[cfg(target_os = "linux")]
+    /// The compositor's workspaces (AeroSpace's on macOS).
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     Workspaces(lyr_wm::State),
     /// The system time zone's name, or `None` when none is set.
     #[cfg(target_os = "linux")]
@@ -174,6 +174,8 @@ pub struct Commands {
     /// is.
     #[cfg(target_os = "macos")]
     _network: Option<lyr_sources::network::macos::Watch>,
+    #[cfg(target_os = "macos")]
+    workspaces: std::sync::mpsc::Sender<macos::WorkspaceRequest>,
     #[cfg(windows)]
     _network: Option<lyr_sources::network::windows::Watch>,
     #[cfg(windows)]
@@ -318,6 +320,21 @@ impl Commands {
         }
     }
 
+    /// macOS: switches to `workspace` through AeroSpace.
+    #[cfg(target_os = "macos")]
+    pub fn focus(&self, workspace: lyr_wm::Workspace) {
+        let _stopped = self
+            .workspaces
+            .send(macos::WorkspaceRequest::Focus(workspace));
+    }
+
+    /// macOS: reads AeroSpace's workspaces again, as `lyr event workspace`
+    /// asks.
+    #[cfg(target_os = "macos")]
+    pub fn refresh_workspaces(&self) {
+        let _stopped = self.workspaces.send(macos::WorkspaceRequest::Refresh);
+    }
+
     /// macOS: mutes or unmutes the default device of `flow`.
     #[cfg(target_os = "macos")]
     pub fn toggle_mute(&self, flow: lyr_sources::audio::macos::Flow) {
@@ -416,6 +433,7 @@ pub fn start(
         let audio = macos::audio(sender.clone(), waker.clone())?;
         let power_profile = macos::power_profile(sender.clone(), waker.clone());
         let network = macos::network(sender.clone(), waker.clone());
+        let workspaces = macos::workspaces(sender.clone(), waker.clone())?;
         let battery = macos::battery(sender, waker);
         Ok((
             receiver,
@@ -424,13 +442,14 @@ pub fn start(
                 _network: network,
                 _power_profile: power_profile,
                 audio,
+                workspaces,
             },
         ))
     }
 }
 
 /// The sources macOS has so far: the battery, the default audio devices,
-/// Low Power Mode and the network.
+/// Low Power Mode, the network and AeroSpace's workspaces.
 #[cfg(target_os = "macos")]
 mod macos {
     use std::sync::mpsc;
@@ -530,6 +549,67 @@ mod macos {
                             tracing::warn!("audio: {error}");
                         }
                     }
+                }
+            })?;
+        Ok(requests)
+    }
+
+    /// What the bar asks of the workspaces thread.
+    #[derive(Debug)]
+    pub(super) enum WorkspaceRequest {
+        /// AeroSpace's hook said something changed: read again.
+        Refresh,
+        Focus(lyr_wm::Workspace),
+    }
+
+    /// Hands AeroSpace's workspaces and focused window to the main loop now
+    /// and after each `lyr event workspace` or click that changes them, on a
+    /// thread of its own, since each read runs `aerospace`. Without
+    /// AeroSpace the first read logs why, and the modules stay out until a
+    /// hook's event finds it.
+    ///
+    /// # Errors
+    ///
+    /// When the thread cannot start.
+    pub(super) fn workspaces(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+    ) -> std::io::Result<mpsc::Sender<WorkspaceRequest>> {
+        use lyr_wm::aerospace;
+        let (requests, incoming) = mpsc::channel();
+        std::thread::Builder::new()
+            .name("lyr workspaces".to_owned())
+            .spawn(move || {
+                // What was last handed over, so only a change wakes the loop.
+                let mut sent = None;
+                let mut request = WorkspaceRequest::Refresh;
+                loop {
+                    // Every waiting switch is carried out; then a run of
+                    // requests reads once.
+                    for asked in std::iter::once(request).chain(incoming.try_iter()) {
+                        if let WorkspaceRequest::Focus(workspace) = asked
+                            && let Err(error) = aerospace::focus(&workspace)
+                        {
+                            tracing::warn!("workspaces: {error}");
+                        }
+                    }
+                    match aerospace::read() {
+                        Ok(state) if sent.as_ref() != Some(&state) => {
+                            sent = Some(state.clone());
+                            if sender.send(Update::Workspaces(state)).is_err() {
+                                break;
+                            }
+                            if let Some(waker) = &waker {
+                                waker.wake();
+                            }
+                        }
+                        Ok(_) => {}
+                        Err(error) => tracing::warn!("workspaces: {error}"),
+                    }
+                    let Ok(next) = incoming.recv() else {
+                        break;
+                    };
+                    request = next;
                 }
             })?;
         Ok(requests)
