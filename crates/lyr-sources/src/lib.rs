@@ -13,12 +13,14 @@
 //! module's source but sit with the other system-bus clients; Windows has
 //! the battery, network, power-profile, audio ([`audio`]) and foreground
 //! window ([`window`]) sources and the power menu's actions. Linux audio waits on a dependency decision
-//! (`docs/backlog.md`). [`program`] names the program a process runs.
+//! (`docs/backlog.md`). [`program`] names the program a process runs, and
+//! [`locale`] gives the calendar's first weekday.
 
 pub mod audio;
 pub mod battery;
 pub mod bluetooth;
 pub mod clock;
+pub mod locale;
 #[cfg(target_os = "macos")]
 mod macos_runloop;
 pub mod mpris;

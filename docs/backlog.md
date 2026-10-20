@@ -21,12 +21,17 @@ implementation follows meanwhile.
   Should lyr also support machines without it, through a new rtnetlink crate
   (`rtnetlink` or `neli`) and a 30 s nl80211 read for the signal (plan 07), or
   leave the module out there?
-- **Calendar locale: may lyr take `libc`?** (M5.) **Q:** Read the first weekday
-  and day and month names from the system locale, as waybar does (`nl_langinfo`
-  with `_NL_TIME_FIRST_WEEKDAY` on Linux, which needs `libc`, not on plan 02's
-  list; on Windows `GetLocaleInfoEx` with `LOCALE_IFIRSTDAYOFWEEK` through
-  `windows-sys`, which is), or add a `clock.first_weekday` config key defaulting
-  to Monday, with English names, which a Sunday-first locale sets by hand?
+- **Calendar locale: may lyr take `libc`?** (M5.) **Q:** The calendar's first
+  weekday now follows the locale on Windows (`GetLocaleInfoEx`'s
+  `LOCALE_IFIRSTDAYOFWEEK`, through the `windows-sys` lyr already has) and macOS
+  (`NSCalendar`'s `firstWeekday`), in `lyr_sources::locale`. Linux still starts
+  on Monday: waybar's read there is `nl_langinfo` with `_NL_TIME_FIRST_WEEKDAY`
+  and `_NL_TIME_WEEK_1STDAY`, glibc-only, which needs `libc` as a direct
+  dependency (it is in the lockfile already, through other crates, but not on
+  plan 02's list). Take `libc` for Linux, or add a `clock.first_weekday` config
+  key that overrides the locale everywhere and is the only way to change it on
+  Linux? Day and month names stay English on every platform until this is
+  answered.
 - **Week numbers: waybar's or ISO?** (M5.) **Q:** The calendar numbers weeks as
   waybar does for a Monday start (`%W`), since the dotfiles do not set
   `iso8601`. ISO weeks (`%V`) are a one-line change. Keep `%W`?
@@ -994,9 +999,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   between the switch and the history (swaync's order): a card per player with
   its title, artist and previous, play/pause and next, the standard media
   symbols since Nerd Font codepoints were not checked; a click presses the
-  control. Not built: a player's art (lyr draws no images), reading the first
-  weekday and names from the locale, and checking what Hyprland does with a
-  click on the bare desktop while it is open.
+  control. Not built: a player's art (lyr draws no images), the day and month
+  names from the locale and the first weekday on Linux (the calendar locale
+  question above), and checking what Hyprland does with a click on the bare
+  desktop while it is open.
 - **Undocumented Windows APIs:** virtual desktops
   (`IVirtualDesktopManagerInternal`) and setting the power mode
   (`PowerSetActiveOverlayScheme`) can break with any Windows build.

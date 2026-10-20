@@ -42,7 +42,7 @@ const PADDING: f32 = 16.0;
 const BORDER: f32 = 2.0;
 /// swaync's corner radius.
 const RADIUS: f32 = 8.0;
-/// Until the locale is read (plan 16, 19).
+/// The calendar's first weekday where the locale's cannot be read: ISO's.
 const FIRST_WEEKDAY: Weekday = Weekday::Mon;
 /// Lines the centre scrolls per wheel step.
 const SCROLL_LINES: f32 = 3.0;
@@ -50,6 +50,8 @@ const SCROLL_LINES: f32 = 3.0;
 /// The open clock panel.
 pub struct ClockPanel {
     window: WindowId,
+    /// The locale's first weekday, read when the panel opens.
+    first: Weekday,
     /// The month the calendar shows, and how.
     shown: NaiveDate,
     mode: Mode,
@@ -100,10 +102,13 @@ impl ClockPanel {
     /// Opens the panel showing `today`'s year, wide enough for the year's
     /// calendar.
     pub fn open(shell: &mut dyn Shell, look: &Look<'_>, today: NaiveDate) -> anyhow::Result<Self> {
+        let first = lyr_sources::locale::first_weekday()
+            .and_then(|day| Weekday::try_from(day).ok())
+            .unwrap_or(FIRST_WEEKDAY);
         let (_, calendar) = calendar::draw::draw(
             today,
             Mode::Year,
-            FIRST_WEEKDAY,
+            first,
             today,
             look.measure_in,
             look.calendar_line_height,
@@ -138,6 +143,7 @@ impl ClockPanel {
         })?;
         Ok(Self {
             window,
+            first,
             shown: today,
             mode: Mode::Year,
             size: Size { width, height: 0.0 },
@@ -301,7 +307,7 @@ impl ClockPanel {
         let (calendar, calendar_size) = calendar::draw::draw(
             self.shown,
             self.mode,
-            FIRST_WEEKDAY,
+            self.first,
             contents.today,
             look.measure_in,
             look.calendar_line_height,

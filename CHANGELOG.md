@@ -114,6 +114,8 @@ and this project adheres to
   `pmset sleepnow`, and Logout, Reboot and Shutdown ask System Events, with no
   Hibernate. `[power.menu]` sets an entry to a command instead
   (`lock = { exec = "hyprlock" }`).
+- On Windows and macOS the clock panel's calendar starts its weeks on the
+  locale's first weekday; Linux keeps Monday.
 - `[tray] spacing` sets the gap between the tray's items, 10 px by default as in
   the dotfiles' waybar, and `lyr import-waybar` carries waybar's `spacing`.
 - `lyr import-waybar FILE` prints a waybar `config.jsonc` as a lyr config: the
