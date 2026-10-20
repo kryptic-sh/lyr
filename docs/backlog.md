@@ -474,25 +474,26 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked on every platform), re-read on each
   `IOPSNotificationCreateRunLoopSource` notification on a run-loop thread of its
   own. `objc2-io-kit`, `objc2-core-foundation`, `objc2-core-audio`,
-  `objc2-foundation`, `objc2`, `block2`, `objc2-system-configuration` and
-  `objc2-core-wlan` were taken under plan 02's `objc2` row, read as covering the
-  `objc2` framework crates; say so if that row did not mean them. Checked by
-  `cargo clippy` for `aarch64-apple-darwin` from WSL. On CI's macOS runner,
-  which has no battery, its test reads the power sources and starts and stops
-  the watch; no Mac with a battery has run it. Volume and mic are built too
-  (`lyr_sources::audio::macos`): CoreAudio's default output and input, their
-  volume (the main element's, else the mean of channels 1 and 2, set on each)
-  and mute, and the transport type's port (`audio::coreaudio`, tested and
-  mutation-checked everywhere); property listeners on the system object and on
-  the default devices, moved when a default changes, run on CoreAudio's own
-  notification thread, and their callback is leaked once per watch so a call in
-  flight after a listener goes stays valid. Cross-checked with clippy for
-  `aarch64-apple-darwin`; CI's macOS runner, whatever audio devices it has, runs
-  its read and the listeners' start, follow and stop; no Mac has played through
-  it. The power menu's actions are built too (the Power menu entry below), and
-  the power profile (`lyr_sources::power_profile::macos`): Low Power Mode from
-  `NSProcessInfo`, as power-saver or balanced (`power_profile::lowpower`, tested
-  everywhere), re-read on `NSProcessInfoPowerStateDidChangeNotification` through
+  `objc2-foundation`, `objc2`, `block2`, `objc2-system-configuration`,
+  `objc2-core-wlan` and `objc2-io-bluetooth` were taken under plan 02's `objc2`
+  row, read as covering the `objc2` framework crates; say so if that row did not
+  mean them. Checked by `cargo clippy` for `aarch64-apple-darwin` from WSL. On
+  CI's macOS runner, which has no battery, its test reads the power sources and
+  starts and stops the watch; no Mac with a battery has run it. Volume and mic
+  are built too (`lyr_sources::audio::macos`): CoreAudio's default output and
+  input, their volume (the main element's, else the mean of channels 1 and 2,
+  set on each) and mute, and the transport type's port (`audio::coreaudio`,
+  tested and mutation-checked everywhere); property listeners on the system
+  object and on the default devices, moved when a default changes, run on
+  CoreAudio's own notification thread, and their callback is leaked once per
+  watch so a call in flight after a listener goes stays valid. Cross-checked
+  with clippy for `aarch64-apple-darwin`; CI's macOS runner, whatever audio
+  devices it has, runs its read and the listeners' start, follow and stop; no
+  Mac has played through it. The power menu's actions are built too (the Power
+  menu entry below), and the power profile
+  (`lyr_sources::power_profile::macos`): Low Power Mode from `NSProcessInfo`, as
+  power-saver or balanced (`power_profile::lowpower`, tested everywhere),
+  re-read on `NSProcessInfoPowerStateDidChangeNotification` through
   `NSNotificationCenter` with no queue, so the block runs on the posting thread;
   CI's Mac reads it and starts and stops the observer, but nothing has turned
   the mode on and off under it. A click on it logs that `cycle_profile` is not
@@ -517,8 +518,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked on every platform, from AeroSpace v0.21.3-Beta's docs and its
   `formatToJson.swift`. No AeroSpace has run it: CI's Mac has none, and its
   process calls run nowhere in the tests. A window's title changing alone tells
-  lyr nothing, so the window module can lag it. Not built: Bluetooth on macOS,
-  the audio menu and the other menus.
+  lyr nothing, so the window module can lag it. Bluetooth is built too
+  (`lyr_sources::bluetooth::macos`): IOBluetooth's default controller and paired
+  devices in BlueZ's shape, so `bluetooth::Tracker` gives the reading, re-read
+  on `IOBluetoothHostControllerPoweredOnNotification` and
+  `…PoweredOffNotification` and on connect and disconnect notifications sent to
+  an Objective-C observer class (`define_class!`), registered on the bar's main
+  thread, whose run loop IOBluetooth delivers on. That the main thread's run
+  loop under crcbl's AppKit backend runs those deliveries is assumed, not seen.
+  CI's Mac has no controller, so it shows only that the module hides and the
+  observers register and unregister. The Bluetooth menu answers that it is not
+  built on macOS, since its actions are BlueZ's. Not built: the audio menu and
+  the other menus on macOS.
 - **Windows sources, M9.** Built: the battery (`lyr_sources::battery::windows`):
   `GetSystemPowerStatus` read at start and again whenever
   `PowerSettingRegisterNotification` reports a change of power source or

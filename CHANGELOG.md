@@ -57,6 +57,9 @@ and this project adheres to
   `lyr event workspace` from `on-focus-changed` to have lyr read them again.
 - `lyr event workspace` tells the running bar that something outside it changed
   the workspaces; only macOS acts on it.
+- On macOS the Bluetooth module shows the controller's power and the last device
+  to connect, from IOBluetooth, updated when the controller powers on or off or
+  a device connects or disconnects. The Bluetooth menu is not built there yet.
 - Clicking a workspace switches to it, and with `workspaces.scroll = true` the
   wheel steps through them. A module's `[<module>.on]` table binds clicks and
   scrolling to a command (`{ exec = "…" }`) or a built-in action. Of the
