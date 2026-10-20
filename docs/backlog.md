@@ -16,11 +16,17 @@ implementation follows meanwhile.
   (`lyr_sources::audio::pactl`): the PulseAudio protocol as pipewire-pulse
   serves it, through its command-line client, so no new crate; `pactl subscribe`
   pushes the changes and each re-read is three `pactl --format=json` runs. The
-  audio menu (streams, every device, Default, plan 10's 150 %) is not built on
-  Linux. It could go on the same way (`list sink-inputs`, `set-default-sink`,
-  `move-sink-input`), or lyr could take `libpulse-binding` (plan 07's default:
-  one connection, no processes) or go native PipeWire with WirePlumber metadata
-  (no libpulse, more code). Keep `pactl` and build the menu on it, or switch?
+  audio menu is built on it too: the playing and recording streams (sink inputs
+  and source outputs, named by their application) and every device but monitors,
+  each with mute, steps, a slider and Default (`set-default-sink`/`-source`),
+  the streams followed only while the menu is open. Seen in a nested Hyprland
+  (2026-10-20): it listed this machine's five sinks with the default marked, and
+  a silent `pacat` stream on Playback, which a keyboard Enter on its Mute muted
+  (read back with `pactl`). Not built: plan 10's 150 % slider (the slider scale,
+  `audio_menu::MAX_PERCENT`, is shared with Windows' 100 %), moving a stream to
+  another device (`move-sink-input`), and wiremix's card tab. Keep `pactl`, or
+  take `libpulse-binding` (plan 07's default: one connection, no processes) or
+  native PipeWire with WirePlumber metadata?
 - **Network without NetworkManager: build the rtnetlink fallback?** (M4.) **Q:**
   The network module reads NetworkManager over zbus, which the dotfiles use.
   Should lyr also support machines without it, through a new rtnetlink crate
@@ -836,9 +842,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `lyr dnd` and `lyr clear` act on the notification daemon on Linux and answer
   that lyr is not the daemon elsewhere. `lyr panel clock`, `lyr panel bluetooth`
   and `lyr panel wifi` open their panels; `lyr panel audio` opens the audio menu
-  on Windows and answers that there is no audio source elsewhere (M7).
-  `lyr event workspace` has the macOS bar read AeroSpace's workspaces again, and
-  answers with an error elsewhere.
+  (M7) on Windows, macOS and Linux, and answers that there is no audio source
+  where none is running. `lyr event workspace` has the macOS bar read
+  AeroSpace's workspaces again, and answers with an error elsewhere.
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]`, `[theme]` and every module's table, the
   embedded defaults, `[platform.*]` layering on both the defaults and the user

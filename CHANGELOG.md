@@ -39,6 +39,10 @@ and this project adheres to
 - On Linux the volume and mic modules show the default output and input through
   PulseAudio's `pactl` (PipeWire serves it through pipewire-pulse), updated as
   they change; a click mutes and a scroll steps the volume, up to 100 %.
+- On Linux the audio menu lists the playing and recording streams and the output
+  and input devices through `pactl`, each with mute, a slider and steps, and a
+  device's Default button makes it the default; a right click on the volume or
+  mic module, or `lyr panel audio`, opens it.
 - On Windows the volume and mic modules show the default output and input, their
   level and mute, updated as they change, and their click and scroll bindings
   mute and step them; an output on Bluetooth (by its device's bus) takes the

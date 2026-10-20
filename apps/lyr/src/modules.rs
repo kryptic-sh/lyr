@@ -128,7 +128,6 @@ impl Data {
                 self.sink = sink;
                 self.source = source;
             }
-            #[cfg(any(windows, target_os = "macos"))]
             Update::AudioNodes(nodes) => self.audio_nodes = Some(nodes),
             #[cfg(windows)]
             Update::ActiveWindow(active) => self.active_window = Some(active),

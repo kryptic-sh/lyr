@@ -1,4 +1,4 @@
-use super::{reading, shows, step_argument};
+use super::{nodes, reading, shows, step_argument, streams};
 
 /// `pactl --format=json info`, cut to what is read.
 const INFO: &str = r#"{"server_name":"PulseAudio (on PipeWire 1.6.8)",
@@ -28,7 +28,7 @@ const SOURCES: &str = r#"[
   {"index":72,"name":"alsa_output.usb-SteelSeries_Arctis_Nova_7-00.analog-stereo.monitor",
    "description":"Monitor of Arctis Nova 7 Analog Stereo","mute":false,
    "volume":{"front-left":{"value":65536},"front-right":{"value":65536}},
-   "properties":{},"active_port":null},
+   "properties":{"device.class":"monitor"},"active_port":null},
   {"index":73,"name":"alsa_input.usb-SteelSeries_Arctis_Nova_7-00.mono-fallback",
    "description":"Arctis Nova 7 Mono","mute":true,
    "volume":{"mono":{"value":19275,"value_percent":"29%","db":"-31.96 dB"}},
@@ -103,4 +103,51 @@ fn a_step_stops_at_100_and_never_lowers_a_boost() {
         "pactl stops at 0"
     );
     assert_eq!(step_argument(50, 0), None);
+}
+
+/// `pactl --format=json list sink-inputs` with one stream, as `pacat`
+/// playing silence showed it on the owner's machine (2026-10-20).
+const SINK_INPUTS: &str = r#"[{"index":1469,"driver":"PipeWire","sink":731,"mute":false,
+    "corked":false,"volume":{"front-left":{"value":65536},"front-right":{"value":32768}},
+    "properties":{"application.name":"lyr-probe","media.name":"silence",
+                  "application.process.binary":"pacat"}}]"#;
+
+#[test]
+fn the_menu_lists_streams_and_devices_without_monitors() {
+    let listed = nodes(INFO, SINKS, SOURCES, SINK_INPUTS, "[]").expect("read");
+    let [stream] = &listed.playback[..] else {
+        panic!("one stream: {:?}", listed.playback);
+    };
+    assert_eq!(stream.id, "1469");
+    assert_eq!(stream.name, "lyr-probe", "its application");
+    assert_eq!(stream.volume, 75, "the channels' mean");
+    assert!(!stream.default);
+    assert!(listed.recording.is_empty());
+    assert_eq!(listed.outputs.len(), 2);
+    let defaults: Vec<_> = listed.outputs.iter().filter(|node| node.default).collect();
+    assert_eq!(defaults.len(), 1);
+    assert_eq!(defaults[0].name, "Arctis Nova 7 Analog Stereo");
+    assert_eq!(
+        defaults[0].id,
+        "alsa_output.usb-SteelSeries_Arctis_Nova_7-00.analog-stereo"
+    );
+    let [input] = &listed.inputs[..] else {
+        panic!("the monitor left out: {:?}", listed.inputs);
+    };
+    assert_eq!(input.name, "Arctis Nova 7 Mono");
+    assert!(input.default && input.muted);
+}
+
+#[test]
+fn a_stream_with_no_names_is_named_by_index() {
+    let unnamed = r#"[{"index":9,"mute":true,"volume":{"mono":{"value":0}},"properties":{}}]"#;
+    let listed = nodes(INFO, SINKS, SOURCES, "[]", unnamed).expect("read");
+    assert_eq!(listed.recording[0].name, "Stream 9");
+}
+
+#[test]
+fn stream_events_are_told_apart() {
+    assert!(streams("Event 'new' on sink-input #1469"));
+    assert!(streams("Event 'remove' on source-output #12"));
+    assert!(!streams("Event 'change' on sink #71"));
 }

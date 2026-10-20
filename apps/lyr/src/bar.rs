@@ -216,8 +216,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             app.observe(event);
             app.event(shell.as_mut(), event, instant)?;
         }
-        // The source reads the streams again while the menu is open.
-        #[cfg(any(windows, target_os = "macos"))]
+        // The source follows the streams while the menu is open.
         app.commands.audio_menu(app.audio_menu.is_some());
         #[cfg(target_os = "linux")]
         app.commands.wifi_menu(app.wifi_menu.is_some());

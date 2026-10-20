@@ -173,8 +173,8 @@ pub fn act(
             };
             #[cfg(target_os = "linux")]
             let which = {
-                use lyr_sources::audio::pactl::Flow;
-                if input { Flow::Input } else { Flow::Output }
+                use lyr_sources::audio::pactl::{Flow, Target};
+                Target::Default(if input { Flow::Input } else { Flow::Output })
             };
             match builtin {
                 Builtin::ToggleMute => commands.toggle_mute(which),

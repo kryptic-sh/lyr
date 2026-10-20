@@ -24,7 +24,6 @@ pub enum Update {
         Option<lyr_core::audio::Source>,
     ),
     /// What the audio menu lists.
-    #[cfg(any(windows, target_os = "macos"))]
     AudioNodes(lyr_core::audio_menu::Nodes),
     /// The foreground window.
     #[cfg(windows)]
@@ -121,13 +120,19 @@ pub enum BluetoothRequest {
     Answer(u64, lyr_core::bluetooth_menu::Reply),
 }
 
-/// What the bar asks of the default output or input on Linux.
+/// What the bar asks of the sound server on Linux.
 #[cfg(target_os = "linux")]
 #[derive(Debug)]
 pub enum AudioRequest {
-    ToggleMute(lyr_sources::audio::pactl::Flow),
+    ToggleMute(lyr_sources::audio::pactl::Target),
     /// By this many percent.
-    Step(lyr_sources::audio::pactl::Flow, i32),
+    Step(lyr_sources::audio::pactl::Target, i32),
+    /// To this percent.
+    Set(lyr_sources::audio::pactl::Target, u32),
+    /// Make the device with this name the flow's default.
+    Default(lyr_sources::audio::pactl::Flow, String),
+    /// The audio menu opened or closed.
+    Menu(bool),
 }
 
 /// What the Wi-Fi menu asks of NetworkManager.
@@ -199,7 +204,6 @@ pub struct Commands {
     #[cfg(target_os = "macos")]
     audio: std::sync::mpsc::Sender<macos::AudioRequest>,
     /// Whether the audio source was last told the menu is open.
-    #[cfg(any(windows, target_os = "macos"))]
     audio_menu: std::cell::Cell<bool>,
     #[cfg(target_os = "linux")]
     focus: tokio::sync::mpsc::UnboundedSender<lyr_wm::Workspace>,
@@ -273,14 +277,32 @@ impl Commands {
             .store(open, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// Mutes or unmutes the default device of `flow`.
-    pub fn toggle_mute(&self, flow: lyr_sources::audio::pactl::Flow) {
-        let _stopped = self.audio.send(AudioRequest::ToggleMute(flow));
+    /// Mutes or unmutes `target`.
+    pub fn toggle_mute(&self, target: lyr_sources::audio::pactl::Target) {
+        let _stopped = self.audio.send(AudioRequest::ToggleMute(target));
     }
 
-    /// Moves the volume of `flow`'s default device by `delta` percent.
-    pub fn step_volume(&self, flow: lyr_sources::audio::pactl::Flow, delta: i32) {
-        let _stopped = self.audio.send(AudioRequest::Step(flow, delta));
+    /// Moves the volume of `target` by `delta` percent.
+    pub fn step_volume(&self, target: lyr_sources::audio::pactl::Target, delta: i32) {
+        let _stopped = self.audio.send(AudioRequest::Step(target, delta));
+    }
+
+    /// Sets the volume of `target` to `percent`.
+    pub fn set_volume(&self, target: lyr_sources::audio::pactl::Target, percent: u32) {
+        let _stopped = self.audio.send(AudioRequest::Set(target, percent));
+    }
+
+    /// Makes the device `name` the default for `flow`.
+    pub fn set_default(&self, flow: lyr_sources::audio::pactl::Flow, name: String) {
+        let _stopped = self.audio.send(AudioRequest::Default(flow, name));
+    }
+
+    /// Tells the audio source whether the menu is open, when that changed:
+    /// the streams' changes count only while it is.
+    pub fn audio_menu(&self, open: bool) {
+        if self.audio_menu.replace(open) != open {
+            let _stopped = self.audio.send(AudioRequest::Menu(open));
+        }
     }
 
     /// Presses `control` on the media player at `bus_name`.
@@ -465,6 +487,7 @@ pub fn start(
                 wifi,
                 wifi_menu,
                 audio,
+                audio_menu: std::cell::Cell::new(false),
                 notices,
                 tray,
             },
@@ -1198,39 +1221,62 @@ mod linux {
         Ok(())
     }
 
-    /// The default output and input through `pactl`, and what the volume
-    /// and mic modules ask of them.
+    /// The default output and input and what the audio menu lists, through
+    /// `pactl`, and what the volume and mic modules and the menu ask.
     async fn audio(
         sender: mpsc::Sender<Update>,
         mut requests: UnboundedReceiver<AudioRequest>,
         waker: Option<ShellWaker>,
     ) {
-        use lyr_sources::audio::pactl::{self, Flow};
+        use std::sync::atomic::{AtomicBool, Ordering};
 
-        let (readings, mut changed) = watch::channel((None, None));
+        use lyr_core::audio_menu::Nodes;
+        use lyr_sources::audio::pactl::{self, Flow, Target};
+
+        let (states, mut changed) = watch::channel(((None, None), Nodes::default()));
+        let menu = AtomicBool::new(false);
         let forward = async {
             while changed.changed().await.is_ok() {
-                let (sink, source) = changed.borrow_and_update().clone();
-                if !deliver(&sender, waker.as_ref(), Update::Audio(sink, source)) {
+                let ((sink, source), nodes) = changed.borrow_and_update().clone();
+                if !deliver(&sender, waker.as_ref(), Update::Audio(sink, source))
+                    || !deliver(&sender, waker.as_ref(), Update::AudioNodes(nodes))
+                {
                     break;
                 }
+            }
+        };
+        // The level a step starts from: the module's device's, or the
+        // menu's row's, as last read.
+        let current = |target: &Target| {
+            let ((sink, source), nodes) = &*states.borrow();
+            let row = |rows: &[lyr_core::audio_menu::Node], id: &str| {
+                rows.iter().find(|row| row.id == id).map(|row| row.volume)
+            };
+            match target {
+                Target::Default(Flow::Output) => sink.as_ref().map(|sink| sink.volume),
+                Target::Default(Flow::Input) => source.as_ref().map(|source| source.volume),
+                Target::Device(Flow::Output, name) => row(&nodes.outputs, name),
+                Target::Device(Flow::Input, name) => row(&nodes.inputs, name),
+                Target::Stream(Flow::Output, index) => row(&nodes.playback, &index.to_string()),
+                Target::Stream(Flow::Input, index) => row(&nodes.recording, &index.to_string()),
             }
         };
         let act = async {
             while let Some(request) = requests.recv().await {
                 let done = match request {
-                    AudioRequest::ToggleMute(flow) => pactl::toggle_mute(flow).await,
-                    AudioRequest::Step(flow, delta) => {
-                        let current = {
-                            let (sink, source) = &*readings.borrow();
-                            match flow {
-                                Flow::Output => sink.as_ref().map(|sink| sink.volume),
-                                Flow::Input => source.as_ref().map(|source| source.volume),
-                            }
-                        };
-                        match current {
-                            Some(current) => pactl::step(flow, current, delta).await,
-                            None => Ok(()),
+                    AudioRequest::ToggleMute(target) => pactl::toggle_mute(&target).await,
+                    AudioRequest::Step(target, delta) => match current(&target) {
+                        Some(level) => pactl::step(&target, level, delta).await,
+                        None => Ok(()),
+                    },
+                    AudioRequest::Set(target, percent) => pactl::set(&target, percent).await,
+                    AudioRequest::Default(flow, name) => pactl::make_default(flow, &name).await,
+                    AudioRequest::Menu(open) => {
+                        menu.store(open, Ordering::Relaxed);
+                        if open {
+                            pactl::refresh(&states).await
+                        } else {
+                            Ok(())
                         }
                     }
                 };
@@ -1239,7 +1285,7 @@ mod linux {
                 }
             }
         };
-        let (watched, (), ()) = tokio::join!(pactl::watch(&readings), forward, act);
+        let (watched, (), ()) = tokio::join!(pactl::watch(&states, &menu), forward, act);
         if let Err(error) = watched {
             tracing::warn!("audio: pactl stopped following the sound server: {error}");
         }

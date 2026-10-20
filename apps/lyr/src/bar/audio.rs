@@ -148,8 +148,39 @@ impl App {
         }
     }
 
-    /// Linux: no source lists streams or devices yet, so the menu never
-    /// opens.
+    /// Linux: carries out a click in the audio menu on a stream or device,
+    /// by its index or name, through `pactl`; steps go by the volume or mic
+    /// module's `scroll_step`, as its flow is. What changed comes back from
+    /// the source.
     #[cfg(target_os = "linux")]
-    fn audio_act(&self, _tab: Tab, _id: String, _action: Action) {}
+    fn audio_act(&self, tab: Tab, id: String, action: Action) {
+        use lyr_core::audio_menu::Step;
+        use lyr_sources::audio::pactl::{Flow, Target};
+        let flow = match tab {
+            Tab::Playback | Tab::Output => Flow::Output,
+            Tab::Recording | Tab::Input => Flow::Input,
+        };
+        let target = if tab.devices() {
+            Target::Device(flow, id.clone())
+        } else {
+            let Ok(index) = id.parse() else {
+                tracing::warn!("audio menu: `{id}` is not a stream's index");
+                return;
+            };
+            Target::Stream(flow, index)
+        };
+        let step = if flow == Flow::Input {
+            self.config.mic.scroll_step
+        } else {
+            self.config.volume.scroll_step
+        };
+        let step = i32::try_from(step).unwrap_or(i32::MAX);
+        match action {
+            Action::Mute => self.commands.toggle_mute(target),
+            Action::Step(Step::Up) => self.commands.step_volume(target, step),
+            Action::Step(Step::Down) => self.commands.step_volume(target, -step),
+            Action::Set(percent) => self.commands.set_volume(target, percent),
+            Action::Default => self.commands.set_default(flow, id),
+        }
+    }
 }

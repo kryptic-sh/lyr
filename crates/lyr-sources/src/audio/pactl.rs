@@ -1,4 +1,5 @@
-//! The volume and mic modules' source on Linux, through `pactl`, the
+//! The volume and mic modules' and the audio menu's source on Linux,
+//! through `pactl`, the
 //! PulseAudio client that pipewire-pulse serves as PulseAudio does, so no
 //! client library is linked (`libpulse-binding` is a question in
 //! `docs/backlog.md`). Changes come from `pactl subscribe`, read again only
@@ -10,7 +11,10 @@ use std::collections::HashMap;
 use std::io;
 use std::process::Stdio;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use lyr_core::audio::{Sink, Source};
+use lyr_core::audio_menu::{Node, Nodes};
 use serde::Deserialize;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -32,28 +36,53 @@ const BLUETOOTH_MONITORS: [&str; 3] = ["a2dp_sink", "a2dp-sink", "bluez"];
 /// The default sink and source, as the volume and mic modules show them.
 pub type Reading = (Option<Sink>, Option<Source>);
 
-/// Which default device a control acts on: the volume module's output or
-/// the mic module's input.
+/// Which way sound goes: out to a sink, as the volume module's, or in from
+/// a source, as the mic module's.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Flow {
     Output,
     Input,
 }
 
-impl Flow {
-    /// `pactl`'s name for the default device of this flow.
-    const fn default_device(self) -> &'static str {
-        match self {
-            Self::Output => "@DEFAULT_SINK@",
-            Self::Input => "@DEFAULT_SOURCE@",
-        }
-    }
+/// What a control acts on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Target {
+    /// The default device of a flow: the volume or the mic module's.
+    Default(Flow),
+    /// A device of a flow, by its name.
+    Device(Flow, String),
+    /// A stream of a flow, a sink input or a source output, by its index.
+    Stream(Flow, u32),
+}
 
-    /// `pactl`'s commands that set this flow's mute and volume.
-    const fn commands(self) -> (&'static str, &'static str) {
+impl Target {
+    /// `pactl`'s commands that set its mute and volume, and its name for it.
+    fn commands(&self) -> (&'static str, &'static str, String) {
         match self {
-            Self::Output => ("set-sink-mute", "set-sink-volume"),
-            Self::Input => ("set-source-mute", "set-source-volume"),
+            Self::Default(Flow::Output) => (
+                "set-sink-mute",
+                "set-sink-volume",
+                "@DEFAULT_SINK@".to_owned(),
+            ),
+            Self::Default(Flow::Input) => (
+                "set-source-mute",
+                "set-source-volume",
+                "@DEFAULT_SOURCE@".to_owned(),
+            ),
+            Self::Device(Flow::Output, name) => ("set-sink-mute", "set-sink-volume", name.clone()),
+            Self::Device(Flow::Input, name) => {
+                ("set-source-mute", "set-source-volume", name.clone())
+            }
+            Self::Stream(Flow::Output, index) => (
+                "set-sink-input-mute",
+                "set-sink-input-volume",
+                index.to_string(),
+            ),
+            Self::Stream(Flow::Input, index) => (
+                "set-source-output-mute",
+                "set-source-output-volume",
+                index.to_string(),
+            ),
         }
     }
 }
@@ -71,7 +100,7 @@ struct Channel {
 
 /// A sink or a source, as `pactl --format=json list` writes it.
 #[derive(Deserialize)]
-struct Node {
+struct Device {
     name: String,
     description: String,
     mute: bool,
@@ -102,8 +131,8 @@ fn percent(volume: &HashMap<String, Channel>) -> u32 {
 /// When any of them is not the JSON `pactl` writes.
 pub fn reading(info: &str, sinks: &str, sources: &str) -> serde_json::Result<Reading> {
     let info: Info = serde_json::from_str(info)?;
-    let sinks: Vec<Node> = serde_json::from_str(sinks)?;
-    let sources: Vec<Node> = serde_json::from_str(sources)?;
+    let sinks: Vec<Device> = serde_json::from_str(sinks)?;
+    let sources: Vec<Device> = serde_json::from_str(sources)?;
     let sink = sinks
         .into_iter()
         .find(|sink| sink.name == info.default_sink_name)
@@ -139,11 +168,107 @@ pub fn reading(info: &str, sinks: &str, sources: &str) -> serde_json::Result<Rea
     Ok((sink, source))
 }
 
+/// A sink input or a source output, as `pactl --format=json list` writes
+/// it.
+#[derive(Deserialize)]
+struct Stream {
+    index: u32,
+    mute: bool,
+    volume: HashMap<String, Channel>,
+    #[serde(default)]
+    properties: HashMap<String, serde_json::Value>,
+}
+
+impl Stream {
+    /// What the menu calls it: its application, else its media, else its
+    /// program, as `pactl` reports them.
+    fn name(&self) -> String {
+        [
+            "application.name",
+            "media.name",
+            "application.process.binary",
+        ]
+        .iter()
+        .find_map(|key| self.properties.get(*key)?.as_str())
+        .map_or_else(|| format!("Stream {}", self.index), str::to_owned)
+    }
+
+    fn node(&self) -> Node {
+        Node {
+            id: self.index.to_string(),
+            name: self.name(),
+            volume: percent(&self.volume),
+            muted: self.mute,
+            default: false,
+        }
+    }
+}
+
+/// Whether a source is a sink's monitor, which the menu leaves out as
+/// wiremix does: `pactl` marks it by its device class.
+fn monitor(device: &Device) -> bool {
+    device
+        .properties
+        .get("device.class")
+        .and_then(serde_json::Value::as_str)
+        == Some("monitor")
+}
+
+/// What the audio menu lists, from `pactl --format=json`'s `info`,
+/// `list sinks`, `list sources`, `list sink-inputs` and
+/// `list source-outputs`.
+///
+/// # Errors
+///
+/// When any of them is not the JSON `pactl` writes.
+pub fn nodes(
+    info: &str,
+    sinks: &str,
+    sources: &str,
+    sink_inputs: &str,
+    source_outputs: &str,
+) -> serde_json::Result<Nodes> {
+    let info: Info = serde_json::from_str(info)?;
+    let devices = |text: &str, default: &str| -> serde_json::Result<Vec<Node>> {
+        let devices: Vec<Device> = serde_json::from_str(text)?;
+        Ok(devices
+            .iter()
+            .filter(|device| !monitor(device))
+            .map(|device| Node {
+                id: device.name.clone(),
+                name: device.description.clone(),
+                volume: percent(&device.volume),
+                muted: device.mute,
+                default: device.name == default,
+            })
+            .collect())
+    };
+    let streams = |text: &str| -> serde_json::Result<Vec<Node>> {
+        let streams: Vec<Stream> = serde_json::from_str(text)?;
+        Ok(streams.iter().map(Stream::node).collect())
+    };
+    Ok(Nodes {
+        playback: streams(sink_inputs)?,
+        recording: streams(source_outputs)?,
+        outputs: devices(sinks, &info.default_sink_name)?,
+        inputs: devices(sources, &info.default_source_name)?,
+    })
+}
+
 /// Whether a `pactl subscribe` line is a change the modules show: a sink, a
 /// source, or the server's defaults, not a stream's.
 #[must_use]
 pub fn shows(line: &str) -> bool {
     [" on sink #", " on source #", " on server"]
+        .iter()
+        .any(|on| line.contains(on))
+}
+
+/// Whether a `pactl subscribe` line is a stream's change, which only the
+/// open menu shows.
+#[must_use]
+pub fn streams(line: &str) -> bool {
+    [" on sink-input #", " on source-output #"]
         .iter()
         .any(|on| line.contains(on))
 }
@@ -181,27 +306,36 @@ async fn pactl(args: &[&str]) -> io::Result<String> {
     String::from_utf8(output.stdout).map_err(io::Error::other)
 }
 
-/// The default sink and source now.
+/// The modules' reading and the menu's nodes now.
 ///
 /// # Errors
 ///
 /// When `pactl` cannot run or reach the server, or writes something else.
-pub async fn read() -> io::Result<Reading> {
-    let (info, sinks, sources) = tokio::try_join!(
+pub async fn read() -> io::Result<(Reading, Nodes)> {
+    let (info, sinks, sources, sink_inputs, source_outputs) = tokio::try_join!(
         pactl(&["--format=json", "info"]),
         pactl(&["--format=json", "list", "sinks"]),
         pactl(&["--format=json", "list", "sources"]),
+        pactl(&["--format=json", "list", "sink-inputs"]),
+        pactl(&["--format=json", "list", "source-outputs"]),
     )?;
-    reading(&info, &sinks, &sources).map_err(io::Error::other)
+    let read = reading(&info, &sinks, &sources).and_then(|reading| {
+        Ok((
+            reading,
+            nodes(&info, &sinks, &sources, &sink_inputs, &source_outputs)?,
+        ))
+    });
+    read.map_err(io::Error::other)
 }
 
-/// Sends the reading to `readings` now and after every change the modules
-/// show, until `pactl subscribe` ends or every receiver is dropped.
+/// Sends what [`read`] reads to `states` now and after every change the
+/// modules show, and every stream's change too while `menu` is set, until
+/// `pactl subscribe` ends or every receiver is dropped.
 ///
 /// # Errors
 ///
 /// When `pactl` cannot run, or a read fails.
-pub async fn watch(readings: &watch::Sender<Reading>) -> io::Result<()> {
+pub async fn watch(states: &watch::Sender<(Reading, Nodes)>, menu: &AtomicBool) -> io::Result<()> {
     // Subscribed before the first read, so a change in between is not lost.
     let mut subscribed = Command::new("pactl")
         .arg("subscribe")
@@ -219,43 +353,76 @@ pub async fn watch(readings: &watch::Sender<Reading>) -> io::Result<()> {
         Some((line, lines))
     });
     let mut changes = Follow::new(Box::pin(lines));
-    let wanted = |line: io::Result<String>| line.map(|line| shows(&line));
-    readings.send_replace(changes.during(read(), wanted).await??);
+    let wanted = |line: io::Result<String>| {
+        line.map(|line| shows(&line) || (menu.load(Ordering::Relaxed) && streams(&line)))
+    };
+    states.send_replace(changes.during(read(), wanted).await??);
     while changes.changed(wanted).await? {
-        if !publish(readings, changes.during(read(), wanted).await??) {
+        if !publish(states, changes.during(read(), wanted).await??) {
             break;
         }
     }
     Ok(())
 }
 
-/// Mutes or unmutes `flow`'s default device.
+/// Reads again and hands `states` what changed, as [`watch`] does on a
+/// change: for the menu opening, whose streams were not followed while it
+/// was closed.
+///
+/// # Errors
+///
+/// When the read fails.
+pub async fn refresh(states: &watch::Sender<(Reading, Nodes)>) -> io::Result<()> {
+    publish(states, read().await?);
+    Ok(())
+}
+
+/// Mutes or unmutes `target`.
 ///
 /// # Errors
 ///
 /// When `pactl` fails.
-pub async fn toggle_mute(flow: Flow) -> io::Result<()> {
-    let (mute, _) = flow.commands();
-    pactl(&[mute, flow.default_device(), "toggle"])
-        .await
-        .map(drop)
+pub async fn toggle_mute(target: &Target) -> io::Result<()> {
+    let (mute, _, id) = target.commands();
+    pactl(&[mute, &id, "toggle"]).await.map(drop)
 }
 
-/// Moves `flow`'s default device by `delta` percent from `current`, as
+/// Moves `target`'s volume by `delta` percent from `current`, as
 /// [`step_argument`] has it.
 ///
 /// # Errors
 ///
 /// When `pactl` fails.
-pub async fn step(flow: Flow, current: u32, delta: i32) -> io::Result<()> {
+pub async fn step(target: &Target, current: u32, delta: i32) -> io::Result<()> {
     let Some(volume) = step_argument(current, delta) else {
         return Ok(());
     };
-    let (_, set) = flow.commands();
+    let (_, set, id) = target.commands();
     // `--` so a step down is not read as an option.
-    pactl(&[set, flow.default_device(), "--", &volume])
-        .await
-        .map(drop)
+    pactl(&[set, &id, "--", &volume]).await.map(drop)
+}
+
+/// Sets `target`'s volume to `percent`.
+///
+/// # Errors
+///
+/// When `pactl` fails.
+pub async fn set(target: &Target, percent: u32) -> io::Result<()> {
+    let (_, set, id) = target.commands();
+    pactl(&[set, &id, &format!("{percent}%")]).await.map(drop)
+}
+
+/// Makes the device `name` of `flow` the default.
+///
+/// # Errors
+///
+/// When `pactl` fails.
+pub async fn make_default(flow: Flow, name: &str) -> io::Result<()> {
+    let command = match flow {
+        Flow::Output => "set-default-sink",
+        Flow::Input => "set-default-source",
+    };
+    pactl(&[command, name]).await.map(drop)
 }
 
 #[cfg(test)]
