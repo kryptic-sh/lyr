@@ -34,6 +34,8 @@ pub enum Error {
     Timeout { request: String },
     #[error("a message from sway on {path} does not start with `i3-ipc`")]
     Framing { path: PathBuf },
+    #[error("sway closed {path} before replying")]
+    Closed { path: PathBuf },
     #[error("sway's reply to `{request}` is not the JSON lyr expects: {source}")]
     Json {
         request: String,
@@ -118,11 +120,17 @@ impl Sway {
 
     /// Ends the sway session: the power menu's Log out.
     ///
+    /// sway quits without answering `exit` (seen on sway in CI's `sway e2e`
+    /// job), so a socket closed before the reply is the command working.
+    ///
     /// # Errors
     ///
     /// When sway cannot be reached or refuses.
     pub async fn exit(&self) -> Result<(), Error> {
-        self.command(EXIT_COMMAND).await
+        match self.command(EXIT_COMMAND).await {
+            Err(Error::Closed { .. }) => Ok(()),
+            outcome => outcome,
+        }
     }
 
     /// Reads the workspaces and the tree, and builds the state from them.
@@ -201,10 +209,8 @@ impl Sway {
 
     /// The error for a socket sway closed before replying.
     fn closed(&self) -> Error {
-        Error::Io {
-            what: "reading a reply from",
+        Error::Closed {
             path: self.socket.clone(),
-            source: io::ErrorKind::UnexpectedEof.into(),
         }
     }
 }
@@ -344,6 +350,10 @@ mod tests {
         Some((header.kind, String::from_utf8(payload).expect("text")))
     }
 
+    /// A command reply that stands for sway closing the socket unanswered,
+    /// as it does on `exit`.
+    const QUITS: &str = "";
+
     /// A sway on `path`: `GET_WORKSPACES` answers [`BEFORE`] the first time
     /// and [`AFTER`] from then on, a subscription is answered with
     /// `subscribed` as its `success` and, when it succeeds, followed by
@@ -381,6 +391,9 @@ mod tests {
                             _ => "{}",
                         };
                         tx.send((kind, payload)).expect("send");
+                        if kind == RUN_COMMAND && command_reply == QUITS {
+                            return;
+                        }
                         stream.write_all(&frame(kind, reply)).await.expect("reply");
                         if kind == SUBSCRIBE && subscribed {
                             for (kind, event) in &events {
@@ -486,6 +499,28 @@ mod tests {
             matches!(at(&silent).exit().await, Err(Error::Refused { .. })),
             "no outcome is not success"
         );
+    }
+
+    #[tokio::test]
+    async fn exit_is_done_when_sway_quits_unanswered_and_only_exit_is() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("sway.sock");
+        let mut requests = fake_sway(&path, true, Vec::new(), QUITS);
+        at(&path).exit().await.expect("quitting is the answer");
+        assert_eq!(
+            requests.recv().await,
+            Some((RUN_COMMAND, "exit".to_owned()))
+        );
+        let two = Workspace {
+            id: 6,
+            name: "2".into(),
+            monitor: None,
+            urgent: false,
+        };
+        assert!(matches!(
+            at(&path).focus(&two).await,
+            Err(Error::Closed { .. })
+        ));
     }
 
     #[tokio::test]

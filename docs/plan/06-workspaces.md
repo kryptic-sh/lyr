@@ -106,7 +106,8 @@ and events are framed the same, events with the type's high bit set.
   `sway/commands/workspace.c`). A name with `"`, `\` or `$`, or one equal to a
   keyword, could reach a different workspace, so lyr refuses to send it and logs
   why, as it does for a Hyprland name it cannot quote.
-- **Log out:** `RUN_COMMAND` with `exit`.
+- **Log out:** `RUN_COMMAND` with `exit`. sway quits without answering it (seen
+  in CI's `sway e2e` job), so the socket closing before a reply counts as done.
 
 ## Linux — niri
 
