@@ -11,6 +11,18 @@ const HEADSET: u32 = 5;
 const HANDSET: u32 = 6;
 const DIGITAL_AUDIO_DISPLAY_DEVICE: u32 = 9;
 
+/// Whether an endpoint's device is on Bluetooth, by the bus enumerator its
+/// property store names (`PKEY_Device_EnumeratorName`): Windows' Bluetooth
+/// buses for classic audio, hands-free and LE. The store gives the device's
+/// bus, not the endpoint's own `SWD`: `USB` for a USB headset on this
+/// development machine, where no Bluetooth endpoint could be seen.
+#[must_use]
+pub fn bluetooth(enumerator: &str) -> bool {
+    ["BTHENUM", "BTHHFENUM", "BTHLEDEVICE"]
+        .iter()
+        .any(|bus| bus.eq_ignore_ascii_case(enumerator))
+}
+
 /// The port kind waybar looks for (`lyr_core::audio`'s `PORTS`) that an
 /// endpoint's form factor is; empty for one with none.
 #[must_use]
@@ -106,6 +118,18 @@ mod tests {
             "shorter than the extension"
         );
         assert_eq!(session_name(false, "", None), "Unknown");
+    }
+
+    #[test]
+    fn a_bluetooth_bus_marks_the_endpoint_bluetooth() {
+        use super::bluetooth;
+        assert!(bluetooth("BTHENUM"));
+        assert!(bluetooth("BTHHFENUM"), "hands-free");
+        assert!(bluetooth("BTHLEDEVICE"), "LE audio");
+        assert!(bluetooth("bthenum"), "names are not case-sensitive");
+        assert!(!bluetooth("USB"), "this machine's headset");
+        assert!(!bluetooth("HDAUDIO"));
+        assert!(!bluetooth(""));
     }
 
     #[test]

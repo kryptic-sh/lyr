@@ -38,12 +38,15 @@ and this project adheres to
   mic module, or `lyr panel audio`, opens it.
 - On Windows the volume and mic modules show the default output and input, their
   level and mute, updated as they change, and their click and scroll bindings
-  mute and step them.
+  mute and step them; an output on Bluetooth (by its device's bus) takes the
+  volume module's Bluetooth format.
 - On Windows the power-profile module shows Windows' power mode (Best power
   efficiency, Balanced, Best performance and the rest), updated when it changes;
   switching it from the bar is not built there yet.
 - On Windows the network module shows the interface with the default route, its
-  address and, on Wi-Fi, the network's name and signal, updated as they change.
+  address and, on Wi-Fi, the network's name and signal, updated as they change;
+  with no link and every Wi-Fi radio switched off, it shows Wi-Fi as off rather
+  than disconnected.
 - On Windows the battery module shows the battery, from Windows' power status,
   updated when the power source or the charge changes.
 - On macOS the battery module shows the internal battery, from IOKit's power

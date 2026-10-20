@@ -13,7 +13,9 @@ use std::io;
 use std::sync::Arc;
 
 use lyr_core::audio::{Sink, Source};
-use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
+use windows::Win32::Devices::FunctionDiscovery::{
+    PKEY_Device_EnumeratorName, PKEY_Device_FriendlyName,
+};
 use windows::Win32::Foundation::{ERROR_NOT_FOUND, PROPERTYKEY};
 use windows::Win32::Media::Audio::Endpoints::{
     IAudioEndpointVolume, IAudioEndpointVolumeCallback, IAudioEndpointVolumeCallback_Impl,
@@ -30,7 +32,7 @@ use windows::Win32::System::Com::{
 use windows::core::{HRESULT, HSTRING, PCWSTR, PWSTR, implement};
 
 use super::level::{percent, scalar, stepped};
-use super::win32::port;
+use super::win32::{bluetooth, port};
 
 /// Joins the calling thread to COM's multithreaded apartment, which the
 /// audio objects are made and called in.
@@ -207,8 +209,8 @@ impl Audio {
                 .unwrap_or_default(),
             port: port(form_factor).to_owned(),
             description: name(&device),
-            // Not read yet: a Bluetooth endpoint shows as any other.
-            bluetooth: false,
+            bluetooth: property(&device, &PKEY_Device_EnumeratorName)
+                .is_some_and(|bus| bluetooth(&bus.to_string())),
         }))
     }
 

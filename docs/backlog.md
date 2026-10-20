@@ -592,8 +592,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   lyr's own. The mapping (`network::win32`) is tested everywhere and
   mutation-checked, the calls on this machine; run in the bar on Windows
   (2026-10-20), its tooltip read `Ethernet 192.168.68.54/22`. Wi-Fi has not been
-  seen, this machine being wired, and the radio's on-off state is not read
-  (`radio_blocked` is always false). The power profile too
+  seen, this machine being wired, The radio's state is read
+  (`WlanEnumInterfaces`, then `WlanQueryInterface`'s
+  `wlan_intf_opcode_radio_state`; off when every phy of every interface has its
+  software or hardware switch off, `network::win32::radio_off`, tested and
+  mutation-checked), but a radio switched off has not been seen either: this
+  machine has no Wi-Fi interface, so the read returns false. It is taken at each
+  reading, and a switch prompts one: the watch registers the WLAN service's MSM
+  source, which carries `wlan_notification_msm_radio_state_change`, and every
+  WLAN notification re-reads. The power profile too
   (`lyr_sources::power_profile::windows`): the effective power mode, reported by
   `PowerRegisterForEffectivePowerModeNotifications` (documented, Windows 10 1809
   and later) when registered and at each change, mapped onto
@@ -618,8 +625,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   reversed mouse scrolling on (`ReverseMouseWheelDirection` = 1 under
   `HKCU\Control Panel\Mouse`), which Windows applies before any program sees the
   event; lyr follows it as every other program does, so it is not a bug. The
-  mute click has not been run, since it cuts what is heard, and a Bluetooth
-  endpoint is not told apart (`Sink::bluetooth` is false). The notifications
+  mute click has not been run, since it cuts what is heard, A Bluetooth endpoint
+  is told apart by its device's bus enumerator (`PKEY_Device_EnumeratorName`
+  among `BTHENUM`, `BTHHFENUM`, `BTHLEDEVICE`; `audio::win32::bluetooth`, tested
+  and mutation-checked). Read on this machine, the USB headset's property store
+  names `USB`, which shows the key gives the device's bus rather than the
+  endpoint's own `SWD`; no Bluetooth endpoint has been seen. The notifications
   module is plan 09's Windows bell: always the `none` icon
   (`lyr_core::bell::stateless`), since Windows offers no API for its
   notifications or do-not-disturb, with both clicks bound in
@@ -696,14 +707,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   an ordinary parent window did not reproduce the bug; trying a panel parent, as
   lyr's bar is, is next in crcbl's backlog, so the fix has no release yet. Seen
   again on crcbl 0.7.0 (2026-10-20, scripted cursor, screenshots before and
-  after) and reported again. crcbl found the cause (a pointer arriving in
-  another of the app's windows moved the leave tracking without reporting a
-  leave of the old one) and fixes it in 0.8.0, with an e2e of lyr's geometry. On
-  0.8.0: run the same hover-then-warp check again, and if the tooltip still
-  stays up, send crcbl the event log around the warp. A tooltip follows its
-  module when the module moves (repositioned where the window system can, opened
-  again elsewhere). A tooltip of several lines (a format with line breaks) is
-  drawn a row per line.
+  after) and reported again. crcbl found a defect that could cause it (a pointer
+  arriving in another of the app's windows moved the leave tracking without
+  reporting a leave of the old one) and fixes it in 0.8.0, but its e2e of lyr's
+  geometry passed on CI even without the fix, so the cause is not proven; the
+  differences left are that lyr's windows draw through a swapchain, the pointer
+  rests through the hover delay, and another process moves it. On 0.8.0: run the
+  same hover-then-warp check again, and if the tooltip still stays up, send
+  crcbl the `crcbl_shell` trace log around the warp, saying whether the bar got
+  a `WM_MOUSELEAVE` at all and whether the tooltip window ever got a
+  `WM_MOUSEMOVE`. A tooltip follows its module when the module moves
+  (repositioned where the window system can, opened again elsewhere). A tooltip
+  of several lines (a format with line breaks) is drawn a row per line.
 - **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second

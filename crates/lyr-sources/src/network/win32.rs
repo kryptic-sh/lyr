@@ -22,6 +22,22 @@ pub struct Adapter {
     pub gateway: Option<Ipv4Addr>,
 }
 
+/// `DOT11_RADIO_STATE`'s off, from Microsoft's reference, spelled out as
+/// plan 11 asks of Windows ABI values.
+const RADIO_OFF: i32 = 2;
+
+/// Whether a Wi-Fi interface's radio is off: every one of its phys has its
+/// software or hardware switch off (`WLAN_PHY_RADIO_STATE`'s
+/// `dot11SoftwareRadioState` and `dot11HardwareRadioState`, as pairs). An
+/// interface that reports no phys is not called off.
+#[must_use]
+pub fn radio_off(phys: &[(i32, i32)]) -> bool {
+    !phys.is_empty()
+        && phys
+            .iter()
+            .all(|&(software, hardware)| software == RADIO_OFF || hardware == RADIO_OFF)
+}
+
 /// A Wi-Fi interface's current connection, from `WlanQueryInterface`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Wifi {
@@ -82,6 +98,18 @@ mod tests {
     use std::net::Ipv4Addr;
 
     use super::{Adapter, Wifi, link, parse_guid};
+
+    #[test]
+    fn a_radio_is_off_when_every_phy_is_switched_off() {
+        use super::radio_off;
+        // DOT11_RADIO_STATE: 1 on, 2 off, 0 unknown.
+        assert!(!radio_off(&[]), "no phys reported");
+        assert!(!radio_off(&[(1, 1)]));
+        assert!(radio_off(&[(2, 1)]), "switched off in Windows");
+        assert!(radio_off(&[(1, 2)]), "a hardware switch");
+        assert!(!radio_off(&[(2, 1), (1, 1)]), "one phy still on");
+        assert!(!radio_off(&[(0, 0)]), "unknown is not off");
+    }
 
     fn wifi_adapter() -> Adapter {
         Adapter {

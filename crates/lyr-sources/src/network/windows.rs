@@ -29,15 +29,16 @@ use windows_sys::Win32::NetworkManagement::IpHelper::{
 };
 use windows_sys::Win32::NetworkManagement::Ndis::IfOperStatusUp;
 use windows_sys::Win32::NetworkManagement::WiFi::{
-    L2_NOTIFICATION_DATA, WLAN_API_VERSION_2_0, WLAN_CONNECTION_ATTRIBUTES,
-    WLAN_NOTIFICATION_SOURCE_ACM, WLAN_NOTIFICATION_SOURCE_MSM, WLAN_NOTIFICATION_SOURCE_NONE,
-    WlanCloseHandle, WlanFreeMemory, WlanOpenHandle, WlanQueryInterface, WlanRegisterNotification,
-    wlan_intf_opcode_current_connection,
+    L2_NOTIFICATION_DATA, WLAN_API_VERSION_2_0, WLAN_CONNECTION_ATTRIBUTES, WLAN_INTERFACE_INFO,
+    WLAN_INTERFACE_INFO_LIST, WLAN_NOTIFICATION_SOURCE_ACM, WLAN_NOTIFICATION_SOURCE_MSM,
+    WLAN_NOTIFICATION_SOURCE_NONE, WLAN_PHY_RADIO_STATE, WLAN_RADIO_STATE, WlanCloseHandle,
+    WlanEnumInterfaces, WlanFreeMemory, WlanOpenHandle, WlanQueryInterface,
+    WlanRegisterNotification, wlan_intf_opcode_current_connection, wlan_intf_opcode_radio_state,
 };
 use windows_sys::Win32::Networking::WinSock::{AF_INET, AF_UNSPEC, SOCKADDR_IN, SOCKET_ADDRESS};
 use windows_sys::core::{GUID, PCSTR, PCWSTR};
 
-use super::win32::{Adapter, Wifi, link, parse_guid};
+use super::win32::{Adapter, Wifi, link, parse_guid, radio_off};
 
 /// `GetAdaptersAddresses`'s first buffer: the 15 KB Microsoft's reference
 /// suggests, which holds most machines' adapters.
@@ -66,8 +67,9 @@ pub fn read() -> io::Result<Reading> {
     let wifi = guid.filter(|_| adapter.wifi).and_then(wifi);
     Ok(Reading {
         link: link(&adapter, wifi.as_ref()),
-        // The radio's state is not read yet.
-        radio_blocked: false,
+        // Shown only with no link: Wi-Fi switched off, rather than nothing
+        // connected.
+        radio_blocked: wifi_radio_off(),
     })
 }
 
@@ -226,6 +228,68 @@ impl Drop for Wlan {
         // process that keeps running.
         unsafe { WlanCloseHandle(self.0, ptr::null()) };
     }
+}
+
+/// Whether the machine's Wi-Fi radios are all off; `false` with no Wi-Fi
+/// interface, or when the WLAN service cannot say.
+fn wifi_radio_off() -> bool {
+    let Some(wlan) = Wlan::open() else {
+        return false;
+    };
+    let mut list: *mut WLAN_INTERFACE_INFO_LIST = ptr::null_mut();
+    // SAFETY: the call allocates the list into a local.
+    if unsafe { WlanEnumInterfaces(wlan.0, ptr::null(), &raw mut list) } != NO_ERROR
+        || list.is_null()
+    {
+        return false;
+    }
+    // SAFETY: the call wrote a list of `dwNumberOfItems` interfaces, the
+    // array running past its declared length of one.
+    let interfaces: Vec<WLAN_INTERFACE_INFO> = unsafe {
+        let count = (*list).dwNumberOfItems as usize;
+        std::slice::from_raw_parts((&raw const (*list).InterfaceInfo).cast(), count).to_vec()
+    };
+    // SAFETY: allocated by `WlanEnumInterfaces`, freed once, after its last
+    // read.
+    unsafe { WlanFreeMemory(list.cast()) };
+    !interfaces.is_empty()
+        && interfaces.iter().all(|interface| {
+            radio_state(&wlan, &interface.InterfaceGuid).is_some_and(|phys| radio_off(&phys))
+        })
+}
+
+/// Each phy's software and hardware radio state on the interface `guid`.
+fn radio_state(wlan: &Wlan, guid: &GUID) -> Option<Vec<(i32, i32)>> {
+    let mut size = 0;
+    let mut data: *mut c_void = ptr::null_mut();
+    // SAFETY: the GUID and the outputs are locals; the call allocates `data`.
+    let error = unsafe {
+        WlanQueryInterface(
+            wlan.0,
+            guid,
+            wlan_intf_opcode_radio_state,
+            ptr::null(),
+            &raw mut size,
+            &raw mut data,
+            ptr::null_mut(),
+        )
+    };
+    if error != NO_ERROR || data.is_null() {
+        return None;
+    }
+    // SAFETY: the call wrote a WLAN_RADIO_STATE at `data`.
+    let state = unsafe { &*data.cast::<WLAN_RADIO_STATE>() };
+    let count = (state.dwNumberOfPhys as usize).min(state.PhyRadioState.len());
+    let phys = state.PhyRadioState[..count]
+        .iter()
+        .map(|phy: &WLAN_PHY_RADIO_STATE| {
+            (phy.dot11SoftwareRadioState, phy.dot11HardwareRadioState)
+        })
+        .collect();
+    // SAFETY: allocated by `WlanQueryInterface`, freed once, after its last
+    // read.
+    unsafe { WlanFreeMemory(data) };
+    Some(phys)
 }
 
 /// The Wi-Fi interface `guid`'s current connection; `None` while it has
