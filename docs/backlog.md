@@ -454,14 +454,20 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   the stack's size changes (`set_panel`, crcbl 0.7.0); a click invokes the
   `default` action when there is one and takes the toast down, a middle click
   dismisses the notification. Tested on crcbl's headless shell and
-  mutation-checked; **never seen on screen**: Windows has no daemon and WSL has
-  no compositor, so the owner's Hyprland is the first real run. The bell is
-  drawn from the store while lyr is the daemon. A toast shows when it arrived as
-  swaync words it ("Now", "2 mins ago", from `get_relative_time` at v0.12.6),
-  redrawn as the words change; a summary long enough to reach the time is cut
-  short of it (`toast::TIME_GAP`), where swaync ellipsizes. The toast under the
-  pointer shows swaync's close button (`toast::close_button`: red, 20 px, 6 px
-  in from the top right, from swaync 0.12.6's `NotificationCloseButton` and the
+  mutation-checked. Seen on screen in a nested Hyprland on the owner's Arch
+  machine (2026-10-20), lyr the daemon on a private session bus
+  (`dbus-run-session`, so swaync kept the real one): a critical toast with its
+  red border and a Reply button, a markup body (bold, italic, an entity) wrapped
+  over three lines above it, newest on top; the clock panel's centre listing
+  them critical first; `lyr dnd` and `lyr clear` acting on them. Not tried
+  there: a click on a toast or a button (no pointer injection on this machine),
+  and the timeouts' pause under the pointer. The bell is drawn from the store
+  while lyr is the daemon. A toast shows when it arrived as swaync words it
+  ("Now", "2 mins ago", from `get_relative_time` at v0.12.6), redrawn as the
+  words change; a summary long enough to reach the time is cut short of it
+  (`toast::TIME_GAP`), where swaync ellipsizes. The toast under the pointer
+  shows swaync's close button (`toast::close_button`: red, 20 px, 6 px in from
+  the top right, from swaync 0.12.6's `NotificationCloseButton` and the
   dotfiles' style; the `toast_close` theme keys), which dismisses; tested on the
   headless shell and mutation-checked. The notification centre's entries show it
   too, in the same place (`centre::Shown::hovered`): swaync's
@@ -979,12 +985,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a
   click on the empty desktop. M5 records what Hyprland does and picks a fix.
-- **Does the year calendar fit the 500 px panel?** Not on Windows with the
-  monospace fallback font (Hack Nerd Font Propo is not installed there): run on
-  2026-10-20, `lyr panel clock` drew the year grid and the panel widened to fit
-  it, about 607 device pixels wide by a screenshot, as `clock_panel`'s
-  `WIDTH.max(...)` does. Still to measure in Hack Nerd Font Propo on the owner's
-  Hyprland ([plan/10](plan/10-popups-and-menus.md#clock-panel)).
+- **The year calendar is wider than swaync's 500 px panel.** In Hack Nerd Font
+  Propo on the owner's Hyprland (2026-10-20) the year grid made the panel 662 px
+  wide (`hyprctl layers`), as `clock_panel`'s `WIDTH.max(...)` lets it; on
+  Windows' monospace fallback it was about 607. Whether a 662 px panel is
+  acceptable, or the year view should shrink (smaller calendar text, two months
+  across), is the owner's call
+  ([plan/10](plan/10-popups-and-menus.md#clock-panel)).
+
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,
   `%U` otherwise, the first row numbered by the 1st), the header order and
