@@ -50,13 +50,15 @@ implementation follows meanwhile.
   Hyprland keeps a layer panel's exclusive keyboard under its grabbing popup, so
   the menu forwards its panel's keys to the open dropdown; and crcbl's grab
   closes a popup on a key whose `key_code` is Escape whatever its keysym, so
-  `wtype`'s first key (keycode 1) closes it (reported to office-crcbl; real
-  keyboards are not affected). Worth knowing: PipeWire's stream-restore
-  remembers a stream's mute and device per application, so a test that mutes or
-  moves a probe stream changes what that application next starts with; the
-  probe's were put back. Keep `pactl`, or take `libpulse-binding` (plan 07's
-  default: one connection, no processes) or native PipeWire with WirePlumber
-  metadata?
+  `wtype`'s first key (keycode 1) closes it; real keyboards are not affected.
+  crcbl fixed it on its main (2026-10-20, unreleased: a grab closes on the
+  Escape keysym, so `caps:escape` closes it too); on that release, run the
+  dropdown under `wtype` without spending keycode 1 first. Worth knowing:
+  PipeWire's stream-restore remembers a stream's mute and device per
+  application, so a test that mutes or moves a probe stream changes what that
+  application next starts with; the probe's were put back. Keep `pactl`, or take
+  `libpulse-binding` (plan 07's default: one connection, no processes) or native
+  PipeWire with WirePlumber metadata?
 - **Network without NetworkManager: build the rtnetlink fallback?** (M4.) **Q:**
   The network module reads NetworkManager over zbus, which the dotfiles use.
   Should lyr also support machines without it, through a new rtnetlink crate
