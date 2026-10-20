@@ -229,9 +229,18 @@ implementation follows meanwhile.
 - **crcbl: changing a panel in place.** crcbl-shell 0.5.0 sets a panel's size
   and margins only when it is created, so lyr's toast stack, whose height
   changes with every toast, recreates its panel. Asked crcbl on 2026-10-19;
-  crcbl took `Shell::set_panel(window, size, &PanelDesc)` (all but namespace and
-  monitor change in place, every backend), after pikr's work and frame pacing,
-  likely in 0.7.0. lyr's bar would use it too, to change height on reload
+  crcbl built `Shell::set_panel(window, size, &PanelDesc)`, on its main at
+  `0c562bb5` (reported 2026-10-20), unreleased, shipping in the next release
+  with frame pacing and `font::breaks`. It changes size, anchor, margins,
+  reserve, layer and keyboard in place: layer-surface setters and a commit on
+  Wayland (the new size arrives as the usual `Resized`), `SetWindowPos` with the
+  appbar re-registered or removed on Win32, frame and level on AppKit. Namespace
+  or monitor changes, or a non-panel window, are `InvalidDescriptor`; X11 and
+  the web are `Unsupported`, as for panels. crcbl's CI ran it on sway, a real
+  Win32 desktop (an appbar growing from 30 to 50 px and giving the edge back)
+  and macOS. Once lyr is on that release: the toast stack resizes its panel
+  instead of recreating it, so do the menus (`MenuPanel::show` recreates on a
+  size change, `Place` then a set margin), and the bar changes height on reload
   without recreating.
 - **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
   the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
