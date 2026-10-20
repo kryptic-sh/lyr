@@ -21,17 +21,17 @@ implementation follows meanwhile.
   Should lyr also support machines without it, through a new rtnetlink crate
   (`rtnetlink` or `neli`) and a 30 s nl80211 read for the signal (plan 07), or
   leave the module out there?
-- **Calendar locale: may lyr take `libc`?** (M5.) **Q:** The calendar's first
-  weekday now follows the locale on Windows (`GetLocaleInfoEx`'s
-  `LOCALE_IFIRSTDAYOFWEEK`, through the `windows-sys` lyr already has) and macOS
-  (`NSCalendar`'s `firstWeekday`), in `lyr_sources::locale`. Linux still starts
-  on Monday: waybar's read there is `nl_langinfo` with `_NL_TIME_FIRST_WEEKDAY`
-  and `_NL_TIME_WEEK_1STDAY`, glibc-only, which needs `libc` as a direct
-  dependency (it is in the lockfile already, through other crates, but not on
-  plan 02's list). Take `libc` for Linux, or add a `clock.first_weekday` config
-  key that overrides the locale everywhere and is the only way to change it on
-  Linux? Day and month names stay English on every platform until this is
-  answered.
+- **Calendar locale: day and month names, and an override?** (M5.) **Q:** The
+  first weekday follows the locale everywhere now, in `lyr_sources::locale`:
+  Windows' `LOCALE_IFIRSTDAYOFWEEK`, macOS' `NSCalendar`, and on Linux glibc's
+  `week-1stday` and `first_weekday` read from `locale -k LC_TIME` (the values
+  waybar reads through `nl_langinfo`, without taking `libc`; a system without
+  glibc's `locale` keeps Monday). Day and month names are still English. The
+  same `locale -k LC_TIME` output carries them (`abday`, `mon`), so Linux could
+  localize them the same way; Windows and macOS would need `GetLocaleInfoEx` and
+  `NSDateFormatter`. Localize them, and add a `clock.first_weekday` key to
+  override the locale? The owner's machine is `en_US`, where neither shows a
+  difference.
 - **Week numbers: waybar's or ISO?** (M5.) **Q:** The calendar numbers weeks as
   waybar does for a Monday start (`%W`), since the dotfiles do not set
   `iso8601`. ISO weeks (`%V`) are a one-line change. Keep `%W`?
@@ -1063,15 +1063,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   as the widest day or weekday name, so a proportional font still lines up, year
   mode three months across, week numbers on the right, all in bold and today in
   its colour and underlined, as the dotfiles' calendar format marks them up,
-  with the `calendar_*` theme keys; tested and mutation-checked. Until the
-  locale decision above is made, weeks start on Monday and names are English
-  (plan 16, 19). The panel is up too (`apps/lyr/src/clock_panel.rs`): opened by
-  `open_clock_panel` (a click on the clock or the bell) or `lyr panel clock`, it
-  opens under the module that opened it by the rule every menu follows
-  (`menu_panel::Place`), and is as big as the calendar view it shows, the year
-  or a month, resized in place when the view switches; with the notification
-  centre below it is at least swaync's 500 px wide, and as tall as it holds up
-  to 16 px short of the output's far edge. Seen in a nested Hyprland
+  with the `calendar_*` theme keys; tested and mutation-checked. Weeks start on
+  the locale's first weekday (Sunday on the owner's `en_US`, seen in a nested
+  Hyprland, numbered `%U`); names stay English until the question above is
+  answered (plan 16, 19). The panel is up too (`apps/lyr/src/clock_panel.rs`):
+  opened by `open_clock_panel` (a click on the clock or the bell) or
+  `lyr panel clock`, it opens under the module that opened it by the rule every
+  menu follows (`menu_panel::Place`), and is as big as the calendar view it
+  shows, the year or a month, resized in place when the view switches; with the
+  notification centre below it is at least swaync's 500 px wide, and as tall as
+  it holds up to 16 px short of the output's far edge. Seen in a nested Hyprland
   (2026-10-20): the year view 662 × 564 under the clock, ended 16 px from the
   right edge, at the same 16 px below the bar as the Wi-Fi and Bluetooth menus.
   The month view and the resize between them are tested on the headless shell
