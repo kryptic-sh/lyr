@@ -101,6 +101,8 @@ impl App {
             Tab::Playback => Which::Stream(Flow::Output, id),
             Tab::Recording => Which::Stream(Flow::Input, id),
             Tab::Output | Tab::Input => Which::Device(id),
+            // Windows lists no cards, so the menu never shows their tab.
+            Tab::Cards => return,
         };
         let step = if matches!(tab, Tab::Recording | Tab::Input) {
             self.config.mic.scroll_step
@@ -130,6 +132,8 @@ impl App {
         let flow = match tab {
             Tab::Output | Tab::Playback => Flow::Output,
             Tab::Input | Tab::Recording => Flow::Input,
+            // macOS lists no cards, so the menu never shows their tab.
+            Tab::Cards => return,
         };
         let Ok(device) = id.parse::<u32>() else {
             tracing::warn!("audio menu: `{id}` is not a CoreAudio device");
