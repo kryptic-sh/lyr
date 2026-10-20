@@ -177,3 +177,58 @@ jobs:
       - run: cargo build --locked -p lyr
       - run: cargo run --locked -p lyr -- --version
       - run: cargo run --locked -p lyr -- --help
+
+  # lyr_wm::sway against a real sway: headless (wlroots' headless backend,
+  # two virtual outputs, no GPU or input devices), in a private
+  # XDG_RUNTIME_DIR, as crcbl's Wayland suite starts one. The test is
+  # #[ignore]d everywhere else; here it runs, and fails without a sway rather
+  # than skipping.
+  sway-e2e:
+    name: sway e2e
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+          cache: false
+      - run: rustup update --no-self-update stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install sway
+        timeout-minutes: 10
+        run:
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          sway
+      - name: Build the test
+        run: cargo test --locked -p lyr-wm --test sway_e2e --no-run
+      - name: Run it against a headless sway
+        run: |
+          runtime="$(mktemp -d)"
+          chmod 700 "$runtime"
+          export XDG_RUNTIME_DIR="$runtime"
+          export WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1
+          export WLR_RENDERER_ALLOW_SOFTWARE=1 WLR_HEADLESS_OUTPUTS=2
+          unset WAYLAND_DISPLAY DISPLAY SWAYSOCK
+          cat > "$runtime/config" <<'CONFIG'
+          output HEADLESS-1 mode 1280x720@60Hz position 0 0
+          output HEADLESS-2 mode 1280x720@60Hz position 1280 0
+          workspace 1 output HEADLESS-1
+          workspace 2 output HEADLESS-2
+          workspace 1
+          CONFIG
+          sway --config "$runtime/config" > "$runtime/sway.log" 2>&1 &
+          sway_pid=$!
+          # A deadline rather than a sleep: poll for sway's IPC socket.
+          deadline=$(( $(date +%s) + 20 ))
+          until SWAYSOCK="$(ls "$runtime"/sway-ipc.*.sock 2>/dev/null | head -n 1)" && [ -n "$SWAYSOCK" ]; do
+            if ! kill -0 "$sway_pid" 2>/dev/null || [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "sway did not start"; cat "$runtime/sway.log"; exit 1
+            fi
+            sleep 0.1
+          done
+          export SWAYSOCK
+          status=0
+          cargo test --locked -p lyr-wm --test sway_e2e -- --ignored || status=$?
+          kill "$sway_pid" 2>/dev/null || true
+          if [ "$status" -ne 0 ]; then cat "$runtime/sway.log"; fi
+          exit "$status"

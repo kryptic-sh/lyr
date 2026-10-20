@@ -10,16 +10,17 @@ checks now, release jobs at the first release.
 Checks only, no deploy steps. `.github/workflows/ci.yml`, triggered on
 `pull_request`, `push` to `main` and `v*` tags, and `workflow_dispatch`:
 
-| Job          | Runs on                  | What                                                                                                                                      |
-| ------------ | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `fmt`        | ubuntu                   | `cargo fmt --all --check`                                                                                                                 |
-| `clippy`     | ubuntu / macos / windows | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`                                                           |
-| `test`       | ubuntu / macos / windows | `cargo nextest run --workspace --all-features --locked --no-fail-fast` + doctests                                                         |
-| `smoke`      | ubuntu / macos / windows | build, `lyr --version`, `lyr --help`                                                                                                      |
-| `leak-guard` | ubuntu / macos / windows | the suite with `$HOME` and the XDG directories at an empty sentinel; fails if a test writes there or into lyr's real directories (tmxr's) |
-| `machete`    | ubuntu                   | unused dependencies                                                                                                                       |
-| `deny`       | ubuntu                   | `cargo deny --all-features check` (licenses, bans, sources, advisories)                                                                   |
-| `audit`      | ubuntu                   | `cargo audit`                                                                                                                             |
+| Job          | Runs on                  | What                                                                                                                                         |
+| ------------ | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `fmt`        | ubuntu                   | `cargo fmt --all --check`                                                                                                                    |
+| `clippy`     | ubuntu / macos / windows | `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings`                                                              |
+| `test`       | ubuntu / macos / windows | `cargo nextest run --workspace --all-features --locked --no-fail-fast` + doctests                                                            |
+| `smoke`      | ubuntu / macos / windows | build, `lyr --version`, `lyr --help`                                                                                                         |
+| `leak-guard` | ubuntu / macos / windows | the suite with `$HOME` and the XDG directories at an empty sentinel; fails if a test writes there or into lyr's real directories (tmxr's)    |
+| `sway-e2e`   | ubuntu                   | `lyr_wm::sway`'s ignored test against a headless sway with two outputs, started in a private `XDG_RUNTIME_DIR` as crcbl's Wayland suite does |
+| `machete`    | ubuntu                   | unused dependencies                                                                                                                          |
+| `deny`       | ubuntu                   | `cargo deny --all-features check` (licenses, bans, sources, advisories)                                                                      |
+| `audit`      | ubuntu                   | `cargo audit`                                                                                                                                |
 
 Conventions carried over from tmxr: `RUSTFLAGS=-D warnings`,
 `CARGO_TERM_COLOR=always`, `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`, a concurrency
