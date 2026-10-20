@@ -116,6 +116,29 @@ implementation follows meanwhile.
   Build it with a table for the released builds, or keep the module read-only on
   Windows, as on macOS? Until then a click logs that `cycle_profile` is not
   implemented.
+- **sway and niri workspace backends: build them?** (Post-MVP.) **Q:** Plan 16's
+  question 8 defaults to Hyprland only on Linux, behind `lyr-wm`'s workspace
+  backend, with sway (i3 IPC: a binary header and JSON over a Unix socket) and
+  niri (a JSON socket) one backend each. Both could be built with what `lyr-wm`
+  already depends on (`serde_json`, `tokio`) and tested against recorded
+  replies, but neither is run here and the dotfiles use Hyprland. Build either,
+  both, or neither until someone uses them?
+- **`lyr import-waybar`: carry `style.css` into `[theme]`?** (Post-MVP.) **Q:**
+  The importer carries `config.jsonc` only. Mapping `style.css` means parsing
+  CSS and choosing which of waybar's selectors (`#battery`, `window#waybar`,
+  `.module` and so on) stand for which `[theme]` key. Parsing it well needs a
+  CSS parser lyr does not have (`cssparser` or `lightningcss`, new
+  dependencies), or a hand-written reader for the declarations the dotfiles'
+  file uses, which would misread anything else. Add a parser, read only the
+  dotfiles' shapes, or leave the theme to the defaults (which are already the
+  dotfiles' `style.css` values, plan 04)?
+- **The window module: carry waybar's `rewrite` and `separate-outputs`?**
+  (Post-MVP.) **Q:** waybar's `hyprland/window` can rewrite titles by regular
+  expression and show each output's own focused window. Neither is in plan 07;
+  `rewrite` would need the `regex` crate, new to lyr, and `separate-outputs`
+  needs Hyprland's per-monitor active window. Carry them, or keep the module to
+  `{title}`, `{class}` and `max_length`? (Its app icon waits on images, the
+  `crcbl-image` question above.)
 
 ## Cross-repo work
 
@@ -631,16 +654,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   click carries the entry out on the source runtime, and Escape, a click outside
   or a second click on the module closes it. Tested on crcbl's headless shell
   and mutation-checked; run on Windows with injected input (open, Down, Escape,
-  reopen, a click on the bar outside it), where the entries log that they are
-  not built. Escape closes it through crcbl 0.6.0's grab, which queues
-  `CloseRequested` after the key on every backend (lyr closed on the key itself
-  under 0.5.0, whose Win32 grab did not); on Wayland a grabbing popup gets the
-  keys even when the compositor keeps focus on the parent, and Win32 keys
-  injected with scancode 0 get a key code from their virtual key. Not run again
-  on Windows since the change. Keys injected with `SendKeys` arrive with no
-  scancode, so crcbl names no key for them; `keybd_event` with scancodes works.
-  `[power.menu]` sets an entry to a command (`{ exec = … }`), which runs instead
-  of lyr's action. The Windows actions are built (`lyr_sources::power::windows`:
+  reopen, a click on the bar outside it). Escape closes it through crcbl 0.6.0's
+  grab, which queues `CloseRequested` after the key on every backend (lyr closed
+  on the key itself under 0.5.0, whose Win32 grab did not); on Wayland a
+  grabbing popup gets the keys even when the compositor keeps focus on the
+  parent, and Win32 keys injected with scancode 0 get a key code from their
+  virtual key. Run again on Windows under 0.6.0 (2026-10-20): a click opened it,
+  two Down keys moved the selection from Lock to Hibernate, Escape closed it,
+  and a click opened it again; no entry was chosen. An arrow key injected with
+  `keybd_event` needs `KEYEVENTF_EXTENDEDKEY`, or its scancode reads as the
+  numpad's. Keys injected with `SendKeys` arrive with no scancode, so crcbl
+  names no key for them; `keybd_event` with scancodes works. `[power.menu]` sets
+  an entry to a command (`{ exec = … }`), which runs instead of lyr's action.
+  The Windows actions are built (`lyr_sources::power::windows`:
   `LockWorkStation`, `SetSuspendState`, and `ExitWindowsEx` after enabling
   `SeShutdownPrivilege` for a reboot or a power-off, run on a thread of their
   own), through `windows-sys`, which plan 02 lists as house precedent and which
