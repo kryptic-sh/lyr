@@ -29,7 +29,8 @@ use windows::Win32::System::Com::{
 };
 use windows::core::{HRESULT, HSTRING, PCWSTR, PWSTR, implement};
 
-use super::win32::{percent, port, scalar, stepped};
+use super::level::{percent, scalar, stepped};
+use super::win32::port;
 
 /// Joins the calling thread to COM's multithreaded apartment, which the
 /// audio objects are made and called in.
