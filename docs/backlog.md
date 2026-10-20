@@ -205,34 +205,21 @@ implementation follows meanwhile.
   does not count as one (M5 measures Hyprland). S3: the Wayland
   `reposition_popup` path needs xdg_wm_base 3 and has not run anywhere.
   `ui.scrollbar` is vertical only.
-- **crcbl: Wayland present path.** It can block on an output that is off
-  (hypridle DPMS), by crcbl's reading of its own source on 2026-10-19, not
-  reproduced: its Wayland backend requests no `wl_surface.frame`, `Pacing::Auto`
-  is FIFO, and crcbl-vk acquires with an infinite timeout. crcbl decided on
-  `Shell::request_frame(window)` and `ShellEvent::FrameReady { window }`, with
-  `ShellCaps::FRAME_CALLBACK` set where the compositor really paces (Wayland,
-  and AppKit if it has a real signal); elsewhere `FrameReady` comes at the next
-  pump, so lyr has one code path. A window destroyed with a frame pending gets
-  no `FrameReady`. It is not in 0.6.0; crcbl reports it on its main (2026-10-20)
-  for the next release, with crcbl-app's own loop waiting for `FrameReady` as a
-  follow-up. lyr's loop then becomes: on a change mark the bar dirty; with no
-  frame pending, present and request one; on `FrameReady`, present again if
-  still dirty
-  ([plan/04](plan/04-rendering-and-theme.md#repaint-on-change-only)). crcbl
-  declined a finite acquire timeout, which would turn the hang into a busy
-  retry. crcbl reported on 2026-10-20 that the fix is built, going to its main
-  for the next release: crcbl-app's `Presenter` gains
-  `request_frame(&mut shell)`, `observe(&ShellEvent)` (which opens the gate on
-  the window's `FrameReady`, or on its `WindowDestroyed` so it cannot stick) and
-  `frame_due()`. While a requested frame is unanswered, `acquire` returns
-  `Ok(None)` before touching the device, so the blocking acquire is never
-  reached; a caller that never requests a frame behaves as before. lyr's part on
-  that release, through `lyr_render::surface::Surface`: hand every pumped event
-  to each surface's `observe`; after `acquire` hands over a frame and before
-  `submit_and_present`, call `request_frame`; when `acquire` returns `None`,
-  keep the window dirty and skip it, and let the loop sleep in `wait_events`
-  while no surface's `frame_due()` is true. crcbl has not yet seen it on a
-  powered-off output (an end-to-end test in its backlog).
+- **crcbl's frame gate: adopted, not yet seen on an output that is off.** A FIFO
+  present to an output the compositor has turned off (hypridle DPMS) could block
+  lyr's loop, by crcbl's reading of its own source (2026-10-19). crcbl 0.7.0's
+  `Presenter` gate is in: `lyr_render::surface::Surface::draw` asks the shell
+  for the next frame before each present, `Surface::observe` reads the answers,
+  and every pumped event reaches every surface (`App::observe` in
+  `apps/lyr/src/bar.rs`); a surface whose answer has not come presents nothing
+  and stays dirty, and the loop's wait counts only what can present now
+  (`ready()` on each window, menu and panel), so it sleeps rather than spins.
+  `Surface`'s test on crcbl's headless shell and null backend shows a present
+  asking, the next draw skipped, and the pump's answer opening it again,
+  mutation-checked. On Windows the bar ran 106 s with `--stats` (2026-10-20): 3
+  presents (the first and one per minute tick) over 7 wake-ups. Not seen: a
+  Wayland compositor holding the answer back, or an output that is off, which is
+  the case this exists for (crcbl has not run it either).
 - **crcbl: changing a panel in place.** crcbl-shell 0.5.0 sets a panel's size
   and margins only when it is created, so lyr's toast stack, whose height
   changes with every toast, recreates its panel. Asked crcbl on 2026-10-19;

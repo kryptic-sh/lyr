@@ -31,6 +31,14 @@ pub(super) struct Window {
 }
 
 impl Window {
+    /// Whether it has a frame to present that it can present now; one whose
+    /// last frame's answer has not come waits for it rather than for nothing.
+    pub(super) const fn ready(&self) -> bool {
+        self.dirty && self.surface.frame_due()
+    }
+}
+
+impl Window {
     /// The workspace button the pointer is over now, by its index in the row.
     pub(super) fn hovered(&self) -> Option<usize> {
         match self.pointer.target(&self.regions) {

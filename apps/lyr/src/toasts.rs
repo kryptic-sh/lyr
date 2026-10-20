@@ -113,9 +113,18 @@ impl Toasts {
             .min()
     }
 
-    /// Whether the panel has a frame to present.
-    pub fn dirty(&self) -> bool {
-        self.panel.as_ref().is_some_and(|panel| panel.dirty)
+    /// Reads one shell event for its surface's frame request.
+    pub fn observe(&mut self, event: &ShellEvent) {
+        if let Some(surface) = self.panel.as_mut().and_then(|panel| panel.surface.as_mut()) {
+            surface.observe(event);
+        }
+    }
+
+    /// Whether it has a frame to present that it can present now.
+    pub fn ready(&self) -> bool {
+        self.panel.as_ref().is_some_and(|panel| {
+            panel.dirty && panel.surface.as_ref().is_none_or(Surface::frame_due)
+        })
     }
 
     /// Whether `window` is the toasts' panel.
@@ -284,11 +293,11 @@ impl Toasts {
     }
 
     /// Draws the panel if it has a frame to present.
-    pub fn draw(&mut self, text: &Text) -> anyhow::Result<()> {
+    pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
         if let Some(panel) = &mut self.panel
             && let (true, Some(surface)) = (panel.dirty, &mut panel.surface)
         {
-            panel.dirty = !surface.draw(&translate(&panel.list, text))?;
+            panel.dirty = !surface.draw(shell, &translate(&panel.list, text))?;
         }
         Ok(())
     }

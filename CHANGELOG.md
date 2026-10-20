@@ -19,6 +19,9 @@ and this project adheres to
   BlueZ, with a connected device's battery) and the workspaces, from Hyprland,
   sway or niri, whichever the session runs under. The other modules are not
   drawn yet.
+- Each bar, menu, panel and toast presents only when the window system asks for
+  its next frame (crcbl 0.7.0's frame gate), so an output the compositor has
+  turned off cannot block the bar.
 - On Windows the notifications module shows a bell, and either click opens
   Windows' notification centre.
 - On Windows the Wi-Fi and Bluetooth menus open the matching Settings page, from

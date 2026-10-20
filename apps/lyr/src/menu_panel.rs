@@ -167,9 +167,17 @@ impl<T: Copy> MenuPanel<T> {
         self.size
     }
 
-    /// Whether it has a frame to present.
-    pub const fn dirty(&self) -> bool {
-        self.dirty
+    /// Reads one shell event for its surface's frame request.
+    pub fn observe(&mut self, event: &ShellEvent) {
+        if let Some(surface) = &mut self.surface {
+            surface.observe(event);
+        }
+    }
+
+    /// Whether it has a frame to present that it can present now; one whose
+    /// last frame's answer has not come waits for it rather than for nothing.
+    pub fn ready(&self) -> bool {
+        self.dirty && self.surface.as_ref().is_none_or(Surface::frame_due)
     }
 
     /// Where the last pick was clicked across `target`, 0 – 1 of its width;
@@ -308,9 +316,9 @@ impl<T: Copy> MenuPanel<T> {
     }
 
     /// Draws the panel if it has a frame to present.
-    pub fn draw(&mut self, text: &Text) -> anyhow::Result<()> {
+    pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
         if let (true, Some(surface)) = (self.dirty, &mut self.surface) {
-            self.dirty = !surface.draw(&translate(&self.list, text))?;
+            self.dirty = !surface.draw(shell, &translate(&self.list, text))?;
         }
         Ok(())
     }

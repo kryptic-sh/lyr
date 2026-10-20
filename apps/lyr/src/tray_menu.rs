@@ -89,9 +89,14 @@ impl TrayMenu {
         self.popup.opened_from(bar)
     }
 
-    /// Whether it has a frame to present.
-    pub fn dirty(&self) -> bool {
-        self.popup.dirty()
+    /// Reads one shell event for its surface's frame request.
+    pub fn observe(&mut self, event: &ShellEvent) {
+        self.popup.observe(event);
+    }
+
+    /// Whether it has a frame to present that it can present now.
+    pub fn ready(&self) -> bool {
+        self.popup.ready()
     }
 
     /// The entry whose children are shown.
@@ -146,8 +151,8 @@ impl TrayMenu {
     }
 
     /// Draws the menu if it has a frame to present.
-    pub fn draw(&mut self, text: &Text) -> anyhow::Result<()> {
-        self.popup.draw(text)
+    pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
+        self.popup.draw(shell, text)
     }
 
     /// Closes the menu: its surface, then its window unless the window

@@ -24,7 +24,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
 use chrono::Local;
-use crcbl_shell::{Shell, WindowId};
+use crcbl_shell::{Shell, ShellEvent, WindowId};
 use lyr_config::{Config, Platform};
 use lyr_core::clock::Tick;
 use lyr_render::text::Text;
@@ -213,6 +213,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         app.stats.events += events.len() as u64;
         let instant = Instant::now();
         for event in &events {
+            app.observe(event);
             app.event(shell.as_mut(), event, instant)?;
         }
         // The source reads the streams again while the menu is open.
@@ -230,17 +231,17 @@ impl App {
         if self
             .windows
             .values()
-            .any(|window| window.dirty || window.tooltips.dirty())
-            || self.power_menu.as_ref().is_some_and(PowerMenu::dirty)
-            || self.toasts.dirty()
-            || self.clock_panel.as_ref().is_some_and(ClockPanel::dirty)
+            .any(|window| window.ready() || window.tooltips.ready())
+            || self.power_menu.as_ref().is_some_and(PowerMenu::ready)
+            || self.toasts.ready()
+            || self.clock_panel.as_ref().is_some_and(ClockPanel::ready)
             || self
                 .bluetooth_menu
                 .as_ref()
-                .is_some_and(BluetoothMenu::dirty)
-            || self.wifi_menu.as_ref().is_some_and(WifiMenu::dirty)
-            || self.audio_menu.as_ref().is_some_and(AudioMenu::dirty)
-            || self.tray_menu.as_ref().is_some_and(TrayMenu::dirty)
+                .is_some_and(BluetoothMenu::ready)
+            || self.wifi_menu.as_ref().is_some_and(WifiMenu::ready)
+            || self.audio_menu.as_ref().is_some_and(AudioMenu::ready)
+            || self.tray_menu.as_ref().is_some_and(TrayMenu::ready)
         {
             return Duration::ZERO;
         }
@@ -252,6 +253,34 @@ impl App {
             .chain(self.wifi_wake())
             .fold(self.next_tick, Instant::min);
         wake.saturating_duration_since(Instant::now())
+    }
+
+    /// Hands one shell event to every surface, for the answer to its last
+    /// frame's request.
+    fn observe(&mut self, event: &ShellEvent) {
+        for window in self.windows.values_mut() {
+            window.surface.observe(event);
+            window.tooltips.observe(event);
+        }
+        self.toasts.observe(event);
+        if let Some(menu) = &mut self.power_menu {
+            menu.observe(event);
+        }
+        if let Some(panel) = &mut self.clock_panel {
+            panel.observe(event);
+        }
+        if let Some(menu) = &mut self.bluetooth_menu {
+            menu.observe(event);
+        }
+        if let Some(menu) = &mut self.wifi_menu {
+            menu.observe(event);
+        }
+        if let Some(menu) = &mut self.audio_menu {
+            menu.observe(event);
+        }
+        if let Some(menu) = &mut self.tray_menu {
+            menu.observe(event);
+        }
     }
 
     /// Applies a source's update.
@@ -465,31 +494,31 @@ impl App {
                 |target| modules::tooltip(target, config, data, &now),
                 Instant::now(),
             )?;
-            window.tooltips.draw(text)?;
+            window.tooltips.draw(shell, text)?;
         }
         if let Some(menu) = power_menu {
-            menu.draw(text)?;
+            menu.draw(shell, text)?;
         }
         if let Some(panel) = clock_panel {
-            panel.draw(text)?;
+            panel.draw(shell, text)?;
         }
         if let Some(menu) = bluetooth_menu {
-            menu.draw(text)?;
+            menu.draw(shell, text)?;
         }
         if let Some(menu) = wifi_menu {
-            menu.draw(text)?;
+            menu.draw(shell, text)?;
         }
         if let Some(menu) = audio_menu {
-            menu.draw(text)?;
+            menu.draw(shell, text)?;
         }
         if let Some(menu) = tray_menu {
-            menu.draw(text)?;
+            menu.draw(shell, text)?;
         }
         for id in toasts.expire(Instant::now()) {
             commands.close_notification(id, lyr_core::notifications::CloseReason::Expired);
         }
         toasts.sync(shell, &look, Instant::now())?;
-        toasts.draw(text)?;
+        toasts.draw(shell, text)?;
         for window in windows.values_mut().filter(|window| window.dirty) {
             let hovered = window.hovered();
             let drawn = modules::draw(
@@ -501,7 +530,7 @@ impl App {
                 data,
                 &now,
             );
-            let presented = window.surface.draw(&translate(&drawn.list, text))?;
+            let presented = window.surface.draw(shell, &translate(&drawn.list, text))?;
             window.regions = drawn.regions;
             window.workspaces = drawn.workspaces;
             window.hovered = hovered;

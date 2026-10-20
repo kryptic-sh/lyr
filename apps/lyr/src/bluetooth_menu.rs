@@ -151,9 +151,14 @@ impl BluetoothMenu {
         self.panel.owns(window)
     }
 
-    /// Whether it has a frame to present.
-    pub const fn dirty(&self) -> bool {
-        self.panel.dirty()
+    /// Reads one shell event for its surface's frame request.
+    pub fn observe(&mut self, event: &ShellEvent) {
+        self.panel.observe(event);
+    }
+
+    /// Whether it has a frame to present that it can present now.
+    pub fn ready(&self) -> bool {
+        self.panel.ready()
     }
 
     /// Draws the menu again for `adapter` and `devices` as they are now,
@@ -263,8 +268,8 @@ impl BluetoothMenu {
     }
 
     /// Draws the menu if it has a frame to present.
-    pub fn draw(&mut self, text: &Text) -> anyhow::Result<()> {
-        self.panel.draw(text)
+    pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
+        self.panel.draw(shell, text)
     }
 
     /// Closes the menu: its surface, then its window unless the window

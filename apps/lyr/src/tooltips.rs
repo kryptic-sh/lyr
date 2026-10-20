@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use crcbl_shell::{
     LogicalPoint, LogicalRect, LogicalSize, PopupDesc, PopupInput, PopupPlacement, Shell,
-    ShellCaps, WindowDesc, WindowId, WindowRole,
+    ShellCaps, ShellEvent, WindowDesc, WindowId, WindowRole,
 };
 use lyr_config::{Module, Position, Theme};
 use lyr_core::draw::{self, DrawList, Size, Target, TextStyle};
@@ -89,9 +89,18 @@ impl Tooltips {
             .is_some_and(|popup| popup.window == window)
     }
 
-    /// Whether the tooltip still has a frame to present.
-    pub fn dirty(&self) -> bool {
-        self.popup.as_ref().is_some_and(|popup| popup.dirty)
+    /// Reads one shell event for its surface's frame request.
+    pub fn observe(&mut self, event: &ShellEvent) {
+        if let Some(surface) = self.popup.as_mut().and_then(|popup| popup.surface.as_mut()) {
+            surface.observe(event);
+        }
+    }
+
+    /// Whether it has a frame to present that it can present now.
+    pub fn ready(&self) -> bool {
+        self.popup.as_ref().is_some_and(|popup| {
+            popup.dirty && popup.surface.as_ref().is_none_or(Surface::frame_due)
+        })
     }
 
     /// Opens, closes or replaces the popup so it shows what should show now:
@@ -204,12 +213,12 @@ impl Tooltips {
     }
 
     /// Draws the popup if it has a frame to present.
-    pub fn draw(&mut self, text: &Text) -> anyhow::Result<()> {
+    pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
         let Some(popup) = &mut self.popup else {
             return Ok(());
         };
         if let (true, Some(surface)) = (popup.dirty, &mut popup.surface) {
-            popup.dirty = !surface.draw(&translate(&popup.list, text))?;
+            popup.dirty = !surface.draw(shell, &translate(&popup.list, text))?;
         }
         Ok(())
     }

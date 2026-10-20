@@ -111,7 +111,7 @@ fn row(index: usize) -> PhysicalPoint {
 fn the_arrow_keys_move_and_enter_chooses() {
     let mut setup = setup();
     assert_eq!(setup.key(KeyCode::ArrowDown), Outcome::Kept);
-    assert!(setup.menu.dirty(), "the selection is redrawn");
+    assert!(setup.menu.ready(), "the selection is redrawn");
     setup.key(KeyCode::ArrowDown);
     setup.key(KeyCode::ArrowUp);
     assert_eq!(setup.key(KeyCode::Enter), Outcome::Chosen(Entry::Sleep));

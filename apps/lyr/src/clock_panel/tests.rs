@@ -168,7 +168,7 @@ fn a_right_click_switches_the_mode_and_scrolling_moves_by_it() {
         NaiveDate::from_ymd_opt(2027, 9, 1).expect("a date"),
         "a month in month mode"
     );
-    assert!(setup.panel.dirty(), "redrawn");
+    assert!(setup.panel.ready(), "redrawn");
 }
 
 #[test]

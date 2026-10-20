@@ -8,7 +8,7 @@ use crcbl_frame::{
     GraphError, ImportedImage, InitialClaim, RenderGraph, TransientPool, UiRenderer,
 };
 use crcbl_hal::{CommandEncoderDesc, HalError, ResourceState};
-use crcbl_shell::{Shell, WindowId};
+use crcbl_shell::{Shell, ShellError, ShellEvent, WindowId};
 use crcbl_ui::DrawList;
 use crcbl_ui::image::ImageAtlas;
 use crcbl_ui::text::FontAtlas;
@@ -26,6 +26,8 @@ pub enum Error {
     Hal(#[from] HalError),
     #[error(transparent)]
     Graph(#[from] GraphError),
+    #[error(transparent)]
+    Shell(#[from] ShellError),
 }
 
 /// The backend lyr asks for first: D3D12 on Windows, where only it gives a
@@ -66,6 +68,17 @@ impl Surface {
         size: (u32, u32),
         scale: f32,
     ) -> Result<Self, Error> {
+        Self::open_on(shell, window, size, scale, preferred_backend())
+    }
+
+    /// [`Surface::open`], asking for `preferred` first.
+    fn open_on(
+        shell: &dyn Shell,
+        window: WindowId,
+        size: (u32, u32),
+        scale: f32,
+        preferred: Option<GpuBackend>,
+    ) -> Result<Self, Error> {
         let adapter_pin = crcbl_app::adapter::pin();
         // The owner's rule for the GPU: `CRCBL_ADAPTER` when set, then the
         // adapter driving the bar's display when it is discrete, then low
@@ -79,15 +92,14 @@ impl Surface {
             power_preference: PowerPreference::LowPower,
             ..PresenterDesc::default()
         };
-        let (presenter, asked) =
-            match Presenter::open(shell, window, size, &desc(preferred_backend())) {
-                Ok(presenter) => (presenter, preferred_backend()),
-                // The preferred backend refused: let crcbl walk its own order.
-                Err(_) if preferred_backend().is_some() => {
-                    (Presenter::open(shell, window, size, &desc(None))?, None)
-                }
-                Err(error) => return Err(error.into()),
-            };
+        let (presenter, asked) = match Presenter::open(shell, window, size, &desc(preferred)) {
+            Ok(presenter) => (presenter, preferred),
+            // The preferred backend refused: let crcbl walk its own order.
+            Err(_) if preferred.is_some() => {
+                (Presenter::open(shell, window, size, &desc(None))?, None)
+            }
+            Err(error) => return Err(error.into()),
+        };
         let ui = UiRenderer::with_ring(
             presenter.device(),
             presenter.queue(),
@@ -133,14 +145,20 @@ impl Surface {
         Ok(())
     }
 
-    /// Draws `list`, in logical pixels, as the window's next frame. Returns
-    /// whether it was presented: `false` when the swapchain was rebuilt
-    /// instead, and the caller has to draw again.
+    /// Draws `list`, in logical pixels, as the window's next frame, asking
+    /// `shell` to say when the window wants the one after. Returns whether
+    /// it was presented: `false` when the swapchain was rebuilt instead, or
+    /// the last frame's answer has not come ([`Surface::frame_due`]), and
+    /// the caller has to draw again.
+    ///
+    /// Asking for each frame is what keeps a present to an output the
+    /// compositor has turned off from blocking the bar: nothing is presented
+    /// there until the compositor answers (crcbl-app's `present` module).
     ///
     /// # Errors
     ///
-    /// When acquiring, recording or presenting fails.
-    pub fn draw(&mut self, list: &DrawList) -> Result<bool, Error> {
+    /// When acquiring, recording or presenting fails, or the window has gone.
+    pub fn draw(&mut self, shell: &mut dyn Shell, list: &DrawList) -> Result<bool, Error> {
         let Some(frame) = self.presenter.acquire()? else {
             return Ok(false);
         };
@@ -171,8 +189,24 @@ impl Surface {
         });
         compiled.execute(device, &mut self.pool, encoder.as_mut(), None)?;
         let commands = encoder.finish()?;
+        // Before the present: on Wayland the request rides its commit.
+        self.presenter.request_frame(shell)?;
         let outcome = self.presenter.submit_and_present(&frame, commands)?;
         Ok(outcome == FrameOutcome::Presented)
+    }
+
+    /// Reads one shell event for the answer to the last frame's request.
+    /// Every pumped event goes through here, or the surface waits for an
+    /// answer it never sees.
+    pub fn observe(&mut self, event: &ShellEvent) {
+        self.presenter.observe(event);
+    }
+
+    /// Whether [`Surface::draw`] would present now: `false` from a present
+    /// until its answer is observed, while the bar has no reason to wake.
+    #[must_use]
+    pub const fn frame_due(&self) -> bool {
+        self.presenter.frame_due()
     }
 
     /// Waits for the device and releases everything, in the order the example
@@ -187,5 +221,43 @@ impl Surface {
         self.pool.destroy(self.presenter.device());
         self.presenter.destroy()?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use crcbl_app::backend::GpuBackend;
+    use crcbl_app::window::{open_window, wait_for_configure};
+    use crcbl_shell::{HeadlessShell, Shell, WindowDesc};
+    use crcbl_ui::DrawList;
+
+    use super::Surface;
+
+    #[test]
+    fn each_present_waits_for_the_shells_answer() {
+        let mut shell = HeadlessShell::new();
+        let window = open_window(&mut shell, Duration::ZERO, &WindowDesc::default())
+            .expect("a headless window");
+        let size = wait_for_configure(&mut shell, window, &mut |_| {}).expect("configured");
+        let mut surface = Surface::open_on(&shell, window, size, 1.0, Some(GpuBackend::Null))
+            .expect("a surface on the null backend");
+        let list = DrawList::default();
+
+        assert!(surface.frame_due());
+        assert!(surface.draw(&mut shell, &list).expect("drawn"), "presented");
+        assert!(!surface.frame_due(), "the present asked for the next frame");
+        assert!(
+            !surface.draw(&mut shell, &list).expect("skipped"),
+            "nothing is presented before the answer"
+        );
+
+        shell.pump(&mut |event| surface.observe(&event));
+        assert!(surface.frame_due(), "the answer came at the pump");
+        assert!(surface.draw(&mut shell, &list).expect("drawn"));
+
+        surface.destroy().expect("released");
+        shell.destroy_window(window).expect("closed");
     }
 }
