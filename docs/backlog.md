@@ -943,21 +943,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   fake NetworkManager and mutation-checked. Run against the owner's
   NetworkManager in a nested Hyprland (2026-10-20): the menu listed the 33 SSIDs
   in range, and on a stale scan showed "Scanning…" until the scan landed, then
-  the list about 3 s later. Those 3 s are the re-read: `wifi` reads each access
-  point's properties one call at a time (about 120 access points here); one
-  `GetAll` per access point would cut it. Not run: joining, Forget, the radio
-  switch, a password. No menu panel is bounded by its output's height
-  (`menu_panel::Place` carries only the width), so a place with many more
-  networks would run the menu past the bottom edge with no way to scroll; not
-  seen, since 33 rows fit 1080 px. The panel is up (`apps/lyr/src/wifi_menu.rs`,
-  its glue in `apps/lyr/src/bar/wifi.rs`): opened by `open_wifi_menu` or
-  `lyr panel wifi` under the network module, a rescan asked for on every open
-  and "Scanning…" until a newer scan lands or `wifi_menu::SCAN_WAIT` (lyr's own
-  15 s) is up, unless the last scan is under 30 s old; a password typed with
-  text input `Password`, spaces kept; `recovery` applied to a failure by the
-  source task; a second click on the module within GTK's default double-click
-  time leaves it open. Tested on crcbl's headless shell and mutation-checked. A
-  failure while the menu is closed is a notice from lyr
+  the list within half a second (about 3 s before `wifi` read each access point
+  with one `GetAll`, all in flight at once, instead of a call per property;
+  about 120 access points here). Not run: joining, Forget, the radio switch, a
+  password. No menu panel is bounded by its output's height (`menu_panel::Place`
+  carries only the width), so a place with many more networks would run the menu
+  past the bottom edge with no way to scroll; not seen, since 33 rows fit 1080
+  px. The panel is up (`apps/lyr/src/wifi_menu.rs`, its glue in
+  `apps/lyr/src/bar/wifi.rs`): opened by `open_wifi_menu` or `lyr panel wifi`
+  under the network module, a rescan asked for on every open and "Scanning…"
+  until a newer scan lands or `wifi_menu::SCAN_WAIT` (lyr's own 15 s) is up,
+  unless the last scan is under 30 s old; a password typed with text input
+  `Password`, spaces kept; `recovery` applied to a failure by the source task; a
+  second click on the module within GTK's default double-click time leaves it
+  open. Tested on crcbl's headless shell and mutation-checked. A failure while
+  the menu is closed is a notice from lyr
   (`notifications::linux::notify_session`, to whichever daemon holds the name,
   lyr's own included), its text escaped for markup (`lyr_core::markup::escape`);
   the call is tested against lyr's daemon on a peer-to-peer connection, the glue

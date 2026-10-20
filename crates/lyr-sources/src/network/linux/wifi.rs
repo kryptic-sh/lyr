@@ -7,17 +7,21 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use futures_util::StreamExt;
+use futures_util::future::try_join_all;
 use lyr_core::wifi_menu::{AccessPoint, Profile, Radio, Security, Wifi};
 use tokio::sync::watch;
+use zbus::fdo::PropertiesProxy;
 use zbus::message::Type;
+use zbus::names::InterfaceName;
 use zbus::{MatchRule, MessageStream, ObjectPath, OwnedObjectPath, OwnedVariant, Variant};
 
-use super::{
-    AccessPointProxy, DEVICE_TYPE_WIFI, DeviceProxy, NONE, NetworkManager, ROOT, WirelessProxy,
-};
+use super::{DEVICE_TYPE_WIFI, DeviceProxy, NONE, NetworkManager, ROOT, WirelessProxy};
 use crate::bus::Follow;
 use crate::network::{Failed, Join};
 
+/// NetworkManager's bus name, and an access point's interface.
+const SERVICE: &str = "org.freedesktop.NetworkManager";
+const ACCESS_POINT: &str = "org.freedesktop.NetworkManager.AccessPoint";
 /// NetworkManager's saved profiles.
 const SETTINGS: &str = "/org/freedesktop/NetworkManager/Settings";
 /// `NM_DEVICE_STATE_UNMANAGED` and `NM_DEVICE_STATE_UNAVAILABLE`, when the
@@ -139,20 +143,16 @@ impl NetworkManager {
             .ok()
             .map(Duration::from_millis);
         let active = wireless.active_access_point().await?;
-        let mut points = Vec::new();
-        for path in wireless.get_all_access_points().await? {
-            let point = self.proxy::<AccessPointProxy>(&path).await?;
-            points.push(AccessPoint {
-                ssid: String::from_utf8_lossy(&point.ssid().await?).into_owned(),
-                strength: point.strength().await?,
-                security: Security::of(
-                    point.flags().await?,
-                    point.wpa_flags().await?,
-                    point.rsn_flags().await?,
-                ),
-                path: path.to_string(),
-            });
-        }
+        // One call an access point, all in flight at once: a busy place has
+        // a hundred, and a call a property one after another took seconds.
+        let points = try_join_all(
+            wireless
+                .get_all_access_points()
+                .await?
+                .into_iter()
+                .map(|path| self.access_point(path)),
+        )
+        .await?;
         Ok(Wifi {
             device: Some(device.to_string()),
             radio,
@@ -162,6 +162,19 @@ impl NetworkManager {
             active: (active.as_str() != NONE).then(|| active.to_string()),
             profiles,
         })
+    }
+
+    /// The access point at `path`, from one `GetAll`.
+    async fn access_point(&self, path: OwnedObjectPath) -> zbus::Result<AccessPoint> {
+        let properties = PropertiesProxy::builder(&self.connection)
+            .destination(SERVICE)
+            .path(path.clone())
+            .cache_properties(zbus::proxy::CacheProperties::No)
+            .build()
+            .await?
+            .get_all(InterfaceName::from_static_str(ACCESS_POINT)?)
+            .await?;
+        access_point(&path, &properties)
     }
 
     /// The saved Wi-Fi client profiles.
@@ -391,6 +404,33 @@ impl NetworkManager {
         }
         Ok(())
     }
+}
+
+/// An access point at `path` from its properties; one missing or of the
+/// wrong type is an error, as reading it alone would be.
+fn access_point(
+    path: &OwnedObjectPath,
+    properties: &HashMap<String, OwnedVariant>,
+) -> zbus::Result<AccessPoint> {
+    fn get<T>(properties: &HashMap<String, OwnedVariant>, name: &str) -> zbus::Result<T>
+    where
+        T: TryFrom<OwnedVariant, Error = zbus::Error>,
+    {
+        let value = properties
+            .get(name)
+            .ok_or_else(|| zbus::Error::Failure(format!("an access point without {name}")))?;
+        T::try_from(value.clone())
+    }
+    Ok(AccessPoint {
+        ssid: String::from_utf8_lossy(&get::<Vec<u8>>(properties, "Ssid")?).into_owned(),
+        strength: get(properties, "Strength")?,
+        security: Security::of(
+            get(properties, "Flags")?,
+            get(properties, "WpaFlags")?,
+            get(properties, "RsnFlags")?,
+        ),
+        path: path.to_string(),
+    })
 }
 
 #[cfg(test)]

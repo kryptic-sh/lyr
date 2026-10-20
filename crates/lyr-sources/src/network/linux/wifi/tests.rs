@@ -583,3 +583,32 @@ fn the_time_since_boot_is_read() {
     assert!(first > Duration::ZERO);
     assert!(since_boot().expect("/proc/uptime") >= first);
 }
+
+#[test]
+fn an_access_point_is_read_from_its_properties_whole() {
+    use zbus::Variant;
+
+    let path =
+        OwnedObjectPath::try_from("/org/freedesktop/NetworkManager/AccessPoint/7").expect("a path");
+    let value = |value: Variant<'_>| OwnedVariant::try_from(value).expect("owned");
+    let mut properties: HashMap<String, OwnedVariant> = HashMap::from([
+        ("Ssid".to_owned(), value(Variant::from(b"home".to_vec()))),
+        ("Strength".to_owned(), value(Variant::from(64_u8))),
+        ("Flags".to_owned(), value(Variant::from(1_u32))),
+        ("WpaFlags".to_owned(), value(Variant::from(0_u32))),
+        ("RsnFlags".to_owned(), value(Variant::from(0x188_u32))),
+    ]);
+    let point = super::access_point(&path, &properties).expect("read");
+    assert_eq!(point.ssid, "home");
+    assert_eq!(point.strength, 64);
+    assert_eq!(point.security, Security::of(1, 0, 0x188));
+    assert_eq!(point.path, path.as_str());
+
+    properties.insert("Strength".to_owned(), value(Variant::from("strong")));
+    assert!(
+        super::access_point(&path, &properties).is_err(),
+        "wrong type"
+    );
+    properties.remove("Strength");
+    assert!(super::access_point(&path, &properties).is_err(), "missing");
+}
