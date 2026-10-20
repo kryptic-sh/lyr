@@ -272,7 +272,9 @@ impl NetworkManager {
             Follow::new(MessageStream::for_match_rule(rule, &self.connection, None).await?);
         // Any change during the first read; then those from the objects
         // the last reading came from.
-        let (reading, mut paths) = changes.during(self.read(), |_| Ok(true)).await??;
+        let (reading, mut paths) = changes
+            .during(self.read(), |_| Ok::<_, zbus::Error>(true))
+            .await??;
         readings.send_replace(Some(reading));
         while changes.changed(|change| from(&paths, change)).await? {
             let (reading, read_from) = changes

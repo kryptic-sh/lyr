@@ -562,7 +562,7 @@ impl Host {
             MessageStream::for_match_rule(listed, &self.connection, None).await?,
             MessageStream::for_match_rule(changed, &self.connection, None).await?,
         ));
-        let wanted = |_| Ok(true);
+        let wanted = |_| Ok::<_, zbus::Error>(true);
         items.send_replace(changes.during(self.items(), wanted).await??);
         while changes.changed(wanted).await? {
             if !crate::bus::publish(items, changes.during(self.items(), wanted).await??) {

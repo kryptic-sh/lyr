@@ -78,7 +78,9 @@ impl TimeDate {
         let interface = InterfaceName::try_from(INTERFACE)?;
         // Subscribe before the first read, so a change in between is not lost.
         let mut changes = Follow::new(self.properties.receive_properties_changed().await?);
-        let wanted = |change: PropertiesChanged| Ok(change.args()?.interface_name() == &interface);
+        let wanted = |change: PropertiesChanged| -> zbus::Result<bool> {
+            Ok(change.args()?.interface_name() == &interface)
+        };
         zones.send_replace(changes.during(self.zone(), wanted).await??);
         while changes.changed(wanted).await? {
             if !crate::bus::publish(zones, changes.during(self.zone(), wanted).await??) {

@@ -105,7 +105,9 @@ impl UPower {
         let interface = InterfaceName::from_static_str(INTERFACE)?;
         // Subscribe before the first read, so a change in between is not lost.
         let mut changes = Follow::new(self.properties.receive_properties_changed().await?);
-        let wanted = |change: PropertiesChanged| Ok(change.args()?.interface_name() == &interface);
+        let wanted = |change: PropertiesChanged| -> zbus::Result<bool> {
+            Ok(change.args()?.interface_name() == &interface)
+        };
         readings.send_replace(changes.during(self.device(), wanted).await??.reading());
         while changes.changed(wanted).await? {
             if !crate::bus::publish(

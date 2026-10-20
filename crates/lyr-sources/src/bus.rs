@@ -64,11 +64,11 @@ impl<S: Stream + Unpin> Follow<S> {
     /// # Errors
     ///
     /// The first error `wanted` returns.
-    pub async fn during<F: Future>(
+    pub async fn during<F: Future, E>(
         &mut self,
         read: F,
-        mut wanted: impl FnMut(S::Item) -> zbus::Result<bool>,
-    ) -> zbus::Result<F::Output> {
+        mut wanted: impl FnMut(S::Item) -> Result<bool, E>,
+    ) -> Result<F::Output, E> {
         let mut read = pin!(read);
         while !self.ended {
             match select(read.as_mut(), self.changes.next()).await {
@@ -88,10 +88,10 @@ impl<S: Stream + Unpin> Follow<S> {
     /// # Errors
     ///
     /// The first error `wanted` returns.
-    pub async fn changed(
+    pub async fn changed<E>(
         &mut self,
-        mut wanted: impl FnMut(S::Item) -> zbus::Result<bool>,
-    ) -> zbus::Result<bool> {
+        mut wanted: impl FnMut(S::Item) -> Result<bool, E>,
+    ) -> Result<bool, E> {
         self.take_queued(&mut wanted)?;
         while !std::mem::take(&mut self.due) {
             if self.ended {
@@ -107,10 +107,10 @@ impl<S: Stream + Unpin> Follow<S> {
     }
 
     /// Takes the changes that are already queued, without waiting.
-    fn take_queued(
+    fn take_queued<E>(
         &mut self,
-        wanted: &mut impl FnMut(S::Item) -> zbus::Result<bool>,
-    ) -> zbus::Result<()> {
+        wanted: &mut impl FnMut(S::Item) -> Result<bool, E>,
+    ) -> Result<(), E> {
         while !self.ended {
             match self.changes.next().now_or_never() {
                 Some(Some(change)) => self.due |= wanted(change)?,

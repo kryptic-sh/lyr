@@ -381,13 +381,17 @@ impl NetworkManager {
         ));
         // Any change during the first read; then the manager's, the
         // profiles' and the Wi-Fi device's.
-        let followed = |device: Option<&str>, change: zbus::Result<zbus::Message>| {
+        let followed = |device: Option<&str>,
+                        change: zbus::Result<zbus::Message>|
+         -> zbus::Result<bool> {
             let change = change?;
             let header = change.header();
             let path = header.path().map(|path| path.as_str());
             Ok(path.is_some_and(|path| path == ROOT || path == SETTINGS || device == Some(path)))
         };
-        let mut wifi = changes.during(self.wifi(), |_| Ok(true)).await??;
+        let mut wifi = changes
+            .during(self.wifi(), |_| Ok::<_, zbus::Error>(true))
+            .await??;
         states.send_replace(wifi.clone());
         while changes
             .changed(|change| followed(wifi.device.as_deref(), change))

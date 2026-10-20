@@ -223,7 +223,7 @@ impl BlueZ {
             MessageStream::for_match_rule(properties, &self.connection, None).await?,
             MessageStream::for_match_rule(objects, &self.connection, None).await?,
         ));
-        let wanted = |_| Ok(true);
+        let wanted = |_| Ok::<_, zbus::Error>(true);
         let mut tracker = Tracker::default();
         let mut snapshot = async || {
             let (adapter, devices) = self.read().await?;

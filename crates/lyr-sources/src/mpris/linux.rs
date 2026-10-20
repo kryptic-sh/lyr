@@ -163,7 +163,7 @@ impl Players {
             .await?
             .map(|_| ());
         let mut changes = Follow::new(stream::select(owners, properties));
-        let wanted = |()| Ok(true);
+        let wanted = |()| Ok::<_, zbus::Error>(true);
         players.send_replace(changes.during(self.all(), wanted).await??);
         while changes.changed(wanted).await? {
             if !crate::bus::publish(players, changes.during(self.all(), wanted).await??) {
