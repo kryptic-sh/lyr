@@ -897,14 +897,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   sway it is the focused window in `GET_TREE` (its app id, or its class under
   Xwayland, and its name), re-read on focus and title events; on niri the window
   niri reports focused, by app id and title. Both are tested against fake
-  sockets only. waybar's `rewrite` rules, `separate-outputs` and app icon are
-  not carried. On Windows (`lyr_sources::window::windows`) it shows the
-  foreground window: its title, and its program's file name as `{class}`
-  (`lyr_sources::program`), re-read through `SetWinEventHook` on a thread of its
-  own when the foreground changes or its title does, lyr's own windows skipped;
-  run on Windows (2026-10-20) with `window` in the centre zone, it showed the
-  terminal's title and then "Notification Center" when that took the foreground.
-  The hook callback's filter is checked only by that run.
+  sockets only; CI's real sway opens no window. waybar's `rewrite` rules,
+  `separate-outputs` and app icon are not carried. On Windows
+  (`lyr_sources::window::windows`) it shows the foreground window: its title,
+  and its program's file name as `{class}` (`lyr_sources::program`), re-read
+  through `SetWinEventHook` on a thread of its own when the foreground changes
+  or its title does, lyr's own windows skipped; run on Windows (2026-10-20) with
+  `window` in the centre zone, it showed the terminal's title and then
+  "Notification Center" when that took the foreground. The hook callback's
+  filter is checked only by that run.
 - **`lyr import-waybar`: the config half.** `lyr import-waybar FILE`
   (`lyr_config::waybar`) prints a waybar `config.jsonc` as a lyr config: the
   bar's settings, the layout and every module lyr has, keys renamed from kebab
@@ -924,17 +925,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 - Nothing has run on Linux under a real compositor: everything Wayland, D-Bus
   and Hyprland is tested against fakes and crcbl's headless shell, so the
   owner's Hyprland is the first real run (M1's check).
-- The sway and niri backends (`lyr_wm::sway`, `lyr_wm::niri`, picked by
-  `lyr_wm::Compositor`) are tested only against fake sockets whose replies were
-  written from sway 1.12's `sway-ipc(7)` and `sway/ipc-json.c` and niri v26.04's
-  `niri-ipc`; neither compositor is installed here (WSL, no sudo). Unchecked
-  against a real one: that sway accepts the quoted `workspace` command and the
-  `exit` reply arrives before it quits, the order `GET_WORKSPACES` lists two
-  outputs in, and that niri's stream opens with both lists as its docs say. A
-  headless sway in CI (crcbl's CI runs one) would check the sway half. On
-  Windows the bar has run, with tooltips, the power menu, the clock panel, the
-  control socket, the volume, mic, notification-bell and window modules and the
-  audio menu (each entry above says what was seen).
+- The sway backend runs against a real sway only in CI's `sway e2e` job
+  (headless, two outputs; first green 2026-10-20, run 39371299842): the first
+  state with a workspace on each output, a switch to a name with a space and a
+  `;`, a refused `$` name, and Log out. Its first runs found that sway quits
+  without answering `exit` and sends events after its socket is gone, both
+  handled since. Not exercised there: the focused window's title (a headless
+  sway has no window open) and urgency. The niri backend is tested only against
+  a fake socket written from niri v26.04's `niri-ipc`; its Quit handling is read
+  from niri's source. Neither runs on a desktop yet.
 - The GPU choice (the owner's rule: `CRCBL_ADAPTER`, else the adapter driving
   the bar's display when it is discrete, else low power) is crcbl-app's
   `adapter::choose` inside the `Presenter`, with `PowerPreference::LowPower`
