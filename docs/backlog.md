@@ -847,14 +847,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Post-MVP
 
-- **Window title module: built, not run.** `window` (`lyr_core::window`, and
-  `lyr_wm::hyprland::State::active_window`) follows Hyprland's
-  `activewindow>>CLASS,TITLE` event, seeded at start from `j/activeworkspace`'s
-  `lastwindowtitle` (what waybar reads) and the client's class; `{title}` and
-  `{class}`, `max_length` cut with an ellipsis, the tooltip the text unless
-  `tooltip_format` is set. Not in the default layout. Tested and
+- **Window title module: built, run on Windows only.** `window`
+  (`lyr_core::window`, and `lyr_wm::hyprland::State::active_window`) follows
+  Hyprland's `activewindow>>CLASS,TITLE` event, seeded at start from
+  `j/activeworkspace`'s `lastwindowtitle` (what waybar reads) and the client's
+  class; `{title}` and `{class}`, `max_length` cut with an ellipsis, the tooltip
+  the text unless `tooltip_format` is set. Not in the default layout. Tested and
   mutation-checked against recorded lines, not against a running Hyprland.
-  waybar's `rewrite` rules, `separate-outputs` and app icon are not carried.
+  waybar's `rewrite` rules, `separate-outputs` and app icon are not carried. On
+  Windows (`lyr_sources::window::windows`) it shows the foreground window: its
+  title, and its program's file name as `{class}` (`lyr_sources::program`),
+  re-read through `SetWinEventHook` on a thread of its own when the foreground
+  changes or its title does, lyr's own windows skipped; run on Windows
+  (2026-10-20) with `window` in the centre zone, it showed the terminal's title
+  and then "Notification Center" when that took the foreground. The hook
+  callback's filter is checked only by that run.
 - **`lyr import-waybar`: the config half.** `lyr import-waybar FILE`
   (`lyr_config::waybar`) prints a waybar `config.jsonc` as a lyr config: the
   bar's settings, the layout and every module lyr has, keys renamed from kebab

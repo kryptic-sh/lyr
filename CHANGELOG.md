@@ -74,8 +74,9 @@ and this project adheres to
   bar's settings, the layout and the modules lyr has, with what it could not
   carry listed at the top. waybar's `style.css` is not read.
 - A `window` module, not in the default layout: the focused window's title on
-  Hyprland, as waybar's `hyprland/window` shows it, with `{title}` and `{class}`
-  placeholders and `max_length`.
+  Hyprland, as waybar's `hyprland/window` shows it, and on Windows the
+  foreground window's, its program's name as `{class}`, with `{title}` and
+  `{class}` placeholders and `max_length`.
 - On Linux, the tray: lyr hosts StatusNotifierItems (Steam, Teams and the like),
   and serves `org.kde.StatusNotifierWatcher` when nothing else does. Each item
   shows as a button with its title's first letter until lyr draws icons, passive

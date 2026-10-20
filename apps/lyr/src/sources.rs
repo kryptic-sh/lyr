@@ -27,6 +27,9 @@ pub enum Update {
     /// What the audio menu lists.
     #[cfg(windows)]
     AudioNodes(lyr_core::audio_menu::Nodes),
+    /// The foreground window.
+    #[cfg(windows)]
+    ActiveWindow(lyr_sources::window::Active),
     /// The power profiles, or `None` when there is none to show.
     #[cfg(any(target_os = "linux", windows))]
     PowerProfile(Option<lyr_sources::power_profile::Profiles>),
@@ -167,6 +170,8 @@ pub struct Commands {
     _network: Option<lyr_sources::network::windows::Watch>,
     #[cfg(windows)]
     _power_profile: Option<lyr_sources::power_profile::windows::Watch>,
+    #[cfg(windows)]
+    _window: Option<lyr_sources::window::windows::Watch>,
     #[cfg(windows)]
     audio: std::sync::mpsc::Sender<windows::AudioRequest>,
     /// Whether the audio source was last told the menu is open.
@@ -373,6 +378,7 @@ pub fn start(
     {
         let network = windows::network(sender.clone(), waker.clone())?;
         let power_profile = windows::power_profile(sender.clone(), waker.clone());
+        let window = windows::window(sender.clone(), waker.clone());
         let audio = windows::audio(sender.clone(), waker.clone())?;
         let battery = windows::battery(sender, waker);
         Ok((
@@ -381,6 +387,7 @@ pub fn start(
                 _battery: battery,
                 _network: network,
                 _power_profile: power_profile,
+                _window: window,
                 audio,
                 audio_menu: std::cell::Cell::new(false),
             },
@@ -588,6 +595,29 @@ mod windows {
                 }
             })?;
         Ok(requests)
+    }
+
+    /// Hands the foreground window to the main loop now and at each change,
+    /// while the returned watch lives; `None` when Windows refuses the hooks,
+    /// which it logs, and the module shows the window it read first.
+    pub(super) fn window(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+    ) -> Option<lyr_sources::window::windows::Watch> {
+        use lyr_sources::window::windows::{Watch, read};
+        let deliver = move |active| {
+            // The main loop has gone when this fails: nothing is left to do.
+            let _gone = sender.send(Update::ActiveWindow(active));
+            if let Some(waker) = &waker {
+                waker.wake();
+            }
+        };
+        if let Some(active) = read() {
+            deliver(active);
+        }
+        Watch::new(deliver)
+            .inspect_err(|error| tracing::warn!("window: changes will not show: {error}"))
+            .ok()
     }
 
     /// Hands the effective power mode to the main loop when registered and at

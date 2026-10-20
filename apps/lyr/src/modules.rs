@@ -54,6 +54,9 @@ pub struct Data {
     pub source: Option<lyr_core::audio::Source>,
     /// What the audio menu lists, where there is a source for it.
     pub audio_nodes: Option<lyr_core::audio_menu::Nodes>,
+    /// The foreground window, on Windows; Linux reads it from Hyprland.
+    #[cfg(windows)]
+    pub active_window: Option<lyr_sources::window::Active>,
 }
 
 impl Data {
@@ -129,6 +132,8 @@ impl Data {
             }
             #[cfg(windows)]
             Update::AudioNodes(nodes) => self.audio_nodes = Some(nodes),
+            #[cfg(windows)]
+            Update::ActiveWindow(active) => self.active_window = Some(active),
             // The bar opens it.
             #[cfg(target_os = "linux")]
             Update::TrayMenu(_) => {}
@@ -262,6 +267,12 @@ fn content(
             let shown = lyr_core::window::view(class, title, &config.window)?;
             Some(label(shown.text, theme.foreground))
         }
+        #[cfg(windows)]
+        Module::Window => {
+            let active = data.active_window.as_ref()?;
+            let shown = lyr_core::window::view(&active.class, &active.title, &config.window)?;
+            Some(label(shown.text, theme.foreground))
+        }
         Module::Volume => {
             let shown = lyr_core::audio::volume(data.sink.as_ref()?, &config.volume);
             Some(label(shown.text, theme.volume))
@@ -368,6 +379,11 @@ pub fn tooltip(
         Module::Window => {
             let (class, title) = data.workspaces.as_ref()?.active_window()?;
             Some(lyr_core::window::view(class, title, &config.window)?.tooltip)
+        }
+        #[cfg(windows)]
+        Module::Window => {
+            let active = data.active_window.as_ref()?;
+            Some(lyr_core::window::view(&active.class, &active.title, &config.window)?.tooltip)
         }
         Module::Volume => {
             Some(lyr_core::audio::volume(data.sink.as_ref()?, &config.volume).tooltip)

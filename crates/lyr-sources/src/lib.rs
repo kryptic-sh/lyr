@@ -11,8 +11,8 @@
 //! sources and the notification daemon ([`notifications`]), with their
 //! Linux backends, and the power menu's actions ([`power`]), which are not a
 //! module's source but sit with the other system-bus clients; Windows has
-//! the battery, network, power-profile and audio ([`audio`]) sources and the
-//! power menu's actions. Linux audio waits on a dependency decision
+//! the battery, network, power-profile, audio ([`audio`]) and foreground
+//! window ([`window`]) sources and the power menu's actions. Linux audio waits on a dependency decision
 //! (`docs/backlog.md`). [`program`] names the program a process runs.
 
 pub mod audio;
@@ -26,3 +26,4 @@ pub mod power;
 pub mod power_profile;
 pub mod program;
 pub mod tray;
+pub mod window;
