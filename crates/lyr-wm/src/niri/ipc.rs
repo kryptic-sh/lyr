@@ -35,6 +35,8 @@ pub enum Error {
     },
     #[error("niri refused `{request}`: {reply}")]
     Refused { request: String, reply: String },
+    #[error("niri closed {path} before replying")]
+    Closed { path: PathBuf },
 }
 
 /// A connection point to one niri instance.
@@ -108,11 +110,19 @@ impl Niri {
 
     /// Ends the niri session: the power menu's Log out.
     ///
+    /// niri carries out `Quit` by stopping its event loop, which also runs
+    /// the task that would write the reply (`src/ipc/server.rs` and
+    /// `src/input/mod.rs` at v26.04), so a socket closed before the reply
+    /// is taken as done, as on sway. Read from the source, not seen.
+    ///
     /// # Errors
     ///
     /// When niri cannot be reached or refuses.
     pub async fn exit(&self) -> Result<(), Error> {
-        self.request(QUIT_REQUEST).await
+        match self.request(QUIT_REQUEST).await {
+            Err(Error::Closed { .. }) => Ok(()),
+            outcome => outcome,
+        }
     }
 
     /// Sends one request on a connection of its own and checks the reply.
@@ -159,7 +169,9 @@ impl Niri {
             .next_line()
             .await
             .map_err(|source| self.io("reading from", source))?
-            .ok_or_else(|| self.io("reading from", io::ErrorKind::UnexpectedEof.into()))
+            .ok_or_else(|| Error::Closed {
+                path: self.socket.clone(),
+            })
     }
 
     async fn connect(&self) -> Result<UnixStream, Error> {
@@ -234,6 +246,9 @@ mod tests {
         {"id":2,"idx":2,"name":null,"output":"DP-1","is_urgent":false,"is_active":false,"is_focused":false}]}}"#;
     const WINDOWS: &str = r#"{"WindowsChanged":{"windows":[]}}"#;
 
+    /// A reply that stands for niri closing the socket unanswered.
+    const QUITS: &str = "";
+
     /// A niri on `path`: each connection's requests are handed out and
     /// answered with `reply`, and once one asks for the event stream it is
     /// sent `events`, each followed by a newline, and held open.
@@ -253,6 +268,9 @@ mod tests {
                     let mut lines = BufReader::new(stream).lines();
                     while let Ok(Some(request)) = lines.next_line().await {
                         tx.send(request.clone()).expect("send");
+                        if reply == QUITS {
+                            return;
+                        }
                         let stream = lines.get_mut().get_mut();
                         stream
                             .write_all(format!("{reply}\n").as_bytes())
@@ -350,6 +368,24 @@ mod tests {
         assert!(matches!(
             at(&refused).subscribe().await,
             Err(Error::Refused { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn quit_is_done_when_niri_closes_unanswered_and_only_quit_is() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("niri.sock");
+        let _requests = fake_niri(&path, QUITS, Vec::new());
+        at(&path).exit().await.expect("closing is the answer");
+        let two = Workspace {
+            id: 2,
+            name: "2".into(),
+            monitor: None,
+            urgent: false,
+        };
+        assert!(matches!(
+            at(&path).focus(&two).await,
+            Err(Error::Closed { .. })
         ));
     }
 

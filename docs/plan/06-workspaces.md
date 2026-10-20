@@ -132,7 +132,9 @@ its own (`niri-ipc`'s `lib.rs` and `socket.rs`, read at niri v26.04).
 - **Switching:** `{"Action":{"FocusWorkspace":{"reference":{"Id":N}}}}`, by id,
   so no name is ever quoted.
 - **Log out:** `{"Action":{"Quit":{"skip_confirmation":true}}}`: the power menu
-  has already asked.
+  has already asked. niri stops its event loop to quit, and that loop also
+  writes the reply, so a socket closed before a reply counts as done, as on sway
+  (read from niri's source, not seen).
 - **Focused window:** the window with `is_focused`, its `app_id` and `title`.
 
 ## Windows — virtual desktops
