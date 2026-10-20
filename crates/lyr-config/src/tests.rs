@@ -387,3 +387,89 @@ fn the_default_glyphs_are_every_private_use_character_once() {
     assert!(glyphs.iter().all(|&c| super::waybar::private_use(c)));
     assert!(glyphs.windows(2).all(|pair| pair[0] < pair[1]), "once each");
 }
+
+/// Where `the_defaults_match_the_dotfiles_waybar_config` reads the waybar
+/// config lyr's defaults are a port of: the dotfiles' `config.jsonc`, which
+/// is the owner's and not in this repository.
+const WAYBAR_CONFIG: &str = "LYR_WAYBAR_CONFIG";
+
+/// The dotfiles' keys lyr leaves out on purpose: swaync's inhibited states,
+/// since lyr has no inhibitors (plan 09).
+const NOT_CARRIED: [&str; 4] = [
+    "notifications.icons.inhibited-notification",
+    "notifications.icons.inhibited-none",
+    "notifications.icons.dnd-inhibited-notification",
+    "notifications.icons.dnd-inhibited-none",
+];
+
+#[test]
+#[ignore = "needs the dotfiles' waybar config.jsonc, named by LYR_WAYBAR_CONFIG"]
+fn the_defaults_match_the_dotfiles_waybar_config() {
+    /// Each value both set, by key path, and how they differ. `[*.on]` is
+    /// left out: waybar's click commands are what lyr's built-ins replace.
+    fn walk(
+        imported: &toml::Table,
+        defaults: &toml::Table,
+        path: &str,
+        compared: &mut usize,
+        differ: &mut Vec<String>,
+        left_out: &mut Vec<String>,
+    ) {
+        for (key, value) in imported {
+            if key == "on" {
+                continue;
+            }
+            let path = if path.is_empty() {
+                key.clone()
+            } else {
+                format!("{path}.{key}")
+            };
+            if NOT_CARRIED.contains(&path.as_str()) {
+                left_out.push(path);
+                continue;
+            }
+            match (value, defaults.get(key)) {
+                (toml::Value::Table(value), Some(toml::Value::Table(default))) => {
+                    walk(value, default, &path, compared, differ, left_out);
+                }
+                (value, Some(default)) => {
+                    *compared += 1;
+                    if value != default {
+                        differ.push(format!("{path}: the dotfiles {value}, lyr {default}"));
+                    }
+                }
+                (value, None) => differ.push(format!("{path}: the dotfiles {value}, lyr unset")),
+            }
+        }
+    }
+
+    let path = std::env::var_os(WAYBAR_CONFIG).expect("LYR_WAYBAR_CONFIG names config.jsonc");
+    let text = std::fs::read_to_string(&path).expect("config.jsonc reads");
+    let imported = super::waybar::import(&text).expect("config.jsonc imports");
+    let imported: toml::Table = toml::from_str(&imported.toml).expect("the import is TOML");
+    let defaults: toml::Table = toml::from_str(super::DEFAULTS).expect("the defaults are TOML");
+    let mut compared = 0;
+    let mut differ = Vec::new();
+    let mut left_out = Vec::new();
+    walk(
+        &imported,
+        &defaults,
+        "",
+        &mut compared,
+        &mut differ,
+        &mut left_out,
+    );
+    assert!(compared > 0, "nothing compared");
+    left_out.sort_unstable();
+    let mut expected = NOT_CARRIED.map(str::to_owned).to_vec();
+    expected.sort_unstable();
+    assert_eq!(
+        left_out, expected,
+        "each key left out is still in the dotfiles"
+    );
+    assert!(
+        differ.is_empty(),
+        "{compared} compared; differing:\n{}",
+        differ.join("\n")
+    );
+}

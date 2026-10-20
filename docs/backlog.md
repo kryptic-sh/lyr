@@ -64,11 +64,15 @@ implementation follows meanwhile.
 - **Config reload on save: may lyr take `notify`?** (M3.) **Q:** Reloading the
   config when the file is saved needs a file watcher; `notify` is the usual
   crate and new to lyr. Add it, or keep reloading on `lyr reload` only?
-- **The defaults-parity test: where does it read `config.jsonc`?** (M3.) **Q:**
-  The test that checks lyr's defaults against the dotfiles' waybar config needs
-  that file, which is at `~/Projects/mxaddict/dotfiles` on the owner's machine
-  and not on CI. Check a copy into lyr as a test fixture, or read a path from
-  the environment and skip the test on CI?
+- **The defaults-parity test on CI: check in a copy of `config.jsonc`?** (M3.)
+  **Q:** The test is built (`lyr_config`'s
+  `the_defaults_match_the_dotfiles_waybar_config`): it imports the file
+  `LYR_WAYBAR_CONFIG` names and checks every value both configs set, `[*.on]`
+  left out and swaync's inhibited icons named as not carried (plan 09). It is
+  ignored without the variable, and passed against the dotfiles on the owner's
+  Arch machine (2026-10-20, 55 values). A copy of `config.jsonc` checked in as a
+  fixture would let CI run it too, at the cost of a copy that drifts from the
+  dotfiles. Check one in, or keep it a local check?
 - **The `lyr` name on crates.io is taken** (M11). **Q:** `lyr` on crates.io is
   someone else's (Serial-ATA's lyrics tool, 0.3.0, last published 2024-07-23;
   checked 2026-10-20), so the app crate cannot be published under it. The
@@ -827,10 +831,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `notify`, new to lyr, so the owner's call), a finer diff (a reload redraws
   everything, and reshapes the bars only when `[bar]` changed; starting and
   stopping sources is a question above), the control socket (its own entry
-  above), and the defaults-parity test against `config.jsonc`. The dotfiles are
-  at `~/Projects/mxaddict/dotfiles` on the owner's Windows machine, not next to
-  lyr, and not on CI, so the test needs either a path from the environment or a
-  copy of `config.jsonc` checked into lyr as a fixture; that is open. Format
+  above), and the defaults-parity test on CI (it runs locally from
+  `LYR_WAYBAR_CONFIG`; whether CI gets a fixture is a question above). Format
   strings are one `Format` type (`lyr-config`'s `format.rs`), parsed when the
   config loads and rendered with `Format::render`, so validation and drawing
   will share one parser. Every error names its full key (`layout.right[0]: …`,
