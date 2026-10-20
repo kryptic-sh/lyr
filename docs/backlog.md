@@ -225,7 +225,19 @@ implementation follows meanwhile.
   still dirty
   ([plan/04](plan/04-rendering-and-theme.md#repaint-on-change-only)). crcbl
   declined a finite acquire timeout, which would turn the hang into a busy
-  retry.
+  retry. crcbl reported on 2026-10-20 that the fix is built, going to its main
+  for the next release: crcbl-app's `Presenter` gains
+  `request_frame(&mut shell)`, `observe(&ShellEvent)` (which opens the gate on
+  the window's `FrameReady`, or on its `WindowDestroyed` so it cannot stick) and
+  `frame_due()`. While a requested frame is unanswered, `acquire` returns
+  `Ok(None)` before touching the device, so the blocking acquire is never
+  reached; a caller that never requests a frame behaves as before. lyr's part on
+  that release, through `lyr_render::surface::Surface`: hand every pumped event
+  to each surface's `observe`; after `acquire` hands over a frame and before
+  `submit_and_present`, call `request_frame`; when `acquire` returns `None`,
+  keep the window dirty and skip it, and let the loop sleep in `wait_events`
+  while no surface's `frame_due()` is true. crcbl has not yet seen it on a
+  powered-off output (an end-to-end test in its backlog).
 - **crcbl: changing a panel in place.** crcbl-shell 0.5.0 sets a panel's size
   and margins only when it is created, so lyr's toast stack, whose height
   changes with every toast, recreates its panel. Asked crcbl on 2026-10-19;
