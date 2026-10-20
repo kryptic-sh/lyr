@@ -5,7 +5,7 @@
 //! either default endpoint (`IMMNotificationClient`) or of its volume
 //! (`IAudioEndpointVolumeCallback`); its callbacks only signal, and the
 //! caller reads, on a thread that has joined COM's multithreaded apartment
-//! ([`init`]). [`menu`] reads what the audio menu lists.
+//! ([`init`]). `menu` reads what the audio menu lists.
 
 mod menu;
 
