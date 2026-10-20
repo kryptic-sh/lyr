@@ -77,9 +77,10 @@ state + config + theme ──► lyr-core: layout ──► DrawList + hit regio
   has it.
 - **No shaping.** Bar text is short left-to-right labels plus Nerd Font
   private-use glyphs, and "Propo" means proportional-width icons that need no
-  ligatures. crcbl-ui's unshaped, cmap-driven text is enough. Whether Hack Nerd
-  Font Propo's private-use glyphs resolve through crcbl-ui's cmap lookup is
-  **not yet tested** (backlog). M1 tests it first.
+  ligatures. crcbl-ui's unshaped, cmap-driven text is enough. That every
+  private-use glyph the defaults draw resolves through crcbl-ui's cmap lookup in
+  Hack Nerd Font Propo is tested (`lyr_render::fonts`' glyph test, run by CI's
+  `nerd font glyphs` job against Nerd Fonts' pinned release).
 - Glyphs are rasterised at the output's scale. Each scale gets its own atlas
   pages, so a 1× and a 1.5× monitor both get crisp text.
 

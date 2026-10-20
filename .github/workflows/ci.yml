@@ -178,6 +178,33 @@ jobs:
       - run: cargo run --locked -p lyr -- --version
       - run: cargo run --locked -p lyr -- --help
 
+  # The defaults' Nerd Font glyphs against the font they name (plan 04, M1's
+  # check): Hack Nerd Font Propo from Nerd Fonts' release, pinned. The test
+  # is #[ignore]d everywhere else, since no runner has the font.
+  nerd-font:
+    name: nerd font glyphs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+          cache: false
+      - run: rustup update --no-self-update stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Hack Nerd Font Propo
+        run: |
+          fonts="$HOME/.local/share/fonts"
+          mkdir -p "$fonts"
+          curl -fsSL https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/Hack.tar.xz \
+            | tar -xJ -C "$fonts" --wildcards 'HackNerdFontPropo-*.ttf'
+          fc-cache -f "$fonts"
+          fc-list | grep -q 'Hack Nerd Font Propo'
+      - run:
+          cargo test --locked -p lyr-render --lib
+          fonts::tests::the_bar_font_has_every_glyph_the_defaults_draw --
+          --ignored --exact
+
   # lyr_wm::sway against a real sway: headless (wlroots' headless backend,
   # two virtual outputs, no GPU or input devices), in a private
   # XDG_RUNTIME_DIR, as crcbl's Wayland suite starts one. The test is

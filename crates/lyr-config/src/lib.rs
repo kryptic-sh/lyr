@@ -192,6 +192,33 @@ fn parse(path: &Path, text: &str) -> Result<toml::Table, ConfigError> {
     })
 }
 
+/// Every private-use character the built-in config draws, on any
+/// platform, once each and in order: the Nerd Font glyphs the bar's font
+/// has to have.
+///
+/// # Panics
+///
+/// When the built-in config is not valid TOML, which its own tests rule out.
+#[must_use]
+pub fn default_glyphs() -> Vec<char> {
+    fn walk(value: &toml::Value, glyphs: &mut Vec<char>) {
+        match value {
+            toml::Value::String(text) => {
+                glyphs.extend(text.chars().filter(|&c| waybar::private_use(c)));
+            }
+            toml::Value::Array(values) => values.iter().for_each(|value| walk(value, glyphs)),
+            toml::Value::Table(table) => table.values().for_each(|value| walk(value, glyphs)),
+            _ => {}
+        }
+    }
+    let defaults: toml::Table = toml::from_str(DEFAULTS).expect("the built-in config parses");
+    let mut glyphs = Vec::new();
+    defaults.values().for_each(|value| walk(value, &mut glyphs));
+    glyphs.sort_unstable();
+    glyphs.dedup();
+    glyphs
+}
+
 /// Merges `from` over `into`: a table merges key by key, and anything else,
 /// a list included, replaces what was there. The same rule as
 /// `hjkl_config::load_layered`, whose merge is not public in hjkl-config

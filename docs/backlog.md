@@ -827,8 +827,7 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   defaults-parity test (M3) should read the glyphs from `config.jsonc` itself,
   not from the plan: the plan once lost every BMP private-use glyph without
   anyone noticing, and now writes them as code points.
-- **Nerd Font glyphs through crcbl-ui:** that Hack Nerd Font Propo's private-use
-  glyphs resolve through crcbl-ui's cmap lookup is untested (M1's first test).
+
 - **Native notification centre and menus, not yet researched**
   ([plan/09](plan/09-notifications.md), [plan/10](plan/10-popups-and-menus.md)).
   Written from memory and the dotfiles, with each item to read when its

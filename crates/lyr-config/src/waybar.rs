@@ -286,7 +286,7 @@ fn loads(config: &Table) -> Result<(), String> {
 
 /// Whether `c` is in one of Unicode's private-use areas, where Nerd Font
 /// glyphs live.
-const fn private_use(c: char) -> bool {
+pub(crate) const fn private_use(c: char) -> bool {
     matches!(c as u32, 0xE000..=0xF8FF | 0xF_0000..=0xF_FFFD | 0x10_0000..=0x10_FFFD)
 }
 

@@ -376,3 +376,14 @@ fn the_bell_opens_windows_notification_centre_there_only() {
         Some(Binding::Builtin(Builtin::ToggleDnd))
     );
 }
+
+#[test]
+fn the_default_glyphs_are_every_private_use_character_once() {
+    let glyphs = super::default_glyphs();
+    // The bell's icons, from `[notifications]`.
+    for glyph in ['\u{F071}', '\u{F0A2}', '\u{F1F7}'] {
+        assert!(glyphs.contains(&glyph), "{glyph:?} in {glyphs:?}");
+    }
+    assert!(glyphs.iter().all(|&c| super::waybar::private_use(c)));
+    assert!(glyphs.windows(2).all(|pair| pair[0] < pair[1]), "once each");
+}

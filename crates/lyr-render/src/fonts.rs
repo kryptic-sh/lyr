@@ -91,3 +91,28 @@ pub fn load(family: &str) -> Result<Loaded, Error> {
         unreadable,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use crcbl_ui::font::GlyphId;
+    use lyr_config::{Platform, from_sources};
+
+    #[test]
+    #[ignore = "needs the defaults' font (Hack Nerd Font Propo) installed; CI's nerd-font job installs it"]
+    fn the_bar_font_has_every_glyph_the_defaults_draw() {
+        let family = from_sources(None, Platform::current())
+            .expect("the defaults")
+            .theme
+            .font;
+        let loaded = super::load(&family).expect("a font");
+        assert_eq!(loaded.missing, None, "{family} is installed");
+        let glyphs = lyr_config::default_glyphs();
+        assert!(!glyphs.is_empty(), "the defaults draw glyphs");
+        let missing: Vec<String> = glyphs
+            .into_iter()
+            .filter(|&glyph| loaded.font.glyph_id(glyph) == GlyphId::NOTDEF)
+            .map(|glyph| format!("U+{:04X}", u32::from(glyph)))
+            .collect();
+        assert!(missing.is_empty(), "{family} lacks {missing:?}");
+    }
+}
