@@ -200,10 +200,10 @@ implementation follows meanwhile.
 - **crcbl: export its keysym names.** lyr's menus act on the key's symbol, not
   on `key_code`, which crcbl derives from the scancode and so ignores xkb remaps
   and virtual keyboards (`wtype`'s Down arrived as `key_code: Escape`). lyr
-  spells the six X11 keysyms it needs itself (`apps/lyr/src/keys.rs`), since
-  crcbl's own table (`named_keysym`) is crate-private. When crcbl exports it, or
-  names constants on `Keysym`, lyr drops its copy. Asked of office-crcbl on
-  2026-10-20.
+  spells the six X11 keysyms it needs itself (`apps/lyr/src/keys.rs`). crcbl
+  named them as constants on `crcbl_core::input::Keysym` on its main
+  (2026-10-20, unreleased); on the release that carries them, `keys.rs` matches
+  `Keysym::ESCAPE` and the rest and drops its own numbers.
 - **crcbl: Linux and Vulkan parity for 0.6 – 0.8.** Also at the owner's request
   (2026-10-20): every crcbl feature developed on the Windows machine to be
   implemented and tested on Wayland, X11 and Vulkan. On crcbl's backlog,
@@ -293,9 +293,14 @@ implementation follows meanwhile.
   `Surface`'s test on crcbl's headless shell and null backend shows a present
   asking, the next draw skipped, and the pump's answer opening it again,
   mutation-checked. On Windows the bar ran 106 s with `--stats` (2026-10-20): 3
-  presents (the first and one per minute tick) over 7 wake-ups. Not seen: a
-  Wayland compositor holding the answer back, or an output that is off, which is
-  the case this exists for (crcbl has not run it either).
+  presents (the first and one per minute tick) over 7 wake-ups. On a nested
+  Hyprland 0.56.2 (2026-10-20) with its output turned off
+  (`hl.dsp.dpms({ action = "off" })`) for 80 s: the control socket answered
+  every request at once, so the loop never blocked; over the 97 s around it the
+  bar woke 16 times (three were those requests) and presented 3 frames, so it
+  did not spin either; turned back on, the bar showed the current minute. Not
+  seen: the owner's real outputs under hypridle, and DPMS on a compositor other
+  than Hyprland.
 - **crcbl's `set_panel`: adopted.** crcbl 0.7.0's `Shell::set_panel` resizes a
   panel in place, and lyr uses it where it used to recreate one: the toast stack
   as toasts come and go (`toasts::panel_desc`), the Bluetooth, Wi-Fi and audio
