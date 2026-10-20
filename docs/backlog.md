@@ -591,7 +591,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   milestone starts: NetworkManager's D-Bus names checked against the installed
   NetworkManager (plan 10 has them from the online API reference) (M7);
   bluetui's and wiremix's source, beyond the READMEs plan 10 now follows (M7);
-  the Windows and macOS menu APIs (M9, M10).
+  the Windows Wi-Fi and Bluetooth menu APIs (M9; the audio menu's WASAPI calls
+  were read in `windows` 0.62.2 and are built) and macOS's (M10).
 - **Power menu, M5.** Built: the Linux actions
   (`lyr_sources::power::linux::Logind`): Lock, Sleep, Hibernate, Reboot and
   Power off as systemd v262.1's `loginctl` and `systemctl` call logind, with the
