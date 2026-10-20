@@ -278,12 +278,18 @@ implementation follows meanwhile.
   and `CURSOR_SHAPE` caps, cursor-shape-v1 on Wayland, the fall-through to D3D12
   for a transparent Win32 window, and Vulkan refusing a composite alpha the
   surface lacks; on main after 0.5.0 (`f35f4228`), X11 cursor shapes through
-  libxcb-cursor. Still open: AT-SPI (through `accesskit_unix`, which pulls in
-  zbus; crcbl is confirming that with the owner) and AppKit accessibility;
-  AppKit's input-method switch, secure input and pre-edit; X11 panels, popups
-  and transparency; tests for the untested cells, including a Hyprland job, a
-  FreeBSD VM job and S21 (fractional scale on a layer panel, which lyr's bar
-  is); no flash on map on AppKit; cold-start timing (S13).
+  libxcb-cursor. AT-SPI is on crcbl's main (2026-10-20, unreleased): with
+  crcbl-shell's `accesskit` feature each window gets an `accesskit_unix` adapter
+  Orca can read and press, raising `AccessibilityActivated`,
+  `AccessibilityAction` and `AccessibilityDeactivated`. It brings zbus 5
+  (`accesskit_unix` 0.24) beside lyr's zbus 6, so turning the feature on in lyr
+  puts two zbus versions in its build, and crcbl ignores three RustSec
+  "unmaintained" advisories on zbus 5's crates meanwhile; whether lyr takes it
+  before an `accesskit_unix` on zbus 6 is the owner's call. Still open: AppKit
+  accessibility; AppKit's input-method switch, secure input and pre-edit; X11
+  panels, popups and transparency; tests for the untested cells, including a
+  Hyprland job, a FreeBSD VM job and S21 (fractional scale on a layer panel,
+  which lyr's bar is); no flash on map on AppKit; cold-start timing (S13).
 - **crcbl: gaps that bear on lyr's milestones.** S9: no pre-edit during a
   compose sequence, no surrounding text, and losing the keyboard mid-sequence is
   untested (crcbl judges the Wi-Fi password field needs none of it). S17: a
