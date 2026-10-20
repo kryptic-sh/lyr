@@ -188,7 +188,7 @@ pub fn act(
         #[cfg(target_os = "linux")]
         Action::StepWorkspace(direction) => {
             use lyr_core::pointer::Direction;
-            use lyr_wm::hyprland::Step;
+            use lyr_wm::Step;
             let state = data.workspaces.as_ref()?;
             let step = match direction {
                 Direction::Next => Step::Next,

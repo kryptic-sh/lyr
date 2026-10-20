@@ -9,7 +9,8 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, Lines};
 use tokio::net::UnixStream;
 
 use super::{
-    Dialect, Event, ParseError, State, Workspace, exit_request, focus_request, parse_line, snapshot,
+    Dialect, Event, ParseError, Tracker, Workspace, exit_request, focus_request, parse_line,
+    snapshot,
 };
 
 /// How long a request may take before lyr gives up on it. `hyprctl` uses
@@ -112,8 +113,8 @@ impl Hyprland {
     /// The event socket is connected first and the state read after, so
     /// that no change between the two is lost: events that arrive meanwhile
     /// wait in the socket and are applied on top of a state that may already
-    /// include them, which [`State::apply`] tolerates.
-    pub async fn subscribe(&self) -> Result<(State, Events), Error> {
+    /// include them, which [`Tracker::apply`] tolerates.
+    pub async fn subscribe(&self) -> Result<(Tracker, Events), Error> {
         let path = self.socket_dir.join(".socket2.sock");
         let stream = UnixStream::connect(&path)
             .await
@@ -348,9 +349,9 @@ mod tests {
             dialect: Dialect::Lua,
         };
 
-        let (mut state, mut events) = hyprland.subscribe().await.expect("subscribed");
-        assert_eq!(state.active(), Some(1));
-        assert_eq!(state.workspaces().count(), 2);
+        let (mut tracker, mut events) = hyprland.subscribe().await.expect("subscribed");
+        assert_eq!(tracker.state().active(), Some(1));
+        assert_eq!(tracker.state().workspaces().count(), 2);
 
         let event = events.next().await.expect("an event").expect("open");
         assert_eq!(
@@ -361,8 +362,8 @@ mod tests {
             },
             "the line lyr does not act on is skipped"
         );
-        assert!(state.apply(event));
-        assert_eq!(state.active(), Some(2));
+        assert!(tracker.apply(event));
+        assert_eq!(tracker.state().active(), Some(2));
 
         assert!(matches!(events.next().await, Err(Error::Parse(_))));
         assert!(matches!(events.next().await, Ok(None)), "socket closed");
@@ -376,11 +377,16 @@ mod tests {
             socket_dir: dir.path().to_owned(),
             dialect: Dialect::Lua,
         };
-        let (state, _events) = lua.subscribe().await.expect("subscribed");
+        let (tracker, _events) = lua.subscribe().await.expect("subscribed");
         for _ in 0..3 {
             requests.recv().await.expect("a state request");
         }
-        let two = state.workspaces().find(|w| w.id == 2).expect("2").clone();
+        let two = tracker
+            .state()
+            .workspaces()
+            .find(|w| w.id == 2)
+            .expect("2")
+            .clone();
 
         lua.focus(&two).await.expect("ok reply");
         assert_eq!(

@@ -1,53 +1,31 @@
-//! Folding events into the workspaces the bar shows.
+//! Folding Hyprland's events into the workspaces the bar shows.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
-use super::{Event, WorkspaceId};
+use super::Event;
+use crate::{State, Workspace, WorkspaceId};
 
-/// One workspace button.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Workspace {
-    pub id: WorkspaceId,
-    pub name: String,
-    /// The monitor it is on, by Hyprland's monitor name. `None` until an event
-    /// says where it is.
-    pub monitor: Option<String>,
-    /// A window on it asked for attention since it was last shown.
-    pub urgent: bool,
-}
-
-/// Which way a scroll over the workspace module moves.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Step {
-    /// To the next workspace in id order.
-    Next,
-    /// To the previous workspace in id order.
-    Previous,
-}
-
-/// What the workspace module shows: every workspace in id order, which one is
-/// active, and which are urgent.
+/// The [`State`] Hyprland's events keep current, with what folding them
+/// needs besides.
 ///
 /// Hyprland emits no event for workspaces that existed before lyr subscribed,
-/// so a state starts from the initial-state query ([`State::seeded`]) and is
-/// kept current by events from then on.
+/// so a tracker starts from the initial-state query ([`Tracker::seeded`]) and
+/// is kept current by events from then on.
 #[derive(Clone, Debug, Default)]
-pub struct State {
-    workspaces: BTreeMap<WorkspaceId, Workspace>,
-    active: Option<WorkspaceId>,
+pub struct Tracker {
+    state: State,
+    /// The monitor Hyprland creates new workspaces on.
     focused_monitor: Option<String>,
     /// Window address to workspace, so an `urgent` event, which names only a
     /// window, can mark the workspace it is on.
     windows: HashMap<String, WorkspaceId>,
-    /// The focused window's class and title.
-    window: Option<(String, String)>,
 }
 
-impl State {
-    /// A state as the initial-state query found it: the workspaces, the one
+impl Tracker {
+    /// A tracker as the initial-state query found it: the workspaces, the one
     /// active on the focused monitor, which window is on which workspace, and
     /// the focused window's class and title.
-    /// Special workspaces are left out, as [`State::apply`] leaves them out.
+    /// Special workspaces are left out, as [`Tracker::apply`] leaves them out.
     #[cfg(unix)]
     pub(super) fn seeded(
         workspaces: impl IntoIterator<Item = Workspace>,
@@ -56,61 +34,26 @@ impl State {
         window: Option<(String, String)>,
     ) -> Self {
         let (active, focused_monitor) = active.unzip();
+        let mut workspaces: Vec<Workspace> = workspaces
+            .into_iter()
+            .filter(|workspace| !is_special(&workspace.name))
+            .collect();
+        workspaces.sort_by_key(|workspace| workspace.id);
         Self {
-            workspaces: workspaces
-                .into_iter()
-                .filter(|workspace| !is_special(&workspace.name))
-                .map(|workspace| (workspace.id, workspace))
-                .collect(),
-            active,
+            state: State {
+                workspaces,
+                active,
+                window,
+            },
             focused_monitor,
             windows: windows.into_iter().collect(),
-            window,
         }
     }
 
-    /// The focused window's class and title, while a window has focus.
+    /// What the bar shows.
     #[must_use]
-    pub fn active_window(&self) -> Option<(&str, &str)> {
-        self.window
-            .as_ref()
-            .map(|(class, title)| (class.as_str(), title.as_str()))
-    }
-
-    /// The workspaces in id order, special workspaces left out.
-    pub fn workspaces(&self) -> impl Iterator<Item = &Workspace> {
-        self.workspaces.values()
-    }
-
-    /// The workspace shown on the focused monitor.
-    #[must_use]
-    pub const fn active(&self) -> Option<WorkspaceId> {
-        self.active
-    }
-
-    /// The workspace a scroll over the module moves to: the button after (or
-    /// before) the active one, wrapping at the ends.
-    ///
-    /// `monitor` is the bar's output when it shows only that output's
-    /// workspaces, and `None` when every bar shows every workspace. `None`
-    /// is returned when the active workspace is not among those buttons
-    /// (it is on another output), since there is no button to step from.
-    #[must_use]
-    pub fn step(&self, step: Step, monitor: Option<&str>) -> Option<&Workspace> {
-        let buttons: Vec<&Workspace> = self
-            .workspaces()
-            .filter(|workspace| monitor.is_none_or(|m| workspace.monitor.as_deref() == Some(m)))
-            .collect();
-        let active = self.active?;
-        let at = buttons
-            .iter()
-            .position(|workspace| workspace.id == active)?;
-        let len = buttons.len();
-        let to = match step {
-            Step::Next => (at + 1) % len,
-            Step::Previous => (at + len - 1) % len,
-        };
-        Some(buttons[to])
+    pub const fn state(&self) -> &State {
+        &self.state
     }
 
     /// Applies one event and returns whether anything the bar draws changed,
@@ -124,9 +67,11 @@ impl State {
             Event::CreateWorkspace { id, name } => self.insert(id, name),
             Event::DestroyWorkspace { id } => {
                 self.windows.retain(|_, workspace| *workspace != id);
-                self.workspaces.remove(&id).is_some()
+                let before = self.state.workspaces.len();
+                self.state.workspaces.retain(|workspace| workspace.id != id);
+                self.state.workspaces.len() != before
             }
-            Event::RenameWorkspace { id, name } => match self.workspaces.get_mut(&id) {
+            Event::RenameWorkspace { id, name } => match self.state.get_mut(id) {
                 Some(workspace) if workspace.name != name => {
                     workspace.name = name;
                     true
@@ -137,7 +82,7 @@ impl State {
                 self.focused_monitor = Some(monitor);
                 self.show(workspace)
             }
-            Event::MoveWorkspace { id, monitor } => match self.workspaces.get_mut(&id) {
+            Event::MoveWorkspace { id, monitor } => match self.state.get_mut(id) {
                 Some(workspace) if workspace.monitor.as_ref() != Some(&monitor) => {
                     workspace.monitor = Some(monitor);
                     true
@@ -149,8 +94,8 @@ impl State {
                 workspace_name,
             } => {
                 let id = self
-                    .workspaces
-                    .values()
+                    .state
+                    .workspaces()
                     .find(|workspace| workspace.name == workspace_name)
                     .map(|workspace| workspace.id);
                 if let Some(id) = id {
@@ -168,18 +113,18 @@ impl State {
             }
             Event::ActiveWindow { class, title } => {
                 let window = (!class.is_empty() || !title.is_empty()).then_some((class, title));
-                let changed = window != self.window;
-                self.window = window;
+                let changed = window != self.state.window;
+                self.state.window = window;
                 changed
             }
             Event::Urgent { window } => {
                 let Some(&id) = self.windows.get(&window) else {
                     return false;
                 };
-                if Some(id) == self.active {
+                if Some(id) == self.state.active {
                     return false;
                 }
-                match self.workspaces.get_mut(&id) {
+                match self.state.get_mut(id) {
                     Some(workspace) if !workspace.urgent => {
                         workspace.urgent = true;
                         true
@@ -190,16 +135,22 @@ impl State {
         }
     }
 
-    /// Adds a workspace lyr has not seen, placed on the focused monitor,
-    /// which is where Hyprland creates one. Special workspaces are not
-    /// buttons, so they are never added.
+    /// Adds a workspace lyr has not seen, in id order, placed on the focused
+    /// monitor, which is where Hyprland creates one. Special workspaces are
+    /// not buttons, so they are never added.
     fn insert(&mut self, id: WorkspaceId, name: String) -> bool {
-        if is_special(&name) || self.workspaces.contains_key(&id) {
+        let workspaces = &mut self.state.workspaces;
+        let at = workspaces.partition_point(|workspace| workspace.id < id);
+        if is_special(&name)
+            || workspaces
+                .get(at)
+                .is_some_and(|workspace| workspace.id == id)
+        {
             return false;
         }
         let monitor = self.focused_monitor.clone();
-        self.workspaces.insert(
-            id,
+        workspaces.insert(
+            at,
             Workspace {
                 id,
                 name,
@@ -213,11 +164,11 @@ impl State {
     /// Makes `id` the active workspace. Showing a workspace clears its urgent
     /// mark, as waybar does.
     fn show(&mut self, id: WorkspaceId) -> bool {
-        let moved = self.active != Some(id);
-        self.active = Some(id);
+        let moved = self.state.active != Some(id);
+        self.state.active = Some(id);
         let cleared = self
-            .workspaces
-            .get_mut(&id)
+            .state
+            .get_mut(id)
             .is_some_and(|workspace| std::mem::take(&mut workspace.urgent));
         moved || cleared
     }
@@ -231,11 +182,11 @@ fn is_special(name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{State, Step, Workspace};
+    use super::Tracker;
     use crate::hyprland::parse_line;
 
     /// Applies event lines in order and returns what each `apply` reported.
-    fn feed(state: &mut State, lines: &[&str]) -> Vec<bool> {
+    fn feed(state: &mut Tracker, lines: &[&str]) -> Vec<bool> {
         lines
             .iter()
             .map(|line| {
@@ -247,8 +198,9 @@ mod tests {
             .collect()
     }
 
-    fn names(state: &State) -> Vec<&str> {
+    fn names(state: &Tracker) -> Vec<&str> {
         state
+            .state()
             .workspaces()
             .map(|workspace| workspace.name.as_str())
             .collect()
@@ -256,7 +208,7 @@ mod tests {
 
     #[test]
     fn workspaces_appear_in_id_order_on_the_focused_monitor() {
-        let mut state = State::default();
+        let mut state = Tracker::default();
         feed(
             &mut state,
             &[
@@ -269,6 +221,7 @@ mod tests {
         assert_eq!(names(&state), ["1", "3"]);
         assert!(
             state
+                .state()
                 .workspaces()
                 .all(|workspace| workspace.monitor.as_deref() == Some("DP-1"))
         );
@@ -276,7 +229,7 @@ mod tests {
 
     #[test]
     fn switching_moves_the_active_workspace_and_reports_a_change() {
-        let mut state = State::default();
+        let mut state = Tracker::default();
         let changed = feed(
             &mut state,
             &[
@@ -288,12 +241,12 @@ mod tests {
             ],
         );
         assert_eq!(changed, [true, true, false, true, true]);
-        assert_eq!(state.active(), Some(2));
+        assert_eq!(state.state().active(), Some(2));
     }
 
     #[test]
     fn rename_move_and_destroy_change_the_buttons() {
-        let mut state = State::default();
+        let mut state = Tracker::default();
         let changed = feed(
             &mut state,
             &[
@@ -311,7 +264,7 @@ mod tests {
 
     #[test]
     fn an_urgent_window_marks_its_workspace_until_it_is_shown() {
-        let mut state = State::default();
+        let mut state = Tracker::default();
         feed(
             &mut state,
             &[
@@ -322,8 +275,9 @@ mod tests {
                 "movewindowv2>>bb,1,1",
             ],
         );
-        let urgent = |state: &State| -> Vec<i64> {
+        let urgent = |state: &Tracker| -> Vec<i64> {
             state
+                .state()
                 .workspaces()
                 .filter(|workspace| workspace.urgent)
                 .map(|workspace| workspace.id)
@@ -340,64 +294,8 @@ mod tests {
     }
 
     #[test]
-    fn scrolling_steps_through_the_buttons_and_wraps() {
-        let mut state = State::default();
-        feed(
-            &mut state,
-            &[
-                "focusedmonv2>>DP-1,1",
-                "createworkspacev2>>1,1",
-                "createworkspacev2>>2,2",
-                "createworkspacev2>>5,5",
-                "workspacev2>>2,2",
-            ],
-        );
-        let id = |workspace: Option<&Workspace>| workspace.map(|workspace| workspace.id);
-
-        assert_eq!(id(state.step(Step::Next, None)), Some(5));
-        assert_eq!(id(state.step(Step::Previous, None)), Some(1));
-
-        feed(&mut state, &["workspacev2>>5,5"]);
-        assert_eq!(id(state.step(Step::Next, None)), Some(1), "wraps forward");
-        feed(&mut state, &["workspacev2>>1,1"]);
-        assert_eq!(id(state.step(Step::Previous, None)), Some(5), "wraps back");
-    }
-
-    #[test]
-    fn a_per_output_bar_steps_only_through_its_own_workspaces() {
-        let mut state = State::default();
-        feed(
-            &mut state,
-            &[
-                "focusedmonv2>>DP-1,1",
-                "createworkspacev2>>1,1",
-                "createworkspacev2>>3,3",
-                "focusedmonv2>>HDMI-A-1,2",
-                "createworkspacev2>>2,2",
-                "focusedmonv2>>DP-1,1",
-            ],
-        );
-        let id = |workspace: Option<&Workspace>| workspace.map(|workspace| workspace.id);
-
-        assert_eq!(id(state.step(Step::Next, Some("DP-1"))), Some(3));
-        assert_eq!(id(state.step(Step::Next, None)), Some(2));
-        assert_eq!(
-            id(state.step(Step::Next, Some("HDMI-A-1"))),
-            None,
-            "the active workspace is on another output"
-        );
-    }
-
-    #[test]
-    fn nothing_to_step_from_before_a_workspace_is_active() {
-        let mut state = State::default();
-        feed(&mut state, &["createworkspacev2>>1,1"]);
-        assert_eq!(state.step(Step::Next, None), None);
-    }
-
-    #[test]
     fn a_closed_window_is_forgotten() {
-        let mut state = State::default();
+        let mut state = Tracker::default();
         feed(
             &mut state,
             &[
@@ -411,8 +309,8 @@ mod tests {
 
     #[test]
     fn the_focused_window_follows_its_events() {
-        let mut state = State::default();
-        assert_eq!(state.active_window(), None);
+        let mut state = Tracker::default();
+        assert_eq!(state.state().active_window(), None);
         assert_eq!(
             feed(
                 &mut state,
@@ -425,8 +323,8 @@ mod tests {
             [true, false, true],
             "a title change redraws, the same one does not"
         );
-        assert_eq!(state.active_window(), Some(("kitty", "vim: lyr")));
+        assert_eq!(state.state().active_window(), Some(("kitty", "vim: lyr")));
         assert_eq!(feed(&mut state, &["activewindow>>,"]), [true]);
-        assert_eq!(state.active_window(), None, "no window focused");
+        assert_eq!(state.state().active_window(), None, "no window focused");
     }
 }

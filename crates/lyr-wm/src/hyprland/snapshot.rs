@@ -7,7 +7,7 @@
 
 use serde::Deserialize;
 
-use super::{State, Workspace, WorkspaceId};
+use super::{Tracker, Workspace, WorkspaceId};
 
 #[derive(Deserialize)]
 struct WorkspaceReply {
@@ -45,7 +45,7 @@ struct ClientWorkspace {
 const NO_MONITOR: &str = "?";
 
 /// Builds the state the three replies describe.
-pub(super) fn parse(workspaces: &str, active: &str, clients: &str) -> serde_json::Result<State> {
+pub(super) fn parse(workspaces: &str, active: &str, clients: &str) -> serde_json::Result<Tracker> {
     let workspaces: Vec<WorkspaceReply> = serde_json::from_str(workspaces)?;
     let active: ActiveReply = serde_json::from_str(active)?;
     let clients: Vec<ClientReply> = serde_json::from_str(clients)?;
@@ -59,7 +59,7 @@ pub(super) fn parse(workspaces: &str, active: &str, clients: &str) -> serde_json
             .unwrap_or_default();
         (class, active.lastwindowtitle.clone())
     });
-    Ok(State::seeded(
+    Ok(Tracker::seeded(
         workspaces.into_iter().map(|workspace| Workspace {
             id: workspace.id,
             name: workspace.name,
@@ -106,7 +106,8 @@ mod tests {
 
     #[test]
     fn the_replies_seed_workspaces_active_and_windows() {
-        let mut state = parse(WORKSPACES, ACTIVE, CLIENTS).expect("valid replies");
+        let mut tracker = parse(WORKSPACES, ACTIVE, CLIENTS).expect("valid replies");
+        let state = tracker.state();
         assert_eq!(
             state.workspaces().cloned().collect::<Vec<_>>(),
             [
@@ -132,7 +133,7 @@ mod tests {
         );
 
         // The client's `0x…` address matches the bare hex an event carries.
-        assert!(state.apply(Event::Urgent {
+        assert!(tracker.apply(Event::Urgent {
             window: "55d0c8a4b1e0".into()
         }));
     }

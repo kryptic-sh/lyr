@@ -36,7 +36,7 @@ pub struct Data {
     /// device's path, and the question.
     pub bluetooth_ask: Option<(u64, String, lyr_core::bluetooth_menu::Question)>,
     #[cfg(target_os = "linux")]
-    pub workspaces: Option<lyr_wm::hyprland::State>,
+    pub workspaces: Option<lyr_wm::State>,
     /// The system time zone's name, from timedate1.
     #[cfg(target_os = "linux")]
     pub zone: Option<String>,
@@ -433,10 +433,10 @@ fn zone(_data: &Data) -> Option<String> {
 /// `all_outputs = false` its own output's.
 #[cfg(target_os = "linux")]
 pub fn shown_workspaces<'a>(
-    state: &'a lyr_wm::hyprland::State,
+    state: &'a lyr_wm::State,
     config: &Config,
     monitor: Option<&str>,
-) -> Vec<&'a lyr_wm::hyprland::Workspace> {
+) -> Vec<&'a lyr_wm::Workspace> {
     state
         .workspaces()
         .filter(|workspace| {

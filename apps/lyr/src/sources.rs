@@ -55,7 +55,7 @@ pub enum Update {
     BluetoothCancel,
     /// Hyprland's workspaces.
     #[cfg(target_os = "linux")]
-    Workspaces(lyr_wm::hyprland::State),
+    Workspaces(lyr_wm::State),
     /// The system time zone's name, or `None` when none is set.
     #[cfg(target_os = "linux")]
     Zone(Option<String>),
@@ -178,7 +178,7 @@ pub struct Commands {
     #[cfg(windows)]
     audio_menu: std::cell::Cell<bool>,
     #[cfg(target_os = "linux")]
-    focus: tokio::sync::mpsc::UnboundedSender<lyr_wm::hyprland::Workspace>,
+    focus: tokio::sync::mpsc::UnboundedSender<lyr_wm::Workspace>,
     #[cfg(target_os = "linux")]
     profile: tokio::sync::mpsc::UnboundedSender<String>,
     #[cfg(target_os = "linux")]
@@ -200,7 +200,7 @@ pub struct Commands {
 #[cfg(target_os = "linux")]
 impl Commands {
     /// Switches to `workspace`.
-    pub fn focus(&self, workspace: lyr_wm::hyprland::Workspace) {
+    pub fn focus(&self, workspace: lyr_wm::Workspace) {
         let _stopped = self.focus.send(workspace);
     }
 
@@ -1193,16 +1193,20 @@ mod linux {
     ) {
         let run = async {
             let hyprland = Hyprland::from_env().await?;
-            let (mut state, mut events) = hyprland.subscribe().await?;
-            if !deliver(&sender, waker.as_ref(), Update::Workspaces(state.clone())) {
+            let (mut tracker, mut events) = hyprland.subscribe().await?;
+            if !deliver(
+                &sender,
+                waker.as_ref(),
+                Update::Workspaces(tracker.state().clone()),
+            ) {
                 return Ok(());
             }
             loop {
                 tokio::select! {
                     event = events.next() => {
                         let Some(event) = event? else { break };
-                        if state.apply(event)
-                            && !deliver(&sender, waker.as_ref(), Update::Workspaces(state.clone()))
+                        if tracker.apply(event)
+                            && !deliver(&sender, waker.as_ref(), Update::Workspaces(tracker.state().clone()))
                         {
                             break;
                         }
