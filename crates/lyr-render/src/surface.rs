@@ -134,6 +134,13 @@ impl Surface {
         }
     }
 
+    /// Window pixels per logical pixel, which [`crate::translate::translate`]
+    /// records a list at.
+    #[must_use]
+    pub const fn scale(&self) -> f32 {
+        self.scale
+    }
+
     /// Follows the window to a new size or scale.
     ///
     /// # Errors
@@ -167,7 +174,9 @@ impl Surface {
             return Ok(false);
         };
         let device = self.presenter.device();
-        self.ui.begin_frame(device, list, &self.atlas, self.scale)?;
+        // The list is in window pixels already (`translate`'s scale), text
+        // sizes included, so nothing is scaled again here.
+        self.ui.begin_frame(device, list, &self.atlas, 1.0)?;
         let mut graph = RenderGraph::new(self.presenter.queue());
         let target = graph.import_image(
             "swapchain",

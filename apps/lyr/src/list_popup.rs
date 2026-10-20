@@ -207,7 +207,7 @@ impl<T: Clone + PartialEq> ListPopup<T> {
     /// Draws the menu if it has a frame to present.
     pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
         if let (true, Some(surface)) = (self.dirty, &mut self.surface) {
-            self.dirty = !surface.draw(shell, &translate(&self.list, text))?;
+            self.dirty = !surface.draw(shell, &translate(&self.list, text, surface.scale()))?;
         }
         Ok(())
     }

@@ -471,10 +471,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   come and go and as the config changes, tested against crcbl-shell's
   `HeadlessShell` and mutation-checked. The main loop draws into them through
   crcbl-app (`lyr_render::surface::Surface`), follows resizes and scale changes,
-  and hands pointer events to the hit tests (`apps/lyr/src/bar.rs`). Not done: a
-  run on a real compositor (the owner's Hyprland is the M1 check; this machine
-  is Windows, where the same panels are Win32 appbars, and has run there), and a
-  scale change seen on a real output.
+  and hands pointer events to the hit tests (`apps/lyr/src/bar.rs`). Run on a
+  real compositor: Hyprland 0.56.2 (the owner's, and nested) and Windows, where
+  the same panels are Win32 appbars. A scale change was seen in a nested
+  Hyprland (2026-10-20): the output set to 1.5 and back, the bar kept its
+  surface and followed both. That run found every text cut short at 1.5 ("D T"
+  drawn as "[ ]"): lyr gave crcbl-frame the scale for glyph sizes only, while
+  positions and clips stayed in logical pixels. `translate` now records the
+  whole list at the window's scale (`DrawList::set_scale`), so text, boxes and
+  clips scale together, and the bar and the clock panel drew whole and sharp at
+  1.5; tested in `translate` and mutation-checked.
 - **Core, rest of M1.** `lyr-core` has the zone layout (`layout::layout`, tested
   and mutation-checked). Icon ramps are `icon::ramp`, transcribing waybar
   0.15.0's `ALabel::getIcon` and tested against its integer steps. Hit testing
@@ -1151,9 +1157,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   its title, artist and previous, play/pause and next, the standard media
   symbols since Nerd Font codepoints were not checked; a click presses the
   control. Not built: a player's art (lyr draws no images), the day and month
-  names from the locale and the first weekday on Linux (the calendar locale
-  question above), and checking what Hyprland does with a click on the bare
-  desktop while it is open.
+  names from the locale (the calendar locale question above), and checking what
+  Hyprland does with a click on the bare desktop while it is open.
 - **Undocumented Windows APIs:** virtual desktops
   (`IVirtualDesktopManagerInternal`) and setting the power mode
   (`PowerSetActiveOverlayScheme`) can break with any Windows build.

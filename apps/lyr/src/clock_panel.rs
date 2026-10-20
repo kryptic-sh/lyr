@@ -382,7 +382,7 @@ impl ClockPanel {
     pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
         self.ask_size(shell)?;
         if let (true, Some(surface)) = (self.dirty, &mut self.surface) {
-            self.dirty = !surface.draw(shell, &translate(&self.list, text))?;
+            self.dirty = !surface.draw(shell, &translate(&self.list, text, surface.scale()))?;
         }
         Ok(())
     }

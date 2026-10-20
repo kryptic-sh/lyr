@@ -309,7 +309,7 @@ impl Toasts {
         if let Some(panel) = &mut self.panel
             && let (true, Some(surface)) = (panel.dirty, &mut panel.surface)
         {
-            panel.dirty = !surface.draw(shell, &translate(&panel.list, text))?;
+            panel.dirty = !surface.draw(shell, &translate(&panel.list, text, surface.scale()))?;
         }
         Ok(())
     }

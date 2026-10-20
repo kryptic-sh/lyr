@@ -539,7 +539,9 @@ impl App {
                 window.dirty = false;
                 continue;
             }
-            let presented = window.surface.draw(shell, &translate(&drawn.list, text))?;
+            let presented = window
+                .surface
+                .draw(shell, &translate(&drawn.list, text, window.surface.scale()))?;
             window.dirty = !presented;
             if presented {
                 window.shown = Some(drawn.list);

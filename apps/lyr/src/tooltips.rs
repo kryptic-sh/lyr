@@ -218,7 +218,7 @@ impl Tooltips {
             return Ok(());
         };
         if let (true, Some(surface)) = (popup.dirty, &mut popup.surface) {
-            popup.dirty = !surface.draw(shell, &translate(&popup.list, text))?;
+            popup.dirty = !surface.draw(shell, &translate(&popup.list, text, surface.scale()))?;
         }
         Ok(())
     }

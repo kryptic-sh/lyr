@@ -9,12 +9,17 @@ use lyr_core::draw::{DrawList as Bar, Item};
 use crate::colour::linear;
 use crate::text::Text;
 
-/// `bar` as crcbl-ui draw commands, its text drawn in `text`. A group is
-/// one of crcbl-ui's opacity groups, faded as one layer as CSS `opacity`
-/// fades it.
+/// `bar` as crcbl-ui draw commands for a window at `scale` window pixels
+/// per logical pixel, its text drawn in `text`. A group is one of
+/// crcbl-ui's opacity groups, faded as one layer as CSS `opacity` fades it.
+///
+/// Everything is recorded at `scale` (`DrawList::set_scale`): positions,
+/// sizes, text and clips alike, so a clip still holds its text on an output
+/// at 1.5.
 #[must_use]
-pub fn translate(bar: &Bar, text: &Text) -> DrawList {
+pub fn translate(bar: &Bar, text: &Text, scale: f32) -> DrawList {
     let mut list = DrawList::new();
+    list.set_scale(scale);
     for item in &bar.items {
         push(&mut list, item, text);
     }
@@ -105,7 +110,7 @@ mod tests {
                 border: Some((2.0, colour("#000000"))),
             }],
         };
-        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0));
+        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0), 1.0);
         let [
             DrawCommand::RoundedRect {
                 min,
@@ -157,7 +162,7 @@ mod tests {
                 },
             ],
         };
-        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0));
+        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0), 1.0);
         let count = list.commands().len();
         let groups: Vec<(std::ops::Range<usize>, f32)> = list
             .opacity_groups()
@@ -197,7 +202,7 @@ mod tests {
                 },
             ],
         };
-        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0));
+        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0), 1.0);
         let (glyphs, boxes): (Vec<_>, Vec<_>) = list
             .commands()
             .iter()
@@ -214,6 +219,41 @@ mod tests {
             panic!("one box");
         };
         assert_eq!(**clip, ClipRect::NONE);
+    }
+
+    #[test]
+    fn at_a_fractional_scale_text_and_its_clip_scale_together() {
+        let bar = Bar {
+            items: vec![Item::Text {
+                rect: RECT,
+                text: "50%".to_owned(),
+                colour: colour("#ffffff"),
+                style: TextStyle::PLAIN,
+            }],
+        };
+        let text = Text::new(Font::sans().clone(), 16.0);
+        let at = |scale| {
+            let list = translate(&bar, &text, scale);
+            list.commands()
+                .iter()
+                .zip(list.clips())
+                .find_map(|(command, clip)| match command {
+                    DrawCommand::Glyphs { size, .. } => Some((*size, *clip)),
+                    _ => None,
+                })
+                .expect("the text drew")
+        };
+        let (size, _) = at(1.0);
+        let (scaled, clip) = at(1.5);
+        assert!(
+            (scaled - size * 1.5).abs() < 0.01,
+            "{size} at 1.5 is {scaled}"
+        );
+        assert_eq!(
+            (clip.min.x, clip.min.y, clip.max.x, clip.max.y),
+            (15.0, 15.0, 90.0, 60.0),
+            "the clip in the same window pixels as its text"
+        );
     }
 
     #[test]
@@ -234,7 +274,7 @@ mod tests {
                 }],
             }],
         };
-        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0));
+        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0), 1.0);
         let [clip] = list.clips() else {
             panic!("one command");
         };
@@ -259,7 +299,7 @@ mod tests {
         let bar = Bar {
             items: vec![item(TextStyle::PLAIN), item(bold)],
         };
-        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0));
+        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0), 1.0);
         let fonts: Vec<_> = list
             .commands()
             .iter()

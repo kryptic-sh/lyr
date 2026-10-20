@@ -506,7 +506,7 @@ impl<T: Copy> MenuPanel<T> {
         if self.dirty {
             let visible = self.visible();
             if let Some(surface) = &mut self.surface {
-                self.dirty = !surface.draw(shell, &translate(&visible, text))?;
+                self.dirty = !surface.draw(shell, &translate(&visible, text, surface.scale()))?;
             }
         }
         Ok(())
