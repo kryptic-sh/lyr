@@ -391,10 +391,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   has the name, logging which, unless `notifications.replace = true` (read at
   start; a reload does not hand the name over). Toasts are on screen
   (`apps/lyr/src/toasts.rs`): one Overlay panel at the top right of the output
-  the user is on, 16 px from the edges and clear of the bar, recreated whenever
-  the stack's size changes (crcbl 0.5.0 cannot resize a panel); a click invokes
-  the `default` action when there is one and takes the toast down, a middle
-  click dismisses the notification. Tested on crcbl's headless shell and
+  the user is on, 16 px from the edges and clear of the bar, resized in place as
+  the stack's size changes (`set_panel`, crcbl 0.7.0); a click invokes the
+  `default` action when there is one and takes the toast down, a middle click
+  dismisses the notification. Tested on crcbl's headless shell and
   mutation-checked; **never seen on screen**: Windows has no daemon and WSL has
   no compositor, so the owner's Hyprland is the first real run. The bell is
   drawn from the store while lyr is the daemon. A toast shows when it arrived as
@@ -654,17 +654,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   tested on Windows and Linux (WSL), and run end to end on Windows (a second
   `lyr` refused; `lyr quit` stopped the bar, exit 0, the work area restored).
   `lyr reload` reloads the config, keeping the running one when the new one is
-  invalid or its font will not load, and recreates the bars when `[bar]`
-  changed; run end to end on Windows (30 px to 40 px, then a bad `bar.height`
-  refused with the bar still running). `lyr toggle` hides the bars by closing
-  them, so their space is given back on every platform, and shows them by
-  creating them again (run on Windows: the work area grew by 50 px and shrank
-  back). `lyr dnd` and `lyr clear` act on the notification daemon on Linux and
-  answer that lyr is not the daemon elsewhere. `lyr panel clock`,
-  `lyr panel bluetooth` and `lyr panel wifi` open their panels;
-  `lyr panel audio` opens the audio menu on Windows and answers that there is no
-  audio source elsewhere (M7). `lyr event workspace` has the macOS bar read
-  AeroSpace's workspaces again, and answers with an error elsewhere.
+  invalid or its font will not load, and reshapes the bars in place when `[bar]`
+  changed (`Bars::reshape`; they were recreated before crcbl 0.7.0); run end to
+  end on Windows (30 px to 40 px when they were recreated, a 30 px top bar to a
+  50 px bottom one in place, then a bad `bar.height` refused with the bar still
+  running). `lyr toggle` hides the bars by closing them, so their space is given
+  back on every platform, and shows them by creating them again (run on Windows:
+  the work area grew by 50 px and shrank back). `lyr dnd` and `lyr clear` act on
+  the notification daemon on Linux and answer that lyr is not the daemon
+  elsewhere. `lyr panel clock`, `lyr panel bluetooth` and `lyr panel wifi` open
+  their panels; `lyr panel audio` opens the audio menu on Windows and answers
+  that there is no audio source elsewhere (M7). `lyr event workspace` has the
+  macOS bar read AeroSpace's workspaces again, and answers with an error
+  elsewhere.
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]`, `[theme]` and every module's table, the
   embedded defaults, `[platform.*]` layering on both the defaults and the user
@@ -675,7 +677,7 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   they are bound in, and the main loop runs them (see "Pointer input"). Not
   built: the tray's table (M8), the file watcher that reloads on save (it needs
   a crate such as `notify`, new to lyr, so the owner's call), a finer diff (a
-  reload redraws everything, and recreates the bars only when `[bar]` changed),
+  reload redraws everything, and reshapes the bars only when `[bar]` changed),
   the control socket (its own entry above), and the defaults-parity test against
   `config.jsonc`. The dotfiles are at `~/Projects/mxaddict/dotfiles` on the
   owner's Windows machine, not next to lyr, and not on CI, so the test needs
@@ -764,11 +766,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (`apps/lyr/src/bluetooth_menu.rs`): a panel at the top left, under the
   Bluetooth module, opened by `open_bluetooth_menu` or `lyr panel bluetooth`,
   taking the keyboard (Escape and losing focus close it), each click sent to
-  BlueZ, and drawn again as BlueZ changes (recreated when its size changes).
-  Tested on crcbl's headless shell and mutation-checked; never run against a
-  real BlueZ, and on Windows `lyr panel bluetooth` answers that there is no
-  adapter. The arrow keys move an outline through its buttons and switches in
-  the order drawn, and Enter acts on the outlined one. The pairing agent
+  BlueZ, and drawn again as BlueZ changes (resized in place when its size
+  changes). Tested on crcbl's headless shell and mutation-checked; never run
+  against a real BlueZ, and on Windows `lyr panel bluetooth` answers that there
+  is no adapter. The arrow keys move an outline through its buttons and switches
+  in the order drawn, and Enter acts on the outlined one. The pairing agent
   (`bluetooth::linux::agent`) is built and registered at start as
   `DisplayYesNo`; its question shows at the top of the menu, which opens if it
   is closed. A passkey confirmation or an authorization is asked with Yes and

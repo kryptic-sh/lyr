@@ -119,7 +119,8 @@ and new configs:
 
 - a theme or format change re-lays out and repaints;
 - a layout or module change starts and stops only the affected sources;
-- a bar change (position, height, outputs, layer) recreates the bar windows.
+- a bar change (position, height, layer) changes the bar windows in place
+  (`Shell::set_panel`), and a change of outputs adds or removes bars.
 
 ## Migration from waybar
 
