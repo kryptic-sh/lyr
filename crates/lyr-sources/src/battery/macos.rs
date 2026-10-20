@@ -6,13 +6,9 @@
 
 use std::ffi::{CStr, c_void};
 use std::io;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc;
-use std::thread::JoinHandle;
 
 use objc2_core_foundation::{
-    CFArray, CFBoolean, CFDictionary, CFNumber, CFRetained, CFRunLoop, CFString, CFType,
+    CFArray, CFBoolean, CFDictionary, CFNumber, CFRetained, CFRunLoopSource, CFString, CFType,
     kCFRunLoopDefaultMode,
 };
 use objc2_io_kit::{
@@ -24,6 +20,7 @@ use objc2_io_kit::{
 };
 
 use super::iops::PowerSource;
+use crate::macos_runloop::RunLoopThread;
 
 /// A power source's description, keyed by `IOPSKeys.h`'s strings.
 type Description = CFDictionary<CFString, CFType>;
@@ -106,43 +103,34 @@ type OnChange = Box<dyn Fn() + Send>;
 
 /// Calls the [`OnChange`] its run loop source was made with.
 unsafe extern "C-unwind" fn changed(context: *mut c_void) {
-    // SAFETY: `context` is the `OnChange` the watch's thread owns, which it
-    // frees only after its run loop, the only caller, has stopped.
+    // SAFETY: `context` is a `Registration`'s `OnChange`, which it frees only
+    // after invalidating the source, the only caller.
     let on_change = unsafe { &*context.cast::<OnChange>() };
     on_change();
 }
 
-/// The watch thread's run loop, as the one handle another thread may hold.
-struct RunLoop(CFRetained<CFRunLoop>);
+/// The notification source on the watch's run loop and the callback it
+/// calls, freed in that order.
+struct Registration {
+    source: CFRetained<CFRunLoopSource>,
+    context: *mut OnChange,
+}
 
-// SAFETY: the handle is used from another thread only through `stop`, and
-// Core Foundation's run loop functions are thread-safe (Apple's Threading
-// Programming Guide, "Run Loop Objects"); `CFRunLoopStop` and
-// `CFRunLoopWakeUp` exist to be called from other threads.
-unsafe impl Send for RunLoop {}
-
-impl RunLoop {
-    /// Stops the loop if it is running, and wakes it so it notices.
-    fn stop(&self) {
-        self.0.stop();
-        self.0.wake_up();
+impl Drop for Registration {
+    fn drop(&mut self) {
+        self.source.invalidate();
+        // SAFETY: the box came from `Box::into_raw`, and the source that
+        // called into it is invalidated, so nothing reads it again.
+        drop(unsafe { Box::from_raw(self.context) });
     }
 }
 
 /// The thread running the power source notification, calling its callback
 /// while it lives.
+#[derive(Debug)]
 pub struct Watch {
-    run_loop: RunLoop,
-    /// Set before stopping, so a loop stopped before it began running does
-    /// not run again.
-    stopping: Arc<AtomicBool>,
-    thread: Option<JoinHandle<()>>,
-}
-
-impl std::fmt::Debug for Watch {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Watch").finish_non_exhaustive()
-    }
+    /// Kept for its drop, which stops the thread.
+    _thread: RunLoopThread,
 }
 
 impl Watch {
@@ -153,61 +141,22 @@ impl Watch {
     ///
     /// When the thread cannot start or IOKit makes no notification source.
     pub fn new(on_change: impl Fn() + Send + 'static) -> io::Result<Self> {
-        let (started, start) = mpsc::channel();
-        let stopping = Arc::new(AtomicBool::new(false));
-        let stop = stopping.clone();
-        let thread = std::thread::Builder::new()
-            .name("lyr battery".to_owned())
-            .spawn(move || {
-                let context: *mut OnChange = Box::into_raw(Box::new(Box::new(on_change)));
-                // SAFETY: `changed` reads `context` as the `OnChange` it is,
-                // and the box is freed below, after the loop has stopped.
-                let source =
-                    unsafe { IOPSNotificationCreateRunLoopSource(Some(changed), context.cast()) };
-                let run_loop = CFRunLoop::current();
-                let (Some(source), Some(run_loop)) = (source, run_loop) else {
-                    // SAFETY: nothing else holds the box.
-                    drop(unsafe { Box::from_raw(context) });
-                    let _gone = started.send(Err(io::Error::other(
-                        "IOKit made no power source notification",
-                    )));
-                    return;
-                };
-                // SAFETY: the default mode is a static CF string.
-                run_loop.add_source(Some(&*source), unsafe { kCFRunLoopDefaultMode });
-                let _gone = started.send(Ok(RunLoop(run_loop)));
-                while !stop.load(Ordering::Acquire) {
-                    CFRunLoop::run();
-                }
-                drop(source);
-                // SAFETY: the loop, the only caller of `changed`, has stopped
-                // and its source is gone.
+        RunLoopThread::spawn("lyr battery", move |run_loop| {
+            let context: *mut OnChange = Box::into_raw(Box::new(Box::new(on_change)));
+            // SAFETY: `changed` reads `context` as the `OnChange` it is, which
+            // the registration frees only after invalidating the source.
+            let source =
+                unsafe { IOPSNotificationCreateRunLoopSource(Some(changed), context.cast()) };
+            let Some(source) = source else {
+                // SAFETY: nothing else holds the box.
                 drop(unsafe { Box::from_raw(context) });
-            })?;
-        let run_loop = start
-            .recv()
-            .map_err(|_| io::Error::other("the battery thread stopped"))??;
-        Ok(Self {
-            run_loop,
-            stopping,
-            thread: Some(thread),
+                return Err(io::Error::other("IOKit made no power source notification"));
+            };
+            // SAFETY: the default mode is a static CF string.
+            run_loop.add_source(Some(&*source), unsafe { kCFRunLoopDefaultMode });
+            Ok(Registration { source, context })
         })
-    }
-}
-
-impl Drop for Watch {
-    fn drop(&mut self) {
-        self.stopping.store(true, Ordering::Release);
-        let Some(thread) = self.thread.take() else {
-            return;
-        };
-        // A stop that lands before the loop starts running is lost, so it is
-        // sent until the thread has seen the flag and ended.
-        while !thread.is_finished() {
-            self.run_loop.stop();
-            std::thread::yield_now();
-        }
-        let _joined = thread.join();
+        .map(|thread| Self { _thread: thread })
     }
 }
 

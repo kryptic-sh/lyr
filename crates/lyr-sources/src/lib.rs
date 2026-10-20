@@ -19,6 +19,8 @@ pub mod audio;
 pub mod battery;
 pub mod bluetooth;
 pub mod clock;
+#[cfg(target_os = "macos")]
+mod macos_runloop;
 pub mod mpris;
 pub mod network;
 pub mod notifications;
