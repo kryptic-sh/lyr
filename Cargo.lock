@@ -950,6 +950,8 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "lyr-core",
+ "objc2-core-foundation",
+ "objc2-io-kit",
  "thiserror",
  "tokio",
  "windows",
@@ -1067,6 +1069,15 @@ checksum = "e3e0adef53c21f888deb4fa59fc59f7eb17404926ee8a6f59f5df0fd7f9f3272"
 dependencies = [
  "bitflags",
  "objc2",
+]
+
+[[package]]
+name = "objc2-io-kit"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33fafba39597d6dc1fb709123dfa8289d39406734be322956a69f0931c73bb15"
+dependencies = [
+ "objc2-core-foundation",
 ]
 
 [[package]]

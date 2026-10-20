@@ -468,6 +468,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   peer-to-peer connection and mutation-checked; the names are from
   NetworkManager's introspection XML on main (2026-10-20), not checked against
   an installed one. Not built: the nl80211 fallback without NetworkManager.
+- **macOS sources, M10.** Built: the battery (`lyr_sources::battery::macos`):
+  IOKit's power sources (`IOPSCopyPowerSourcesInfo`), the first internal
+  battery's description turned into the reading by `battery::iops` (tested and
+  mutation-checked on every platform), re-read on each
+  `IOPSNotificationCreateRunLoopSource` notification on a run-loop thread of its
+  own. `objc2-io-kit` and `objc2-core-foundation` were taken under plan 02's
+  `objc2` row, read as covering the `objc2` framework crates; say so if that row
+  did not mean them. Checked by `cargo clippy` for `aarch64-apple-darwin` from
+  WSL. On CI's macOS runner, which has no battery, its test reads the power
+  sources and starts and stops the watch; no Mac with a battery has run it. Not
+  built: the other macOS sources (network, Bluetooth, volume and mic, power
+  profile) and the menus.
 - **Windows sources, M9.** Built: the battery (`lyr_sources::battery::windows`):
   `GetSystemPowerStatus` read at start and again whenever
   `PowerSettingRegisterNotification` reports a change of power source or

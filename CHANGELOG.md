@@ -37,6 +37,9 @@ and this project adheres to
   address and, on Wi-Fi, the network's name and signal, updated as they change.
 - On Windows the battery module shows the battery, from Windows' power status,
   updated when the power source or the charge changes.
+- On macOS the battery module shows the internal battery, from IOKit's power
+  sources, updated when macOS reports a power source change; plugged in and held
+  below full (optimized charging) shows as plugged.
 - Clicking a workspace switches to it, and with `workspaces.scroll = true` the
   wheel steps through them. A module's `[<module>.on]` table binds clicks and
   scrolling to a command (`{ exec = "…" }`) or a built-in action. Of the

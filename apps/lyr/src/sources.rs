@@ -6,17 +6,17 @@
 //! Linux has the battery (UPower), the power profile (power-profiles-daemon),
 //! the network (NetworkManager), bluetooth (BlueZ), the time zone (timedate1)
 //! and the workspaces (Hyprland, sway or niri). Windows has its own (`windows`
-//! below). macOS has no sources yet, and its modules are left out of the bar.
+//! below). macOS has the battery (IOKit's power sources) so far, and its
+//! other modules are left out of the bar.
 
 use std::sync::mpsc;
 
 use crcbl_shell::ShellWaker;
 
-/// A source's new state. Empty on a platform with no sources.
+/// A source's new state.
 #[derive(Debug)]
 pub enum Update {
     /// The battery, or `None` when there is none to show.
-    #[cfg(any(target_os = "linux", windows))]
     Battery(Option<lyr_core::battery::Reading>),
     /// The default output and input, or `None` where there is none.
     #[cfg(windows)]
@@ -166,6 +166,9 @@ pub struct Commands {
     /// while the bar is.
     #[cfg(windows)]
     _battery: Option<lyr_sources::battery::windows::Watch>,
+    /// macOS: the battery's change notifications, live while the bar is.
+    #[cfg(target_os = "macos")]
+    _battery: Option<lyr_sources::battery::macos::Watch>,
     #[cfg(windows)]
     _network: Option<lyr_sources::network::windows::Watch>,
     #[cfg(windows)]
@@ -395,8 +398,41 @@ pub fn start(
     }
     #[cfg(target_os = "macos")]
     {
-        drop((sender, waker));
-        Ok((receiver, Commands {}))
+        let battery = macos::battery(sender, waker);
+        Ok((receiver, Commands { _battery: battery }))
+    }
+}
+
+/// The sources macOS has so far: the battery.
+#[cfg(target_os = "macos")]
+mod macos {
+    use std::sync::mpsc;
+
+    use crcbl_shell::ShellWaker;
+    use lyr_sources::battery::macos::{Watch, power_source};
+
+    use super::Update;
+
+    /// Hands the battery to the main loop now and after every power source
+    /// change, while the returned watch lives. `None` when IOKit gives no
+    /// change notification, which it logs; the first reading is still
+    /// handed over.
+    pub(super) fn battery(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+    ) -> Option<Watch> {
+        let deliver = move || {
+            // The main loop has gone when this fails: nothing is left to do.
+            let reading = power_source().and_then(|source| source.reading());
+            let _gone = sender.send(Update::Battery(reading));
+            if let Some(waker) = &waker {
+                waker.wake();
+            }
+        };
+        deliver();
+        Watch::new(deliver)
+            .inspect_err(|error| tracing::warn!("battery: changes will not show: {error}"))
+            .ok()
     }
 }
 
