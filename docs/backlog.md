@@ -906,8 +906,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 - Nothing has run on Linux under a real compositor: everything Wayland, D-Bus
   and Hyprland is tested against fakes and crcbl's headless shell, so the
   owner's Hyprland is the first real run (M1's check). On Windows the bar has
-  run, with tooltips, the power menu, the clock panel and the control socket
-  (each entry above says what was seen).
+  run, with tooltips, the power menu, the clock panel, the control socket, the
+  volume, mic, notification-bell and window modules and the audio menu (each
+  entry above says what was seen).
 - The GPU choice (the owner's rule: `CRCBL_ADAPTER`, else the adapter driving
   the bar's display when it is discrete, else low power) is crcbl-app's
   `adapter::choose` inside the `Presenter`, with `PowerPreference::LowPower`
