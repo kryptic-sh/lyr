@@ -232,7 +232,12 @@ implementation follows meanwhile.
   place, seen in a screenshot. That run found that D3D12 refuses `ResizeBuffers`
   while frames in flight use the back buffers, and crcbl-app's
   `Presenter::resize` does not wait, so the bar exited; `Surface::resize` now
-  drains first. Reported to crcbl, whose resize could drain itself.
+  drains first. Reported to crcbl, which agreed (crcbl-dx12 waits for the queue,
+  but the command buffers the `Presenter` still holds keep the back buffers
+  referenced) and makes every `Presenter` reconfigure drain first, shipping in
+  0.8.0. On 0.8.0: drop the drain from `Surface::resize` (keeping it is
+  harmless) and run the reload reshape on Windows again without it, which is the
+  D3D12 check crcbl has no CI leg for, and tell crcbl what it shows.
 - **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
   the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
   S8 – S27. pikr's session tracks the move in pikr's own backlog and
