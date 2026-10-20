@@ -745,8 +745,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a
   click on the empty desktop. M5 records what Hyprland does and picks a fix.
-- **Does the year calendar fit the 500 px panel?** Measured in M5; the panel
-  widens if not ([plan/10](plan/10-popups-and-menus.md#clock-panel)).
+- **Does the year calendar fit the 500 px panel?** Not on Windows with the
+  monospace fallback font (Hack Nerd Font Propo is not installed there): run on
+  2026-10-20, `lyr panel clock` drew the year grid and the panel widened to fit
+  it, about 607 device pixels wide by a screenshot, as `clock_panel`'s
+  `WIDTH.max(...)` does. Still to measure in Hack Nerd Font Propo on the owner's
+  Hyprland ([plan/10](plan/10-popups-and-menus.md#clock-panel)).
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,
   `%U` otherwise, the first row numbered by the 1st), the header order and
