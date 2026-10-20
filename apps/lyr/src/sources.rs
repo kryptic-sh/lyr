@@ -133,6 +133,8 @@ pub enum AudioRequest {
     Default(lyr_sources::audio::pactl::Flow, String),
     /// Move the stream with this index to the device with this name.
     Move(lyr_sources::audio::pactl::Flow, u32, String),
+    /// Switch the card with this name to the profile with this name.
+    Profile(String, String),
     /// The audio menu opened or closed.
     Menu(bool),
 }
@@ -292,6 +294,11 @@ impl Commands {
     /// Sets the volume of `target` to `percent`.
     pub fn set_volume(&self, target: lyr_sources::audio::pactl::Target, percent: u32) {
         let _stopped = self.audio.send(AudioRequest::Set(target, percent));
+    }
+
+    /// Switches the card `card` to its profile `profile`.
+    pub fn set_card_profile(&self, card: String, profile: String) {
+        let _stopped = self.audio.send(AudioRequest::Profile(card, profile));
     }
 
     /// Moves the stream `index` of `flow` to the device `name`.
@@ -1259,6 +1266,9 @@ mod linux {
                     AudioRequest::Step(target, delta) => pactl::step(&target, delta).await,
                     AudioRequest::Set(target, percent) => pactl::set(&target, percent).await,
                     AudioRequest::Default(flow, name) => pactl::make_default(flow, &name).await,
+                    AudioRequest::Profile(card, profile) => {
+                        pactl::set_profile(&card, &profile).await
+                    }
                     AudioRequest::Move(flow, index, name) => {
                         pactl::move_stream(flow, index, &name).await
                     }

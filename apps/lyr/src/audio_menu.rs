@@ -34,6 +34,8 @@ pub enum Action {
     Default,
     /// Move the stream to the next device of its flow.
     Route,
+    /// Switch the card to its next profile.
+    Profile,
 }
 
 /// What an event did to the menu.
@@ -133,6 +135,7 @@ impl AudioMenu {
             Target::Step(index, step) => (index, Action::Step(step)),
             Target::Default(index) => (index, Action::Default),
             Target::Route(index) => (index, Action::Route),
+            Target::Profile(index) => (index, Action::Profile),
             Target::Level(index) => match self.panel.picked_across(&target) {
                 Some(across) => (index, Action::Set(level_at(across))),
                 None => return Outcome::Kept,
@@ -158,7 +161,10 @@ impl AudioMenu {
 
 /// The ids of `tab`'s rows of `nodes`, in the order the menu draws them.
 fn ids(nodes: &Nodes, tab: Tab) -> Vec<String> {
-    nodes.of(tab).iter().map(|node| node.id.clone()).collect()
+    match (tab, &nodes.cards) {
+        (Tab::Cards, Some(cards)) => cards.iter().map(|card| card.id.clone()).collect(),
+        _ => nodes.of(tab).iter().map(|node| node.id.clone()).collect(),
+    }
 }
 
 #[cfg(test)]

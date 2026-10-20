@@ -20,11 +20,19 @@ pub enum Tab {
     Recording,
     Output,
     Input,
+    /// The sound cards' profiles, where the platform has cards.
+    Cards,
 }
 
 impl Tab {
     /// Every tab, in the order the menu shows them, wiremix's.
-    pub const ALL: [Self; 4] = [Self::Playback, Self::Recording, Self::Output, Self::Input];
+    pub const ALL: [Self; 5] = [
+        Self::Playback,
+        Self::Recording,
+        Self::Output,
+        Self::Input,
+        Self::Cards,
+    ];
 
     /// Its label.
     #[must_use]
@@ -34,6 +42,7 @@ impl Tab {
             Self::Recording => "Recording",
             Self::Output => "Output devices",
             Self::Input => "Input devices",
+            Self::Cards => "Configuration",
         }
     }
 
@@ -49,6 +58,7 @@ impl Tab {
             Self::Playback => "Nothing is playing",
             Self::Recording => "Nothing is recording",
             Self::Output | Self::Input => "No devices",
+            Self::Cards => "No cards",
         }
     }
 }
@@ -70,6 +80,41 @@ pub struct Node {
     pub device: Option<String>,
 }
 
+/// A sound card and the profile it runs, such as "Analog Stereo Output +
+/// Mono Input".
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Card {
+    /// What identifies it to its source.
+    pub id: String,
+    pub name: String,
+    /// Its available profiles, by id and description, in the source's
+    /// order.
+    pub profiles: Vec<(String, String)>,
+    /// The active profile's id.
+    pub active: String,
+}
+
+impl Card {
+    /// The active profile's description, else its id.
+    #[must_use]
+    pub fn profile(&self) -> &str {
+        self.profiles
+            .iter()
+            .find(|(id, _)| *id == self.active)
+            .map_or(&self.active, |(_, description)| description)
+    }
+
+    /// The profile after the active one, wrapping; `None` when there is no
+    /// other.
+    #[must_use]
+    pub fn next_profile(&self) -> Option<&str> {
+        let at = self.profiles.iter().position(|(id, _)| *id == self.active);
+        let next = at.map_or(0, |at| (at + 1) % self.profiles.len());
+        let (id, _) = self.profiles.get(next)?;
+        (*id != self.active).then_some(id.as_str())
+    }
+}
+
 /// Everything the menu lists, a list per tab.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Nodes {
@@ -77,10 +122,13 @@ pub struct Nodes {
     pub recording: Vec<Node>,
     pub outputs: Vec<Node>,
     pub inputs: Vec<Node>,
+    /// The sound cards, or `None` where the platform has none to configure,
+    /// which hides their tab.
+    pub cards: Option<Vec<Card>>,
 }
 
 impl Nodes {
-    /// The rows `tab` shows.
+    /// The rows `tab` shows; the cards' tab has none of these.
     #[must_use]
     pub fn of(&self, tab: Tab) -> &[Node] {
         match tab {
@@ -88,7 +136,16 @@ impl Nodes {
             Tab::Recording => &self.recording,
             Tab::Output => &self.outputs,
             Tab::Input => &self.inputs,
+            Tab::Cards => &[],
         }
+    }
+
+    /// The tabs to show: every one, but the cards' only where there are
+    /// cards to configure.
+    pub fn tabs(&self) -> impl Iterator<Item = Tab> + '_ {
+        Tab::ALL
+            .into_iter()
+            .filter(|&tab| tab != Tab::Cards || self.cards.is_some())
     }
 }
 
@@ -112,6 +169,8 @@ pub enum Target {
     Default(usize),
     /// A stream's device: a click moves it to the next of its flow.
     Route(usize),
+    /// A card's profile: a click moves it to the next.
+    Profile(usize),
 }
 
 /// The step buttons' labels.
@@ -191,9 +250,9 @@ pub fn draw(
     let row = menu::row(line_height);
     let button_width = |label: &str| button_width(label, measure);
     let rows = nodes.of(tab);
-    let tabs_width = Tab::ALL
-        .iter()
-        .map(|&each| {
+    let tabs_width = nodes
+        .tabs()
+        .map(|each| {
             if each == tab {
                 measure(each.label())
             } else {
@@ -201,10 +260,15 @@ pub fn draw(
             }
         })
         .sum::<f32>()
-        + GAP * (Tab::ALL.len() - 1) as f32;
+        + GAP * (nodes.tabs().count() - 1) as f32;
+    let cards = match (tab, &nodes.cards) {
+        (Tab::Cards, Some(cards)) => &cards[..],
+        _ => &[],
+    };
     let name_width = rows
         .iter()
         .map(|node| measure(&node.name))
+        .chain(cards.iter().map(|card| measure(&card.name)))
         .fold(measure(tab.empty()), f32::max);
     // Each column as wide as its widest label, so the rows line up.
     let mute_width = button_width("Unmute");
@@ -227,14 +291,21 @@ pub fn draw(
     let devices = match tab {
         Tab::Playback => &nodes.outputs[..],
         Tab::Recording => &nodes.inputs[..],
-        Tab::Output | Tab::Input => &[],
+        Tab::Output | Tab::Input | Tab::Cards => &[],
     };
     let route_width = rows
         .iter()
         .filter_map(|node| device_name(node, devices))
         .map(|name| GAP + button_width(name))
         .fold(0.0, f32::max);
-    let controls_width = controls_width + route_width;
+    let controls_width = if tab == Tab::Cards {
+        cards
+            .iter()
+            .map(|card| button_width(card.profile()))
+            .fold(0.0, f32::max)
+    } else {
+        controls_width + route_width
+    };
     let width = 2.0 * PADDING + tabs_width.max(name_width + GAP + controls_width);
     let mut items = Vec::new();
     let mut regions = Regions::default();
@@ -254,7 +325,7 @@ pub fn draw(
         };
     let mut y = PADDING;
     let mut x = PADDING;
-    for each in Tab::ALL {
+    for each in nodes.tabs() {
         x += if each == tab {
             items.push(text(each.label().to_owned(), x, y, theme.workspace_active));
             measure(each.label())
@@ -270,8 +341,21 @@ pub fn draw(
         } + GAP;
     }
     y += row + 2.0 * GAP;
-    if rows.is_empty() {
+    if rows.is_empty() && cards.is_empty() {
         items.push(text(tab.empty().to_owned(), PADDING, y, theme.foreground));
+        y += row + GAP;
+    }
+    for (index, card) in cards.iter().enumerate() {
+        items.push(text(card.name.clone(), PADDING, y, theme.foreground));
+        let x = PADDING + name_width + GAP;
+        button(
+            &mut items,
+            &mut regions,
+            x,
+            y,
+            card.profile(),
+            Target::Profile(index),
+        );
         y += row + GAP;
     }
     for (index, node) in rows.iter().enumerate() {

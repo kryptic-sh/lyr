@@ -14,7 +14,7 @@ use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use lyr_core::audio::{Sink, Source};
-use lyr_core::audio_menu::{Node, Nodes};
+use lyr_core::audio_menu::{Card, Node, Nodes};
 use serde::Deserialize;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
@@ -208,6 +208,50 @@ impl Stream {
     }
 }
 
+/// A card, as `pactl --format=json list cards` writes it.
+#[derive(Deserialize)]
+struct CardJson {
+    name: String,
+    active_profile: String,
+    profiles: HashMap<String, ProfileJson>,
+    #[serde(default)]
+    properties: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Deserialize)]
+struct ProfileJson {
+    description: String,
+    available: bool,
+    priority: u32,
+}
+
+impl CardJson {
+    /// Its row: named by its description, its available profiles best
+    /// first by PulseAudio's priority (a JSON object keeps no order), the
+    /// active one listed even if marked unavailable.
+    fn card(self) -> Card {
+        let mut profiles: Vec<_> = self
+            .profiles
+            .into_iter()
+            .filter(|(id, profile)| profile.available || *id == self.active_profile)
+            .collect();
+        profiles.sort_by(|(a, x), (b, y)| y.priority.cmp(&x.priority).then_with(|| a.cmp(b)));
+        Card {
+            name: self
+                .properties
+                .get("device.description")
+                .and_then(serde_json::Value::as_str)
+                .map_or_else(|| self.name.clone(), str::to_owned),
+            id: self.name,
+            profiles: profiles
+                .into_iter()
+                .map(|(id, profile)| (id, profile.description))
+                .collect(),
+            active: self.active_profile,
+        }
+    }
+}
+
 /// Whether a source is a sink's monitor, which the menu leaves out as
 /// wiremix does: `pactl` marks it by its device class.
 fn monitor(device: &Device) -> bool {
@@ -219,8 +263,8 @@ fn monitor(device: &Device) -> bool {
 }
 
 /// What the audio menu lists, from `pactl --format=json`'s `info`,
-/// `list sinks`, `list sources`, `list sink-inputs` and
-/// `list source-outputs`.
+/// `list sinks`, `list sources`, `list sink-inputs`,
+/// `list source-outputs` and `list cards`.
 ///
 /// # Errors
 ///
@@ -231,6 +275,7 @@ pub fn nodes(
     sources: &str,
     sink_inputs: &str,
     source_outputs: &str,
+    cards: &str,
 ) -> serde_json::Result<Nodes> {
     let info: Info = serde_json::from_str(info)?;
     let sinks: Vec<Device> = serde_json::from_str(sinks)?;
@@ -264,14 +309,21 @@ pub fn nodes(
         recording: streams(source_outputs, &sources)?,
         outputs: devices(&sinks, &info.default_sink_name),
         inputs: devices(&sources, &info.default_source_name),
+        cards: Some(
+            serde_json::from_str::<Vec<CardJson>>(cards)?
+                .into_iter()
+                .map(CardJson::card)
+                .collect(),
+        ),
     })
 }
 
-/// Whether a `pactl subscribe` line is a change the modules show: a sink, a
-/// source, or the server's defaults, not a stream's.
+/// Whether a `pactl subscribe` line is a change the modules or the menu's
+/// devices and cards show: a sink, a source, a card, or the server's
+/// defaults, not a stream's.
 #[must_use]
 pub fn shows(line: &str) -> bool {
-    [" on sink #", " on source #", " on server"]
+    [" on sink #", " on source #", " on card #", " on server"]
         .iter()
         .any(|on| line.contains(on))
 }
@@ -321,17 +373,25 @@ async fn pactl(args: &[&str]) -> io::Result<String> {
 ///
 /// When `pactl` cannot run or reach the server, or writes something else.
 pub async fn read() -> io::Result<(Reading, Nodes)> {
-    let (info, sinks, sources, sink_inputs, source_outputs) = tokio::try_join!(
+    let (info, sinks, sources, sink_inputs, source_outputs, cards) = tokio::try_join!(
         pactl(&["--format=json", "info"]),
         pactl(&["--format=json", "list", "sinks"]),
         pactl(&["--format=json", "list", "sources"]),
         pactl(&["--format=json", "list", "sink-inputs"]),
         pactl(&["--format=json", "list", "source-outputs"]),
+        pactl(&["--format=json", "list", "cards"]),
     )?;
     let read = reading(&info, &sinks, &sources).and_then(|reading| {
         Ok((
             reading,
-            nodes(&info, &sinks, &sources, &sink_inputs, &source_outputs)?,
+            nodes(
+                &info,
+                &sinks,
+                &sources,
+                &sink_inputs,
+                &source_outputs,
+                &cards,
+            )?,
         ))
     });
     read.map_err(io::Error::other)
@@ -431,6 +491,15 @@ pub async fn move_stream(flow: Flow, index: u32, name: &str) -> io::Result<()> {
         Flow::Input => "move-source-output",
     };
     pactl(&[command, &index.to_string(), name]).await.map(drop)
+}
+
+/// Switches the card `card` to its profile `profile`.
+///
+/// # Errors
+///
+/// When `pactl` fails.
+pub async fn set_profile(card: &str, profile: &str) -> io::Result<()> {
+    pactl(&["set-card-profile", card, profile]).await.map(drop)
 }
 
 /// Makes the device `name` of `flow` the default.

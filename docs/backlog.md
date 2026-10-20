@@ -30,12 +30,19 @@ implementation follows meanwhile.
   wiremix's dropdown; seen in a nested Hyprland (2026-10-20), a keyboard Enter
   moved a silent `pacat` stream from the headset to HDMI 3, read back with
   `pactl`. Windows has no public API for it, so its streams carry no device and
-  draw no button. Not built: wiremix's card tab, and the dropdown. Worth
-  knowing: PipeWire's stream-restore remembers a stream's mute and device per
-  application, so a test that mutes or moves a probe stream changes what that
-  application next starts with; the probe's were put back. Keep `pactl`, or take
-  `libpulse-binding` (plan 07's default: one connection, no processes) or native
-  PipeWire with WirePlumber metadata?
+  draw no button. The Configuration tab lists the sound cards with their active
+  profile as a button, and a click moves a card to its next available profile,
+  best first by PulseAudio's priority (`set-card-profile`); seen in a nested
+  Hyprland (2026-10-20), a keyboard Enter moved the Intel card (none of whose
+  sinks was in use) to its next profile, which was then set back with `pactl`.
+  The tab shows only where a source lists cards (`Nodes::cards`, `None` on
+  Windows and macOS). Not built: choosing a device's port on that tab, and
+  wiremix's dropdowns in place of the cycling buttons. Worth knowing: PipeWire's
+  stream-restore remembers a stream's mute and device per application, so a test
+  that mutes or moves a probe stream changes what that application next starts
+  with; the probe's were put back. Keep `pactl`, or take `libpulse-binding`
+  (plan 07's default: one connection, no processes) or native PipeWire with
+  WirePlumber metadata?
 - **Network without NetworkManager: build the rtnetlink fallback?** (M4.) **Q:**
   The network module reads NetworkManager over zbus, which the dotfiles use.
   Should lyr also support machines without it, through a new rtnetlink crate

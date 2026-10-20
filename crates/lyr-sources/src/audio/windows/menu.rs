@@ -39,6 +39,8 @@ impl Audio {
             recording: self.stream_nodes(Flow::Input)?,
             outputs: self.device_nodes(Flow::Output)?,
             inputs: self.device_nodes(Flow::Input)?,
+            // Windows has no cards to configure.
+            cards: None,
         })
     }
 

@@ -107,7 +107,7 @@ const SINK_INPUTS: &str = r#"[{"index":1469,"driver":"PipeWire","sink":71,"mute"
 
 #[test]
 fn the_menu_lists_streams_and_devices_without_monitors() {
-    let listed = nodes(INFO, SINKS, SOURCES, SINK_INPUTS, "[]").expect("read");
+    let listed = nodes(INFO, SINKS, SOURCES, SINK_INPUTS, "[]", CARDS).expect("read");
     let [stream] = &listed.playback[..] else {
         panic!("one stream: {:?}", listed.playback);
     };
@@ -139,7 +139,7 @@ fn the_menu_lists_streams_and_devices_without_monitors() {
 #[test]
 fn a_stream_with_no_names_is_named_by_index() {
     let unnamed = r#"[{"index":9,"mute":true,"volume":{"mono":{"value":0}},"properties":{}}]"#;
-    let listed = nodes(INFO, SINKS, SOURCES, "[]", unnamed).expect("read");
+    let listed = nodes(INFO, SINKS, SOURCES, "[]", unnamed, "[]").expect("read");
     assert_eq!(listed.recording[0].name, "Stream 9");
     assert_eq!(listed.recording[0].device, None, "no source named");
 }
@@ -149,4 +149,43 @@ fn stream_events_are_told_apart() {
     assert!(streams("Event 'new' on sink-input #1469"));
     assert!(streams("Event 'remove' on source-output #12"));
     assert!(!streams("Event 'change' on sink #71"));
+}
+
+/// `pactl --format=json list cards`, the headset's card on the owner's
+/// machine cut to four profiles, one marked unavailable for the test.
+const CARDS: &str = r#"[{"index":730,"name":"alsa_card.usb-SteelSeries_Arctis_Nova_7-00",
+    "active_profile":"output:analog-stereo+input:mono-fallback",
+    "properties":{"device.description":"Arctis Nova 7"},
+    "profiles":{
+      "off":{"description":"Off","available":true,"priority":0},
+      "output:analog-stereo+input:mono-fallback":{"description":"Analog Stereo Output + Mono Input","available":true,"priority":6501},
+      "output:analog-stereo":{"description":"Analog Stereo Output","available":true,"priority":6500},
+      "output:iec958-stereo":{"description":"Digital Stereo (IEC958) Output","available":false,"priority":5500}}}]"#;
+
+#[test]
+fn cards_list_their_available_profiles_best_first() {
+    let listed = nodes(INFO, SINKS, SOURCES, "[]", "[]", CARDS).expect("read");
+    let cards = listed.cards.expect("cards on Linux");
+    let [card] = &cards[..] else {
+        panic!("one card: {cards:?}");
+    };
+    assert_eq!(card.id, "alsa_card.usb-SteelSeries_Arctis_Nova_7-00");
+    assert_eq!(card.name, "Arctis Nova 7", "its description");
+    let ids: Vec<_> = card.profiles.iter().map(|(id, _)| id.as_str()).collect();
+    assert_eq!(
+        ids,
+        [
+            "output:analog-stereo+input:mono-fallback",
+            "output:analog-stereo",
+            "off"
+        ],
+        "by priority, the unavailable one left out"
+    );
+    assert_eq!(card.profile(), "Analog Stereo Output + Mono Input");
+    assert_eq!(card.next_profile(), Some("output:analog-stereo"));
+}
+
+#[test]
+fn card_events_count() {
+    assert!(shows("Event 'change' on card #730"));
 }
