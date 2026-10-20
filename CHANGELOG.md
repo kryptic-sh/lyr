@@ -46,6 +46,11 @@ and this project adheres to
   such as the built-in output, is read as their mean and set on each channel.
 - On macOS the power-profile module shows Low Power Mode, as power-saver while
   it is on, updated when it turns on or off. It is read-only there.
+- On macOS the network module shows the primary interface, its address, prefix
+  and router, and on Wi-Fi the network's name and signal (waybar's scale from
+  dBm), updated when the system's network state changes. Without Location
+  permission macOS withholds the name, and the link still shows as Wi-Fi; with
+  the Wi-Fi radio off and no link, it shows as disabled.
 - Clicking a workspace switches to it, and with `workspaces.scroll = true` the
   wheel steps through them. A module's `[<module>.on]` table binds clicks and
   scrolling to a command (`{ exec = "…" }`) or a built-in action. Of the

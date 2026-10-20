@@ -36,5 +36,7 @@ block2 = "0.6.2"
 objc2 = "0.6.5"
 objc2-core-audio = { version = "0.3.2", default-features = false, features = ["std", "AudioHardware"] }
 objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFArray", "CFBase", "CFDictionary", "CFNumber", "CFString", "CFRunLoop"] }
+objc2-core-wlan = { version = "0.3.2", default-features = false, features = ["std", "CWWiFiClient", "CWInterface"] }
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "block2", "NSNotification", "NSOperation", "NSProcessInfo", "NSString"] }
 objc2-io-kit = { version = "0.3.2", default-features = false, features = ["std", "ps"] }
+objc2-system-configuration = { version = "0.3.2", default-features = false, features = ["std", "SCDynamicStore", "SCDynamicStoreKey", "SCSchemaDefinitions"] }

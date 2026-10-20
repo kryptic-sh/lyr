@@ -20,7 +20,6 @@ use crate::sources::Update;
 pub struct Data {
     pub battery: Option<Reading>,
     pub power_profile: Option<lyr_sources::power_profile::Profiles>,
-    #[cfg(any(target_os = "linux", windows))]
     pub network: Option<lyr_core::network::Reading>,
     /// The Wi-Fi device, its networks and profiles, for the Wi-Fi menu.
     /// `None` where there is no source for them.
@@ -93,7 +92,6 @@ impl Data {
         match update {
             Update::Battery(reading) => self.battery = reading,
             Update::PowerProfile(profiles) => self.power_profile = profiles,
-            #[cfg(any(target_os = "linux", windows))]
             Update::Network(reading) => self.network = reading,
             #[cfg(target_os = "linux")]
             Update::Wifi(wifi) => self.wifi = Some(wifi),
@@ -247,7 +245,6 @@ fn content(
             let shown = lyr_core::power_profile::view(&profiles.active, &config.power_profile);
             Some(label(shown.text, theme.foreground))
         }
-        #[cfg(any(target_os = "linux", windows))]
         Module::Network => {
             let shown = data.network.as_ref()?.view(&config.network);
             Some(label(shown.text, theme.foreground))
@@ -368,7 +365,6 @@ pub fn tooltip(
             )
             .tooltip,
         ),
-        #[cfg(any(target_os = "linux", windows))]
         Module::Network => Some(data.network.as_ref()?.view(&config.network).tooltip),
         #[cfg(target_os = "linux")]
         Module::Window => {

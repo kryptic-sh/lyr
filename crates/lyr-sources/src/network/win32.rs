@@ -55,6 +55,7 @@ pub fn link(adapter: &Adapter, wifi: Option<&Wifi>) -> Option<Link> {
             .map(|wifi| String::from_utf8_lossy(&wifi.ssid).into_owned())
             .unwrap_or_default(),
         signal_strength: wifi.map_or(0, |wifi| wifi.quality.min(100) as u8),
+        wireless: false,
     })
 }
 

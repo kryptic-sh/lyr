@@ -33,8 +33,7 @@ pub enum Update {
     /// The power profiles, or `None` when there is none to show.
     PowerProfile(Option<lyr_sources::power_profile::Profiles>),
     /// The network's reading (NetworkManager's on Linux, IP Helper's on
-    /// Windows), or `None` before the first.
-    #[cfg(any(target_os = "linux", windows))]
+    /// Windows, the dynamic store's on macOS), or `None` before the first.
     Network(Option<lyr_core::network::Reading>),
     /// What the Wi-Fi menu shows.
     #[cfg(target_os = "linux")]
@@ -171,6 +170,10 @@ pub struct Commands {
     /// macOS: Low Power Mode's change notification, live while the bar is.
     #[cfg(target_os = "macos")]
     _power_profile: lyr_sources::power_profile::macos::Watch,
+    /// macOS: the dynamic store's change notifications, live while the bar
+    /// is.
+    #[cfg(target_os = "macos")]
+    _network: Option<lyr_sources::network::macos::Watch>,
     #[cfg(windows)]
     _network: Option<lyr_sources::network::windows::Watch>,
     #[cfg(windows)]
@@ -412,11 +415,13 @@ pub fn start(
     {
         let audio = macos::audio(sender.clone(), waker.clone())?;
         let power_profile = macos::power_profile(sender.clone(), waker.clone());
+        let network = macos::network(sender.clone(), waker.clone());
         let battery = macos::battery(sender, waker);
         Ok((
             receiver,
             Commands {
                 _battery: battery,
+                _network: network,
                 _power_profile: power_profile,
                 audio,
             },
@@ -424,8 +429,8 @@ pub fn start(
     }
 }
 
-/// The sources macOS has so far: the battery, the default audio devices
-/// and Low Power Mode.
+/// The sources macOS has so far: the battery, the default audio devices,
+/// Low Power Mode and the network.
 #[cfg(target_os = "macos")]
 mod macos {
     use std::sync::mpsc;
@@ -528,6 +533,31 @@ mod macos {
                 }
             })?;
         Ok(requests)
+    }
+
+    /// Hands the network to the main loop now and after every change the
+    /// dynamic store reports, while the returned watch lives. `None` when the
+    /// store refuses the watch, which it logs; the first reading is still
+    /// handed over.
+    pub(super) fn network(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+    ) -> Option<lyr_sources::network::macos::Watch> {
+        use lyr_sources::network::macos::{Watch, reading};
+        let deliver = move |reading| {
+            // The main loop has gone when this fails: nothing is left to do.
+            let _gone = sender.send(Update::Network(Some(reading)));
+            if let Some(waker) = &waker {
+                waker.wake();
+            }
+        };
+        match reading() {
+            Ok(now) => deliver(now),
+            Err(error) => tracing::warn!("network: {error}"),
+        }
+        Watch::new(deliver)
+            .inspect_err(|error| tracing::warn!("network: changes will not show: {error}"))
+            .ok()
     }
 
     /// Hands Low Power Mode, as the module's profile, to the main loop now

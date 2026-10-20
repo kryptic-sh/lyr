@@ -46,6 +46,10 @@ pub struct Link {
     pub essid: String,
     /// Percent.
     pub signal_strength: u8,
+    /// A Wi-Fi link whose network name the platform withholds, as macOS does
+    /// without Location permission. Elsewhere the name decides, as in
+    /// waybar, and this stays false.
+    pub wireless: bool,
 }
 
 /// What a source read: the interface with the default route, if any, and
@@ -60,14 +64,14 @@ impl Reading {
     /// The link's state, as waybar's `getNetworkState` decides it: with no
     /// interface, disabled while the radio is blocked and disconnected
     /// otherwise; then linked until it has an address, and Wi-Fi when it has
-    /// an SSID.
+    /// an SSID, or is Wi-Fi with its SSID withheld.
     #[must_use]
     pub fn state(&self) -> State {
         match &self.link {
             None if self.radio_blocked => State::Disabled,
             None => State::Disconnected,
             Some(link) if link.ipaddr.is_empty() => State::Linked,
-            Some(link) if link.essid.is_empty() => State::Ethernet,
+            Some(link) if link.essid.is_empty() && !link.wireless => State::Ethernet,
             Some(_) => State::Wifi,
         }
     }
@@ -144,6 +148,7 @@ mod tests {
             gwaddr: "192.168.1.1".to_owned(),
             essid: "home".to_owned(),
             signal_strength: 71,
+            wireless: false,
         }
     }
 
@@ -190,7 +195,16 @@ mod tests {
             essid: String::new(),
             ..link()
         };
-        assert_eq!(reading(Some(wired), false).state(), State::Ethernet);
+        assert_eq!(reading(Some(wired.clone()), false).state(), State::Ethernet);
+        let withheld = Link {
+            wireless: true,
+            ..wired
+        };
+        assert_eq!(
+            reading(Some(withheld), false).state(),
+            State::Wifi,
+            "Wi-Fi with its name withheld"
+        );
         let waiting = Link {
             ipaddr: String::new(),
             ..link()
