@@ -136,14 +136,16 @@ implementation follows meanwhile.
 ## Cross-repo work
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
-  `=0.6.0` (published 2026-10-20; crcbl's `rust-version` is 1.98, and lyr's
-  follows). crcbl 0.4.0 (2026-10-18) brought `crcbl-app`, the window-plus-device
-  crate lyr asked for so that it links no engine, audio (cpal, ALSA) or physics;
-  0.5.0's only breaking change is in crcbl-phys. M1 adds `crcbl-app`,
-  `crcbl-hal`, `crcbl-ui` (with `system-fonts`), `crcbl-frame`, `crcbl-font` and
-  the backend per platform (Vulkan on Linux, D3D12 on Windows, Metal on macOS),
-  each pinned exactly, and `crcbl-image` with M6. The GPU path, as crcbl
-  reported it (not read yet at 0.4.0 or later; read before M1 relies on it):
+  `=0.7.0` (published 2026-10-20, with `set_panel`, frame pacing and
+  `font::breaks`; crcbl's `rust-version` is 1.98, and lyr's follows). The bump
+  needed no change in lyr; the bar ran on it on Windows. crcbl 0.4.0
+  (2026-10-18) brought `crcbl-app`, the window-plus-device crate lyr asked for
+  so that it links no engine, audio (cpal, ALSA) or physics; 0.5.0's only
+  breaking change is in crcbl-phys. M1 adds `crcbl-app`, `crcbl-hal`, `crcbl-ui`
+  (with `system-fonts`), `crcbl-frame`, `crcbl-font` and the backend per
+  platform (Vulkan on Linux, D3D12 on Windows, Metal on macOS), each pinned
+  exactly, and `crcbl-image` with M6. The GPU path, as crcbl reported it (not
+  read yet at 0.4.0 or later; read before M1 relies on it):
   `crcbl_app::window::open_window(shell, elapsed, desc)`, `wait_for_configure`
   for the extent, then
   `crcbl_app::present::Presenter::open(&shell, window, extent, &PresenterDesc)`
