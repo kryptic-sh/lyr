@@ -294,6 +294,12 @@ fn content(
                 theme.foreground,
             ))
         }
+        // Windows keeps its notifications to itself: a bell that opens them.
+        #[cfg(windows)]
+        Module::Notifications => Some(label(
+            lyr_core::bell::stateless(&config.notifications),
+            theme.foreground,
+        )),
         #[cfg(target_os = "linux")]
         Module::Workspaces => {
             let state = data.workspaces.as_ref()?;

@@ -19,6 +19,18 @@ pub fn view(store: &Store, config: &Config) -> String {
         (true, false) => "dnd-notification",
         (true, true) => "dnd-none",
     };
+    render(state, config)
+}
+
+/// The bell where lyr cannot read the notifications or do-not-disturb, as
+/// on Windows (plan 09): always the `none` state.
+#[must_use]
+pub fn stateless(config: &Config) -> String {
+    render("none", config)
+}
+
+/// The bell's text in `state` under `config`.
+fn render(state: &str, config: &Config) -> String {
     let icon = pick(&config.icons, &[state], 0);
     config
         .format
@@ -31,7 +43,7 @@ mod tests {
 
     use lyr_config::{Platform, from_sources};
 
-    use super::view;
+    use super::{stateless, view};
     use crate::notifications::{Incoming, Store};
 
     fn incoming(transient: bool) -> Incoming {
@@ -41,6 +53,12 @@ mod tests {
             transient,
             ..Incoming::default()
         }
+    }
+
+    #[test]
+    fn the_stateless_bell_is_the_empty_one() {
+        let config = from_sources(None, Platform::Windows).expect("the defaults");
+        assert_eq!(stateless(&config.notifications), "\u{F0A2}");
     }
 
     #[test]

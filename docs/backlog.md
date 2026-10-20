@@ -479,8 +479,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `HKCU\Control Panel\Mouse`), which Windows applies before any program sees the
   event; lyr follows it as every other program does, so it is not a bug. The
   mute click has not been run, since it cuts what is heard, and a Bluetooth
-  endpoint is not told apart (`Sink::bluetooth` is false). The Wi-Fi and
-  Bluetooth menus open Windows' Settings pages in their place
+  endpoint is not told apart (`Sink::bluetooth` is false). The notifications
+  module is plan 09's Windows bell: always the `none` icon
+  (`lyr_core::bell::stateless`), since Windows offers no API for its
+  notifications or do-not-disturb, with both clicks bound in
+  `[platform.windows.notifications.on]` to `start "" ms-actioncenter:`; run on
+  Windows (2026-10-20), a click on it opened the notification centre. The Wi-Fi
+  and Bluetooth menus open Windows' Settings pages in their place
   (`apps/lyr/src/settings.rs`, `ms-settings:network` and `:bluetooth` through
   `cmd /C start`), from their bindings and from `lyr panel`; run on Windows
   (2026-10-20), `lyr panel bluetooth` brought up a Settings window, though which

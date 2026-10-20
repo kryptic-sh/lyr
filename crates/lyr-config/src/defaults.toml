@@ -167,5 +167,11 @@ calendar_today = "#ff6699"
 [platform.windows.layout]
 right = ["volume", "mic", "clock", "notifications"]
 
+# Windows has no API for its notifications or do-not-disturb: either click
+# opens its notification centre (plan 09).
+[platform.windows.notifications.on]
+click = { exec = 'start "" ms-actioncenter:' }
+click_right = { exec = 'start "" ms-actioncenter:' }
+
 [platform.macos.layout]
 right = ["volume", "mic", "clock"]

@@ -18,6 +18,8 @@ and this project adheres to
   its address and, on Wi-Fi, the network's name and signal), Bluetooth (from
   BlueZ, with a connected device's battery) and the Hyprland workspaces. The
   other modules are not drawn yet.
+- On Windows the notifications module shows a bell, and either click opens
+  Windows' notification centre.
 - On Windows the Wi-Fi and Bluetooth menus open the matching Settings page, from
   their bindings and from `lyr panel`.
 - On Windows the audio menu lists the playing and recording programs and the

@@ -355,3 +355,23 @@ fn the_window_module_takes_title_class_and_a_positive_length() {
         assert!(message.starts_with(key), "{text:?}: {message}");
     }
 }
+
+#[test]
+fn the_bell_opens_windows_notification_centre_there_only() {
+    use super::{Binding, Builtin};
+    let centre = Binding::Exec {
+        exec: r#"start "" ms-actioncenter:"#.to_owned(),
+    };
+    let windows = from_sources(None, Platform::Windows).expect("the defaults");
+    assert_eq!(windows.notifications.on.click.as_ref(), Some(&centre));
+    assert_eq!(windows.notifications.on.click_right.as_ref(), Some(&centre));
+    let linux = from_sources(None, Platform::Linux).expect("the defaults");
+    assert_eq!(
+        linux.notifications.on.click,
+        Some(Binding::Builtin(Builtin::OpenClockPanel))
+    );
+    assert_eq!(
+        linux.notifications.on.click_right,
+        Some(Binding::Builtin(Builtin::ToggleDnd))
+    );
+}
