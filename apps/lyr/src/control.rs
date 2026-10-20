@@ -230,8 +230,11 @@ mod tests {
     #[test]
     fn a_socket_left_by_a_dead_bar_is_replaced() {
         let path = unique("stale");
-        // std leaves its socket file behind when the listener is dropped.
-        drop(std::os::unix::net::UnixListener::bind(&path).expect("bound"));
+        // A socket file nobody answers on, as a lyr that died leaves. Bound
+        // as a datagram socket, never listening: a listener dropped here
+        // could still be held open by a child another test forks before its
+        // exec, and answer the liveness check.
+        drop(std::os::unix::net::UnixDatagram::bind(&path).expect("bound"));
         assert!(path.exists());
         let requests = listen(path.clone(), None).expect("the stale socket replaced");
         let main_loop = std::thread::spawn(move || {
