@@ -488,8 +488,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   flight after a listener goes stays valid. Cross-checked with clippy for
   `aarch64-apple-darwin`; CI's macOS runner, whatever audio devices it has, runs
   its read and the listeners' start, follow and stop; no Mac has played through
-  it. Not built: the other macOS sources (network, Bluetooth, power profile),
-  the audio menu and the other menus.
+  it. The power menu's actions are built too (the Power menu entry below). Not
+  built: the other macOS sources (network, Bluetooth, power profile), the audio
+  menu and the other menus.
 - **Windows sources, M9.** Built: the battery (`lyr_sources::battery::windows`):
   `GetSystemPowerStatus` read at start and again whenever
   `PowerSettingRegisterNotification` reports a change of power source or
@@ -707,8 +708,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   own), through `windows-sys`, which plan 02 lists as house precedent and which
   was already in lyr's build through `interprocess`; enabling the privilege is
   tested on this machine by reading the token back, but no entry has been run,
-  since each locks, suspends, logs off or shuts the machine down. Not built: the
-  macOS actions, and checking what Hyprland does with an outside click (M5's
+  since each locks, suspends, logs off or shuts the machine down. The macOS
+  actions are built (`lyr_sources::power::macos`): each entry's command from
+  `power::macos_command`, plan 10's table (`pmset displaysleepnow`,
+  `pmset sleepnow`, and System Events' `log out`, `restart` and `shut down`
+  through `osascript`), run on the power thread and its exit status checked; the
+  table is tested and mutation-checked everywhere, and only Hibernate's refusal
+  is run, on CI's Mac, since every other entry would lock, sleep or end the
+  session. Not checked: that a Mac asks for its password after `displaysleepnow`
+  (a setting of the Mac's), and what Hyprland does with an outside click (M5's
   open question for panels applies to this grab popup too).
 - **Bluetooth menu, M7.** Built: its actions on Linux
   (`lyr_sources::bluetooth::linux::BlueZ`): the adapter's power, discoverable

@@ -266,14 +266,18 @@ impl Commands {
 
 #[cfg(not(target_os = "linux"))]
 impl Commands {
-    /// Windows: carries out a power menu entry through Win32, on a thread of
-    /// its own, since `SetSuspendState` returns only once the machine wakes.
-    #[cfg(windows)]
+    /// Windows and macOS: carries out a power menu entry, through Win32 or
+    /// its macOS command, on a thread of its own, since a sleep returns only
+    /// once the machine wakes.
     pub fn power(&self, entry: lyr_core::power_menu::Entry) {
+        #[cfg(target_os = "macos")]
+        use lyr_sources::power::macos::carry_out;
+        #[cfg(windows)]
+        use lyr_sources::power::windows::carry_out;
         let spawned = std::thread::Builder::new()
             .name("lyr power".to_owned())
             .spawn(move || {
-                if let Err(error) = lyr_sources::power::windows::carry_out(entry) {
+                if let Err(error) = carry_out(entry) {
                     tracing::warn!("power menu: {}: {error}", entry.label());
                 }
             });
@@ -320,15 +324,6 @@ impl Commands {
     #[cfg(target_os = "macos")]
     pub fn step_volume(&self, flow: lyr_sources::audio::macos::Flow, delta: i32) {
         let _stopped = self.audio.send(macos::AudioRequest::Step(flow, delta));
-    }
-
-    /// macOS: the power menu's actions are not built yet (M10).
-    #[cfg(target_os = "macos")]
-    pub fn power(&self, entry: lyr_core::power_menu::Entry) {
-        tracing::warn!(
-            "power menu: {} is not built on this platform yet",
-            entry.label()
-        );
     }
 
     /// Windows and macOS: no media players are read there yet, so there is

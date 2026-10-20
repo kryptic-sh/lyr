@@ -76,8 +76,10 @@ and this project adheres to
   On Linux each entry asks logind as `systemctl` and `loginctl` do, and Logout
   asks the compositor (Hyprland, sway or niri) to end the session; on Windows
   each entry is its Win32 call (locking, sleep, hibernate, log out, reboot, shut
-  down); on macOS the entries are not built yet. `[power.menu]` sets an entry to
-  a command instead (`lock = { exec = "hyprlock" }`).
+  down); on macOS Lock and Sleep are `pmset displaysleepnow` and
+  `pmset sleepnow`, and Logout, Reboot and Shutdown ask System Events, with no
+  Hibernate. `[power.menu]` sets an entry to a command instead
+  (`lock = { exec = "hyprlock" }`).
 - `lyr import-waybar FILE` prints a waybar `config.jsonc` as a lyr config: the
   bar's settings, the layout and the modules lyr has, with what it could not
   carry listed at the top; waybar's Hyprland, sway and niri workspace and window

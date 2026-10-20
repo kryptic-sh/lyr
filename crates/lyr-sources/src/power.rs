@@ -1,14 +1,17 @@
 //! The power menu's actions (`docs/plan/10-popups-and-menus.md#power-menu`).
 //!
-//! [`reboot_flags`] chooses the flags `systemctl reboot` would, and
-//! [`windows_call`] the Win32 call each entry is, on every platform's tests;
-//! [`linux`] makes logind's calls as systemctl makes them, and [`windows`]
-//! the Win32 ones. macOS comes with milestone M10.
+//! [`reboot_flags`] chooses the flags `systemctl reboot` would,
+//! [`windows_call`] the Win32 call each entry is, and [`macos_command`] the
+//! command each is on macOS, on every platform's tests; [`linux`] makes
+//! logind's calls as systemctl makes them, [`windows`] the Win32 ones, and
+//! `macos` runs the commands.
 
 use lyr_core::power_menu::Entry;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
+#[cfg(target_os = "macos")]
+pub mod macos;
 #[cfg(windows)]
 pub mod windows;
 
@@ -50,6 +53,35 @@ pub const fn windows_call(entry: Entry) -> WindowsCall {
         Entry::Logout => WindowsCall::Exit(Exit::LogOff),
         Entry::Reboot => WindowsCall::Exit(Exit::Reboot),
         Entry::Shutdown => WindowsCall::Exit(Exit::PowerOff),
+    }
+}
+
+/// The command `entry` is on macOS (plan 10's table), program first, or
+/// `None` for Hibernate, which macOS does not offer. Locking puts the
+/// display to sleep, which locks it when the Mac asks for a password on
+/// waking; the session's end goes through System Events, as the Apple menu's
+/// items do.
+#[must_use]
+pub const fn macos_command(entry: Entry) -> Option<&'static [&'static str]> {
+    match entry {
+        Entry::Lock => Some(&["pmset", "displaysleepnow"]),
+        Entry::Sleep => Some(&["pmset", "sleepnow"]),
+        Entry::Hibernate => None,
+        Entry::Logout => Some(&[
+            "osascript",
+            "-e",
+            r#"tell application "System Events" to log out"#,
+        ]),
+        Entry::Reboot => Some(&[
+            "osascript",
+            "-e",
+            r#"tell application "System Events" to restart"#,
+        ]),
+        Entry::Shutdown => Some(&[
+            "osascript",
+            "-e",
+            r#"tell application "System Events" to shut down"#,
+        ]),
     }
 }
 
@@ -96,9 +128,32 @@ mod tests {
     use lyr_core::power_menu::Entry;
 
     use super::{
-        Exit, REBOOT_VIA_KEXEC, SOFT_REBOOT_IF_NEXTROOT_SET_UP, WindowsCall, reboot_flags,
-        windows_call,
+        Exit, REBOOT_VIA_KEXEC, SOFT_REBOOT_IF_NEXTROOT_SET_UP, WindowsCall, macos_command,
+        reboot_flags, windows_call,
     };
+
+    #[test]
+    fn each_entry_is_plan_tens_macos_command() {
+        let joined = |entry| macos_command(entry).map(|argv| argv.join(" "));
+        assert_eq!(
+            joined(Entry::Lock).as_deref(),
+            Some("pmset displaysleepnow")
+        );
+        assert_eq!(joined(Entry::Sleep).as_deref(), Some("pmset sleepnow"));
+        assert_eq!(joined(Entry::Hibernate), None, "macOS offers no hibernate");
+        for (entry, verb) in [
+            (Entry::Logout, "log out"),
+            (Entry::Reboot, "restart"),
+            (Entry::Shutdown, "shut down"),
+        ] {
+            assert_eq!(
+                joined(entry),
+                Some(format!(
+                    r#"osascript -e tell application "System Events" to {verb}"#
+                ))
+            );
+        }
+    }
 
     #[test]
     fn each_entry_is_its_win32_call() {
