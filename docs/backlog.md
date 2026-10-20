@@ -275,25 +275,25 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 ## Known gaps in the design
 
 - **Hyprland backend, rest of M2.** `lyr-wm::hyprland` is built against Hyprland
-  v0.56.2's formats: the event parser, the `State` reducer, the JSON seed, and
-  `Hyprland` (socket I/O, `from_env`, `subscribe`, `focus`). Its tests run
-  against a fake Hyprland on Unix sockets, not a real one. Not verified on a
-  running Hyprland: the Lua focus request (the framing was read from hyprctl's
-  source). The dialect comes from Hyprland itself (`j/status`'s
-  `configProvider`, as ironbar reads it), tested against the fake on Linux under
-  WSL. A named workspace is `name:NAME` in Lua too, quoted as a Lua long string
-  (`request::lua_long_string`), after Hyprland's `hlFocus` (main `12f2425`); not
-  run against a real Hyprland. Click is `focus_request` and scroll is
-  `State::step`, both pure and tested. The bar shows the workspaces
-  (`apps/lyr/src/sources.rs` runs the backend and hands its `State` to the main
-  loop), and a click on a button or, with `workspaces.scroll`, a wheel step
-  sends the switch through the same task (`apps/lyr/src/input.rs`,
-  `lyr_core::pointer`). Not run against a real Hyprland. `lyr --stats` logs the
-  idle counts (`apps/lyr/src/stats.rs`); on Windows an idle bar showed 3
-  wake-ups, 2 events and 2 presents over 86 s (the start and one per clock
-  minute). The idle test itself, on Hyprland with every source running, has not
-  been run. The `WorkspaceBackend` trait waits for the Windows backend (M9).
-  Hyprland main's changes for the next release are in
+  v0.56.2's formats: the event parser, the `Tracker` that folds events into the
+  shared `lyr_wm::State`, the JSON seed, and `Hyprland` (socket I/O, `from_env`,
+  `subscribe`, `focus`). Its tests run against a fake Hyprland on Unix sockets,
+  not a real one. Not verified on a running Hyprland: the Lua focus request (the
+  framing was read from hyprctl's source). The dialect comes from Hyprland
+  itself (`j/status`'s `configProvider`, as ironbar reads it), tested against
+  the fake on Linux under WSL. A named workspace is `name:NAME` in Lua too,
+  quoted as a Lua long string (`request::lua_long_string`), after Hyprland's
+  `hlFocus` (main `12f2425`); not run against a real Hyprland. Click is
+  `focus_request` and scroll is `State::step`, both pure and tested. The bar
+  shows the workspaces (`apps/lyr/src/sources.rs` runs the backend and hands its
+  `State` to the main loop), and a click on a button or, with
+  `workspaces.scroll`, a wheel step sends the switch through the same task
+  (`apps/lyr/src/input.rs`, `lyr_core::pointer`). Not run against a real
+  Hyprland. `lyr --stats` logs the idle counts (`apps/lyr/src/stats.rs`); on
+  Windows an idle bar showed 3 wake-ups, 2 events and 2 presents over 86 s (the
+  start and one per clock minute). The idle test itself, on Hyprland with every
+  source running, has not been run. `lyr_wm::Compositor` picks it, or sway or
+  niri, at start. Hyprland main's changes for the next release are in
   [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Render, rest of M1.** `lyr-render` has the GPU-free half: the bar font found
   with crcbl-font and given the system's fallback faces (`fonts::load`), text
@@ -649,20 +649,20 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 - **Native notification centre and menus, not yet researched**
   ([plan/09](plan/09-notifications.md), [plan/10](plan/10-popups-and-menus.md)).
   Written from memory and the dotfiles, with each item to read when its
-  milestone starts: NetworkManager's D-Bus names checked against the installed
-  NetworkManager (plan 10 has them from the online API reference) (M7);
-  bluetui's and wiremix's source, beyond the READMEs plan 10 now follows (M7);
-  the Windows Wi-Fi and Bluetooth menu APIs (M9; the audio menu's WASAPI calls
-  were read in `windows` 0.62.2 and are built) and macOS's (M10).
+  milestone starts: bluetui's and wiremix's source, beyond the READMEs plan 10
+  now follows (M7); the Windows Wi-Fi and Bluetooth menu APIs (M9; the audio
+  menu's WASAPI calls were read in `windows` 0.62.2 and are built) and macOS's
+  (M10).
 - **Power menu, M5.** Built: the Linux actions
   (`lyr_sources::power::linux::Logind`): Lock, Sleep, Hibernate, Reboot and
   Power off as systemd v262.1's `loginctl` and `systemctl` call logind, with the
   `WithFlags` fallback, the reboot flags (`power::reboot_flags`) and the
   soft-reboot retry, tested against fake new and old loginds and
-  mutation-checked. Log out is `lyr_wm::hyprland::Hyprland::exit`
-  (`hl.dsp.exit()` in Lua, as the dotfiles' `.menu-power` sends, or the `exit`
-  dispatcher), tested against the fake Hyprland. Neither is run against the real
-  thing. The menu (`apps/lyr/src/power_menu.rs`, drawn by
+  mutation-checked. Log out is `lyr_wm::Compositor::exit`: on Hyprland
+  `hl.dsp.exit()` in Lua, as the dotfiles' `.menu-power` sends, or the `exit`
+  dispatcher, tested against the fake Hyprland; on sway `exit`, run against CI's
+  headless sway; on niri `Quit`, tested against a fake. logind's actions are not
+  run against the real thing. The menu (`apps/lyr/src/power_menu.rs`, drawn by
   `lyr_core::power_menu`) opens from `open_power_menu` as a grab popup under the
   clicked module: arrow keys and the pointer move the selection, Enter or a
   click carries the entry out on the source runtime, and Escape, a click outside

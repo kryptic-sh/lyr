@@ -193,8 +193,11 @@ names it uses are [below](#over-networkmanagers-d-bus-api).
 ### Over NetworkManager's D-Bus API
 
 Read from NetworkManager's API reference (`networkmanager.dev/docs/api/latest`)
-on 2026-10-18. M7 still checks each name against the installed NetworkManager's
-introspection.
+on 2026-10-18. Every method, property and signal lyr's proxies use (in
+`lyr_sources::network::linux` and its `wifi` module) was checked on 2026-10-20
+against the introspection XML of NetworkManager 1.58.1, its latest release, with
+each signature and property access: all match. The owner's installed version is
+not checked.
 
 | What the menu does         | D-Bus                                                                                                                                                                                                                             |
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
