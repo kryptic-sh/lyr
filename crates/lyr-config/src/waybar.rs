@@ -147,8 +147,8 @@ fn module(name: &str, body: Option<&Map<String, Value>>) -> Option<&'static str>
         "power-profiles-daemon" => "power_profile",
         "network" => "network",
         "bluetooth" => "bluetooth",
-        "hyprland/workspaces" => "workspaces",
-        "hyprland/window" => "window",
+        "hyprland/workspaces" | "sway/workspaces" | "niri/workspaces" => "workspaces",
+        "hyprland/window" | "sway/window" | "niri/window" => "window",
         "tray" => "tray",
         "clock" => "clock",
         // The microphone is a pulseaudio module shown by its source.

@@ -3,10 +3,10 @@
 //! channel and waking it, so the main loop never blocks on a source and no
 //! source is polled.
 //!
-//! Linux has the battery (UPower), the power profile
-//! (power-profiles-daemon), the network (NetworkManager), bluetooth (BlueZ), the time zone (timedate1) and
-//! the workspaces (Hyprland). Other platforms have no sources yet, and their
-//! modules are left out of the bar.
+//! Linux has the battery (UPower), the power profile (power-profiles-daemon),
+//! the network (NetworkManager), bluetooth (BlueZ), the time zone (timedate1)
+//! and the workspaces (Hyprland, sway or niri). Windows has its own (`windows`
+//! below). macOS has no sources yet, and its modules are left out of the bar.
 
 use std::sync::mpsc;
 
@@ -53,7 +53,7 @@ pub enum Update {
     /// The pairing agent's question is no longer asked.
     #[cfg(target_os = "linux")]
     BluetoothCancel,
-    /// Hyprland's workspaces.
+    /// The compositor's workspaces.
     #[cfg(target_os = "linux")]
     Workspaces(lyr_wm::State),
     /// The system time zone's name, or `None` when none is set.
@@ -692,7 +692,7 @@ mod linux {
     use lyr_sources::network::linux::NetworkManager;
     use lyr_sources::power::linux::Logind;
     use lyr_sources::power_profile::linux::PowerProfiles;
-    use lyr_wm::hyprland::{Hyprland, Workspace};
+    use lyr_wm::{Compositor, Workspace};
     use tokio::sync::mpsc::UnboundedReceiver;
     use tokio::sync::watch;
 
@@ -1192,35 +1192,30 @@ mod linux {
         waker: Option<ShellWaker>,
     ) {
         let run = async {
-            let hyprland = Hyprland::from_env().await?;
-            let (mut tracker, mut events) = hyprland.subscribe().await?;
-            if !deliver(
-                &sender,
-                waker.as_ref(),
-                Update::Workspaces(tracker.state().clone()),
-            ) {
+            let compositor = Compositor::from_env().await?;
+            tracing::info!("workspaces: following {}", compositor.name());
+            let (state, mut changes) = compositor.subscribe().await?;
+            if !deliver(&sender, waker.as_ref(), Update::Workspaces(state)) {
                 return Ok(());
             }
             loop {
                 tokio::select! {
-                    event = events.next() => {
-                        let Some(event) = event? else { break };
-                        if tracker.apply(event)
-                            && !deliver(&sender, waker.as_ref(), Update::Workspaces(tracker.state().clone()))
-                        {
+                    state = changes.next() => {
+                        let Some(state) = state? else { break };
+                        if !deliver(&sender, waker.as_ref(), Update::Workspaces(state)) {
                             break;
                         }
                     }
                     Some(workspace) = focus.recv() => {
                         // A refused switch changes nothing on screen, which
                         // is the truth; it is only logged.
-                        if let Err(error) = hyprland.focus(&workspace).await {
+                        if let Err(error) = compositor.focus(&workspace).await {
                             tracing::warn!("workspaces: {error}");
                         }
                     }
                 }
             }
-            Ok::<_, lyr_wm::hyprland::Error>(())
+            Ok::<_, lyr_wm::Error>(())
         };
         if let Err(error) = run.await {
             tracing::warn!("workspaces: {error}");
@@ -1244,7 +1239,7 @@ mod linux {
             Entry::Hibernate => Logind::system().await?.hibernate().await?,
             Entry::Shutdown => Logind::system().await?.power_off().await?,
             Entry::Reboot => Logind::system().await?.reboot().await?,
-            Entry::Logout => Hyprland::from_env().await?.exit().await?,
+            Entry::Logout => Compositor::from_env().await?.exit().await?,
         }
         Ok(())
     }

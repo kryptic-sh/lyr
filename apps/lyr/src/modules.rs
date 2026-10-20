@@ -54,7 +54,7 @@ pub struct Data {
     pub source: Option<lyr_core::audio::Source>,
     /// What the audio menu lists, where there is a source for it.
     pub audio_nodes: Option<lyr_core::audio_menu::Nodes>,
-    /// The foreground window, on Windows; Linux reads it from Hyprland.
+    /// The foreground window, on Windows; Linux reads it from the compositor.
     #[cfg(windows)]
     pub active_window: Option<lyr_sources::window::Active>,
 }

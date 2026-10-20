@@ -133,6 +133,31 @@ fn what_lyr_cannot_carry_is_listed() {
 }
 
 #[test]
+fn sway_and_niri_modules_are_lyrs_workspaces_and_window() {
+    for compositor in ["sway", "niri"] {
+        let waybar = format!(
+            r#"{{ "modules-center": ["{compositor}/workspaces", "{compositor}/window"],
+                 "{compositor}/workspaces": {{ "all-outputs": false }} }}"#
+        );
+        let imported = import(&waybar).expect("converted");
+        let config = from_sources(
+            Some((Path::new("import.toml"), &imported.toml)),
+            Platform::Linux,
+        )
+        .expect("the result loads");
+        assert_eq!(
+            config.layout.center,
+            [
+                crate::Item::Named("workspaces".to_owned()),
+                crate::Item::Named("window".to_owned())
+            ],
+            "{compositor}"
+        );
+        assert!(!config.workspaces.all_outputs, "{compositor}");
+    }
+}
+
+#[test]
 fn a_second_module_of_one_kind_and_bad_json_are_refused() {
     let doubled = r#"{ "modules-left": ["battery", "battery#bat2"] }"#;
     let imported = import(doubled).expect("converted");

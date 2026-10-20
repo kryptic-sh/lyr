@@ -62,7 +62,12 @@ impl Hyprland {
     /// Finds the Hyprland this process runs under, from its environment, and
     /// asks it which config dialect it runs.
     pub async fn from_env() -> Result<Self, Error> {
-        Self::at(socket_dir(|name| std::env::var_os(name))?).await
+        Self::from_vars(|name| std::env::var_os(name)).await
+    }
+
+    /// [`Hyprland::from_env`], reading the variables through `var`.
+    pub(crate) async fn from_vars(var: impl Fn(&str) -> Option<OsString>) -> Result<Self, Error> {
+        Self::at(socket_dir(var)?).await
     }
 
     /// Connects to the Hyprland whose sockets are in `socket_dir`.
@@ -367,6 +372,22 @@ mod tests {
 
         assert!(matches!(events.next().await, Err(Error::Parse(_))));
         assert!(matches!(events.next().await, Ok(None)), "socket closed");
+    }
+
+    #[tokio::test]
+    async fn as_the_compositor_only_changes_are_handed_on() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let _requests =
+            fake_hyprland(dir.path(), replies, "workspacev2>>1,1\nworkspacev2>>2,2\n").await;
+        let compositor = crate::Compositor::Hyprland(Hyprland {
+            socket_dir: dir.path().to_owned(),
+            dialect: Dialect::Lua,
+        });
+        let (state, mut changes) = compositor.subscribe().await.expect("subscribed");
+        assert_eq!(state.active(), Some(1));
+        let next = changes.next().await.expect("read").expect("a change");
+        assert_eq!(next.active(), Some(2), "the shown workspace 1 was skipped");
+        assert!(matches!(changes.next().await, Ok(None)), "socket closed");
     }
 
     #[tokio::test]

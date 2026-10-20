@@ -12,9 +12,9 @@ on the GPU through [crcbl](https://github.com/kryptic-sh/crcbl). Part of the
 
 ## What it will do
 
-- **Workspaces** that speak Hyprland's Lua dispatch form
-  (`hl.dsp.focus({ workspace = N })`), with Windows virtual desktops and
-  AeroSpace on macOS.
+- **Workspaces** on Hyprland (in its Lua dispatch form,
+  `hl.dsp.focus({ workspace = N })`), sway and niri, with Windows virtual
+  desktops and AeroSpace on macOS.
 - **Modules:** power menu, battery, power profile, network, bluetooth, tray,
   volume, mic, clock with a calendar, and notifications. Each one works on every
   platform that exposes what it needs.
@@ -33,8 +33,10 @@ Linux under Wayland:
 
 - One transparent bar along the top of every output, with the power button, the
   clock and, on Linux, the battery (UPower), power profile
-  (power-profiles-daemon), Bluetooth (BlueZ), the notification bell and the
-  Hyprland workspaces. Network, volume, mic and the tray are not built yet.
+  (power-profiles-daemon), network (NetworkManager), Bluetooth (BlueZ), the tray
+  (a letter per icon until lyr draws images), the notification bell and the
+  Hyprland, sway or niri workspaces. Volume and mic have sources on Windows only
+  so far.
 - Tooltips, the power menu (its actions are built on Linux only), and the clock
   panel's calendar.
 - On Linux, the notification daemon with toasts, when no other daemon (such as
@@ -119,7 +121,7 @@ crcbl's.
 | `lyr-core`    | Module state, formats, layout, draw lists, hit testing (no platform code) |
 | `lyr-render`  | Drawing the bar through crcbl's GPU layer, fonts                          |
 | `lyr-shell`   | Bar and popup windows over crcbl-shell, outputs, input                    |
-| `lyr-wm`      | Workspace backends: Hyprland, Windows virtual desktops, AeroSpace         |
+| `lyr-wm`      | Workspace backends: Hyprland, sway, niri; Windows and macOS to come       |
 | `lyr-sources` | Module data sources per platform: audio, network, bluetooth, battery, …   |
 
 ## Contributing

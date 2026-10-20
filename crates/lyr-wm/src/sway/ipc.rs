@@ -1,5 +1,6 @@
 //! Talking to a running sway over its IPC socket.
 
+use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -57,7 +58,12 @@ impl Sway {
     ///
     /// [`Error::NotRunning`] when the variable is not set.
     pub fn from_env() -> Result<Self, Error> {
-        let socket = std::env::var_os("SWAYSOCK").ok_or(Error::NotRunning)?;
+        Self::from_vars(|name| std::env::var_os(name))
+    }
+
+    /// [`Sway::from_env`], reading the variable through `var`.
+    pub(crate) fn from_vars(var: impl Fn(&str) -> Option<OsString>) -> Result<Self, Error> {
+        let socket = var("SWAYSOCK").ok_or(Error::NotRunning)?;
         Ok(Self {
             socket: socket.into(),
         })

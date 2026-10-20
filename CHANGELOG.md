@@ -16,8 +16,9 @@ and this project adheres to
   (from UPower), the power profile (from power-profiles-daemon; a click cycles
   it), the network (from NetworkManager: the interface with the default route,
   its address and, on Wi-Fi, the network's name and signal), Bluetooth (from
-  BlueZ, with a connected device's battery) and the Hyprland workspaces. The
-  other modules are not drawn yet.
+  BlueZ, with a connected device's battery) and the workspaces, from Hyprland,
+  sway or niri, whichever the session runs under. The other modules are not
+  drawn yet.
 - On Windows the notifications module shows a bell, and either click opens
   Windows' notification centre.
 - On Windows the Wi-Fi and Bluetooth menus open the matching Settings page, from
@@ -66,17 +67,18 @@ and this project adheres to
 - A click on the power button opens the power menu (Lock, Sleep, Hibernate,
   Shutdown, Logout, Reboot), driven by the arrow keys and Enter or the pointer.
   On Linux each entry asks logind as `systemctl` and `loginctl` do, and Logout
-  asks Hyprland to exit; on Windows each entry is its Win32 call (locking,
-  sleep, hibernate, log out, reboot, shut down); on macOS the entries are not
-  built yet. `[power.menu]` sets an entry to a command instead
-  (`lock = { exec = "hyprlock" }`).
+  asks the compositor (Hyprland, sway or niri) to end the session; on Windows
+  each entry is its Win32 call (locking, sleep, hibernate, log out, reboot, shut
+  down); on macOS the entries are not built yet. `[power.menu]` sets an entry to
+  a command instead (`lock = { exec = "hyprlock" }`).
 - `lyr import-waybar FILE` prints a waybar `config.jsonc` as a lyr config: the
   bar's settings, the layout and the modules lyr has, with what it could not
-  carry listed at the top. waybar's `style.css` is not read.
+  carry listed at the top; waybar's Hyprland, sway and niri workspace and window
+  modules all become lyr's. waybar's `style.css` is not read.
 - A `window` module, not in the default layout: the focused window's title on
-  Hyprland, as waybar's `hyprland/window` shows it, and on Windows the
-  foreground window's, its program's name as `{class}`, with `{title}` and
-  `{class}` placeholders and `max_length`.
+  Hyprland, sway and niri, as waybar's `hyprland/window` shows it, and on
+  Windows the foreground window's, its program's name as `{class}`, with
+  `{title}` and `{class}` placeholders and `max_length`.
 - On Linux, the tray: lyr hosts StatusNotifierItems (Steam, Teams and the like),
   and serves `org.kde.StatusNotifierWatcher` when nothing else does. Each item
   shows as a button with its title's first letter until lyr draws icons, passive
