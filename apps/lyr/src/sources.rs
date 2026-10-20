@@ -19,7 +19,6 @@ pub enum Update {
     /// The battery, or `None` when there is none to show.
     Battery(Option<lyr_core::battery::Reading>),
     /// The default output and input, or `None` where there is none.
-    #[cfg(any(windows, target_os = "macos"))]
     Audio(
         Option<lyr_core::audio::Sink>,
         Option<lyr_core::audio::Source>,
@@ -122,6 +121,15 @@ pub enum BluetoothRequest {
     Answer(u64, lyr_core::bluetooth_menu::Reply),
 }
 
+/// What the bar asks of the default output or input on Linux.
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+pub enum AudioRequest {
+    ToggleMute(lyr_sources::audio::pactl::Flow),
+    /// By this many percent.
+    Step(lyr_sources::audio::pactl::Flow, i32),
+}
+
 /// What the Wi-Fi menu asks of NetworkManager.
 #[cfg(target_os = "linux")]
 #[derive(Debug)]
@@ -207,6 +215,8 @@ pub struct Commands {
     bluetooth: tokio::sync::mpsc::UnboundedSender<BluetoothRequest>,
     #[cfg(target_os = "linux")]
     wifi: tokio::sync::mpsc::UnboundedSender<WifiRequest>,
+    #[cfg(target_os = "linux")]
+    audio: tokio::sync::mpsc::UnboundedSender<AudioRequest>,
     /// Linux: whether the Wi-Fi menu is open, the only thing that shows the
     /// Wi-Fi state; while it is closed a change waits for the bar's next
     /// wake-up rather than causing one.
@@ -261,6 +271,16 @@ impl Commands {
     pub fn wifi_menu(&self, open: bool) {
         self.wifi_menu
             .store(open, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Mutes or unmutes the default device of `flow`.
+    pub fn toggle_mute(&self, flow: lyr_sources::audio::pactl::Flow) {
+        let _stopped = self.audio.send(AudioRequest::ToggleMute(flow));
+    }
+
+    /// Moves the volume of `flow`'s default device by `delta` percent.
+    pub fn step_volume(&self, flow: lyr_sources::audio::pactl::Flow, delta: i32) {
+        let _stopped = self.audio.send(AudioRequest::Step(flow, delta));
     }
 
     /// Presses `control` on the media player at `bus_name`.
@@ -414,6 +434,7 @@ pub fn start(
         let (notices, notice_requests) = tokio::sync::mpsc::unbounded_channel();
         let (tray, tray_requests) = tokio::sync::mpsc::unbounded_channel();
         let wifi_menu = std::sync::Arc::default();
+        let (audio, audio_requests) = tokio::sync::mpsc::unbounded_channel();
         linux::start(
             sender,
             linux::Requests {
@@ -425,6 +446,7 @@ pub fn start(
                 bluetooth: bluetooth_requests,
                 wifi: wifi_requests,
                 wifi_menu: std::sync::Arc::clone(&wifi_menu),
+                audio: audio_requests,
                 notices: notice_requests,
                 tray: tray_requests,
             },
@@ -442,6 +464,7 @@ pub fn start(
                 bluetooth,
                 wifi,
                 wifi_menu,
+                audio,
                 notices,
                 tray,
             },
@@ -1095,7 +1118,8 @@ mod linux {
     use lyr_sources::notifications::linux::{Daemon, serve_session};
 
     use super::{
-        BluetoothRequest, JoinRequest, NotificationRequest, TrayRequest, Update, WifiRequest,
+        AudioRequest, BluetoothRequest, JoinRequest, NotificationRequest, TrayRequest, Update,
+        WifiRequest,
     };
     use crate::wifi_menu::Joined;
 
@@ -1119,6 +1143,7 @@ mod linux {
         pub(super) bluetooth: UnboundedReceiver<BluetoothRequest>,
         pub(super) wifi: UnboundedReceiver<WifiRequest>,
         pub(super) wifi_menu: std::sync::Arc<std::sync::atomic::AtomicBool>,
+        pub(super) audio: UnboundedReceiver<AudioRequest>,
         pub(super) notices: UnboundedReceiver<(String, String)>,
         pub(super) tray: UnboundedReceiver<TrayRequest>,
     }
@@ -1138,6 +1163,7 @@ mod linux {
             bluetooth: bluetooth_requests,
             wifi,
             wifi_menu,
+            audio: audio_requests,
             notices: notice_requests,
             tray: tray_requests,
         } = requests;
@@ -1151,6 +1177,7 @@ mod linux {
                     tokio::join!(
                         battery(sender.clone(), waker.clone()),
                         network(sender.clone(), wifi, wifi_menu, waker.clone()),
+                        audio(sender.clone(), audio_requests, waker.clone()),
                         power_profile(sender.clone(), profile, waker.clone()),
                         bluetooth(sender.clone(), bluetooth_requests, waker.clone()),
                         clock(sender.clone(), waker.clone()),
@@ -1169,6 +1196,53 @@ mod linux {
                 });
             })?;
         Ok(())
+    }
+
+    /// The default output and input through `pactl`, and what the volume
+    /// and mic modules ask of them.
+    async fn audio(
+        sender: mpsc::Sender<Update>,
+        mut requests: UnboundedReceiver<AudioRequest>,
+        waker: Option<ShellWaker>,
+    ) {
+        use lyr_sources::audio::pactl::{self, Flow};
+
+        let (readings, mut changed) = watch::channel((None, None));
+        let forward = async {
+            while changed.changed().await.is_ok() {
+                let (sink, source) = changed.borrow_and_update().clone();
+                if !deliver(&sender, waker.as_ref(), Update::Audio(sink, source)) {
+                    break;
+                }
+            }
+        };
+        let act = async {
+            while let Some(request) = requests.recv().await {
+                let done = match request {
+                    AudioRequest::ToggleMute(flow) => pactl::toggle_mute(flow).await,
+                    AudioRequest::Step(flow, delta) => {
+                        let current = {
+                            let (sink, source) = &*readings.borrow();
+                            match flow {
+                                Flow::Output => sink.as_ref().map(|sink| sink.volume),
+                                Flow::Input => source.as_ref().map(|source| source.volume),
+                            }
+                        };
+                        match current {
+                            Some(current) => pactl::step(flow, current, delta).await,
+                            None => Ok(()),
+                        }
+                    }
+                };
+                if let Err(error) = done {
+                    tracing::warn!("audio: {error}");
+                }
+            }
+        };
+        let (watched, (), ()) = tokio::join!(pactl::watch(&readings), forward, act);
+        if let Err(error) = watched {
+            tracing::warn!("audio: pactl stopped following the sound server: {error}");
+        }
     }
 
     async fn battery(sender: mpsc::Sender<Update>, waker: Option<ShellWaker>) {

@@ -147,7 +147,6 @@ pub fn act(
         ) => {
             return Some(builtin);
         }
-        #[cfg(any(windows, target_os = "macos"))]
         Action::Builtin(
             builtin @ (Builtin::ToggleMute | Builtin::VolumeUp | Builtin::VolumeDown),
         ) => {
@@ -172,12 +171,20 @@ pub fn act(
                 use lyr_sources::audio::macos::{Flow, Which};
                 Which::Default(if input { Flow::Input } else { Flow::Output })
             };
+            #[cfg(target_os = "linux")]
+            let which = {
+                use lyr_sources::audio::pactl::Flow;
+                if input { Flow::Input } else { Flow::Output }
+            };
             match builtin {
                 Builtin::ToggleMute => commands.toggle_mute(which),
                 Builtin::VolumeUp => commands.step_volume(which, step),
                 _ => commands.step_volume(which, -step),
             }
         }
+        // Linux carries out every built-in; Windows and macOS cannot switch
+        // the power profile yet.
+        #[cfg(not(target_os = "linux"))]
         Action::Builtin(builtin) => {
             tracing::warn!("`{}` is not implemented yet", builtin.name());
         }

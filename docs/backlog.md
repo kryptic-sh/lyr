@@ -11,11 +11,16 @@ costs. The provisional decisions in
 [plan/16-open-questions.md](plan/16-open-questions.md) are the defaults the
 implementation follows meanwhile.
 
-- **Audio: may lyr take `libpulse-binding`?** (M4 volume and mic modules, M7
-  audio menu.) **Q:** Add `libpulse-binding` (the PulseAudio protocol through
-  `pipewire-pulse`, plan 07's default), or go native PipeWire with WirePlumber
-  metadata instead (no libpulse, more code)? Nothing for audio is built until
-  this is answered.
+- **Audio: `pactl`, `libpulse-binding`, or native PipeWire?** (M7 audio menu.)
+  **Q:** The volume and mic modules are built on `pactl`
+  (`lyr_sources::audio::pactl`): the PulseAudio protocol as pipewire-pulse
+  serves it, through its command-line client, so no new crate; `pactl subscribe`
+  pushes the changes and each re-read is three `pactl --format=json` runs. The
+  audio menu (streams, every device, Default, plan 10's 150 %) is not built on
+  Linux. It could go on the same way (`list sink-inputs`, `set-default-sink`,
+  `move-sink-input`), or lyr could take `libpulse-binding` (plan 07's default:
+  one connection, no processes) or go native PipeWire with WirePlumber metadata
+  (no libpulse, more code). Keep `pactl` and build the menu on it, or switch?
 - **Network without NetworkManager: build the rtnetlink fallback?** (M4.) **Q:**
   The network module reads NetworkManager over zbus, which the dotfiles use.
   Should lyr also support machines without it, through a new rtnetlink crate
@@ -563,10 +568,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   read once and again on each `PropertiesChanged` under `/org/bluez` or object
   added or removed, the rfkill block from the adapter's `PowerState`, and the
   device shown the last to connect, as waybar does
-  (`lyr_sources::bluetooth::Tracker`); tested against a fake BlueZ. Not built:
-  the Linux volume and mic sources (the notification daemon is its own entry;
-  Windows' are built, under M9), which wait on the new-dependency decision
-  above. The network source is built over NetworkManager
+  (`lyr_sources::bluetooth::Tracker`); tested against a fake BlueZ. The volume
+  and mic sources are built over `pactl` (`lyr_sources::audio::pactl`), after
+  waybar 0.15.0's `AudioBackend`: the default sink and source, the channels'
+  mean rounded, the active port and form factor for the icon, Bluetooth told by
+  the monitor's name, re-read on `pactl subscribe`'s sink, source and server
+  events only (drained through `bus::Follow`, so a burst is one re-read); a
+  click mutes and a wheel step moves the volume, held to 100 % and never
+  lowering a boost (`step_argument`). The parsing is tested on JSON from the
+  owner's machine and mutation-checked; the subprocess side is not. Run in a
+  nested Hyprland (2026-10-20): the bar showed the headset at 50 % and the mic
+  at 29 %, as waybar did, and the mic's change to 40 % and back within a second.
+  A click and a scroll have not been made (no pointer injection here). The
+  network source is built over NetworkManager
   (`lyr_sources::network::linux::NetworkManager`): the device of
   `PrimaryConnection` (the default route, as waybar picks it), else of
   `ActivatingConnection`, its IPv4 address, prefix and gateway, and on Wi-Fi the
@@ -770,20 +784,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   power profile, `open_power_menu` opens the power menu, `toggle_dnd` flips
   do-not-disturb as `lyr dnd` does (the bell's right click; not run end to end,
   since Windows draws no bell and WSL has no compositor), and every other
-  built-in is handled; `cycle_profile` on Windows and macOS and the volume
-  built-ins on Linux say they are not implemented, each waiting on a question
-  above. Touchpad scrolling makes one step per 50 device pixels
-  (`PIXELS_PER_STEP`, lyr's own choice; crcbl leaves it to the application).
-  Scrolling away from the user steps to the previous workspace. Not tried with a
-  real click: the tests cover the resolution and the step arithmetic, and the
-  Windows run had no pointer input. Hover is built: the workspace button under
-  the pointer takes the active colour, as waybar's style colours both
-  (`apps/lyr/src/modules.rs`), and moving onto another button redraws the bar.
-  Tooltips are built (`apps/lyr/src/tooltips.rs`): timed as GTK 3 does
-  (`lyr_core::tooltip`), a passthrough popup below the module (above it on a
-  bottom bar) drawn by `lyr_core::draw::tooltip`, for every module that has one;
-  tested on crcbl's headless shell and mutation-checked. Seen on Windows: the
-  clock's `UTC+08:00` and the power button's "Power Button" tooltips opened
+  built-in is handled; `cycle_profile` on Windows and macOS says it is not
+  implemented, waiting on a question above. Touchpad scrolling makes one step
+  per 50 device pixels (`PIXELS_PER_STEP`, lyr's own choice; crcbl leaves it to
+  the application). Scrolling away from the user steps to the previous
+  workspace. Not tried with a real click: the tests cover the resolution and the
+  step arithmetic, and the Windows run had no pointer input. Hover is built: the
+  workspace button under the pointer takes the active colour, as waybar's style
+  colours both (`apps/lyr/src/modules.rs`), and moving onto another button
+  redraws the bar. Tooltips are built (`apps/lyr/src/tooltips.rs`): timed as GTK
+  3 does (`lyr_core::tooltip`), a passthrough popup below the module (above it
+  on a bottom bar) drawn by `lyr_core::draw::tooltip`, for every module that has
+  one; tested on crcbl's headless shell and mutation-checked. Seen on Windows:
+  the clock's `UTC+08:00` and the power button's "Power Button" tooltips opened
   below them. **Known issue on Windows:** once the popup is open, the bar gets
   no pointer-leave from crcbl 0.5.0's Win32 backend, so the tooltip stays up
   after the pointer leaves the bar (with no popup, the leave arrives). Seen with

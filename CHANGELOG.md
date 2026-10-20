@@ -36,6 +36,9 @@ and this project adheres to
   output and input devices, each with mute, a volume slider and steps; a
   device's Default button opens Sound settings. A right click on the volume or
   mic module, or `lyr panel audio`, opens it.
+- On Linux the volume and mic modules show the default output and input through
+  PulseAudio's `pactl` (PipeWire serves it through pipewire-pulse), updated as
+  they change; a click mutes and a scroll steps the volume, up to 100 %.
 - On Windows the volume and mic modules show the default output and input, their
   level and mute, updated as they change, and their click and scroll bindings
   mute and step them; an output on Bluetooth (by its device's bus) takes the

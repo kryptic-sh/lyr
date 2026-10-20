@@ -185,11 +185,13 @@ muted, and unmuting output restores that state.
 
 ### Audio sources
 
-- Linux: the **PulseAudio protocol** (`libpulse` bindings), which PipeWire
-  serves through `pipewire-pulse`. It pushes sink, source and server changes
-  through its subscribe API, and follows `@DEFAULT_SINK@` / `@DEFAULT_SOURCE@`
-  the way `pactl` does. Native PipeWire would need WirePlumber metadata to find
-  the default node, which is more code for no visible gain. See
+- Linux: the **PulseAudio protocol**, which PipeWire serves through
+  `pipewire-pulse`. It pushes sink, source and server changes through its
+  subscribe API, and follows `@DEFAULT_SINK@` / `@DEFAULT_SOURCE@`. The modules
+  speak it through `pactl` (`pactl subscribe` for changes, `--format=json`
+  reads), which needs no client library; `libpulse` bindings remain the option
+  for the audio menu (backlog). Native PipeWire would need WirePlumber metadata
+  to find the default node, which is more code for no visible gain. See
   [16](16-open-questions.md).
 - Windows: WASAPI `IAudioEndpointVolume` with an `IAudioEndpointVolumeCallback`
   for changes, and `IMMNotificationClient` for default-device changes.

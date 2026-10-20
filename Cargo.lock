@@ -961,6 +961,8 @@ dependencies = [
  "objc2-io-bluetooth",
  "objc2-io-kit",
  "objc2-system-configuration",
+ "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "windows",
