@@ -15,7 +15,7 @@ use lyr_core::wifi_menu::{
 };
 use lyr_render::text::Text;
 
-use crate::menu_panel::{Event, MenuPanel};
+use crate::menu_panel::{Event, MenuPanel, Place};
 use crate::tooltips::Look;
 
 /// How long the menu shows "Scanning…" at most: NetworkManager can take a
@@ -115,12 +115,11 @@ pub enum Joined {
 }
 
 impl WifiMenu {
-    /// Opens the menu showing `wifi`, `left` from the output's left edge,
-    /// at `now`, `since_boot` after boot (`None` when it is not known, which
+    /// Opens the menu showing `wifi` at `place`, at `now`, `since_boot` after boot (`None` when it is not known, which
     /// treats the last scan as stale).
     pub fn open(
         shell: &mut dyn Shell,
-        left: f64,
+        place: Place,
         look: &Look<'_>,
         wifi: &Wifi,
         now: Instant,
@@ -145,7 +144,7 @@ impl WifiMenu {
             look.theme,
         );
         Ok(Self {
-            panel: MenuPanel::open(shell, left, drawn)?,
+            panel: MenuPanel::open(shell, place, drawn)?,
             networks,
             showing: None,
             shown: None,

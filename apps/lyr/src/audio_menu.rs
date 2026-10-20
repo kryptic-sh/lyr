@@ -12,7 +12,7 @@ use crcbl_shell::{Shell, ShellEvent, WindowId};
 use lyr_core::audio_menu::{self, Nodes, Step, Tab, Target};
 use lyr_render::text::Text;
 
-use crate::menu_panel::{Event, MenuPanel};
+use crate::menu_panel::{Event, MenuPanel, Place};
 use crate::tooltips::Look;
 
 /// The open menu.
@@ -49,18 +49,17 @@ pub enum Outcome {
 }
 
 impl AudioMenu {
-    /// Opens the menu on `tab` of `nodes`, `left` from the output's left
-    /// edge.
+    /// Opens the menu on `tab` of `nodes` at `place`.
     pub fn open(
         shell: &mut dyn Shell,
-        left: f64,
+        place: Place,
         look: &Look<'_>,
         nodes: &Nodes,
         tab: Tab,
     ) -> anyhow::Result<Self> {
         let drawn = audio_menu::draw(nodes, tab, None, look.measure, look.line_height, look.theme);
         Ok(Self {
-            panel: MenuPanel::open(shell, left, drawn)?,
+            panel: MenuPanel::open(shell, place, drawn)?,
             tab,
             ids: ids(nodes, tab),
         })

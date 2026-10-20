@@ -35,11 +35,11 @@ use crate::audio_menu::AudioMenu;
 use crate::bluetooth_menu::BluetoothMenu;
 use crate::clock_panel::{ClockPanel, Contents};
 use crate::control;
+use crate::menu_panel::Place;
 use crate::modules::{self, Data};
 use crate::power_menu::PowerMenu;
 use crate::sources::{self, Commands, Update};
 use crate::stats::Stats;
-use crate::toasts::EDGE_MARGIN;
 use crate::toasts::Toasts;
 use crate::tooltips::{Anchor, Look};
 use crate::tray_menu::TrayMenu;
@@ -321,13 +321,13 @@ impl App {
         Ok(())
     }
 
-    /// Opens the Bluetooth menu `left` from the output's left edge, or
+    /// Opens the Bluetooth menu at `place`, or
     /// closes it if it is open. Returns why it did not open: there is no
     /// adapter. Windows opens its Bluetooth Settings page instead.
     fn toggle_bluetooth_menu(
         &mut self,
         shell: &mut dyn Shell,
-        left: f64,
+        place: Place,
     ) -> anyhow::Result<Result<(), &'static str>> {
         if let Some(menu) = self.bluetooth_menu.take() {
             menu.close(shell, false)?;
@@ -353,7 +353,7 @@ impl App {
         self.bluetooth_menu = Some(
             BluetoothMenu::open(
                 shell,
-                left,
+                place,
                 &look,
                 adapter,
                 &self.data.bluetooth_devices,
@@ -369,7 +369,7 @@ impl App {
     /// opens it, since a question nobody sees times out.
     fn refresh_bluetooth_menu(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {
         if self.bluetooth_menu.is_none() && self.data.bluetooth_ask.is_some() {
-            if let Err(why) = self.toggle_bluetooth_menu(shell, EDGE_MARGIN)? {
+            if let Err(why) = self.toggle_bluetooth_menu(shell, Place::EDGE)? {
                 tracing::warn!("bluetooth: a pairing question, but {why}");
             }
             return Ok(());

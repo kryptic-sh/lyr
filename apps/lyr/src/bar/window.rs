@@ -6,6 +6,7 @@ use lyr_core::hit::Regions;
 use lyr_render::surface::Surface;
 
 use crate::input::Pointer;
+use crate::menu_panel::Place;
 use crate::tooltips::Tooltips;
 
 /// One bar window: its surface, its size, and what it drew last.
@@ -36,5 +37,15 @@ impl Window {
             Some(Target::Button(Module::Workspaces, index)) => Some(*index),
             _ => None,
         }
+    }
+
+    /// Where a menu opens under `target` on this bar, or `None` when the
+    /// last frame did not draw it.
+    pub(super) fn place_under(&self, target: &Target<Module>) -> Option<Place> {
+        let rect = self.regions.rect(target)?;
+        Some(Place {
+            left: f64::from(rect.x),
+            width: f64::from(self.width),
+        })
     }
 }

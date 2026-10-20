@@ -8,6 +8,7 @@ use lyr_core::bluetooth_menu::{
 };
 
 use super::{BluetoothMenu, Outcome};
+use crate::menu_panel::Place;
 use crate::tooltips::Look;
 
 /// Every character is 10 px wide.
@@ -74,8 +75,8 @@ fn setup(devices: &[Device]) -> Setup {
         line_height: 20.0,
         calendar_line_height: 20.0,
     };
-    let menu =
-        BluetoothMenu::open(&mut shell, 16.0, &look, &adapter(), devices, None).expect("opened");
+    let menu = BluetoothMenu::open(&mut shell, Place::EDGE, &look, &adapter(), devices, None)
+        .expect("opened");
     Setup { shell, theme, menu }
 }
 

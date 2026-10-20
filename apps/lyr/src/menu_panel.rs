@@ -1,5 +1,6 @@
-//! What the Bluetooth and Wi-Fi menus do alike: a panel at the top left of
-//! the output, taking the keyboard, drawn from a draw list and its input
+//! What the Bluetooth, Wi-Fi and audio menus do alike: a panel at the top
+//! of the output, under the module that opened it and kept inside the
+//! output ([`Place`]), taking the keyboard, drawn from a draw list and its input
 //! regions, the arrow keys moving an outline through the regions in the
 //! order drawn, and Escape, losing focus or the window system closing it.
 //!
@@ -25,8 +26,7 @@ use crate::toasts::EDGE_MARGIN;
 /// An open menu's panel.
 pub struct MenuPanel<T> {
     window: WindowId,
-    /// From the output's left edge.
-    left: f64,
+    place: Place,
     size: Size,
     list: DrawList,
     regions: Regions<T>,
@@ -54,8 +54,34 @@ pub enum Event<T> {
     Redraw,
 }
 
-/// The panel's window, `size` big, `left` from the output's left edge.
-fn create(shell: &mut dyn Shell, size: Size, left: f64) -> anyhow::Result<WindowId> {
+/// Where a menu's panel opens: `left` from its output's left edge, on an
+/// output `width` wide, in logical pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Place {
+    pub left: f64,
+    pub width: f64,
+}
+
+impl Place {
+    /// At the output's left edge, on an output of unknown width: where
+    /// `lyr panel` opens a menu no bar shows the module of.
+    pub const EDGE: Self = Self {
+        left: EDGE_MARGIN,
+        width: f64::INFINITY,
+    };
+
+    /// The left margin of a panel `size` big: `left`, moved left as far as
+    /// it takes to end a margin from the output's right edge, but not past
+    /// its left edge.
+    fn left(self, size: Size) -> f64 {
+        self.left
+            .min(self.width - f64::from(size.width) - EDGE_MARGIN)
+            .max(0.0)
+    }
+}
+
+/// The panel's window, `size` big, at `place`.
+fn create(shell: &mut dyn Shell, size: Size, place: Place) -> anyhow::Result<WindowId> {
     Ok(shell.create_window(&WindowDesc {
         title: NAMESPACE,
         app_id: NAMESPACE,
@@ -74,7 +100,7 @@ fn create(shell: &mut dyn Shell, size: Size, left: f64) -> anyhow::Result<Window
                 top: EDGE_MARGIN,
                 right: 0.0,
                 bottom: 0.0,
-                left,
+                left: place.left(size),
             },
             keyboard: PanelKeyboard::Exclusive,
         }),
@@ -84,15 +110,15 @@ fn create(shell: &mut dyn Shell, size: Size, left: f64) -> anyhow::Result<Window
 
 impl<T: Copy> MenuPanel<T> {
     /// Opens a panel showing `list`, `size` big, with its input `regions`,
-    /// `left` from the output's left edge.
+    /// at `place`.
     pub fn open(
         shell: &mut dyn Shell,
-        left: f64,
+        place: Place,
         (list, size, regions): (DrawList, Size, Regions<T>),
     ) -> anyhow::Result<Self> {
         Ok(Self {
-            window: create(shell, size, left)?,
-            left,
+            window: create(shell, size, place)?,
+            place,
             size,
             list,
             regions,
@@ -161,7 +187,7 @@ impl<T: Copy> MenuPanel<T> {
                 surface.destroy()?;
             }
             shell.destroy_window(self.window)?;
-            self.window = create(shell, size, self.left)?;
+            self.window = create(shell, size, self.place)?;
             self.size = size;
         }
         self.list = list;
@@ -257,5 +283,42 @@ impl<T: Copy> MenuPanel<T> {
             shell.destroy_window(self.window)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lyr_core::draw::Size;
+
+    use super::Place;
+    use crate::toasts::EDGE_MARGIN;
+
+    #[test]
+    fn a_panel_stays_inside_its_output() {
+        let size = Size {
+            width: 600.0,
+            height: 200.0,
+        };
+        let place = |left| Place {
+            left,
+            width: 1920.0,
+        };
+        assert!(
+            (place(100.0).left(size) - 100.0).abs() < f64::EPSILON,
+            "room"
+        );
+        assert!(
+            (place(1500.0).left(size) - (1920.0 - 600.0 - EDGE_MARGIN)).abs() < f64::EPSILON,
+            "moved left to end a margin from the right edge"
+        );
+        let narrow = Place {
+            left: 100.0,
+            width: 400.0,
+        };
+        assert!(
+            narrow.left(size).abs() < f64::EPSILON,
+            "wider than the output"
+        );
+        assert!((Place::EDGE.left(size) - EDGE_MARGIN).abs() < f64::EPSILON);
     }
 }

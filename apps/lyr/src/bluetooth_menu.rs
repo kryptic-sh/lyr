@@ -16,7 +16,7 @@ use lyr_core::bluetooth_menu::{
 };
 use lyr_render::text::Text;
 
-use crate::menu_panel::{Event, MenuPanel};
+use crate::menu_panel::{Event, MenuPanel, Place};
 use crate::tooltips::Look;
 
 /// The open menu.
@@ -61,11 +61,10 @@ pub enum Outcome {
 }
 
 impl BluetoothMenu {
-    /// Opens the menu for `adapter` and its `devices`, `left` from the
-    /// output's left edge.
+    /// Opens the menu for `adapter` and its `devices` at `place`.
     pub fn open(
         shell: &mut dyn Shell,
-        left: f64,
+        place: Place,
         look: &Look<'_>,
         adapter: &Adapter,
         devices: &[Device],
@@ -81,7 +80,7 @@ impl BluetoothMenu {
             look.theme,
         );
         let menu = Self {
-            panel: MenuPanel::open(shell, left, drawn)?,
+            panel: MenuPanel::open(shell, place, drawn)?,
             paths: paths(devices),
             renaming: None,
             showing: ask.map(|ask| Showing::Ask(ask.device.to_owned(), ask.question)),

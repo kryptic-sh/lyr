@@ -221,7 +221,7 @@ impl App {
                         continue;
                     }
                     if opens == Some(Builtin::OpenBluetoothMenu) {
-                        bluetooth_at = window.regions.rect(target).map(|rect| f64::from(rect.x));
+                        bluetooth_at = window.place_under(target);
                         continue;
                     }
                     if opens == Some(Builtin::OpenAudioMenu) {
@@ -235,14 +235,11 @@ impl App {
                         } else {
                             lyr_core::audio_menu::Tab::Output
                         };
-                        audio_at = window
-                            .regions
-                            .rect(target)
-                            .map(|rect| (f64::from(rect.x), tab));
+                        audio_at = window.place_under(target).map(|place| (place, tab));
                         continue;
                     }
                     if opens == Some(Builtin::OpenWifiMenu) {
-                        wifi_at = window.regions.rect(target).map(|rect| f64::from(rect.x));
+                        wifi_at = window.place_under(target);
                         continue;
                     }
                     if opens != Some(Builtin::OpenPowerMenu) {
@@ -275,21 +272,21 @@ impl App {
                 if toggle_panel {
                     self.toggle_clock_panel(shell)?;
                 }
-                if let Some(left) = bluetooth_at
-                    && let Err(why) = self.toggle_bluetooth_menu(shell, left)?
+                if let Some(place) = bluetooth_at
+                    && let Err(why) = self.toggle_bluetooth_menu(shell, place)?
                 {
                     tracing::warn!("open_bluetooth_menu: {why}");
                 }
-                if let Some((left, tab)) = audio_at
-                    && let Err(why) = self.toggle_audio_menu(shell, left, tab)?
+                if let Some((place, tab)) = audio_at
+                    && let Err(why) = self.toggle_audio_menu(shell, place, tab)?
                 {
                     tracing::warn!("open_audio_menu: {why}");
                 }
                 if let Some((rect, index, press)) = tray_press {
                     self.tray_press(id, rect, index, press);
                 }
-                if let Some(left) = wifi_at
-                    && let Err(why) = self.toggle_wifi_menu(shell, left, instant)?
+                if let Some(place) = wifi_at
+                    && let Err(why) = self.toggle_wifi_menu(shell, place, instant)?
                 {
                     tracing::warn!("open_wifi_menu: {why}");
                 }

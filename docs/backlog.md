@@ -485,11 +485,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   endpoint change and once a second while the menu is open, since session
   changes have no callbacks wired. Run on Windows (2026-10-20):
   `lyr panel audio` opened it listing this machine's four output devices, the
-  default in the active colour; it opened under the volume module and ran off
-  the screen's right edge, which the panel placement fix that followed
-  addresses. Each control's lookup was tested by a 0 % step on every device and
-  stream; no row's button has been clicked on the real machine, since each
-  changes its real volume. Not built: a slider (plan 10's), wiremix's card
+  default in the active colour; a menu panel now stays inside its output
+  (`menu_panel::Place`, from the clicked bar's width; `lyr panel` with no bar
+  showing the module opens at the left edge), and the audio menu opened ending
+  16 px from the screen's right edge, its Playback tab clicked for real
+  redrawing it there. Each control's lookup was tested by a 0 % step on every
+  device and stream; no row's button has been clicked on the real machine, since
+  each changes its real volume. Not built: a slider (plan 10's), wiremix's card
   configuration tab, and routing a stream to another device (no public API on
   Windows). Not built: the other Windows sources (Bluetooth, workspaces, both
   waiting on the owner's questions above) and the native menus plan 10 names;

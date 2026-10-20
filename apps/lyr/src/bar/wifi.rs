@@ -7,18 +7,19 @@ use anyhow::Context as _;
 use crcbl_shell::{Shell, ShellEvent};
 
 use super::App;
+use crate::menu_panel::Place;
 use crate::tooltips::Look;
 use crate::wifi_menu::{DOUBLE_CLICK, Outcome, WifiMenu};
 
 impl App {
-    /// Opens the Wi-Fi menu `left` from the output's left edge at `now`, or
+    /// Opens the Wi-Fi menu at `place` at `now`, or
     /// closes it if it is open, unless it opened a double click's interval
     /// ago. Returns why it did not open: there is no Wi-Fi device. Windows
     /// opens its network Settings page instead.
     pub(super) fn toggle_wifi_menu(
         &mut self,
         shell: &mut dyn Shell,
-        left: f64,
+        place: Place,
         now: Instant,
     ) -> anyhow::Result<Result<(), &'static str>> {
         if let Some(menu) = &self.wifi_menu {
@@ -53,7 +54,7 @@ impl App {
             calendar_line_height: self.text.calendar_line_height(),
         };
         self.wifi_menu = Some(
-            WifiMenu::open(shell, left, &look, wifi, now, since_boot())
+            WifiMenu::open(shell, place, &look, wifi, now, since_boot())
                 .context("opening the Wi-Fi menu")?,
         );
         Ok(Ok(()))

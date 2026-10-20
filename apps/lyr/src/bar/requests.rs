@@ -5,12 +5,13 @@ use std::sync::PoisonError;
 
 use anyhow::Context as _;
 use crcbl_shell::Shell;
-use lyr_config::Platform;
+use lyr_config::{Module, Platform};
 use lyr_core::clock::Tick;
 use lyr_core::control::{Panel, Request};
 
 use super::{App, load_text, next_tick};
 use crate::control::{self, Incoming};
+use crate::menu_panel::Place;
 
 impl App {
     /// Carries out `incoming` and replies to it. Returns whether it asked the
@@ -42,50 +43,22 @@ impl App {
                 incoming.reply(control::OK);
             }
             Request::Panel(Panel::Bluetooth) => {
-                // Under the module where a bar shows it, else at the edge.
-                let left = self
-                    .windows
-                    .values()
-                    .find_map(|window| {
-                        window.regions.rect(&lyr_core::draw::Target::Module(
-                            lyr_config::Module::Bluetooth,
-                        ))
-                    })
-                    .map_or(crate::toasts::EDGE_MARGIN, |rect| f64::from(rect.x));
-                match self.toggle_bluetooth_menu(shell, left)? {
+                let place = self.place_under(Module::Bluetooth);
+                match self.toggle_bluetooth_menu(shell, place)? {
                     Ok(()) => incoming.reply(control::OK),
                     Err(why) => incoming.reply(format!("error: {why}")),
                 }
             }
             Request::Panel(Panel::Wifi) => {
-                // Under the module where a bar shows it, else at the edge.
-                let left = self
-                    .windows
-                    .values()
-                    .find_map(|window| {
-                        window
-                            .regions
-                            .rect(&lyr_core::draw::Target::Module(lyr_config::Module::Network))
-                    })
-                    .map_or(crate::toasts::EDGE_MARGIN, |rect| f64::from(rect.x));
-                match self.toggle_wifi_menu(shell, left, std::time::Instant::now())? {
+                let place = self.place_under(Module::Network);
+                match self.toggle_wifi_menu(shell, place, std::time::Instant::now())? {
                     Ok(()) => incoming.reply(control::OK),
                     Err(why) => incoming.reply(format!("error: {why}")),
                 }
             }
             Request::Panel(Panel::Audio) => {
-                // Under the volume module where a bar shows it, else at the
-                // edge.
-                let left = self
-                    .windows
-                    .values()
-                    .find_map(|window| {
-                        window
-                            .regions
-                            .rect(&lyr_core::draw::Target::Module(lyr_config::Module::Volume))
-                    })
-                    .map_or(crate::toasts::EDGE_MARGIN, |rect| f64::from(rect.x));
-                match self.toggle_audio_menu(shell, left, lyr_core::audio_menu::Tab::Output)? {
+                let place = self.place_under(Module::Volume);
+                match self.toggle_audio_menu(shell, place, lyr_core::audio_menu::Tab::Output)? {
                     Ok(()) => incoming.reply(control::OK),
                     Err(why) => incoming.reply(format!("error: {why}")),
                 }
@@ -96,6 +69,15 @@ impl App {
             }
         }
         Ok(false)
+    }
+
+    /// Where `lyr panel` opens a menu: under `module` where a bar shows it,
+    /// else at the output's edge.
+    fn place_under(&self, module: Module) -> Place {
+        self.windows
+            .values()
+            .find_map(|window| window.place_under(&lyr_core::draw::Target::Module(module)))
+            .unwrap_or(Place::EDGE)
     }
 
     /// `lyr reload`. An invalid config is logged and the running one kept

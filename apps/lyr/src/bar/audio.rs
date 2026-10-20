@@ -8,16 +8,17 @@ use lyr_core::audio_menu::Tab;
 
 use super::App;
 use crate::audio_menu::{Action, AudioMenu, Outcome};
+use crate::menu_panel::Place;
 use crate::tooltips::Look;
 
 impl App {
-    /// Opens the audio menu on `tab`, `left` from the output's left edge, or
+    /// Opens the audio menu on `tab` at `place`, or
     /// closes it if it is open. Returns why it did not open: there is no
     /// audio source on this platform yet.
     pub(super) fn toggle_audio_menu(
         &mut self,
         shell: &mut dyn Shell,
-        left: f64,
+        place: Place,
         tab: Tab,
     ) -> anyhow::Result<Result<(), &'static str>> {
         if let Some(menu) = self.audio_menu.take() {
@@ -35,7 +36,7 @@ impl App {
             calendar_line_height: self.text.calendar_line_height(),
         };
         self.audio_menu = Some(
-            AudioMenu::open(shell, left, &look, nodes, tab).context("opening the audio menu")?,
+            AudioMenu::open(shell, place, &look, nodes, tab).context("opening the audio menu")?,
         );
         Ok(Ok(()))
     }

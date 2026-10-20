@@ -5,6 +5,7 @@ use lyr_config::{Platform, Theme, from_sources};
 use lyr_core::wifi_menu::{AccessPoint, Profile, Radio, Scan, Security, Wifi};
 
 use super::{Joined, Outcome, SCAN_WAIT, WifiMenu};
+use crate::menu_panel::Place;
 use crate::tooltips::Look;
 
 /// Every character is 10 px wide.
@@ -133,7 +134,7 @@ fn setup(wifi: &Wifi) -> Setup {
     let opened = Instant::now();
     let menu = WifiMenu::open(
         &mut shell,
-        16.0,
+        Place::EDGE,
         &look(&theme),
         wifi,
         opened,
@@ -257,7 +258,7 @@ fn a_stale_list_waits_for_a_fresh_scan_or_the_cap() {
     let opened = Instant::now();
     let menu = WifiMenu::open(
         &mut shell,
-        16.0,
+        Place::EDGE,
         &look(&theme),
         &stale,
         opened,

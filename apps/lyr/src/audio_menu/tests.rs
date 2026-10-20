@@ -5,6 +5,7 @@ use lyr_config::{Platform, Theme, from_sources};
 use lyr_core::audio_menu::{self, Node, Nodes, Step, Tab, Target};
 
 use super::{Action, AudioMenu, Outcome};
+use crate::menu_panel::Place;
 use crate::tooltips::Look;
 
 /// Every character is 10 px wide.
@@ -102,7 +103,7 @@ fn setup(tab: Tab) -> Setup {
         line_height: LINE,
         calendar_line_height: LINE,
     };
-    let menu = AudioMenu::open(&mut shell, 16.0, &look, &nodes(), tab).expect("opened");
+    let menu = AudioMenu::open(&mut shell, Place::EDGE, &look, &nodes(), tab).expect("opened");
     Setup { shell, theme, menu }
 }
 
