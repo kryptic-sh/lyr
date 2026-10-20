@@ -13,6 +13,7 @@
 //! bar's main thread, whose run loop runs.
 
 use std::cell::RefCell;
+use std::ffi::{c_int, c_uint};
 use std::ptr::NonNull;
 
 use block2::RcBlock;
@@ -35,13 +36,15 @@ const DEFAULT_ADAPTER: &str = "default";
 fn adapter() -> Option<Adapter> {
     // SAFETY: plain Objective-C calls with no preconditions.
     let controller = unsafe { IOBluetoothHostController::defaultController() }?;
+    // `objc2-io-bluetooth` 0.3.2 binds `powerState` as returning an unsigned
+    // `BluetoothHCIPowerState`, but the runtime declares it `int` (seen on
+    // CI's Mac, where objc2's check refused the send), so it is sent here
+    // with the type the runtime has.
+    // SAFETY: `powerState` takes no arguments and returns an `int`.
+    let state: c_int = unsafe { msg_send![&*controller, powerState] };
     // SAFETY: as above.
-    let (powered, address) = unsafe {
-        (
-            controller.powerState() == BluetoothHCIPowerState::ON,
-            controller.addressAsString(),
-        )
-    };
+    let address = unsafe { controller.addressAsString() };
+    let powered = c_uint::try_from(state).is_ok_and(|state| state == BluetoothHCIPowerState::ON.0);
     Some(Adapter {
         path: address.map_or_else(|| DEFAULT_ADAPTER.to_owned(), |address| address.to_string()),
         powered,
