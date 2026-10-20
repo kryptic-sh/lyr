@@ -31,7 +31,6 @@ pub enum Update {
     #[cfg(windows)]
     ActiveWindow(lyr_sources::window::Active),
     /// The power profiles, or `None` when there is none to show.
-    #[cfg(any(target_os = "linux", windows))]
     PowerProfile(Option<lyr_sources::power_profile::Profiles>),
     /// The network's reading (NetworkManager's on Linux, IP Helper's on
     /// Windows), or `None` before the first.
@@ -169,6 +168,9 @@ pub struct Commands {
     /// macOS: the battery's change notifications, live while the bar is.
     #[cfg(target_os = "macos")]
     _battery: Option<lyr_sources::battery::macos::Watch>,
+    /// macOS: Low Power Mode's change notification, live while the bar is.
+    #[cfg(target_os = "macos")]
+    _power_profile: lyr_sources::power_profile::macos::Watch,
     #[cfg(windows)]
     _network: Option<lyr_sources::network::windows::Watch>,
     #[cfg(windows)]
@@ -409,19 +411,21 @@ pub fn start(
     #[cfg(target_os = "macos")]
     {
         let audio = macos::audio(sender.clone(), waker.clone())?;
+        let power_profile = macos::power_profile(sender.clone(), waker.clone());
         let battery = macos::battery(sender, waker);
         Ok((
             receiver,
             Commands {
                 _battery: battery,
+                _power_profile: power_profile,
                 audio,
             },
         ))
     }
 }
 
-/// The sources macOS has so far: the battery and the default audio
-/// devices.
+/// The sources macOS has so far: the battery, the default audio devices
+/// and Low Power Mode.
 #[cfg(target_os = "macos")]
 mod macos {
     use std::sync::mpsc;
@@ -524,6 +528,35 @@ mod macos {
                 }
             })?;
         Ok(requests)
+    }
+
+    /// Hands Low Power Mode, as the module's profile, to the main loop now
+    /// and each time it turns on or off, while the returned watch lives.
+    pub(super) fn power_profile(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+    ) -> lyr_sources::power_profile::macos::Watch {
+        use lyr_core::power_profile::Profile;
+        use lyr_sources::power_profile::Profiles;
+        use lyr_sources::power_profile::macos::{Watch, read};
+        // The notification may come on any thread, and an mpsc sender is
+        // not shared between threads, so each call sends through its own.
+        let sender = std::sync::Mutex::new(sender);
+        let deliver = move |active: Profile| {
+            let profiles = Some(Profiles {
+                active,
+                available: Vec::new(),
+            });
+            if let Ok(sender) = sender.lock() {
+                // The main loop has gone when this fails: nothing to do.
+                let _gone = sender.send(Update::PowerProfile(profiles));
+            }
+            if let Some(waker) = &waker {
+                waker.wake();
+            }
+        };
+        deliver(read());
+        Watch::new(deliver)
     }
 
     /// Hands the battery to the main loop now and after every power source

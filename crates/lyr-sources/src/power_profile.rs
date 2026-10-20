@@ -1,14 +1,18 @@
 //! The power-profile module's source (`docs/plan/07-modules.md#power-profile`).
 //!
 //! [`Profiles`] turns power-profiles-daemon's properties into what the view
-//! and the click need, and [`win32`] Windows' effective power mode into a
-//! profile, on every platform's tests; [`linux`] reads the daemon over
-//! D-Bus, and [`windows`] the power mode. macOS comes with milestone M10.
+//! and the click need, [`win32`] Windows' effective power mode into a
+//! profile, and [`lowpower`] macOS's Low Power Mode, on every platform's
+//! tests; [`linux`] reads the daemon over D-Bus, [`windows`] the power mode,
+//! and `macos` Low Power Mode.
 
 use lyr_core::power_profile::Profile;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
+pub mod lowpower;
+#[cfg(target_os = "macos")]
+pub mod macos;
 pub mod win32;
 #[cfg(windows)]
 pub mod windows;

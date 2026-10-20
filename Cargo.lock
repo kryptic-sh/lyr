@@ -948,10 +948,13 @@ dependencies = [
 name = "lyr-sources"
 version = "0.1.0"
 dependencies = [
+ "block2",
  "futures-util",
  "lyr-core",
+ "objc2",
  "objc2-core-audio",
  "objc2-core-foundation",
+ "objc2-foundation",
  "objc2-io-kit",
  "thiserror",
  "tokio",
@@ -1078,6 +1081,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3e0adef53c21f888deb4fa59fc59f7eb17404926ee8a6f59f5df0fd7f9f3272"
 dependencies = [
  "bitflags",
+ "block2",
  "objc2",
 ]
 

@@ -44,6 +44,8 @@ and this project adheres to
   level and mute, from CoreAudio, updated as they change; their click and scroll
   bindings mute and step the device. A device with only per-channel volumes,
   such as the built-in output, is read as their mean and set on each channel.
+- On macOS the power-profile module shows Low Power Mode, as power-saver while
+  it is on, updated when it turns on or off. It is read-only there.
 - Clicking a workspace switches to it, and with `workspaces.scroll = true` the
   wheel steps through them. A module's `[<module>.on]` table binds clicks and
   scrolling to a command (`{ exec = "…" }`) or a built-in action. Of the
