@@ -492,12 +492,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   showing the module opens at the left edge), and the audio menu opened ending
   16 px from the screen's right edge, its Playback tab clicked for real
   redrawing it there. Each control's lookup was tested by a 0 % step on every
-  device and stream; no row's button has been clicked on the real machine, since
-  each changes its real volume. Not built: a slider (plan 10's), wiremix's card
-  configuration tab, and routing a stream to another device (no public API on
-  Windows). Not built: the other Windows sources (Bluetooth, workspaces, both
-  waiting on the owner's questions above) and the native menus plan 10 names;
-  macOS's `x-apple.systempreferences:` fallbacks wait on M10.
+  device and stream; on the real machine (2026-10-20) a click on the steam
+  stream's step down showed 95 % and its step up 100 % again, so a click reaches
+  the source and the change comes back to the menu; Mute and a device's steps
+  have not been clicked, since they change what is heard. Not built: a slider
+  (plan 10's), wiremix's card configuration tab, and routing a stream to another
+  device (no public API on Windows). Not built: the other Windows sources
+  (Bluetooth, workspaces, both waiting on the owner's questions above) and the
+  native menus plan 10 names; macOS's `x-apple.systempreferences:` fallbacks
+  wait on M10.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace
