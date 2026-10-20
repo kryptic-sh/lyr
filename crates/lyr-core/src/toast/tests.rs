@@ -75,6 +75,24 @@ two
 }
 
 #[test]
+fn a_line_may_also_end_after_a_hyphen_or_between_ideographs() {
+    // "a well-known" is 120 px; UAX #14 allows a break after the hyphen.
+    assert_eq!(lines("a well-known"), ["a well-", "known"]);
+    // Twelve ideographs, 120 px, with a break allowed between any two.
+    assert_eq!(
+        lines(
+            "\u{4e00}\u{4e8c}\u{4e09}\u{56db}\u{4e94}\u{516d}\u{4e03}\u{516b}\u{4e5d}\u{5341}\u{767e}\u{5343}"
+        ),
+        [
+            "\u{4e00}\u{4e8c}\u{4e09}\u{56db}\u{4e94}\u{516d}\u{4e03}\u{516b}\u{4e5d}\u{5341}",
+            "\u{767e}\u{5343}"
+        ]
+    );
+    // A line separator (U+2028) is a hard break, as a line feed is.
+    assert_eq!(lines("one\u{2028}two"), ["one", "two"]);
+}
+
+#[test]
 fn bold_is_measured_bold_and_the_space_starts_the_next_span() {
     // "bold words" fits 100 px in the regular face, but "bold" is 60 px.
     assert_eq!(lines("<b>bold</b> words"), ["bold", "words"]);

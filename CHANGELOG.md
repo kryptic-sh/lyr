@@ -25,6 +25,9 @@ and this project adheres to
 - The toast stack, the menus and, on a reload that changes `[bar]`, the bars
   change size and place in place (crcbl 0.7.0's `set_panel`) instead of closing
   and reopening their windows.
+- A toast's body wraps where Unicode's line breaking rules allow (UAX #14,
+  through crcbl-ui's `font::breaks`): after a hyphen and between ideographs as
+  well as at spaces, and at every kind of line break.
 - On Windows the notifications module shows a bell, and either click opens
   Windows' notification centre.
 - On Windows the Wi-Fi and Bluetooth menus open the matching Settings page, from

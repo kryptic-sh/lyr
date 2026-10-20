@@ -10,6 +10,7 @@ pub mod stack;
 
 use std::time::Duration;
 
+use crcbl_ui::font::breaks;
 use lyr_config::Theme;
 
 use crate::draw::{DrawList, Item, Size, TextStyle};
@@ -62,11 +63,14 @@ pub const fn text_style(style: Style) -> TextStyle {
     }
 }
 
-/// `spans` broken into lines no wider than `width`, at spaces, keeping the
-/// text's own line breaks, each line in spans of one style. A word wider
-/// than `width` gets a line of its own and runs past it. The space between
-/// two words starts the second one's span: a span's width does not count a
-/// space at its end.
+/// `spans` broken into lines no wider than `width`, keeping the text's own
+/// line breaks, each line in spans of one style. A line may end where
+/// Unicode's line breaking rules (UAX #14) allow, as crcbl-ui's
+/// `font::breaks` finds it: after the spaces between words, after a hyphen,
+/// between ideographs. A run of whitespace between two pieces becomes one
+/// space, which starts the second piece's span, so a span's width does not
+/// count a space at its end; whitespace at a line's ends goes. A piece wider
+/// than `width` gets a line of its own and runs past it.
 #[must_use]
 pub fn wrap(
     spans: &[Span],
@@ -80,20 +84,22 @@ pub fn wrap(
     };
     let mut lines = Vec::new();
     for paragraph in paragraphs(spans) {
-        let mut line = Vec::new();
-        for word in words(&paragraph) {
+        let mut line: Vec<Span> = Vec::new();
+        for (spaced, piece) in pieces(&paragraph) {
             if line.is_empty() {
-                line = word;
+                line = piece;
                 continue;
             }
             let mut candidate = line.clone();
-            let mut spaced = word.clone();
-            spaced[0].text.insert(0, ' ');
-            append(&mut candidate, spaced);
+            let mut joined = piece.clone();
+            if spaced {
+                joined[0].text.insert(0, ' ');
+            }
+            append(&mut candidate, joined);
             if width_of(&candidate) <= width {
                 line = candidate;
             } else {
-                lines.push(std::mem::replace(&mut line, word));
+                lines.push(std::mem::replace(&mut line, piece));
             }
         }
         lines.push(line);
@@ -101,30 +107,60 @@ pub fn wrap(
     lines
 }
 
-/// The text's lines, as `str::lines` splits them: a final line break ends
-/// the last line rather than starting another.
+/// The text's paragraphs, between UAX #14's hard breaks (a line feed, a
+/// carriage return and line feed as one, a line separator, …), each as its
+/// characters and their styles. A final hard break ends the last paragraph
+/// rather than starting another, as `str::lines` has it.
 fn paragraphs(spans: &[Span]) -> Vec<Vec<(char, Style)>> {
-    let chars: Vec<(char, Style)> = spans
+    let text: String = spans.iter().map(|span| span.text.as_str()).collect();
+    let styles: Vec<Style> = spans
         .iter()
-        .flat_map(|span| span.text.chars().map(move |c| (c, span.style)))
+        .flat_map(|span| span.text.chars().map(move |_| span.style))
         .collect();
-    // A `\r` before a line break is whitespace, which a line's words leave
-    // out.
-    let mut paragraphs: Vec<Vec<(char, Style)>> = chars
-        .split(|&(c, _)| c == '\n')
-        .map(<[(char, Style)]>::to_vec)
-        .collect();
-    if chars.last().is_none_or(|&(c, _)| c == '\n') {
+    // Each char's style, by the byte it starts at.
+    let styled = |range: std::ops::Range<usize>| -> Vec<(char, Style)> {
+        let first = text[..range.start].chars().count();
+        text[range]
+            .chars()
+            .zip(styles[first..].iter().copied())
+            .collect()
+    };
+    let mut paragraphs: Vec<Vec<(char, Style)>> = breaks::paragraphs(&text).map(styled).collect();
+    if paragraphs.last().is_some_and(Vec::is_empty) {
         paragraphs.pop();
     }
     paragraphs
 }
 
-/// A line's words, each in spans of one style.
-fn words(line: &[(char, Style)]) -> Vec<Vec<Span>> {
-    line.split(|&(c, _)| c.is_whitespace())
-        .filter(|word| !word.is_empty())
-        .map(|word| {
+/// A paragraph cut where a line may end, each piece in spans of one style
+/// with the whitespace around it left out, and whether whitespace came
+/// before it. Whitespace alone makes no piece.
+fn pieces(paragraph: &[(char, Style)]) -> Vec<(bool, Vec<Span>)> {
+    let text: String = paragraph.iter().map(|&(c, _)| c).collect();
+    // Where each soft break falls, as a char index rather than a byte.
+    let mut cuts: Vec<usize> = breaks::soft_breaks(&text)
+        .into_iter()
+        .map(|byte| text[..byte].chars().count())
+        .collect();
+    cuts.push(paragraph.len());
+    let mut pieces = Vec::new();
+    let mut spaced = false;
+    let mut start = 0;
+    for end in cuts {
+        let chars = &paragraph[start..end];
+        start = end;
+        let leading = chars
+            .iter()
+            .take_while(|&&(c, _)| c.is_whitespace())
+            .count();
+        let trailing = chars[leading..]
+            .iter()
+            .rev()
+            .take_while(|&&(c, _)| c.is_whitespace())
+            .count();
+        spaced |= leading > 0;
+        let word = &chars[leading..chars.len() - trailing];
+        if !word.is_empty() {
             let mut spans = Vec::new();
             for &(c, style) in word {
                 append(
@@ -135,9 +171,12 @@ fn words(line: &[(char, Style)]) -> Vec<Vec<Span>> {
                     }],
                 );
             }
-            spans
-        })
-        .collect()
+            pieces.push((spaced, spans));
+            spaced = false;
+        }
+        spaced |= trailing > 0;
+    }
+    pieces
 }
 
 /// Adds `more` to the end of `line`, joining spans of one style.
