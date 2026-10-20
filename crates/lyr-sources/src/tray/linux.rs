@@ -9,6 +9,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Duration;
 
 use futures_util::StreamExt;
 use futures_util::stream::select;
@@ -235,9 +236,24 @@ pub async fn serve(connection: &Connection) -> zbus::Result<Option<Served>> {
 ///
 /// When the session bus cannot be reached or does not answer.
 pub async fn session() -> zbus::Result<(Host, Option<Served>)> {
-    let connection = Connection::session().await?;
+    let connection = with_call_timeout(zbus::connection::Builder::session())
+        .build()
+        .await?;
     let served = serve(&connection).await?;
     Ok((Host::on(&connection).await?, served))
+}
+
+/// How long the tray waits for a call to answer, lyr's own choice: an item
+/// answers from its own process at once or not at all (Spotify was seen
+/// never answering `GetAll`), and GDBus's 25 s default would leave the tray
+/// empty that long behind it.
+pub const CALL_TIMEOUT: Duration = Duration::from_secs(2);
+
+/// `builder` with the tray's [`CALL_TIMEOUT`], so an item that does not
+/// answer is named in [`Listing::unreadable`] rather than holding up the
+/// rest.
+fn with_call_timeout(builder: zbus::connection::Builder<'_>) -> zbus::connection::Builder<'_> {
+    builder.method_timeout(CALL_TIMEOUT)
 }
 
 /// How the host sees a watcher, lyr's or another's.

@@ -9,7 +9,7 @@ use zbus::connection::Builder;
 use zbus::object_server::{InterfaceRef, SignalEmitter};
 use zbus::{Connection, Guid, OwnedObjectPath};
 
-use super::{Host, Listing, Served, ToolTip, WATCHER_PATH};
+use super::{Host, Listing, Served, ToolTip, WATCHER_PATH, with_call_timeout};
 
 /// Where the fake item says it is: p2p connections carry no sender, so it
 /// registers with its name and path together.
@@ -553,4 +553,53 @@ async fn a_watcher_another_process_has_is_left_to_it() {
             .expect("left to the other")
             .is_none()
     );
+}
+
+/// An item whose `GetAll` never answers, as Spotify's was seen doing.
+struct HungItem;
+
+#[zbus::interface(name = "org.kde.StatusNotifierItem")]
+impl HungItem {
+    #[zbus(property)]
+    async fn id(&self) -> String {
+        std::future::pending().await
+    }
+}
+
+#[tokio::test]
+async fn an_item_that_hangs_does_not_hold_up_the_others() {
+    const HUNG: &str = "/StatusNotifierItem/hung";
+    let calls = Calls::default();
+    let (server, client) = UnixStream::pair().expect("socket pair");
+    let server = Builder::unix_stream(server)
+        .server(Guid::generate())
+        .p2p()
+        .serve_at(HUNG, HungItem)
+        .serve_at(
+            PATH,
+            FakeItem {
+                calls,
+                title: "Steam".to_owned(),
+                menu: "/MenuBar",
+            },
+        )
+        .build();
+    let client = with_call_timeout(Builder::unix_stream(client).p2p()).build();
+    let (server, client) = tokio::try_join!(server, client).expect("connected");
+    let _served = Served::at(&server).await.expect("served");
+    let app = application(&client).await;
+    for path in [HUNG, PATH] {
+        app.register_status_notifier_item(&format!("{BUS}{path}"))
+            .await
+            .expect("registered");
+    }
+    let host = Host::on(&client).await.expect("host");
+    let read = tokio::time::timeout(Duration::from_secs(10), host.items())
+        .await
+        .expect("the hung item was given up on")
+        .expect("read");
+    assert_eq!(read.items.len(), 1, "the other item is read");
+    assert_eq!(read.items[0].title, "Steam");
+    assert_eq!(read.unreadable.len(), 1);
+    assert!(read.unreadable[0].starts_with(&format!("{BUS}{HUNG}: ")));
 }
