@@ -696,9 +696,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   an ordinary parent window did not reproduce the bug; trying a panel parent, as
   lyr's bar is, is next in crcbl's backlog, so the fix has no release yet. Seen
   again on crcbl 0.7.0 (2026-10-20, scripted cursor, screenshots before and
-  after) and reported again. A tooltip follows its module when the module moves
-  (repositioned where the window system can, opened again elsewhere). A tooltip
-  of several lines (a format with line breaks) is drawn a row per line.
+  after) and reported again. crcbl found the cause (a pointer arriving in
+  another of the app's windows moved the leave tracking without reporting a
+  leave of the old one) and fixes it in 0.8.0, with an e2e of lyr's geometry. On
+  0.8.0: run the same hover-then-warp check again, and if the tooltip still
+  stays up, send crcbl the event log around the warp. A tooltip follows its
+  module when the module moves (repositioned where the window system can, opened
+  again elsewhere). A tooltip of several lines (a format with line breaks) is
+  drawn a row per line.
 - **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second
