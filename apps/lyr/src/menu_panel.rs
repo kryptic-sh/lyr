@@ -1,6 +1,7 @@
-//! What the Bluetooth, Wi-Fi and audio menus do alike: a panel at the top
-//! of the output, under the module that opened it and kept inside the
-//! output ([`Place`]), taking the keyboard, drawn from a draw list and its input
+//! What the Bluetooth, Wi-Fi and audio menus do alike: a panel beside the
+//! bar, under the module that opened it and kept inside the output
+//! ([`Place`], where every menu and popup of the bar's opens), taking the
+//! keyboard, drawn from a draw list and its input
 //! regions, the arrow keys moving an outline through the regions in the
 //! order drawn, and Escape, losing focus or the window system closing it.
 //!
@@ -13,8 +14,9 @@ use crcbl_shell::{
     PanelLayer, PointerButton, Reserve, Shell, ShellEvent, TextPurpose, WindowDesc, WindowId,
     WindowRole,
 };
+use lyr_config::Position;
 use lyr_core::draw::{DrawList, Size};
-use lyr_core::hit::Regions;
+use lyr_core::hit::{Rect, Regions};
 use lyr_core::pointer::Press;
 use lyr_render::surface::Surface;
 use lyr_render::text::Text;
@@ -63,20 +65,34 @@ pub enum Event<T> {
     Redraw,
 }
 
-/// Where a menu's panel opens: `left` from its output's left edge, on an
-/// output `width` wide, in logical pixels.
+/// Where a menu, popup or panel the bar opens sits: `GAP` past the bar's
+/// edge, its left edge on the module that opened it, kept inside the
+/// output. Every one of them opens by this rule, so they line up alike.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Place {
+    /// The module's left edge, from its output's left edge, in logical
+    /// pixels.
     pub left: f64,
+    /// The output's width.
     pub width: f64,
+    /// The height beside the bar, from its edge to the output's far edge.
+    pub room: f64,
+    /// The bar's edge of the output, which the menu opens away from.
+    pub edge: Position,
 }
 
+/// How far past the bar's edge a menu opens: the toasts' margin, so they
+/// all keep one distance.
+pub const GAP: f64 = EDGE_MARGIN;
+
 impl Place {
-    /// At the output's left edge, on an output of unknown width: where
+    /// At the output's left edge, on an output of unknown size: where
     /// `lyr panel` opens a menu no bar shows the module of.
     pub const EDGE: Self = Self {
         left: EDGE_MARGIN,
         width: f64::INFINITY,
+        room: f64::INFINITY,
+        edge: Position::Top,
     };
 
     /// The left margin of a panel `size` big: `left`, moved left as far as
@@ -87,29 +103,69 @@ impl Place {
             .min(self.width - f64::from(size.width) - EDGE_MARGIN)
             .max(0.0)
     }
+
+    /// The tallest a panel here can be and still end a margin short of the
+    /// output's far edge.
+    pub fn max_height(self) -> f32 {
+        (self.room - 2.0 * GAP).max(0.0) as f32
+    }
+}
+
+/// The anchor for a popup under `module`, on a bar `bar_height` tall at
+/// `edge`: the module's box stretched `GAP` past the bar's edge, since a
+/// popup opens against its anchor's edge, so it lands where a [`Place`]
+/// puts a panel.
+pub fn popup_anchor(module: Rect, bar_height: f32, edge: Position) -> Rect {
+    let gap = GAP as f32;
+    match edge {
+        Position::Top => Rect {
+            height: bar_height + gap - module.y,
+            ..module
+        },
+        Position::Bottom => Rect {
+            y: -gap,
+            height: module.y + module.height + gap,
+            ..module
+        },
+    }
 }
 
 /// The panel, `size` big at `place`: kept inside the output, so its left
 /// margin moves with its width.
-fn panel_desc(size: Size, place: Place) -> PanelDesc<'static> {
+pub fn panel_desc(size: Size, place: Place) -> PanelDesc<'static> {
+    let (edge, margins) = match place.edge {
+        Position::Top => (
+            PanelAnchor::TOP,
+            Margins {
+                top: GAP,
+                right: 0.0,
+                bottom: 0.0,
+                left: place.left(size),
+            },
+        ),
+        Position::Bottom => (
+            PanelAnchor::BOTTOM,
+            Margins {
+                top: 0.0,
+                right: 0.0,
+                bottom: GAP,
+                left: place.left(size),
+            },
+        ),
+    };
     PanelDesc {
         namespace: NAMESPACE,
         monitor: None,
         layer: PanelLayer::Overlay,
-        anchor: PanelAnchor::TOP | PanelAnchor::LEFT,
+        anchor: edge | PanelAnchor::LEFT,
         reserve: Reserve::None,
-        margins: Margins {
-            top: EDGE_MARGIN,
-            right: 0.0,
-            bottom: 0.0,
-            left: place.left(size),
-        },
+        margins,
         keyboard: PanelKeyboard::Exclusive,
     }
 }
 
 /// `size` as the window system's logical size.
-fn logical(size: Size) -> LogicalSize {
+pub fn logical(size: Size) -> LogicalSize {
     LogicalSize {
         width: f64::from(size.width),
         height: f64::from(size.height),
@@ -344,9 +400,12 @@ impl<T: Copy> MenuPanel<T> {
 
 #[cfg(test)]
 mod tests {
+    use crcbl_shell::PanelAnchor;
+    use lyr_config::Position;
     use lyr_core::draw::Size;
+    use lyr_core::hit::Rect;
 
-    use super::Place;
+    use super::{GAP, Place, panel_desc, popup_anchor};
     use crate::toasts::EDGE_MARGIN;
 
     #[test]
@@ -358,6 +417,7 @@ mod tests {
         let place = |left| Place {
             left,
             width: 1920.0,
+            ..Place::EDGE
         };
         assert!(
             (place(100.0).left(size) - 100.0).abs() < f64::EPSILON,
@@ -370,11 +430,56 @@ mod tests {
         let narrow = Place {
             left: 100.0,
             width: 400.0,
+            ..Place::EDGE
         };
         assert!(
             narrow.left(size).abs() < f64::EPSILON,
             "wider than the output"
         );
         assert!((Place::EDGE.left(size) - EDGE_MARGIN).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn panels_open_a_gap_past_the_bar_s_edge() {
+        let size = Size {
+            width: 300.0,
+            height: 200.0,
+        };
+        let top = panel_desc(size, Place::EDGE);
+        assert_eq!(top.anchor, PanelAnchor::TOP | PanelAnchor::LEFT);
+        assert!((top.margins.top - GAP).abs() < f64::EPSILON);
+        let bottom = panel_desc(
+            size,
+            Place {
+                edge: Position::Bottom,
+                ..Place::EDGE
+            },
+        );
+        assert_eq!(bottom.anchor, PanelAnchor::BOTTOM | PanelAnchor::LEFT);
+        assert!((bottom.margins.bottom - GAP).abs() < f64::EPSILON);
+        assert!(bottom.margins.top.abs() < f64::EPSILON);
+        let room = Place {
+            room: 1000.0,
+            ..Place::EDGE
+        };
+        assert!((room.max_height() - (1000.0 - 2.0 * GAP as f32)).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn a_popup_lands_where_a_panel_does() {
+        // A 37 px module box 7 px down a 50 px bar.
+        let module = Rect {
+            x: 120.0,
+            y: 7.0,
+            width: 40.0,
+            height: 37.0,
+        };
+        let gap = GAP as f32;
+        let below = popup_anchor(module, 50.0, Position::Top);
+        assert!((below.x - 120.0).abs() < f32::EPSILON, "left edges aligned");
+        assert!((below.y + below.height - (50.0 + gap)).abs() < f32::EPSILON);
+        let above = popup_anchor(module, 50.0, Position::Bottom);
+        assert!((above.y + gap).abs() < f32::EPSILON, "a gap above the bar");
+        assert!((above.y + above.height - (module.y + module.height)).abs() < f32::EPSILON);
     }
 }

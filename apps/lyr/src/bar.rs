@@ -330,9 +330,9 @@ impl App {
         panel.refresh(&look, &contents);
     }
 
-    /// Opens the clock panel, or closes it if it is open. Opening it takes
-    /// the toasts down, since it lists them.
-    fn toggle_clock_panel(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {
+    /// Opens the clock panel at `place`, or closes it if it is open.
+    /// Opening it takes the toasts down, since it lists them.
+    fn toggle_clock_panel(&mut self, shell: &mut dyn Shell, place: Place) -> anyhow::Result<()> {
         if let Some(panel) = self.clock_panel.take() {
             return panel.close(shell, false);
         }
@@ -345,7 +345,7 @@ impl App {
         };
         let today = Local::now().date_naive();
         self.clock_panel =
-            Some(ClockPanel::open(shell, &look, today).context("opening the clock panel")?);
+            Some(ClockPanel::open(shell, place, &look, today).context("opening the clock panel")?);
         self.toasts.take_down();
         Ok(())
     }

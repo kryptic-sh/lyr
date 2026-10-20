@@ -186,6 +186,24 @@ implementation follows meanwhile.
 
 ## Cross-repo work
 
+- **crcbl: a native notification seam, and lyr's notifications on it.** The
+  owner asked (2026-10-20) that crcbl gain one API for creating, reading,
+  updating and dismissing notifications on every platform, and that lyr's
+  notification work use it. office-crcbl put it on crcbl's backlog the same day,
+  with the Linux client and server shapes lyr's daemon already has
+  (`lyr_sources::notifications::linux`), the Windows (WinRT toasts,
+  `UserNotificationListener`) and macOS (`UNUserNotificationCenter`, no reading)
+  shapes, per-operation capability flags, and zbus as a crcbl dependency flagged
+  as the owner's call. When it lands: move lyr's daemon and `notify_session`
+  onto it, and the Windows bell from `ms-actioncenter:` to real state where the
+  seam can read it.
+- **crcbl: Linux and Vulkan parity for 0.6 – 0.8.** Also at the owner's request
+  (2026-10-20): every crcbl feature developed on the Windows machine to be
+  implemented and tested on Wayland, X11 and Vulkan. On crcbl's backlog,
+  starting with a per-feature table; lyr reported what its Hyprland runs showed
+  (`set_panel` and the frame gate working; the DPMS-off present, the
+  `Presenter::resize` drain and the opacity group unchecked on Vulkan).
+
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
   `=0.7.0` (published 2026-10-20, with `set_panel`, frame pacing and
   `font::breaks`; crcbl's `rust-version` is 1.98, and lyr's follows). The bump
@@ -992,17 +1010,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   tooltips, now keyed by the hovered target rather than the module. Icons wait
   on images (the decision above); until then an item is drawn as its title's
   first letter (`Item::letter`), where plan 08 asks for a generic icon.
+- **The power and tray menus' new place is unseen.** They now open where the
+  panels do (`menu_panel::popup_anchor`: the module's box stretched 16 px past
+  the bar), tested for the arithmetic only. A Wayland popup's anchor reaching
+  past its parent's surface is not something xdg-shell forbids, but how Hyprland
+  places it has not been seen: both open only from a click, and this machine has
+  no pointer injection (`wlrctl`, `ydotool` or `dotool` would give one;
+  installing one is the owner's call). Win32 and AppKit place popups themselves
+  from the same anchor.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a
   click on the empty desktop. M5 records what Hyprland does and picks a fix.
-- **The year calendar is wider than swaync's 500 px panel.** In Hack Nerd Font
-  Propo on the owner's Hyprland (2026-10-20) the year grid made the panel 662 px
-  wide (`hyprctl layers`), as `clock_panel`'s `WIDTH.max(...)` lets it; on
-  Windows' monospace fallback it was about 607. Whether a 662 px panel is
-  acceptable, or the year view should shrink (smaller calendar text, two months
-  across), is the owner's call
-  ([plan/10](plan/10-popups-and-menus.md#clock-panel)).
 
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,
@@ -1019,12 +1038,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   locale decision above is made, weeks start on Monday and names are English
   (plan 16, 19). The panel is up too (`apps/lyr/src/clock_panel.rs`): opened by
   `open_clock_panel` (a click on the clock or the bell) or `lyr panel clock`, it
-  sits at the top right of the output the user is on, 16 px from the edges and
-  clear of the bar, runs the output's height, and is as wide as swaync's 500 px
-  or the year grid, whichever is wider (the year is wider in the fallback font
-  this machine has, so the grid does not fit 500 px there). It takes the
-  keyboard; Escape, losing focus and the same click or binding again close it; a
-  right click switches year and month mode and scrolling moves by one of either.
+  opens under the module that opened it by the rule every menu follows
+  (`menu_panel::Place`), and is as big as the calendar view it shows, the year
+  or a month, resized in place when the view switches; with the notification
+  centre below it is at least swaync's 500 px wide, and as tall as it holds up
+  to 16 px short of the output's far edge. Seen in a nested Hyprland
+  (2026-10-20): the year view 662 × 564 under the clock, ended 16 px from the
+  right edge, at the same 16 px below the bar as the Wi-Fi and Bluetooth menus.
+  The month view and the resize between them are tested on the headless shell
+  only (no pointer injection here for the right click). It takes the keyboard;
+  Escape, losing focus and the same click or binding again close it; a right
+  click switches year and month mode and scrolling moves by one of either.
   Opening it takes the toasts down, and no toast shows while it is open. Run on
   Windows: year, month and Escape seen. While lyr is the notification daemon the
   notification centre is below the calendar (`lyr_core::centre`): the title with

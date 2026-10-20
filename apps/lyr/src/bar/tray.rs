@@ -42,7 +42,14 @@ impl App {
                         menu: menu.clone(),
                         root: lyr_core::tray::menu::Entry::default(),
                         bar,
-                        anchor: rect,
+                        // Where every menu of the bar's opens.
+                        anchor: self.windows.get(&bar).map_or(rect, |window| {
+                            crate::menu_panel::popup_anchor(
+                                rect,
+                                window.height,
+                                self.config.bar.position,
+                            )
+                        }),
                     },
                 },
                 (Some(click), _) => TrayRequest::Click {

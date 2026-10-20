@@ -1,8 +1,8 @@
 //! One bar window's state.
 
-use lyr_config::Module;
+use lyr_config::{Module, Position};
 use lyr_core::draw::{DrawList, Target};
-use lyr_core::hit::Regions;
+use lyr_core::hit::{Rect, Regions};
 use lyr_render::surface::Surface;
 
 use crate::input::Pointer;
@@ -14,6 +14,9 @@ pub(super) struct Window {
     pub(super) surface: Surface,
     /// Logical pixels.
     pub(super) width: f32,
+    pub(super) height: f32,
+    /// Its output's height, in logical pixels.
+    pub(super) output_height: f32,
     /// Device pixels per logical pixel.
     pub(super) scale: f32,
     /// The output it is on, by name, for a per-output workspace list.
@@ -50,13 +53,22 @@ impl Window {
         }
     }
 
-    /// Where a menu opens under `target` on this bar, or `None` when the
-    /// last frame did not draw it.
-    pub(super) fn place_under(&self, target: &Target<Module>) -> Option<Place> {
+    /// Where a menu opens under `target` on this bar at `edge`, or `None`
+    /// when the last frame did not draw it.
+    pub(super) fn place_under(&self, target: &Target<Module>, edge: Position) -> Option<Place> {
         let rect = self.regions.rect(target)?;
         Some(Place {
             left: f64::from(rect.x),
             width: f64::from(self.width),
+            room: f64::from(self.output_height - self.height),
+            edge,
         })
+    }
+
+    /// The anchor for a popup under `target`, or `None` when the last frame
+    /// did not draw it.
+    pub(super) fn popup_anchor(&self, target: &Target<Module>, edge: Position) -> Option<Rect> {
+        let rect = self.regions.rect(target)?;
+        Some(crate::menu_panel::popup_anchor(rect, self.height, edge))
     }
 }

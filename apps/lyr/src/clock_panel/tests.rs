@@ -11,7 +11,8 @@ use lyr_core::centre::Target;
 use lyr_core::notifications::Store;
 use lyr_core::pointer::Press;
 
-use super::{ClockPanel, Contents, Outcome};
+use super::{CENTRE_WIDTH, ClockPanel, Contents, Outcome};
+use crate::menu_panel::{GAP, Place};
 use crate::tooltips::Look;
 
 /// Every character is 10 px wide.
@@ -38,6 +39,7 @@ fn setup() -> Setup {
         .theme;
     let panel = ClockPanel::open(
         &mut shell,
+        Place::EDGE,
         &Look {
             theme: &theme,
             measure: &measure,
@@ -57,6 +59,24 @@ fn setup() -> Setup {
 }
 
 impl Setup {
+    /// Right-clicks the calendar, which switches its mode.
+    fn right_click_calendar(&mut self) {
+        let window = self.panel.window;
+        let at = PhysicalPoint { x: 50.0, y: 50.0 };
+        self.shell
+            .move_pointer(window, at, (0.0, 0.0))
+            .expect("moved");
+        self.shell
+            .button(window, PointerButton::Right, ButtonState::Pressed, Some(at))
+            .expect("clicked");
+        self.pump();
+    }
+
+    /// Asks for the size the panel needs, as each draw does first.
+    fn draw(&mut self) {
+        self.panel.ask_size(&mut self.shell).expect("resized");
+    }
+
     /// Feeds the panel its queued events, sizing ones left out (they open a
     /// GPU surface), and returns the last outcome.
     fn pump(&mut self) -> Outcome {
@@ -96,12 +116,53 @@ impl Setup {
 }
 
 #[test]
-fn it_opens_as_wide_as_swaync_s_centre_or_the_year() {
+fn it_opens_as_big_as_the_year() {
     let setup = setup();
-    // Three 240 px month blocks and two 30 px gaps are 780 px, more than 500.
+    // Three 240 px month blocks and two 30 px gaps.
     assert_eq!(setup.panel.size.width, 780.0 + 2.0 * (16.0 + 2.0));
     assert_eq!((setup.panel.mode, setup.panel.shown), (Mode::Year, today()));
     assert!(setup.shell.title(setup.panel.window).is_ok());
+}
+
+#[test]
+fn it_takes_the_size_of_the_view_it_shows() {
+    let mut setup = setup();
+    setup.lay_out(2000.0);
+    let year = setup.panel.size;
+    assert_eq!(setup.panel.resize_to, None, "opened at the year's size");
+    let window = setup.panel.window;
+    setup.right_click_calendar();
+    assert_eq!(setup.panel.mode, Mode::Month);
+    let month = setup.panel.size;
+    // One 240 px month block.
+    assert_eq!(month.width, 240.0 + 2.0 * (16.0 + 2.0));
+    assert!(month.height < year.height, "a month is shorter than a year");
+    assert_eq!(setup.panel.resize_to, Some(month), "asked for in place");
+    setup.draw();
+    assert_eq!(setup.panel.resize_to, None, "asked once");
+    let mut events = Vec::new();
+    setup.shell.pump(&mut |event| events.push(event));
+    let resized = events.iter().find_map(|event| match event {
+        ShellEvent::Resized {
+            window: at, size, ..
+        } if *at == window => Some(*size),
+        _ => None,
+    });
+    let resized = resized.expect("the window was resized in place");
+    assert_eq!(f64::from(resized.width), f64::from(month.width));
+}
+
+#[test]
+fn the_centre_widens_it_and_the_output_holds_it() {
+    let mut setup = setup();
+    setup.store = Some(Store::default());
+    setup.lay_out(2000.0);
+    setup.right_click_calendar();
+    assert_eq!(setup.panel.size.width, CENTRE_WIDTH, "the centre's width");
+    let tall = setup.panel.size.height;
+    assert!(tall > setup.panel.calendar_bottom, "the centre below");
+    setup.lay_out(200.0);
+    assert_eq!(setup.panel.size.height, 200.0, "held short of the far edge");
 }
 
 #[test]
@@ -182,9 +243,9 @@ fn closing_destroys_its_window() {
 }
 
 impl Setup {
-    /// Lays the panel out as its first resize would, `height` tall.
+    /// Lays the panel out with `height` to fill at most.
     fn lay_out(&mut self, height: f32) {
-        self.panel.size.height = height;
+        self.panel.place.room = f64::from(height) + 2.0 * GAP;
         let look = Look {
             theme: &self.theme,
             measure: &measure,

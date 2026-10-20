@@ -39,7 +39,8 @@ impl App {
                 incoming.reply(control::OK);
             }
             Request::Panel(Panel::Clock) => {
-                self.toggle_clock_panel(shell)?;
+                let place = self.place_under(Module::Clock);
+                self.toggle_clock_panel(shell, place)?;
                 incoming.reply(control::OK);
             }
             Request::Panel(Panel::Bluetooth) => {
@@ -87,7 +88,12 @@ impl App {
     fn place_under(&self, module: Module) -> Place {
         self.windows
             .values()
-            .find_map(|window| window.place_under(&lyr_core::draw::Target::Module(module)))
+            .find_map(|window| {
+                window.place_under(
+                    &lyr_core::draw::Target::Module(module),
+                    self.config.bar.position,
+                )
+            })
             .unwrap_or(Place::EDGE)
     }
 

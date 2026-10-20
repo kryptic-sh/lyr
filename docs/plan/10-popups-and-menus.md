@@ -28,6 +28,14 @@ milestones of their own ([15](15-milestones.md)).
   event that opened it, and a key binding sent over the control socket has none.
   Opening a panel by click or by binding closes any other panel or popup.
 
+Every popup and panel the bar opens sits by one rule, so they line up alike (the
+owner's request, 2026-10-20): 16 px past the bar's edge (the toasts' margin),
+its left edge on the module that opened it, moved left only as far as it takes
+to end 16 px from the output's right edge (`menu_panel::Place`). A popup gets
+there through its anchor, the module's box stretched 16 px past the bar
+(`menu_panel::popup_anchor`); `lyr panel …` with no bar showing the module opens
+at the output's left edge.
+
 All of them share one renderer and theme, and draw the same `DrawList`
 ([04](04-rendering-and-theme.md)) as the bar.
 
@@ -78,9 +86,11 @@ From the top:
      `#ecc6d9`, weeks `#99ffdd`, weekdays `#ffcc66`, today `#ff6699` underlined.
      All bold.
    - The first day of the week follows the system locale.
-   - Whether the year grid fits swaync's 500 px width in that font is measured
-     in M5. If it does not, the panel grows to the grid's width; the grid is not
-     shrunk.
+     - The panel is as big as the view it shows, the year or a month (the
+       owner's request, 2026-10-20), and changes size in place when the view
+       switches. The notification centre below needs swaync's 500 px, so with it
+       the panel is at least that wide; its height is what it holds, held 16 px
+       short of the output's far edge, past which the centre scrolls.
 2. **Title** ("Notification Center") with **Clear All**.
 3. **Do Not Disturb** switch.
 4. **Media players** (MPRIS).

@@ -123,9 +123,22 @@ impl App {
                 let device = (size.width, size.height);
                 let scale = scale_factor as f32;
                 let width = size.width as f32 / scale;
+                let height = size.height as f32 / scale;
+                let info = self
+                    .bars
+                    .windows()
+                    .find(|&(_, bar)| bar == window)
+                    .and_then(|(monitor, _)| shell.monitor(monitor));
+                // Unknown, a menu beside it is not held short of the far edge.
+                let output_height = info.map_or(f32::INFINITY, |info| {
+                    (f64::from(info.bounds.height) / info.scale_factor) as f32
+                });
+                let monitor = info.map(|info| info.name.clone());
                 if let Some(open) = self.windows.get_mut(&window) {
                     open.surface.resize(device, scale)?;
                     open.width = width;
+                    open.height = height;
+                    open.output_height = output_height;
                     open.scale = scale;
                     open.dirty = true;
                     open.shown = None;
@@ -133,17 +146,13 @@ impl App {
                     let surface = Surface::open(shell, window, device, scale)
                         .context("opening a bar's surface")?;
                     tracing::info!("drawing on {}", surface.describe());
-                    let monitor = self
-                        .bars
-                        .windows()
-                        .find(|&(_, bar)| bar == window)
-                        .and_then(|(monitor, _)| shell.monitor(monitor))
-                        .map(|info| info.name.clone());
                     self.windows.insert(
                         window,
                         Window {
                             surface,
                             width,
+                            height,
+                            output_height,
                             scale,
                             monitor,
                             pointer: Pointer::default(),
@@ -189,7 +198,9 @@ impl App {
                 }
                 // Applied once the bar is no longer borrowed.
                 let mut toggle_dnd = false;
-                let mut toggle_panel = false;
+                // Where the clock panel is to open; a second press in the
+                // batch cancels the first.
+                let mut toggle_panel = None;
                 let mut bluetooth_at = None;
                 let mut wifi_at = None;
                 let mut audio_at = None;
@@ -219,11 +230,14 @@ impl App {
                         continue;
                     }
                     if opens == Some(Builtin::OpenClockPanel) {
-                        toggle_panel = !toggle_panel;
+                        toggle_panel = match toggle_panel {
+                            Some(_) => None,
+                            None => window.place_under(target, self.config.bar.position),
+                        };
                         continue;
                     }
                     if opens == Some(Builtin::OpenBluetoothMenu) {
-                        bluetooth_at = window.place_under(target);
+                        bluetooth_at = window.place_under(target, self.config.bar.position);
                         continue;
                     }
                     if opens == Some(Builtin::OpenAudioMenu) {
@@ -237,11 +251,13 @@ impl App {
                         } else {
                             lyr_core::audio_menu::Tab::Output
                         };
-                        audio_at = window.place_under(target).map(|place| (place, tab));
+                        audio_at = window
+                            .place_under(target, self.config.bar.position)
+                            .map(|place| (place, tab));
                         continue;
                     }
                     if opens == Some(Builtin::OpenWifiMenu) {
-                        wifi_at = window.place_under(target);
+                        wifi_at = window.place_under(target, self.config.bar.position);
                         continue;
                     }
                     if opens != Some(Builtin::OpenPowerMenu) {
@@ -251,7 +267,7 @@ impl App {
                     if let Some(menu) = self.power_menu.take() {
                         menu.close(shell, false)?;
                     } else if self.menu_dismissed_at != Some(instant)
-                        && let Some(anchor) = window.regions.rect(target)
+                        && let Some(anchor) = window.popup_anchor(target, self.config.bar.position)
                     {
                         let look = Look {
                             theme: &self.config.theme,
@@ -271,8 +287,8 @@ impl App {
                         .context("opening the power menu")?;
                     }
                 }
-                if toggle_panel {
-                    self.toggle_clock_panel(shell)?;
+                if let Some(place) = toggle_panel {
+                    self.toggle_clock_panel(shell, place)?;
                 }
                 if let Some(place) = bluetooth_at
                     && let Err(why) = self.toggle_bluetooth_menu(shell, place)?

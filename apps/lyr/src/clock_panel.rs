@@ -1,8 +1,9 @@
 //! The clock panel (`docs/plan/10-popups-and-menus.md#clock-panel`): a panel
-//! at the top right of the output the user is on, as swaync's control centre
-//! sits, running the output's height. It holds the calendar
-//! ([`lyr_core::calendar`]) and, while lyr is the notification daemon, the
-//! notification centre below it ([`lyr_core::centre`]).
+//! under the module that opened it, where every menu of the bar's opens
+//! ([`Place`]), as big as what it shows: the calendar's view, the year or a
+//! month ([`lyr_core::calendar`]), and while lyr is the notification daemon
+//! the notification centre below it ([`lyr_core::centre`]), held short of
+//! the output's far edge, past which the centre scrolls.
 //!
 //! It takes the keyboard. `Escape`, losing focus and the same click or
 //! binding again close it. Over the calendar a right click switches between
@@ -11,8 +12,7 @@
 
 use chrono::{NaiveDate, Weekday};
 use crcbl_shell::{
-    ButtonState, CloseReply, KeyCode, LogicalSize, Margins, PanelAnchor, PanelDesc, PanelKeyboard,
-    PanelLayer, Reserve, Shell, ShellEvent, WindowDesc, WindowId, WindowRole,
+    ButtonState, CloseReply, KeyCode, Shell, ShellEvent, WindowDesc, WindowId, WindowRole,
 };
 use lyr_config::Theme;
 use std::time::Instant;
@@ -31,11 +31,12 @@ use lyr_render::translate::translate;
 use lyr_shell::bars::NAMESPACE;
 
 use crate::input::Pointer;
-use crate::toasts::EDGE_MARGIN;
+use crate::menu_panel::{Place, logical, panel_desc};
 use crate::tooltips::Look;
 
-/// swaync's `control-center-width`.
-const WIDTH: f32 = 500.0;
+/// swaync's `control-center-width`, the narrowest the notification centre
+/// is laid out; the calendar alone takes only its own width.
+const CENTRE_WIDTH: f32 = 500.0;
 /// swaync's `.control-center` padding.
 const PADDING: f32 = 16.0;
 /// swaync's `.control-center` border.
@@ -50,13 +51,17 @@ const SCROLL_LINES: f32 = 3.0;
 /// The open clock panel.
 pub struct ClockPanel {
     window: WindowId,
+    place: Place,
     /// The locale's first weekday, read when the panel opens.
     first: Weekday,
     /// The month the calendar shows, and how.
     shown: NaiveDate,
     mode: Mode,
-    /// Logical pixels, from its last resize.
+    /// Logical pixels: what it shows needs, held to the output.
     size: Size,
+    /// The size last asked of the window system, and one still to ask.
+    requested: Size,
+    resize_to: Option<Size>,
     scale: f32,
     list: DrawList,
     /// The calendar's height, below which the centre starts.
@@ -99,9 +104,14 @@ pub struct Contents<'a> {
 }
 
 impl ClockPanel {
-    /// Opens the panel showing `today`'s year, wide enough for the year's
-    /// calendar.
-    pub fn open(shell: &mut dyn Shell, look: &Look<'_>, today: NaiveDate) -> anyhow::Result<Self> {
+    /// Opens the panel at `place` showing `today`'s year, as big as the
+    /// year's calendar; the centre, if any, is sized in on its first draw.
+    pub fn open(
+        shell: &mut dyn Shell,
+        place: Place,
+        look: &Look<'_>,
+        today: NaiveDate,
+    ) -> anyhow::Result<Self> {
         let first = lyr_sources::locale::first_weekday()
             .and_then(|day| Weekday::try_from(day).ok())
             .unwrap_or(FIRST_WEEKDAY);
@@ -114,39 +124,28 @@ impl ClockPanel {
             look.calendar_line_height,
             look.theme,
         );
-        let width = WIDTH.max(calendar.width + 2.0 * (PADDING + BORDER));
+        let inset = PADDING + BORDER;
+        let size = Size {
+            width: calendar.width + 2.0 * inset,
+            height: (calendar.height + 2.0 * inset).min(place.max_height()),
+        };
         let window = shell.create_window(&WindowDesc {
             title: NAMESPACE,
             app_id: NAMESPACE,
-            // Its height is the output's: it is held against the top and the
-            // bottom.
-            size: LogicalSize {
-                width: f64::from(width),
-                height: 0.0,
-            },
+            size: logical(size),
             transparent: true,
-            role: WindowRole::Panel(PanelDesc {
-                namespace: NAMESPACE,
-                monitor: None,
-                layer: PanelLayer::Overlay,
-                anchor: PanelAnchor::TOP | PanelAnchor::BOTTOM | PanelAnchor::RIGHT,
-                reserve: Reserve::None,
-                margins: Margins {
-                    top: EDGE_MARGIN,
-                    right: EDGE_MARGIN,
-                    bottom: EDGE_MARGIN,
-                    left: 0.0,
-                },
-                keyboard: PanelKeyboard::Exclusive,
-            }),
+            role: WindowRole::Panel(panel_desc(size, place)),
             ..WindowDesc::default()
         })?;
         Ok(Self {
             window,
+            place,
             first,
             shown: today,
             mode: Mode::Year,
-            size: Size { width, height: 0.0 },
+            size,
+            requested: size,
+            resize_to: None,
             scale: 1.0,
             list: DrawList::default(),
             calendar_bottom: 0.0,
@@ -202,10 +201,6 @@ impl ClockPanel {
             } => {
                 let device = (size.width, size.height);
                 self.scale = scale_factor as f32;
-                self.size = Size {
-                    width: size.width as f32 / self.scale,
-                    height: size.height as f32 / self.scale,
-                };
                 match &mut self.surface {
                     Some(surface) => surface.resize(device, self.scale)?,
                     None => {
@@ -300,10 +295,10 @@ impl ClockPanel {
         self.rebuild(look, contents);
     }
 
-    /// Draws the panel's frame again for its size, mode and month, and the
-    /// centre below the calendar.
+    /// Lays the panel out again for its mode and month and the centre
+    /// below the calendar, at the size they need, and asks the window
+    /// system for that size when it changed.
     fn rebuild(&mut self, look: &Look<'_>, contents: &Contents<'_>) {
-        self.list = frame(self.size, look.theme);
         let (calendar, calendar_size) = calendar::draw::draw(
             self.shown,
             self.mode,
@@ -314,15 +309,11 @@ impl ClockPanel {
             look.theme,
         );
         let inset = BORDER + PADDING;
-        self.list.items.extend(
-            calendar
-                .items
-                .into_iter()
-                .map(|item| item.offset(inset, inset)),
-        );
         self.calendar_bottom = inset + calendar_size.height;
-        self.centre = Regions::default();
-        if let Some(store) = contents.store {
+        let mut width = calendar_size.width + 2.0 * inset;
+        let mut height = self.calendar_bottom + inset;
+        let centre = contents.store.map(|store| {
+            width = width.max(CENTRE_WIDTH);
             let top = self.calendar_bottom + centre::GAP;
             let shown = centre::Shown {
                 store,
@@ -330,13 +321,33 @@ impl ClockPanel {
                 now: contents.now,
                 hovered: self.hovered,
             };
-            let (list, centre_size, regions) = centre::draw(
+            let drawn = centre::draw(
                 &shown,
-                self.size.width - 2.0 * inset,
+                width - 2.0 * inset,
                 look.measure_in,
                 look.line_height,
                 look.theme,
             );
+            height = top + drawn.1.height + inset;
+            (top, drawn)
+        });
+        self.size = Size {
+            width,
+            height: height.min(self.place.max_height()),
+        };
+        if self.size != self.requested {
+            self.requested = self.size;
+            self.resize_to = Some(self.size);
+        }
+        self.list = frame(self.size, look.theme);
+        self.list.items.extend(
+            calendar
+                .items
+                .into_iter()
+                .map(|item| item.offset(inset, inset)),
+        );
+        self.centre = Regions::default();
+        if let Some((top, (list, centre_size, regions))) = centre {
             self.centre_view = Rect {
                 x: inset,
                 y: top,
@@ -360,8 +371,19 @@ impl ClockPanel {
         self.dirty = true;
     }
 
-    /// Draws the panel if it has a frame to present.
+    /// Asks the window system for the size the panel needs, if that
+    /// changed; the new size comes back as its next `Resized`.
+    fn ask_size(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {
+        if let Some(size) = self.resize_to.take() {
+            shell.set_panel(self.window, logical(size), &panel_desc(size, self.place))?;
+        }
+        Ok(())
+    }
+
+    /// Draws the panel if it has a frame to present, at the size it asked
+    /// for.
     pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
+        self.ask_size(shell)?;
         if let (true, Some(surface)) = (self.dirty, &mut self.surface) {
             self.dirty = !surface.draw(shell, &translate(&self.list, text))?;
         }

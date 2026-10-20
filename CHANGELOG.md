@@ -149,7 +149,8 @@ and this project adheres to
   passkey to confirm shows at the top of the menu with Yes and No, and a PIN
   asked for by a device that pairs the legacy way is typed into it. The arrow
   keys move through its buttons and Enter presses the outlined one.
-- The clock panel, opened by a click on the clock or `lyr panel clock`: waybar's
+- The clock panel, opened by a click on the clock or `lyr panel clock` under the
+  clock, as big as the calendar view it shows (the year or a month): waybar's
   year calendar, three months across with week numbers, in bold and today
   underlined, smaller as waybar's `<tt><small>` draws it and in
   `theme.calendar_font` when that is set; a right click switches to the month,
