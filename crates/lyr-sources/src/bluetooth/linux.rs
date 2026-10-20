@@ -9,13 +9,14 @@
 
 pub mod agent;
 
-use futures_util::StreamExt;
 use futures_util::stream::select;
 use tokio::sync::watch;
 use zbus::fdo::{ManagedObjects, ObjectManagerProxy};
 use zbus::message::Type;
 use zbus::proxy::CacheProperties;
 use zbus::{Connection, MatchRule, MessageStream, ObjectPath, OwnedVariant};
+
+use crate::bus::Follow;
 
 use super::{Adapter, Device, DeviceAction, Snapshot, Switch, Tracker};
 
@@ -218,10 +219,11 @@ impl BlueZ {
             .interface("org.freedesktop.DBus.ObjectManager")
             .build()?;
         // Subscribed before the first read, so a change in between is not lost.
-        let mut changes = select(
+        let mut changes = Follow::new(select(
             MessageStream::for_match_rule(properties, &self.connection, None).await?,
             MessageStream::for_match_rule(objects, &self.connection, None).await?,
-        );
+        ));
+        let wanted = |_| Ok(true);
         let mut tracker = Tracker::default();
         let mut snapshot = async || {
             let (adapter, devices) = self.read().await?;
@@ -231,9 +233,12 @@ impl BlueZ {
                 devices,
             })
         };
-        snapshots.send_replace(snapshot().await?);
-        while changes.next().await.is_some() {
-            if snapshots.send(snapshot().await?).is_err() {
+        snapshots.send_replace(changes.during(snapshot(), wanted).await??);
+        while changes.changed(wanted).await? {
+            if snapshots
+                .send(changes.during(snapshot(), wanted).await??)
+                .is_err()
+            {
                 break;
             }
         }

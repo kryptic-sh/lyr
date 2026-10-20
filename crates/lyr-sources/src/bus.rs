@@ -1,5 +1,9 @@
 //! What the D-Bus sources share about the bus itself.
 
+use std::pin::pin;
+
+use futures_util::future::{Either, select};
+use futures_util::{FutureExt, Stream, StreamExt};
 use zbus::Connection;
 use zbus::fdo::{RequestNameFlags, RequestNameReply};
 
@@ -24,6 +28,96 @@ pub async fn claim(
             Ok(false)
         }
         Err(error) => Err(error),
+    }
+}
+
+/// A stream of changes a source follows, drained while the source reads.
+///
+/// zbus stops reading a connection while any of its streams is full, so a
+/// stream left unpolled through a read that awaits replies on the same
+/// connection never gets them: a Wi-Fi scan's burst of access-point
+/// signals hung NetworkManager's watch that way. So each read runs through
+/// [`Follow::during`], and the changes it accepts meanwhile make one more
+/// read, not one each.
+pub struct Follow<S> {
+    changes: S,
+    /// A wanted change came during the last read.
+    due: bool,
+    ended: bool,
+}
+
+impl<S: Stream + Unpin> Follow<S> {
+    /// Follows `changes`: subscribe them before the first read, so a change
+    /// during it is not lost.
+    pub const fn new(changes: S) -> Self {
+        Self {
+            changes,
+            due: false,
+            ended: false,
+        }
+    }
+
+    /// Runs `read` to its end, draining the changes meanwhile; one that
+    /// `wanted` accepts makes [`Follow::changed`] answer at once.
+    ///
+    /// # Errors
+    ///
+    /// The first error `wanted` returns.
+    pub async fn during<F: Future>(
+        &mut self,
+        read: F,
+        mut wanted: impl FnMut(S::Item) -> zbus::Result<bool>,
+    ) -> zbus::Result<F::Output> {
+        let mut read = pin!(read);
+        while !self.ended {
+            match select(read.as_mut(), self.changes.next()).await {
+                Either::Left((output, _)) => return Ok(output),
+                Either::Right((Some(change), _)) => self.due |= wanted(change)?,
+                Either::Right((None, _)) => self.ended = true,
+            }
+        }
+        Ok(read.await)
+    }
+
+    /// Waits for a change `wanted` accepts, or says there was one during
+    /// the last read; `false` once the changes have ended. The changes
+    /// already queued are taken too, since the read this asks for covers
+    /// them.
+    ///
+    /// # Errors
+    ///
+    /// The first error `wanted` returns.
+    pub async fn changed(
+        &mut self,
+        mut wanted: impl FnMut(S::Item) -> zbus::Result<bool>,
+    ) -> zbus::Result<bool> {
+        self.take_queued(&mut wanted)?;
+        while !std::mem::take(&mut self.due) {
+            if self.ended {
+                return Ok(false);
+            }
+            match self.changes.next().await {
+                Some(change) => self.due = wanted(change)?,
+                None => self.ended = true,
+            }
+            self.take_queued(&mut wanted)?;
+        }
+        Ok(true)
+    }
+
+    /// Takes the changes that are already queued, without waiting.
+    fn take_queued(
+        &mut self,
+        wanted: &mut impl FnMut(S::Item) -> zbus::Result<bool>,
+    ) -> zbus::Result<()> {
+        while !self.ended {
+            match self.changes.next().now_or_never() {
+                Some(Some(change)) => self.due |= wanted(change)?,
+                Some(None) => self.ended = true,
+                None => break,
+            }
+        }
+        Ok(())
     }
 }
 
@@ -120,5 +214,85 @@ mod tests {
                 .await
                 .unwrap()
         );
+    }
+}
+
+#[cfg(test)]
+mod follow_tests {
+    use std::os::unix::net::UnixStream;
+    use std::time::Duration;
+
+    use zbus::connection::Builder;
+    use zbus::message::Type;
+    use zbus::object_server::SignalEmitter;
+    use zbus::{Guid, MatchRule, MessageStream};
+
+    use super::Follow;
+
+    /// More signals than a stream queues by default (zbus's 64).
+    const BURST: u32 = 500;
+
+    /// A service whose every read sends a burst of change signals before it
+    /// answers, as NetworkManager's access points do during a scan.
+    struct Bursty;
+
+    #[zbus::interface(name = "sh.kryptic.lyr.Bursty")]
+    impl Bursty {
+        async fn read(
+            &self,
+            #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        ) -> zbus::fdo::Result<u32> {
+            for _ in 0..BURST {
+                Self::changed(&emitter).await?;
+            }
+            Ok(BURST)
+        }
+
+        #[zbus(signal)]
+        async fn changed(emitter: &SignalEmitter<'_>) -> zbus::Result<()>;
+    }
+
+    #[zbus::proxy(
+        interface = "sh.kryptic.lyr.Bursty",
+        default_service = "sh.kryptic.lyr.Bursty",
+        default_path = "/sh/kryptic/lyr/Bursty"
+    )]
+    trait BurstyClient {
+        fn read(&self) -> zbus::Result<u32>;
+    }
+
+    #[tokio::test]
+    async fn a_burst_during_a_read_does_not_stall_the_connection() {
+        let (server, client) = UnixStream::pair().expect("socket pair");
+        let server = Builder::unix_stream(server)
+            .server(Guid::generate())
+            .p2p()
+            .serve_at("/sh/kryptic/lyr/Bursty", Bursty)
+            .build();
+        let client = Builder::unix_stream(client).p2p().build();
+        let (_server, client) = tokio::try_join!(server, client).expect("connected");
+        let proxy = BurstyClientProxy::new(&client).await.expect("proxy");
+        let rule = MatchRule::builder()
+            .msg_type(Type::Signal)
+            .member("Changed")
+            .build()
+            .expect("a rule");
+        let changes = MessageStream::for_match_rule(rule, &client, None)
+            .await
+            .expect("subscribed");
+        assert!(changes.max_queued().get() < BURST as usize);
+
+        let mut changes = Follow::new(changes);
+        let wanted = |change: zbus::Result<zbus::Message>| change.map(|_| true);
+        let read = changes.during(proxy.read(), wanted);
+        let read = tokio::time::timeout(Duration::from_secs(10), read)
+            .await
+            .expect("the read was answered, burst and all")
+            .expect("drained");
+        assert_eq!(read.expect("read"), BURST);
+        // The whole burst asks for one more read, not one each.
+        assert!(changes.changed(wanted).await.expect("changed"));
+        let more = tokio::time::timeout(Duration::from_millis(200), changes.changed(wanted)).await;
+        assert!(more.is_err(), "nothing changed since");
     }
 }

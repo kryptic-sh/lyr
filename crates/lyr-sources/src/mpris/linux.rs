@@ -15,6 +15,8 @@ use zbus::{Connection, MatchRule, MessageStream, OwnedVariant};
 
 use lyr_core::media::{Control, Player, Status};
 
+use crate::bus::Follow;
+
 /// The bus names MPRIS players take.
 pub const PREFIX: &str = "org.mpris.MediaPlayer2.";
 /// Where every player serves its interfaces.
@@ -160,10 +162,14 @@ impl Players {
         let properties = MessageStream::for_match_rule(changed, &self.connection, None)
             .await?
             .map(|_| ());
-        let mut changes = stream::select(owners, properties);
-        players.send_replace(self.all().await?);
-        while changes.next().await.is_some() {
-            if players.send(self.all().await?).is_err() {
+        let mut changes = Follow::new(stream::select(owners, properties));
+        let wanted = |()| Ok(true);
+        players.send_replace(changes.during(self.all(), wanted).await??);
+        while changes.changed(wanted).await? {
+            if players
+                .send(changes.during(self.all(), wanted).await??)
+                .is_err()
+            {
                 break;
             }
         }

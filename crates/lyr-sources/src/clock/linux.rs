@@ -3,10 +3,11 @@
 //! `PropertiesChanged`. timedated is started on demand and exits when idle;
 //! a change made through it starts it, so the signal still comes.
 
-use futures_util::StreamExt;
 use tokio::sync::watch;
+
+use crate::bus::Follow;
 use zbus::Connection;
-use zbus::fdo::PropertiesProxy;
+use zbus::fdo::{PropertiesChanged, PropertiesProxy};
 use zbus::names::InterfaceName;
 use zbus::proxy::CacheProperties;
 
@@ -76,13 +77,14 @@ impl TimeDate {
     pub async fn watch(&self, zones: &watch::Sender<Option<String>>) -> zbus::Result<()> {
         let interface = InterfaceName::try_from(INTERFACE)?;
         // Subscribe before the first read, so a change in between is not lost.
-        let mut changes = self.properties.receive_properties_changed().await?;
-        zones.send_replace(self.zone().await?);
-        while let Some(change) = changes.next().await {
-            if change.args()?.interface_name() != &interface {
-                continue;
-            }
-            if zones.send(self.zone().await?).is_err() {
+        let mut changes = Follow::new(self.properties.receive_properties_changed().await?);
+        let wanted = |change: PropertiesChanged| Ok(change.args()?.interface_name() == &interface);
+        zones.send_replace(changes.during(self.zone(), wanted).await??);
+        while changes.changed(wanted).await? {
+            if zones
+                .send(changes.during(self.zone(), wanted).await??)
+                .is_err()
+            {
                 break;
             }
         }

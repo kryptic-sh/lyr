@@ -3,11 +3,12 @@
 //! Nothing is polled. lyr reads the device once, then again each time UPower
 //! signals `PropertiesChanged` on it, and sends the new reading on.
 
-use futures_util::StreamExt;
 use lyr_core::battery::Reading;
 use tokio::sync::watch;
+
+use crate::bus::Follow;
 use zbus::Connection;
-use zbus::fdo::PropertiesProxy;
+use zbus::fdo::{PropertiesChanged, PropertiesProxy};
 use zbus::names::InterfaceName;
 use zbus::proxy::CacheProperties;
 
@@ -103,13 +104,14 @@ impl UPower {
     pub async fn watch(&self, readings: &watch::Sender<Option<Reading>>) -> zbus::Result<()> {
         let interface = InterfaceName::from_static_str(INTERFACE)?;
         // Subscribe before the first read, so a change in between is not lost.
-        let mut changes = self.properties.receive_properties_changed().await?;
-        readings.send_replace(self.device().await?.reading());
-        while let Some(change) = changes.next().await {
-            if change.args()?.interface_name() != &interface {
-                continue;
-            }
-            if readings.send(self.device().await?.reading()).is_err() {
+        let mut changes = Follow::new(self.properties.receive_properties_changed().await?);
+        let wanted = |change: PropertiesChanged| Ok(change.args()?.interface_name() == &interface);
+        readings.send_replace(changes.during(self.device(), wanted).await??.reading());
+        while changes.changed(wanted).await? {
+            if readings
+                .send(changes.during(self.device(), wanted).await??.reading())
+                .is_err()
+            {
                 break;
             }
         }

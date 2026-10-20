@@ -15,6 +15,7 @@ use zbus::{MatchRule, MessageStream, ObjectPath, OwnedObjectPath, OwnedVariant, 
 use super::{
     AccessPointProxy, DEVICE_TYPE_WIFI, DeviceProxy, NONE, NetworkManager, ROOT, WirelessProxy,
 };
+use crate::bus::Follow;
 use crate::network::{Failed, Join};
 
 /// NetworkManager's saved profiles.
@@ -361,23 +362,29 @@ impl NetworkManager {
             .path(SETTINGS)
             .build()?;
         // Subscribed before the first read, so a change in between is not lost.
-        let mut changes = futures_util::stream::select(
+        let mut changes = Follow::new(futures_util::stream::select(
             MessageStream::for_match_rule(properties, &self.connection, None).await?,
             MessageStream::for_match_rule(profiles, &self.connection, None).await?,
-        );
-        let mut wifi = self.wifi().await?;
-        states.send_replace(wifi.clone());
-        while let Some(change) = changes.next().await {
+        ));
+        // Any change during the first read; then the manager's, the
+        // profiles' and the Wi-Fi device's.
+        let followed = |device: Option<&str>, change: zbus::Result<zbus::Message>| {
             let change = change?;
             let header = change.header();
             let path = header.path().map(|path| path.as_str());
-            let followed = path.is_some_and(|path| {
-                path == ROOT || path == SETTINGS || wifi.device.as_deref() == Some(path)
-            });
-            if !followed {
-                continue;
-            }
-            wifi = self.wifi().await?;
+            Ok(path.is_some_and(|path| path == ROOT || path == SETTINGS || device == Some(path)))
+        };
+        let mut wifi = changes.during(self.wifi(), |_| Ok(true)).await??;
+        states.send_replace(wifi.clone());
+        while changes
+            .changed(|change| followed(wifi.device.as_deref(), change))
+            .await?
+        {
+            wifi = changes
+                .during(self.wifi(), |change| {
+                    followed(wifi.device.as_deref(), change)
+                })
+                .await??;
             if states.send(wifi.clone()).is_err() {
                 break;
             }

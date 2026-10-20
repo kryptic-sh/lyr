@@ -14,9 +14,10 @@
 
 use std::collections::HashMap;
 
-use futures_util::StreamExt;
 use lyr_core::network::{Link, Reading};
 use tokio::sync::watch;
+
+use crate::bus::Follow;
 use zbus::message::Type;
 use zbus::proxy::CacheProperties;
 use zbus::{
@@ -267,21 +268,16 @@ impl NetworkManager {
             .path_namespace(ROOT)
             .build()?;
         // Subscribed before the first read, so a change in between is not lost.
-        let mut changes = MessageStream::for_match_rule(rule, &self.connection, None).await?;
-        let (reading, mut paths) = self.read().await?;
+        let mut changes =
+            Follow::new(MessageStream::for_match_rule(rule, &self.connection, None).await?);
+        // Any change during the first read; then those from the objects
+        // the last reading came from.
+        let (reading, mut paths) = changes.during(self.read(), |_| Ok(true)).await??;
         readings.send_replace(Some(reading));
-        while let Some(change) = changes.next().await {
-            let change = change?;
-            let header = change.header();
-            let followed = header.path().is_some_and(|path| {
-                paths
-                    .iter()
-                    .any(|followed| followed.as_str() == path.as_str())
-            });
-            if !followed {
-                continue;
-            }
-            let (reading, read_from) = self.read().await?;
+        while changes.changed(|change| from(&paths, change)).await? {
+            let (reading, read_from) = changes
+                .during(self.read(), |change| from(&paths, change))
+                .await??;
             paths = read_from;
             if readings.send(Some(reading)).is_err() {
                 break;
@@ -289,6 +285,17 @@ impl NetworkManager {
         }
         Ok(())
     }
+}
+
+/// Whether `change` came from one of `paths`.
+fn from(paths: &[OwnedObjectPath], change: zbus::Result<zbus::Message>) -> zbus::Result<bool> {
+    let change = change?;
+    let header = change.header();
+    Ok(header.path().is_some_and(|path| {
+        paths
+            .iter()
+            .any(|followed| followed.as_str() == path.as_str())
+    }))
 }
 
 pub mod wifi;

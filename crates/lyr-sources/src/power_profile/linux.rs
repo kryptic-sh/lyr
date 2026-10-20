@@ -10,11 +10,12 @@
 
 use std::collections::HashMap;
 
-use futures_util::StreamExt;
 use tokio::sync::watch;
+
+use crate::bus::Follow;
 use zbus::Connection;
 use zbus::OwnedVariant;
-use zbus::fdo::PropertiesProxy;
+use zbus::fdo::{PropertiesChanged, PropertiesProxy};
 use zbus::names::InterfaceName;
 use zbus::proxy::CacheProperties;
 
@@ -144,13 +145,14 @@ impl PowerProfiles {
     pub async fn watch(&self, states: &watch::Sender<Option<Profiles>>) -> zbus::Result<()> {
         let interface = InterfaceName::try_from(self.interface)?;
         // Subscribe before the first read, so a change in between is not lost.
-        let mut changes = self.properties.receive_properties_changed().await?;
-        states.send_replace(self.profiles().await?);
-        while let Some(change) = changes.next().await {
-            if change.args()?.interface_name() != &interface {
-                continue;
-            }
-            if states.send(self.profiles().await?).is_err() {
+        let mut changes = Follow::new(self.properties.receive_properties_changed().await?);
+        let wanted = |change: PropertiesChanged| Ok(change.args()?.interface_name() == &interface);
+        states.send_replace(changes.during(self.profiles(), wanted).await??);
+        while changes.changed(wanted).await? {
+            if states
+                .send(changes.during(self.profiles(), wanted).await??)
+                .is_err()
+            {
                 break;
             }
         }
