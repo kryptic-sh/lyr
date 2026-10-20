@@ -169,3 +169,66 @@ fn a_click_on_a_slider_sets_where_it_lands_and_enter_there_does_nothing() {
         .expect("a key");
     assert_eq!(setup.pump(), Outcome::Kept);
 }
+
+#[test]
+fn a_drag_on_a_slider_sets_as_it_moves_until_let_go() {
+    let mut setup = setup(Tab::Output);
+    let (_, _, regions) =
+        audio_menu::draw(&nodes(), Tab::Output, None, &measure, LINE, &setup.theme);
+    let slider = regions.rect(&Target::Level(1)).expect("drawn");
+    let at = |share: f32| PhysicalPoint {
+        x: f64::from(slider.x + slider.width * share),
+        y: f64::from(slider.y + slider.height / 2.0),
+    };
+    let window = setup.menu.panel.window();
+    let set = |percent| Outcome::Act(Tab::Output, "headphones".to_owned(), Action::Set(percent));
+    setup
+        .shell
+        .move_pointer(window, at(0.25), (0.0, 0.0))
+        .expect("moved");
+    setup
+        .shell
+        .button(
+            window,
+            PointerButton::Left,
+            ButtonState::Pressed,
+            Some(at(0.25)),
+        )
+        .expect("pressed");
+    assert_eq!(setup.pump(), set(25));
+    setup
+        .shell
+        .move_pointer(window, at(0.75), (0.0, 0.0))
+        .expect("moved");
+    assert_eq!(setup.pump(), set(75), "followed the drag");
+    setup
+        .shell
+        .button(
+            window,
+            PointerButton::Left,
+            ButtonState::Released,
+            Some(at(0.75)),
+        )
+        .expect("let go");
+    setup.pump();
+    setup
+        .shell
+        .move_pointer(window, at(0.5), (0.0, 0.0))
+        .expect("moved");
+    assert_eq!(setup.pump(), Outcome::Kept, "let go: a move sets nothing");
+}
+
+#[test]
+fn a_drag_from_a_button_does_not_press_it_again() {
+    let mut setup = setup(Tab::Output);
+    assert_eq!(
+        setup.click(Tab::Output, Target::Mute(0)),
+        Outcome::Act(Tab::Output, "speakers".to_owned(), Action::Mute)
+    );
+    let window = setup.menu.panel.window();
+    setup
+        .shell
+        .move_pointer(window, PhysicalPoint { x: 20.0, y: 20.0 }, (0.0, 0.0))
+        .expect("moved");
+    assert_eq!(setup.pump(), Outcome::Kept);
+}

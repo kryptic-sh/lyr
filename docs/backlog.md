@@ -510,12 +510,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (`level_at`, from `MenuPanel::picked_across`), up to `MAX_PERCENT`, 100 % for
   Windows; Enter on it does nothing, having no place. Clicked on the real
   machine (2026-10-20): a quarter of the way along steam's slider set 25 %, and
-  its right end then a step up set 100 % again. Not built: dragging the slider,
-  plan 10's 150 % (with a Linux source), wiremix's card configuration tab, and
-  routing a stream to another device (no public API on Windows). Not built: the
-  other Windows sources (Bluetooth, workspaces, both waiting on the owner's
-  questions above) and the native menus plan 10 names; macOS's
-  `x-apple.systempreferences:` fallbacks wait on M10.
+  its right end then a step up set 100 % again. A drag that starts on a slider
+  sets it at every move until the button is let go (`MenuPanel::with_drags`),
+  dragged on the real machine from a quarter to three quarters of steam's slider
+  for 75 %. Not built: plan 10's 150 % (with a Linux source), wiremix's card
+  configuration tab, and routing a stream to another device (no public API on
+  Windows). Not built: the other Windows sources (Bluetooth, workspaces, both
+  waiting on the owner's questions above) and the native menus plan 10 names;
+  macOS's `x-apple.systempreferences:` fallbacks wait on M10.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace

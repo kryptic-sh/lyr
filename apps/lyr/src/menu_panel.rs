@@ -10,7 +10,8 @@
 
 use crcbl_shell::{
     ButtonState, CloseReply, KeyCode, LogicalSize, Margins, PanelAnchor, PanelDesc, PanelKeyboard,
-    PanelLayer, Reserve, Shell, ShellEvent, TextPurpose, WindowDesc, WindowId, WindowRole,
+    PanelLayer, PointerButton, Reserve, Shell, ShellEvent, TextPurpose, WindowDesc, WindowId,
+    WindowRole,
 };
 use lyr_core::draw::{DrawList, Size};
 use lyr_core::hit::Regions;
@@ -36,6 +37,11 @@ pub struct MenuPanel<T> {
     /// Where the last [`Event::Pick`] was clicked, in logical pixels; `None`
     /// when Enter chose it.
     picked_at: Option<(f32, f32)>,
+    /// Which targets a drag picks again as the pointer moves, a slider's.
+    drags: fn(&T) -> bool,
+    /// The target the left button went down on, while it is held, when it
+    /// is one [`Self::drags`] takes.
+    dragging: Option<T>,
     scale: f32,
     surface: Option<Surface>,
     dirty: bool,
@@ -127,11 +133,21 @@ impl<T: Copy> MenuPanel<T> {
             regions,
             focus: None,
             picked_at: None,
+            drags: |_| false,
+            dragging: None,
             pointer: Pointer::default(),
             scale: 1.0,
             surface: None,
             dirty: false,
         })
+    }
+
+    /// Has a drag that starts on a target `drags` takes pick it again at
+    /// every move until the button is let go.
+    #[must_use]
+    pub fn with_drags(mut self, drags: fn(&T) -> bool) -> Self {
+        self.drags = drags;
+        self
     }
 
     /// Whether `window` is the panel's.
@@ -268,11 +284,21 @@ impl<T: Copy> MenuPanel<T> {
                     _ => {}
                 }
             }
+            ShellEvent::Button {
+                button: PointerButton::Left,
+                state: ButtonState::Released,
+                ..
+            } => self.dragging = None,
             _ => {
                 let presses = self.pointer.handle(event, self.scale);
                 if presses.contains(&Press::Left)
                     && let Some(&target) = self.pointer.target(&self.regions)
                 {
+                    self.picked_at = self.pointer.position();
+                    self.dragging = (self.drags)(&target).then_some(target);
+                    return Ok(Event::Pick(target));
+                }
+                if let (ShellEvent::PointerMotion { .. }, Some(target)) = (event, self.dragging) {
                     self.picked_at = self.pointer.position();
                     return Ok(Event::Pick(target));
                 }
