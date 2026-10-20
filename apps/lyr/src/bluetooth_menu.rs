@@ -10,12 +10,13 @@
 //! Its panel is [`MenuPanel`]'s, recreated when its size changes (a scan
 //! finding a device).
 
-use crcbl_shell::{ButtonState, KeyCode, Shell, ShellEvent, TextPurpose, WindowId};
+use crcbl_shell::{Shell, ShellEvent, TextPurpose, WindowId};
 use lyr_core::bluetooth_menu::{
     self, Adapter, Ask, Device, Header, PIN_LENGTH, Question, Reply, Target, order,
 };
 use lyr_render::text::Text;
 
+use crate::keys::{self, Key};
 use crate::menu_panel::{Event, MenuPanel, Place};
 use crate::tooltips::Look;
 
@@ -80,7 +81,7 @@ impl BluetoothMenu {
             look.theme,
         );
         let menu = Self {
-            panel: MenuPanel::open(shell, place, drawn)?,
+            panel: MenuPanel::open(shell, place, look.line_height, drawn)?,
             paths: paths(devices),
             renaming: None,
             showing: ask.map(|ask| Showing::Ask(ask.device.to_owned(), ask.question)),
@@ -199,11 +200,9 @@ impl BluetoothMenu {
             return Ok(Outcome::Kept);
         }
         match *event {
-            ShellEvent::Key {
-                key_code: Some(KeyCode::Escape),
-                state: ButtonState::Pressed,
-                ..
-            } if self.renaming.is_some() => {
+            ShellEvent::Key { .. }
+                if self.renaming.is_some() && keys::pressed(event) == Some(Key::Escape) =>
+            {
                 self.renaming = None;
                 return Ok(Outcome::Redraw);
             }
@@ -216,11 +215,9 @@ impl BluetoothMenu {
                     .extend(text.chars().filter(|c| !c.is_control()).take(room));
                 return Ok(Outcome::Redraw);
             }
-            ShellEvent::Key {
-                key_code: Some(KeyCode::Backspace),
-                state: ButtonState::Pressed,
-                ..
-            } if self.field().is_some() => {
+            ShellEvent::Key { .. }
+                if self.field().is_some() && keys::pressed(event) == Some(Key::Backspace) =>
+            {
                 self.typed.pop();
                 return Ok(Outcome::Redraw);
             }

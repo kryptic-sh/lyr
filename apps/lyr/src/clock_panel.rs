@@ -11,9 +11,7 @@
 //! centre is the caller's to carry out.
 
 use chrono::{NaiveDate, Weekday};
-use crcbl_shell::{
-    ButtonState, CloseReply, KeyCode, Shell, ShellEvent, WindowDesc, WindowId, WindowRole,
-};
+use crcbl_shell::{CloseReply, Shell, ShellEvent, WindowDesc, WindowId, WindowRole};
 use lyr_config::Theme;
 use std::time::Instant;
 
@@ -31,6 +29,7 @@ use lyr_render::translate::translate;
 use lyr_shell::bars::NAMESPACE;
 
 use crate::input::Pointer;
+use crate::keys::{self, Key};
 use crate::menu_panel::{Place, logical, panel_desc};
 use crate::tooltips::Look;
 
@@ -213,12 +212,10 @@ impl ClockPanel {
                 shell.reply_close_request(window, CloseReply::Close)?;
                 return Ok(Outcome::Closed);
             }
-            ShellEvent::Focus { focused: false, .. }
-            | ShellEvent::Key {
-                key_code: Some(KeyCode::Escape),
-                state: ButtonState::Pressed,
-                ..
-            } => return Ok(Outcome::Close),
+            ShellEvent::Focus { focused: false, .. } => return Ok(Outcome::Close),
+            ShellEvent::Key { .. } if keys::pressed(event) == Some(Key::Escape) => {
+                return Ok(Outcome::Close);
+            }
             _ => {
                 for press in self.pointer.handle(event, self.scale) {
                     let Some((_, y)) = self.pointer.position() else {

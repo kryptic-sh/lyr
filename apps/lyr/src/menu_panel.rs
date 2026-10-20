@@ -10,12 +10,12 @@
 //! follows its content's size in place (`Shell::set_panel`).
 
 use crcbl_shell::{
-    ButtonState, CloseReply, KeyCode, LogicalSize, Margins, PanelAnchor, PanelDesc, PanelKeyboard,
+    ButtonState, CloseReply, LogicalSize, Margins, PanelAnchor, PanelDesc, PanelKeyboard,
     PanelLayer, PointerButton, Reserve, Shell, ShellEvent, TextPurpose, WindowDesc, WindowId,
     WindowRole,
 };
 use lyr_config::Position;
-use lyr_core::draw::{DrawList, Size};
+use lyr_core::draw::{DrawList, Item, Size};
 use lyr_core::hit::{Rect, Regions};
 use lyr_core::pointer::Press;
 use lyr_render::surface::Surface;
@@ -24,13 +24,21 @@ use lyr_render::translate::translate;
 use lyr_shell::bars::NAMESPACE;
 
 use crate::input::Pointer;
+use crate::keys::{self, Key};
 use crate::toasts::EDGE_MARGIN;
 
 /// An open menu's panel.
 pub struct MenuPanel<T> {
     window: WindowId,
     place: Place,
+    /// The window's size: the content's, held to [`Place::max_height`].
     size: Size,
+    /// What the menu holds, and how far it is scrolled when it holds more
+    /// than the window shows.
+    content: Size,
+    scroll: f32,
+    /// How far a wheel step scrolls it.
+    scroll_step: f32,
     list: DrawList,
     regions: Regions<T>,
     /// The keyboard's place, by the target's index in the order drawn.
@@ -80,6 +88,10 @@ pub struct Place {
     /// The bar's edge of the output, which the menu opens away from.
     pub edge: Position,
 }
+
+/// Lines a wheel step scrolls a menu taller than its room, as the clock
+/// panel's centre scrolls.
+const SCROLL_LINES: f32 = 3.0;
 
 /// How far past the bar's edge a menu opens: the toasts' margin, so they
 /// all keep one distance.
@@ -164,6 +176,15 @@ pub fn panel_desc(size: Size, place: Place) -> PanelDesc<'static> {
     }
 }
 
+/// The window's size for `content` at `place`: as big, but no taller than
+/// the room beside the bar.
+fn held(content: Size, place: Place) -> Size {
+    Size {
+        width: content.width,
+        height: content.height.min(place.max_height()),
+    }
+}
+
 /// `size` as the window system's logical size.
 pub fn logical(size: Size) -> LogicalSize {
     LogicalSize {
@@ -186,16 +207,21 @@ fn create(shell: &mut dyn Shell, size: Size, place: Place) -> anyhow::Result<Win
 
 impl<T: Copy> MenuPanel<T> {
     /// Opens a panel showing `list`, `size` big, with its input `regions`,
-    /// at `place`.
+    /// at `place`; text in it is `line_height` a line.
     pub fn open(
         shell: &mut dyn Shell,
         place: Place,
-        (list, size, regions): (DrawList, Size, Regions<T>),
+        line_height: f32,
+        (list, content, regions): (DrawList, Size, Regions<T>),
     ) -> anyhow::Result<Self> {
+        let size = held(content, place);
         Ok(Self {
             window: create(shell, size, place)?,
             place,
             size,
+            content,
+            scroll: 0.0,
+            scroll_step: SCROLL_LINES * line_height,
             list,
             regions,
             focus: None,
@@ -276,24 +302,112 @@ impl<T: Copy> MenuPanel<T> {
         self.regions.targets().nth(self.focus?).copied()
     }
 
-    /// Shows `list`, `size` big, with its input `regions`, keeping the
+    /// Shows `list`, `content` big, with its input `regions`, keeping the
     /// keyboard's place within them, and resizing the window in place if its
     /// size changed; the new size comes back as its next `Resized`.
     pub fn show(
         &mut self,
         shell: &mut dyn Shell,
-        (list, size, regions): (DrawList, Size, Regions<T>),
+        (list, content, regions): (DrawList, Size, Regions<T>),
     ) -> anyhow::Result<()> {
         let count = regions.targets().count();
         self.focus = self.focus.filter(|_| count > 0).map(|at| at.min(count - 1));
+        let size = held(content, self.place);
         if size != self.size {
             shell.set_panel(self.window, logical(size), &panel_desc(size, self.place))?;
             self.size = size;
         }
+        self.content = content;
         self.list = list;
         self.regions = regions;
+        self.scroll_to(self.scroll);
         self.dirty = true;
         Ok(())
+    }
+
+    /// How far it can scroll: what it holds beyond what the window shows.
+    fn scroll_max(&self) -> f32 {
+        (self.content.height - self.size.height).max(0.0)
+    }
+
+    /// Scrolls to `scroll`, held to what there is.
+    fn scroll_to(&mut self, scroll: f32) {
+        self.scroll = scroll.clamp(0.0, self.scroll_max());
+    }
+
+    /// Scrolls the keyboard's place into view.
+    fn reveal_focus(&mut self) {
+        let Some(rect) = self.focus.and_then(|at| self.regions.rect_at(at)) else {
+            return;
+        };
+        if rect.y < self.scroll {
+            self.scroll_to(rect.y);
+        } else if rect.y + rect.height > self.scroll + self.size.height {
+            self.scroll_to(rect.y + rect.height - self.size.height);
+        }
+    }
+
+    /// The target under the pointer, through the scroll.
+    fn under_pointer(&self) -> Option<&T> {
+        let (x, y) = self.pointer.position()?;
+        self.regions.hit(x, y + self.scroll)
+    }
+
+    /// What the window shows: the list, or when it holds more than fits,
+    /// its frame at the window's size and the rest scrolled inside it.
+    fn visible(&self) -> DrawList {
+        if self.scroll_max() <= 0.0 {
+            return self.list.clone();
+        }
+        let mut items = self.list.items.clone();
+        let whole = |rect: &lyr_core::hit::Rect| {
+            rect.x == 0.0
+                && rect.y == 0.0
+                && rect.width == self.content.width
+                && rect.height == self.content.height
+        };
+        // `lyr_core::menu::frame` puts the box first; anything else is
+        // clipped and scrolled whole.
+        let frame = match items.first() {
+            Some(Item::Box { rect, .. }) if whole(rect) => Some(items.remove(0)),
+            _ => None,
+        };
+        let view = lyr_core::hit::Rect {
+            x: 0.0,
+            y: 0.0,
+            width: self.size.width,
+            height: self.size.height,
+        };
+        let (mut shown, inset) = match frame {
+            Some(Item::Box {
+                radius,
+                fill,
+                border,
+                ..
+            }) => (
+                vec![Item::Box {
+                    rect: view,
+                    radius,
+                    fill,
+                    border,
+                }],
+                border.map_or(0.0, |(width, _)| width),
+            ),
+            _ => (Vec::new(), 0.0),
+        };
+        shown.push(Item::Clip {
+            rect: lyr_core::hit::Rect {
+                x: inset,
+                y: inset,
+                width: (view.width - 2.0 * inset).max(0.0),
+                height: (view.height - 2.0 * inset).max(0.0),
+            },
+            items: items
+                .into_iter()
+                .map(|item| item.offset(0.0, -self.scroll))
+                .collect(),
+        });
+        DrawList { items: shown }
     }
 
     /// Applies an event for the panel's window. A menu that types takes
@@ -323,31 +437,27 @@ impl<T: Copy> MenuPanel<T> {
                 shell.reply_close_request(window, CloseReply::Close)?;
                 return Ok(Event::Closed);
             }
-            ShellEvent::Focus { focused: false, .. }
-            | ShellEvent::Key {
-                key_code: Some(KeyCode::Escape),
-                state: ButtonState::Pressed,
-                ..
-            } => return Ok(Event::Close),
-            ShellEvent::Key {
-                key_code: Some(key),
-                state: ButtonState::Pressed,
-                ..
-            } => {
+            ShellEvent::Focus { focused: false, .. } => return Ok(Event::Close),
+            ShellEvent::Key { .. } if keys::pressed(event) == Some(Key::Escape) => {
+                return Ok(Event::Close);
+            }
+            ShellEvent::Key { .. } => {
                 let count = self.regions.targets().count();
                 if count == 0 {
                     return Ok(Event::Kept);
                 }
-                match key {
-                    KeyCode::ArrowDown => {
+                match keys::pressed(event) {
+                    Some(Key::Down) => {
                         self.focus = Some(self.focus.map_or(0, |at| (at + 1).min(count - 1)));
+                        self.reveal_focus();
                         return Ok(Event::Redraw);
                     }
-                    KeyCode::ArrowUp => {
+                    Some(Key::Up) => {
                         self.focus = Some(self.focus.map_or(0, |at| at.saturating_sub(1)));
+                        self.reveal_focus();
                         return Ok(Event::Redraw);
                     }
-                    KeyCode::Enter | KeyCode::NumpadEnter => {
+                    Some(Key::Enter) => {
                         self.picked_at = None;
                         return Ok(self.focused().map_or(Event::Enter, Event::Pick));
                     }
@@ -361,8 +471,22 @@ impl<T: Copy> MenuPanel<T> {
             } => self.dragging = None,
             _ => {
                 let presses = self.pointer.handle(event, self.scale);
+                let scrolled = presses
+                    .iter()
+                    .fold(self.scroll, |scroll, press| match press {
+                        Press::ScrollUp => scroll - self.scroll_step,
+                        Press::ScrollDown => scroll + self.scroll_step,
+                        _ => scroll,
+                    });
+                if scrolled != self.scroll {
+                    let before = self.scroll;
+                    self.scroll_to(scrolled);
+                    if self.scroll != before {
+                        self.dirty = true;
+                    }
+                }
                 if presses.contains(&Press::Left)
-                    && let Some(&target) = self.pointer.target(&self.regions)
+                    && let Some(&target) = self.under_pointer()
                 {
                     self.picked_at = self.pointer.position();
                     self.dragging = (self.drags)(&target).then_some(target);
@@ -379,8 +503,11 @@ impl<T: Copy> MenuPanel<T> {
 
     /// Draws the panel if it has a frame to present.
     pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
-        if let (true, Some(surface)) = (self.dirty, &mut self.surface) {
-            self.dirty = !surface.draw(shell, &translate(&self.list, text))?;
+        if self.dirty {
+            let visible = self.visible();
+            if let Some(surface) = &mut self.surface {
+                self.dirty = !surface.draw(shell, &translate(&visible, text))?;
+            }
         }
         Ok(())
     }
@@ -400,12 +527,16 @@ impl<T: Copy> MenuPanel<T> {
 
 #[cfg(test)]
 mod tests {
-    use crcbl_shell::PanelAnchor;
-    use lyr_config::Position;
-    use lyr_core::draw::Size;
-    use lyr_core::hit::Rect;
+    use crcbl_shell::{
+        ButtonState, HeadlessShell, KeyCode, PanelAnchor, PhysicalPoint, PointerButton,
+        ScrollDelta, Shell, ShellEvent,
+    };
+    use lyr_config::{Platform, Position, from_sources};
+    use lyr_core::draw::{Item, Size};
+    use lyr_core::hit::{Rect, Regions};
+    use lyr_core::menu;
 
-    use super::{GAP, Place, panel_desc, popup_anchor};
+    use super::{Event, GAP, MenuPanel, Place, held, panel_desc, popup_anchor};
     use crate::toasts::EDGE_MARGIN;
 
     #[test]
@@ -463,6 +594,115 @@ mod tests {
             ..Place::EDGE
         };
         assert!((room.max_height() - (1000.0 - 2.0 * GAP as f32)).abs() < f32::EPSILON);
+    }
+
+    /// Ten 60 px rows in a 600 px menu, with room for 200 px of it.
+    fn tall() -> (MenuPanel<usize>, HeadlessShell) {
+        let theme = from_sources(None, Platform::Linux)
+            .expect("the defaults")
+            .theme;
+        let content = Size {
+            width: 100.0,
+            height: 600.0,
+        };
+        let mut regions = Regions::default();
+        for row in 0..10_u8 {
+            let rect = Rect {
+                x: 0.0,
+                y: f32::from(row) * 60.0,
+                width: 100.0,
+                height: 60.0,
+            };
+            regions.push(rect, usize::from(row));
+        }
+        let place = Place {
+            room: 200.0 + 2.0 * GAP,
+            ..Place::EDGE
+        };
+        let mut shell = HeadlessShell::new();
+        let panel = MenuPanel::open(
+            &mut shell,
+            place,
+            20.0,
+            (
+                menu::frame(content, Vec::new(), None, &theme),
+                content,
+                regions,
+            ),
+        )
+        .expect("opened");
+        (panel, shell)
+    }
+
+    /// Feeds the panel its queued events, sizing ones left out (they open
+    /// a GPU surface).
+    fn pump(panel: &mut MenuPanel<usize>, shell: &mut HeadlessShell) -> Vec<Event<usize>> {
+        let mut events = Vec::new();
+        shell.pump(&mut |event| events.push(event));
+        events
+            .iter()
+            .filter(|event| !matches!(event, ShellEvent::Resized { .. }))
+            .map(|event| panel.event(shell, event).expect("applied"))
+            .collect()
+    }
+
+    #[test]
+    fn a_menu_taller_than_its_room_scrolls() {
+        let (mut panel, mut shell) = tall();
+        let window = panel.window;
+        assert!(
+            (panel.size().height - 200.0).abs() < f32::EPSILON,
+            "held to the room"
+        );
+
+        // The fifth row, 240 – 300, comes into view at the bottom.
+        for _ in 0..5 {
+            shell.key_press(window, KeyCode::ArrowDown).expect("a key");
+        }
+        pump(&mut panel, &mut shell);
+        assert_eq!(panel.focused(), Some(4));
+        assert!(
+            (panel.scroll - 100.0).abs() < f32::EPSILON,
+            "{}",
+            panel.scroll
+        );
+
+        // Drawn as the frame at the window's size, the rows clipped in it.
+        let visible = panel.visible();
+        assert!(matches!(
+            visible.items.first(),
+            Some(Item::Box { rect, .. }) if (rect.height - 200.0).abs() < f32::EPSILON
+        ));
+        assert!(matches!(visible.items.get(1), Some(Item::Clip { .. })));
+
+        // A click 10 px down hits the row scrolled under it, the second.
+        let at = PhysicalPoint { x: 50.0, y: 10.0 };
+        shell.move_pointer(window, at, (0.0, 0.0)).expect("moved");
+        shell
+            .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
+            .expect("clicked");
+        assert!(pump(&mut panel, &mut shell).contains(&Event::Pick(1)));
+
+        // The wheel goes no further than the last row.
+        for _ in 0..100 {
+            shell
+                .scroll(window, ScrollDelta::Lines { x: 0.0, y: -1.0 }, Some(at))
+                .expect("scrolled");
+        }
+        pump(&mut panel, &mut shell);
+        assert!(
+            (panel.scroll - 400.0).abs() < f32::EPSILON,
+            "{}",
+            panel.scroll
+        );
+    }
+
+    #[test]
+    fn a_menu_that_fits_draws_as_it_is() {
+        let (mut panel, _shell) = tall();
+        panel.place.room = 1000.0;
+        panel.size = held(panel.content, panel.place);
+        assert_eq!(panel.visible(), panel.list);
     }
 
     #[test]

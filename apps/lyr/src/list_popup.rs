@@ -6,8 +6,8 @@
 //! click outside it closes it (both reported by crcbl as a close request).
 
 use crcbl_shell::{
-    ButtonState, CloseReply, KeyCode, LogicalPoint, LogicalRect, LogicalSize, PopupDesc,
-    PopupInput, PopupPlacement, Shell, ShellEvent, WindowDesc, WindowId, WindowRole,
+    CloseReply, LogicalPoint, LogicalRect, LogicalSize, PopupDesc, PopupInput, PopupPlacement,
+    Shell, ShellEvent, WindowDesc, WindowId, WindowRole,
 };
 use lyr_config::Position;
 use lyr_core::draw::DrawList;
@@ -19,6 +19,7 @@ use lyr_render::translate::translate;
 use lyr_shell::bars::NAMESPACE;
 
 use crate::input::Pointer;
+use crate::keys::{self, Key};
 use crate::tooltips::Look;
 
 /// An open list menu, whose rows stand for `T`s.
@@ -162,14 +163,10 @@ impl<T: Clone + PartialEq> ListPopup<T> {
                 shell.reply_close_request(window, CloseReply::Close)?;
                 return Ok(Outcome::Dismissed);
             }
-            ShellEvent::Key {
-                key_code: Some(key),
-                state: ButtonState::Pressed,
-                ..
-            } => match key {
-                KeyCode::ArrowUp => self.moved(look, Menu::up),
-                KeyCode::ArrowDown => self.moved(look, Menu::down),
-                KeyCode::Enter | KeyCode::NumpadEnter => {
+            ShellEvent::Key { .. } => match keys::pressed(event) {
+                Some(Key::Up) => self.moved(look, Menu::up),
+                Some(Key::Down) => self.moved(look, Menu::down),
+                Some(Key::Enter) => {
                     if let Some(value) = self.menu.selected() {
                         return Ok(Outcome::Chosen(value.clone()));
                     }

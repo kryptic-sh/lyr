@@ -62,7 +62,7 @@ impl AudioMenu {
         let drawn = audio_menu::draw(nodes, tab, None, look.measure, look.line_height, look.theme);
         Ok(Self {
             // A slider follows a drag.
-            panel: MenuPanel::open(shell, place, drawn)?
+            panel: MenuPanel::open(shell, place, look.line_height, drawn)?
                 .with_drags(|target| matches!(target, Target::Level(_))),
             tab,
             ids: ids(nodes, tab),

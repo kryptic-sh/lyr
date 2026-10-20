@@ -70,6 +70,13 @@ impl<T> Regions<T> {
             .map(|(rect, _)| *rect)
     }
 
+    /// The rectangle of the region added `index`-th, in the order
+    /// [`Regions::targets`] gives.
+    #[must_use]
+    pub fn rect_at(&self, index: usize) -> Option<Rect> {
+        self.regions.get(index).map(|(rect, _)| *rect)
+    }
+
     /// Every region's target, in the order they were added.
     pub fn targets(&self) -> impl Iterator<Item = &T> {
         self.regions.iter().map(|(_, target)| target)

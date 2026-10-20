@@ -197,6 +197,13 @@ implementation follows meanwhile.
   as the owner's call. When it lands: move lyr's daemon and `notify_session`
   onto it, and the Windows bell from `ms-actioncenter:` to real state where the
   seam can read it.
+- **crcbl: export its keysym names.** lyr's menus act on the key's symbol, not
+  on `key_code`, which crcbl derives from the scancode and so ignores xkb remaps
+  and virtual keyboards (`wtype`'s Down arrived as `key_code: Escape`). lyr
+  spells the six X11 keysyms it needs itself (`apps/lyr/src/keys.rs`), since
+  crcbl's own table (`named_keysym`) is crate-private. When crcbl exports it, or
+  names constants on `Keysym`, lyr drops its copy. Asked of office-crcbl on
+  2026-10-20.
 - **crcbl: Linux and Vulkan parity for 0.6 – 0.8.** Also at the owner's request
   (2026-10-20): every crcbl feature developed on the Windows machine to be
   implemented and tested on Wayland, X11 and Vulkan. On crcbl's backlog,
@@ -950,26 +957,27 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   the list within half a second (about 3 s before `wifi` read each access point
   with one `GetAll`, all in flight at once, instead of a call per property;
   about 120 access points here). Not run: joining, Forget, the radio switch, a
-  password. No menu panel is bounded by its output's height (`menu_panel::Place`
-  carries only the width), so a place with many more networks would run the menu
-  past the bottom edge with no way to scroll; not seen, since 33 rows fit 1080
-  px. The panel is up (`apps/lyr/src/wifi_menu.rs`, its glue in
-  `apps/lyr/src/bar/wifi.rs`): opened by `open_wifi_menu` or `lyr panel wifi`
-  under the network module, a rescan asked for on every open and "Scanning…"
-  until a newer scan lands or `wifi_menu::SCAN_WAIT` (lyr's own 15 s) is up,
-  unless the last scan is under 30 s old; a password typed with text input
-  `Password`, spaces kept; `recovery` applied to a failure by the source task; a
-  second click on the module within GTK's default double-click time leaves it
-  open. Tested on crcbl's headless shell and mutation-checked. A failure while
-  the menu is closed is a notice from lyr
-  (`notifications::linux::notify_session`, to whichever daemon holds the name,
-  lyr's own included), its text escaped for markup (`lyr_core::markup::escape`);
-  the call is tested against lyr's daemon on a peer-to-peer connection, the glue
-  that sends it is not. Two equally strong access points of one SSID: the first
-  listed is joined, which either would do. The header's buttons take the arrow
-  keys from the right (No before Yes), as in the Bluetooth menu. Both menus drop
-  the keyboard's outline when a question appears (`MenuPanel::unfocus`), so
-  Enter answers it.
+  password. A menu taller than the room beside the bar is held to it and scrolls
+  (`MenuPanel`: three lines a wheel step, the arrow keys bringing the outlined
+  control into view, the frame kept at the window's size); seen on a nested
+  Hyprland whose output was cut to 500 px, the Wi-Fi menu held to 418 px and
+  scrolled by keys typed with `wtype`. The panel is up
+  (`apps/lyr/src/wifi_menu.rs`, its glue in `apps/lyr/src/bar/wifi.rs`): opened
+  by `open_wifi_menu` or `lyr panel wifi` under the network module, a rescan
+  asked for on every open and "Scanning…" until a newer scan lands or
+  `wifi_menu::SCAN_WAIT` (lyr's own 15 s) is up, unless the last scan is under
+  30 s old; a password typed with text input `Password`, spaces kept; `recovery`
+  applied to a failure by the source task; a second click on the module within
+  GTK's default double-click time leaves it open. Tested on crcbl's headless
+  shell and mutation-checked. A failure while the menu is closed is a notice
+  from lyr (`notifications::linux::notify_session`, to whichever daemon holds
+  the name, lyr's own included), its text escaped for markup
+  (`lyr_core::markup::escape`); the call is tested against lyr's daemon on a
+  peer-to-peer connection, the glue that sends it is not. Two equally strong
+  access points of one SSID: the first listed is joined, which either would do.
+  The header's buttons take the arrow keys from the right (No before Yes), as in
+  the Bluetooth menu. Both menus drop the keyboard's outline when a question
+  appears (`MenuPanel::unfocus`), so Enter answers it.
 - **Tray, M8.** Built: the rules (`lyr_core::tray`, after waybar's
   `src/modules/sni` at master `c15ec02`): an item's status (passive items
   hidden, as waybar hides them by default), a click (left activates, or opens

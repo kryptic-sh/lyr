@@ -9,12 +9,13 @@
 
 use std::time::{Duration, Instant};
 
-use crcbl_shell::{ButtonState, KeyCode, Shell, ShellEvent, TextPurpose, WindowId};
+use crcbl_shell::{Shell, ShellEvent, TextPurpose, WindowId};
 use lyr_core::wifi_menu::{
     self, Header, Network, Scan, Shown, Target, Wifi, password_fits, scan_is_fresh,
 };
 use lyr_render::text::Text;
 
+use crate::keys::{self, Key};
 use crate::menu_panel::{Event, MenuPanel, Place};
 use crate::tooltips::Look;
 
@@ -148,7 +149,7 @@ impl WifiMenu {
             look.theme,
         );
         Ok(Self {
-            panel: MenuPanel::open(shell, place, drawn)?,
+            panel: MenuPanel::open(shell, place, look.line_height, drawn)?,
             networks,
             showing: None,
             shown: None,
@@ -289,14 +290,12 @@ impl WifiMenu {
         }
         let typing = matches!(self.showing, Some(Showing::Password { .. }));
         match *event {
-            ShellEvent::Key {
-                key_code: Some(KeyCode::Escape),
-                state: ButtonState::Pressed,
-                ..
-            } if matches!(
-                self.showing,
-                Some(Showing::Password { .. } | Showing::Forget(_) | Showing::Error(_))
-            ) =>
+            ShellEvent::Key { .. }
+                if keys::pressed(event) == Some(Key::Escape)
+                    && matches!(
+                        self.showing,
+                        Some(Showing::Password { .. } | Showing::Forget(_) | Showing::Error(_))
+                    ) =>
             {
                 self.showing = None;
                 self.typed.clear();
@@ -307,11 +306,7 @@ impl WifiMenu {
                 self.typed.extend(text.chars().filter(|c| !c.is_control()));
                 return Ok(Outcome::Redraw);
             }
-            ShellEvent::Key {
-                key_code: Some(KeyCode::Backspace),
-                state: ButtonState::Pressed,
-                ..
-            } if typing => {
+            ShellEvent::Key { .. } if typing && keys::pressed(event) == Some(Key::Backspace) => {
                 self.typed.pop();
                 return Ok(Outcome::Redraw);
             }

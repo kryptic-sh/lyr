@@ -11,6 +11,7 @@ mod clock_panel;
 mod control;
 mod exec;
 mod input;
+mod keys;
 mod list_popup;
 mod log;
 mod menu_panel;
