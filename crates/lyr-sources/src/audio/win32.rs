@@ -64,9 +64,38 @@ pub fn session_name(system_sounds: bool, display: &str, program: Option<&str>) -
     stem.map_or(file, |end| &file[..end]).to_owned()
 }
 
+/// The audio menu's row for a stream named `name`, on the default endpoint
+/// (`elsewhere` `None`) or on the endpoint named `elsewhere`; `None` for
+/// one it leaves out. Every endpoint has a session for Windows' own sounds,
+/// which play on the default, so another endpoint's is left out; another
+/// stream elsewhere names its endpoint, which tells the rows apart.
+#[must_use]
+pub fn stream_row(name: String, system_sounds: bool, elsewhere: Option<&str>) -> Option<String> {
+    match elsewhere {
+        None => Some(name),
+        Some(_) if system_sounds => None,
+        Some(device) => Some(format!("{name} ({device})")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{percent, port, session_name, stepped};
+    use super::{percent, port, session_name, stepped, stream_row};
+
+    #[test]
+    fn a_stream_elsewhere_names_its_endpoint_and_its_system_sounds_go() {
+        let row = |name: &str, system, elsewhere| stream_row(name.to_owned(), system, elsewhere);
+        assert_eq!(row("Spotify", false, None).as_deref(), Some("Spotify"));
+        assert_eq!(
+            row("System sounds", true, None).as_deref(),
+            Some("System sounds")
+        );
+        assert_eq!(
+            row("Spotify", false, Some("Headphones")).as_deref(),
+            Some("Spotify (Headphones)")
+        );
+        assert_eq!(row("System sounds", true, Some("Headphones")), None);
+    }
 
     #[test]
     fn a_stream_is_named_by_itself_else_by_its_program() {

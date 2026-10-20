@@ -2,7 +2,8 @@
 //! and the streams on them, which WASAPI calls audio sessions
 //! (`IAudioSessionManager2`). A session whose program has quit, expired,
 //! is left out; one whose program is open but quiet is listed, as Windows'
-//! own volume mixer lists it.
+//! own volume mixer lists it. A stream off the default endpoint is shown as
+//! [`super::super::win32::stream_row`] says.
 
 use std::io;
 
@@ -19,7 +20,7 @@ use windows_sys::Win32::System::Threading::{
     OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
 };
 
-use super::super::win32::session_name;
+use super::super::win32::{session_name, stream_row};
 use super::{Audio, Control, Flow, id, name, take, volume};
 
 /// A stream and its volume control.
@@ -80,8 +81,10 @@ impl Audio {
 
     /// The streams on every one of `flow`'s endpoints.
     fn sessions(&self, flow: Flow) -> io::Result<Vec<Session>> {
+        let default = self.device(flow)?.and_then(|device| id(&device));
         let mut sessions = Vec::new();
         for device in self.devices(flow)? {
+            let elsewhere = (id(&device) != default).then(|| name(&device));
             // SAFETY: no activation parameters; plain reads after.
             unsafe {
                 let manager: IAudioSessionManager2 = device
@@ -95,19 +98,27 @@ impl Audio {
                     }
                     let control: IAudioSessionControl2 =
                         control.cast().map_err(io::Error::other)?;
+                    let system_sounds = control.IsSystemSoundsSession() == S_OK;
                     let display = control.GetDisplayName().ok().and_then(take);
                     let program = control.GetProcessId().ok().and_then(program);
+                    let Some(name) = stream_row(
+                        session_name(
+                            system_sounds,
+                            display.as_deref().unwrap_or_default(),
+                            program.as_deref(),
+                        ),
+                        system_sounds,
+                        elsewhere.as_deref(),
+                    ) else {
+                        continue;
+                    };
                     sessions.push(Session {
                         id: control
                             .GetSessionInstanceIdentifier()
                             .ok()
                             .and_then(take)
                             .unwrap_or_default(),
-                        name: session_name(
-                            control.IsSystemSoundsSession() == S_OK,
-                            display.as_deref().unwrap_or_default(),
-                            program.as_deref(),
-                        ),
+                        name,
                         volume: control.cast().map_err(io::Error::other)?,
                     });
                 }

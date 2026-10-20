@@ -478,10 +478,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `apps/lyr/src/audio_menu.rs`, `lyr_sources::audio::windows::menu`): tabs for
   playback and recording streams (WASAPI's audio sessions on every active
   endpoint, named by the session, else its program's file name,
-  `audio::win32::session_name`) and output and input devices, each row with
-  mute, a step down and up by the module's `scroll_step`, and on a device that
-  is not the default a Default button, which opens `ms-settings:sound` since
-  Windows has no public API for setting it. The source re-reads the rows on each
+  `audio::win32::session_name`; every endpoint has a system-sounds session, so
+  those off the default endpoint are left out, and another stream there names
+  its endpoint, `stream_row`) and output and input devices, each row with mute,
+  a step down and up by the module's `scroll_step`, and on a device that is not
+  the default a Default button, which opens `ms-settings:sound` since Windows
+  has no public API for setting it. The source re-reads the rows on each
   endpoint change and once a second while the menu is open, since session
   changes have no callbacks wired. Run on Windows (2026-10-20):
   `lyr panel audio` opened it listing this machine's four output devices, the
