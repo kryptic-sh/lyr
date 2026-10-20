@@ -219,6 +219,8 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         // The source reads the streams again while the menu is open.
         #[cfg(any(windows, target_os = "macos"))]
         app.commands.audio_menu(app.audio_menu.is_some());
+        #[cfg(target_os = "linux")]
+        app.commands.wifi_menu(app.wifi_menu.is_some());
         app.draw(shell.as_mut())?;
     }
 }

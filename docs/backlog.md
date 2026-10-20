@@ -359,14 +359,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   D-Bus watcher hands on only a value that changed
   (`lyr_sources::bus::publish`); before, UPower's identical 30 s re-sends and
   every Wi-Fi or BlueZ change the bar does not show each presented a frame.
-  Wake-ups do not meet it yet: about 13 a minute, from UPower's power reading
-  (which the battery module's icon does not show) and the Wi-Fi state, which
-  NetworkManager's background scans move every few seconds though only the
-  closed Wi-Fi menu shows it. Following the Wi-Fi state only while the menu is
-  open (a request to the source, as Windows' audio menu does with
-  `Commands::audio_menu`) would remove most of them. `lyr_wm::Compositor` picks
-  it, or sway or niri, at start. Hyprland main's changes for the next release
-  are in [plan/06](plan/06-workspaces.md#linux--hyprland).
+  Wake-ups do not meet it yet: 5 in an idle minute, down from 13 once a Wi-Fi
+  change (NetworkManager's background scans move it every few seconds) stopped
+  waking the bar while the menu is closed (`Commands::wifi_menu`; the change
+  waits in the channel for the next wake-up, which drains it before handling its
+  own events, so a click opening the menu still sees it). The rest are UPower's
+  power reading, which only the battery's tooltip shows, and the clock.
+  `lyr_wm::Compositor` picks it, or sway or niri, at start. Hyprland main's
+  changes for the next release are in
+  [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Render, rest of M1.** `lyr-render` has the GPU-free half: the bar font found
   with crcbl-font and given the system's fallback faces (`fonts::load`), text
   measured and drawn as one glyph run per face (`text::Text`), sRGB colours in
@@ -1015,9 +1016,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   the bar), tested for the arithmetic only. A Wayland popup's anchor reaching
   past its parent's surface is not something xdg-shell forbids, but how Hyprland
   places it has not been seen: both open only from a click, and this machine has
-  no pointer injection (`wlrctl`, `ydotool` or `dotool` would give one;
-  installing one is the owner's call). Win32 and AppKit place popups themselves
-  from the same anchor.
+  no pointer injection. A headless sway now runs here (sway 1.12,
+  `WLR_RENDER_DRM_DEVICE` set to the Intel render node, since the NVIDIA driver
+  is broken until a reboot, and a short `XDG_RUNTIME_DIR` under `/run/user`,
+  since a socket path over 108 bytes fails), and lyr draws there, but its seat
+  has no pointer (`capabilities: 0`), so `swaymsg seat … cursor press` reaches
+  nothing. `wlrctl` (AUR) would inject through the virtual-pointer protocol into
+  that compositor alone; `ydotool` (in extra) goes through uinput and would
+  click on the owner's real desktop too. Installing one is the owner's call.
+  Win32 and AppKit place popups themselves from the same anchor.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
   keyboard focus (S17) closes it on a click into another window, but not on a

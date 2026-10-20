@@ -207,6 +207,11 @@ pub struct Commands {
     bluetooth: tokio::sync::mpsc::UnboundedSender<BluetoothRequest>,
     #[cfg(target_os = "linux")]
     wifi: tokio::sync::mpsc::UnboundedSender<WifiRequest>,
+    /// Linux: whether the Wi-Fi menu is open, the only thing that shows the
+    /// Wi-Fi state; while it is closed a change waits for the bar's next
+    /// wake-up rather than causing one.
+    #[cfg(target_os = "linux")]
+    wifi_menu: std::sync::Arc<std::sync::atomic::AtomicBool>,
     #[cfg(target_os = "linux")]
     notices: tokio::sync::mpsc::UnboundedSender<(String, String)>,
     #[cfg(target_os = "linux")]
@@ -250,6 +255,12 @@ impl Commands {
     /// Asks NetworkManager what the Wi-Fi menu wants.
     pub fn wifi(&self, request: WifiRequest) {
         let _stopped = self.wifi.send(request);
+    }
+
+    /// Tells the network source whether the Wi-Fi menu is open.
+    pub fn wifi_menu(&self, open: bool) {
+        self.wifi_menu
+            .store(open, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Presses `control` on the media player at `bus_name`.
@@ -402,6 +413,7 @@ pub fn start(
         let (wifi, wifi_requests) = tokio::sync::mpsc::unbounded_channel();
         let (notices, notice_requests) = tokio::sync::mpsc::unbounded_channel();
         let (tray, tray_requests) = tokio::sync::mpsc::unbounded_channel();
+        let wifi_menu = std::sync::Arc::default();
         linux::start(
             sender,
             linux::Requests {
@@ -412,6 +424,7 @@ pub fn start(
                 media: media_requests,
                 bluetooth: bluetooth_requests,
                 wifi: wifi_requests,
+                wifi_menu: std::sync::Arc::clone(&wifi_menu),
                 notices: notice_requests,
                 tray: tray_requests,
             },
@@ -428,6 +441,7 @@ pub fn start(
                 media,
                 bluetooth,
                 wifi,
+                wifi_menu,
                 notices,
                 tray,
             },
@@ -1104,6 +1118,7 @@ mod linux {
         pub(super) media: UnboundedReceiver<(String, Control)>,
         pub(super) bluetooth: UnboundedReceiver<BluetoothRequest>,
         pub(super) wifi: UnboundedReceiver<WifiRequest>,
+        pub(super) wifi_menu: std::sync::Arc<std::sync::atomic::AtomicBool>,
         pub(super) notices: UnboundedReceiver<(String, String)>,
         pub(super) tray: UnboundedReceiver<TrayRequest>,
     }
@@ -1122,6 +1137,7 @@ mod linux {
             media,
             bluetooth: bluetooth_requests,
             wifi,
+            wifi_menu,
             notices: notice_requests,
             tray: tray_requests,
         } = requests;
@@ -1134,7 +1150,7 @@ mod linux {
                 runtime.block_on(async move {
                     tokio::join!(
                         battery(sender.clone(), waker.clone()),
-                        network(sender.clone(), wifi, waker.clone()),
+                        network(sender.clone(), wifi, wifi_menu, waker.clone()),
                         power_profile(sender.clone(), profile, waker.clone()),
                         bluetooth(sender.clone(), bluetooth_requests, waker.clone()),
                         clock(sender.clone(), waker.clone()),
@@ -1181,6 +1197,7 @@ mod linux {
     async fn network(
         sender: mpsc::Sender<Update>,
         mut requests: UnboundedReceiver<WifiRequest>,
+        wifi_menu: std::sync::Arc<std::sync::atomic::AtomicBool>,
         waker: Option<ShellWaker>,
     ) {
         let network = match NetworkManager::system().await {
@@ -1203,7 +1220,11 @@ mod linux {
         let forward_wifi = async {
             while wifi_changed.changed().await.is_ok() {
                 let state = wifi_changed.borrow_and_update().clone();
-                if !deliver(&sender, waker.as_ref(), Update::Wifi(state)) {
+                // Only the menu shows it; NetworkManager's background scans
+                // change it every few seconds.
+                let open = wifi_menu.load(std::sync::atomic::Ordering::Relaxed);
+                let waker = waker.as_ref().filter(|_| open);
+                if !deliver(&sender, waker, Update::Wifi(state)) {
                     break;
                 }
             }
