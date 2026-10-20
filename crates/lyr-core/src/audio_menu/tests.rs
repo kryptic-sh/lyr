@@ -1,6 +1,6 @@
 use lyr_config::{Platform, Theme, from_sources};
 
-use super::{GAP, Node, Nodes, PADDING, Step, Tab, Target, draw};
+use super::{GAP, MAX_PERCENT, Node, Nodes, PADDING, Step, Tab, Target, draw, level_at};
 use crate::draw::Item;
 
 fn theme() -> Theme {
@@ -166,4 +166,52 @@ fn the_focus_is_outlined() {
         Some(Item::Box { rect: outlined, border: Some((_, colour)), .. })
             if *outlined == rect && *colour == theme.workspace_active
     ));
+}
+
+/// The width of the level drawn in `slider`: the box inside it with no
+/// border, its track being the one with one.
+fn level_width(items: &[Item], slider: crate::hit::Rect) -> f32 {
+    items
+        .iter()
+        .find_map(|item| match item {
+            Item::Box {
+                rect, border: None, ..
+            } if (rect.x - slider.x).abs() < 0.01
+                && rect.y > slider.y
+                && rect.y < slider.y + slider.height =>
+            {
+                Some(rect.width)
+            }
+            _ => None,
+        })
+        .expect("a level drawn")
+}
+
+#[test]
+fn a_slider_fills_to_the_level_and_sits_between_the_steps() {
+    let mut nodes = nodes();
+    nodes.outputs[1].volume = 150;
+    let (list, _, regions) = draw(&nodes, Tab::Output, None, &measure, LINE, &theme());
+    let slider = regions.rect(&Target::Level(0)).expect("drawn");
+    let down = regions.rect(&Target::Step(0, Step::Down)).expect("drawn");
+    let up = regions.rect(&Target::Step(0, Step::Up)).expect("drawn");
+    assert!(down.x + down.width <= slider.x && slider.x + slider.width <= up.x);
+    assert!(
+        (level_width(&list.items, slider) - slider.width * 0.4).abs() < 0.01,
+        "40 %"
+    );
+    let boosted = regions.rect(&Target::Level(1)).expect("drawn");
+    assert!(
+        (level_width(&list.items, boosted) - boosted.width).abs() < 0.01,
+        "a boost fills it, no further"
+    );
+}
+
+#[test]
+fn a_click_across_a_slider_is_a_percent() {
+    assert_eq!(level_at(0.0), 0);
+    assert_eq!(level_at(0.404), 40);
+    assert_eq!(level_at(1.0), MAX_PERCENT);
+    assert_eq!(level_at(1.5), MAX_PERCENT);
+    assert_eq!(level_at(-0.5), 0);
 }

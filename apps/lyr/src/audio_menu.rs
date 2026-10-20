@@ -1,15 +1,15 @@
 //! The audio menu (`docs/plan/10-popups-and-menus.md#audio-menu`): a panel
 //! at the top left, under the volume or mic module where a bar shows one,
 //! taking the keyboard. A click on a tab shows it; a click on a row's
-//! button, or Enter on the one the arrow keys moved to, is the caller's to
-//! carry out, by the row's id. `Escape`, losing focus and the same click or
+//! button or slider, or Enter on a button the arrow keys moved to, is the
+//! caller's to carry out, by the row's id. `Escape`, losing focus and the same click or
 //! binding again close it.
 //!
 //! Its panel is [`MenuPanel`]'s, recreated when its size changes (a stream
 //! starting).
 
 use crcbl_shell::{Shell, ShellEvent, WindowId};
-use lyr_core::audio_menu::{self, Nodes, Step, Tab, Target};
+use lyr_core::audio_menu::{self, Nodes, Step, Tab, Target, level_at};
 use lyr_render::text::Text;
 
 use crate::menu_panel::{Event, MenuPanel, Place};
@@ -28,6 +28,8 @@ pub struct AudioMenu {
 pub enum Action {
     Mute,
     Step(Step),
+    /// Set the volume to this percent: a click on the slider.
+    Set(u32),
     /// Make the device the default.
     Default,
 }
@@ -109,7 +111,8 @@ impl AudioMenu {
 
     /// What choosing `target` does: a tab is shown, with the outline gone
     /// since its place may not be on the new tab; a row's button is the
-    /// caller's to carry out.
+    /// caller's to carry out, and so is a click on its slider, as the volume
+    /// where it landed. Enter on a slider has no place to set it to.
     fn act(&mut self, target: Target) -> Outcome {
         let (index, action) = match target {
             Target::Tab(tab) => {
@@ -120,6 +123,10 @@ impl AudioMenu {
             Target::Mute(index) => (index, Action::Mute),
             Target::Step(index, step) => (index, Action::Step(step)),
             Target::Default(index) => (index, Action::Default),
+            Target::Level(index) => match self.panel.picked_across(&target) {
+                Some(across) => (index, Action::Set(level_at(across))),
+                None => return Outcome::Kept,
+            },
         };
         match self.ids.get(index) {
             Some(id) => Outcome::Act(self.tab, id.clone(), action),

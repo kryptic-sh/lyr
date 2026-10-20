@@ -33,6 +33,9 @@ pub struct MenuPanel<T> {
     /// The keyboard's place, by the target's index in the order drawn.
     focus: Option<usize>,
     pointer: Pointer,
+    /// Where the last [`Event::Pick`] was clicked, in logical pixels; `None`
+    /// when Enter chose it.
+    picked_at: Option<(f32, f32)>,
     scale: f32,
     surface: Option<Surface>,
     dirty: bool,
@@ -123,6 +126,7 @@ impl<T: Copy> MenuPanel<T> {
             list,
             regions,
             focus: None,
+            picked_at: None,
             pointer: Pointer::default(),
             scale: 1.0,
             surface: None,
@@ -150,6 +154,16 @@ impl<T: Copy> MenuPanel<T> {
     /// Whether it has a frame to present.
     pub const fn dirty(&self) -> bool {
         self.dirty
+    }
+
+    /// Where the last pick was clicked across `target`, 0 – 1 of its width;
+    /// `None` when Enter chose it or it is not drawn.
+    pub fn picked_across(&self, target: &T) -> Option<f32>
+    where
+        T: PartialEq,
+    {
+        let (x, _) = self.picked_at?;
+        Some(self.regions.rect(target)?.across(x))
     }
 
     /// Turns the window system's text input on for `purpose`, or off.
@@ -248,6 +262,7 @@ impl<T: Copy> MenuPanel<T> {
                         return Ok(Event::Redraw);
                     }
                     KeyCode::Enter | KeyCode::NumpadEnter => {
+                        self.picked_at = None;
                         return Ok(self.focused().map_or(Event::Enter, Event::Pick));
                     }
                     _ => {}
@@ -258,6 +273,7 @@ impl<T: Copy> MenuPanel<T> {
                 if presses.contains(&Press::Left)
                     && let Some(&target) = self.pointer.target(&self.regions)
                 {
+                    self.picked_at = self.pointer.position();
                     return Ok(Event::Pick(target));
                 }
             }

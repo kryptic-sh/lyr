@@ -88,8 +88,9 @@ impl App {
         }
     }
 
-    /// Carries out a click in the audio menu: a stream or device is muted or
-    /// stepped by the volume or mic module's `scroll_step`, as its flow is;
+    /// Carries out a click in the audio menu: a stream or device is muted,
+    /// set, or stepped by the volume or mic module's `scroll_step`, as its
+    /// flow is;
     /// "make default" opens the Sound Settings page, since Windows has no
     /// public API for it. What changed comes back from the source.
     #[cfg(windows)]
@@ -111,6 +112,7 @@ impl App {
             Action::Mute => self.commands.toggle_mute(which),
             Action::Step(Step::Up) => self.commands.step_volume(which, step),
             Action::Step(Step::Down) => self.commands.step_volume(which, -step),
+            Action::Set(percent) => self.commands.set_volume(which, percent),
             Action::Default => crate::settings::open(crate::settings::Page::Sound),
         }
     }

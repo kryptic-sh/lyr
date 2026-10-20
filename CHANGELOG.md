@@ -21,9 +21,9 @@ and this project adheres to
 - On Windows the Wi-Fi and Bluetooth menus open the matching Settings page, from
   their bindings and from `lyr panel`.
 - On Windows the audio menu lists the playing and recording programs and the
-  output and input devices, each with mute and volume steps; a device's Default
-  button opens Sound settings. A right click on the volume or mic module, or
-  `lyr panel audio`, opens it.
+  output and input devices, each with mute, a volume slider and steps; a
+  device's Default button opens Sound settings. A right click on the volume or
+  mic module, or `lyr panel audio`, opens it.
 - On Windows the volume and mic modules show the default output and input, their
   level and mute, updated as they change, and their click and scroll bindings
   mute and step them.

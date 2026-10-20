@@ -139,3 +139,33 @@ fn a_tab_shows_its_rows() {
         Outcome::Act(Tab::Input, "microphone".to_owned(), Action::Mute)
     );
 }
+
+#[test]
+fn a_click_on_a_slider_sets_where_it_lands_and_enter_there_does_nothing() {
+    let mut setup = setup(Tab::Output);
+    assert_eq!(
+        setup.click(Tab::Output, Target::Level(1)),
+        Outcome::Act(Tab::Output, "headphones".to_owned(), Action::Set(50)),
+        "the middle"
+    );
+    let (_, _, regions) =
+        audio_menu::draw(&nodes(), Tab::Output, None, &measure, LINE, &setup.theme);
+    let at = regions
+        .targets()
+        .position(|target| *target == Target::Level(0))
+        .expect("drawn");
+    let window = setup.menu.panel.window();
+    for _ in 0..=at {
+        setup
+            .shell
+            .key_press(window, KeyCode::ArrowDown)
+            .expect("a key");
+    }
+    setup.pump();
+    assert_eq!(setup.menu.panel.focused(), Some(Target::Level(0)));
+    setup
+        .shell
+        .key_press(window, KeyCode::Enter)
+        .expect("a key");
+    assert_eq!(setup.pump(), Outcome::Kept);
+}

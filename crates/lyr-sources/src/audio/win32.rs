@@ -33,6 +33,13 @@ pub fn percent(scalar: f32) -> u32 {
     (scalar.clamp(0.0, 1.0) * 100.0).round() as u32
 }
 
+/// The scalar volume, 0 – 1, a volume of `percent` is, held to 100 %:
+/// Windows' endpoint volume does not boost past it.
+#[must_use]
+pub fn scalar(percent: u32) -> f32 {
+    percent.min(100) as f32 / 100.0
+}
+
 /// The scalar volume a step of `delta` percent from `scalar` sets, held to
 /// 0 – 1: Windows' endpoint volume does not boost past 100 %.
 #[must_use]
@@ -80,7 +87,7 @@ pub fn stream_row(name: String, system_sounds: bool, elsewhere: Option<&str>) ->
 
 #[cfg(test)]
 mod tests {
-    use super::{percent, port, session_name, stepped, stream_row};
+    use super::{percent, port, scalar, session_name, stepped, stream_row};
 
     #[test]
     fn a_stream_elsewhere_names_its_endpoint_and_its_system_sounds_go() {
@@ -155,5 +162,12 @@ mod tests {
             "no boost past 100 %"
         );
         assert!(stepped(0.02, -5).abs() < f32::EPSILON);
+        assert!(scalar(0).abs() < f32::EPSILON);
+        assert!((scalar(40) - 0.4).abs() < f32::EPSILON);
+        assert!(
+            (scalar(150) - 1.0).abs() < f32::EPSILON,
+            "no boost past 100 %"
+        );
+        assert_eq!(percent(scalar(55)), 55, "a percent survives the round trip");
     }
 }

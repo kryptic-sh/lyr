@@ -284,6 +284,12 @@ impl Commands {
         let _stopped = self.audio.send(windows::AudioRequest::Step(which, delta));
     }
 
+    /// Windows: sets the volume of what `which` names to `percent`.
+    #[cfg(windows)]
+    pub fn set_volume(&self, which: lyr_sources::audio::windows::Which, percent: u32) {
+        let _stopped = self.audio.send(windows::AudioRequest::Set(which, percent));
+    }
+
     /// Windows: tells the audio source whether the menu is open, when that
     /// changed.
     #[cfg(windows)]
@@ -449,6 +455,7 @@ mod windows {
         Menu(bool),
         ToggleMute(lyr_sources::audio::windows::Which),
         Step(lyr_sources::audio::windows::Which, i32),
+        Set(lyr_sources::audio::windows::Which, u32),
     }
 
     /// How often the open audio menu's streams and devices are read again: a
@@ -572,6 +579,7 @@ mod windows {
                             }
                             AudioRequest::ToggleMute(which) => audio.toggle_mute(&which),
                             AudioRequest::Step(which, delta) => audio.step(&which, delta),
+                            AudioRequest::Set(which, percent) => audio.set(&which, percent),
                         };
                         if let Err(error) = done {
                             tracing::warn!("audio: {error}");

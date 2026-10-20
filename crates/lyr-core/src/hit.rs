@@ -22,6 +22,17 @@ impl Rect {
     pub fn contains(&self, x: f32, y: f32) -> bool {
         (self.x..self.x + self.width).contains(&x) && (self.y..self.y + self.height).contains(&y)
     }
+
+    /// Where `x` is across it, from 0 at its left edge to 1 at its right,
+    /// held to that range; 0 for a rectangle with no width.
+    #[must_use]
+    pub fn across(&self, x: f32) -> f32 {
+        if self.width > 0.0 {
+            ((x - self.x) / self.width).clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    }
 }
 
 /// The input regions of one layout, each standing for a `T` (a module, a
@@ -78,6 +89,20 @@ impl<T> Regions<T> {
 #[cfg(test)]
 mod tests {
     use super::{Rect, Regions};
+
+    #[test]
+    fn across_is_the_share_of_the_width_held_to_its_edges() {
+        let rect = rect(100.0, 200.0);
+        assert!(rect.across(100.0).abs() < f32::EPSILON);
+        assert!((rect.across(150.0) - 0.25).abs() < f32::EPSILON);
+        assert!((rect.across(300.0) - 1.0).abs() < f32::EPSILON);
+        assert!(rect.across(40.0).abs() < f32::EPSILON, "left of it");
+        assert!(
+            (rect.across(900.0) - 1.0).abs() < f32::EPSILON,
+            "right of it"
+        );
+        assert!(super::Rect { width: 0.0, ..rect }.across(100.0).abs() < f32::EPSILON);
+    }
 
     const fn rect(x: f32, width: f32) -> Rect {
         Rect {

@@ -495,12 +495,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   device and stream; on the real machine (2026-10-20) a click on the steam
   stream's step down showed 95 % and its step up 100 % again, so a click reaches
   the source and the change comes back to the menu; Mute and a device's steps
-  have not been clicked, since they change what is heard. Not built: a slider
-  (plan 10's), wiremix's card configuration tab, and routing a stream to another
-  device (no public API on Windows). Not built: the other Windows sources
-  (Bluetooth, workspaces, both waiting on the owner's questions above) and the
-  native menus plan 10 names; macOS's `x-apple.systempreferences:` fallbacks
-  wait on M10.
+  have not been clicked, since they change what is heard. Each row also has a
+  slider (`audio_menu::Target::Level`): a click sets the volume where it lands
+  (`level_at`, from `MenuPanel::picked_across`), up to `MAX_PERCENT`, 100 % for
+  Windows; Enter on it does nothing, having no place. Clicked on the real
+  machine (2026-10-20): a quarter of the way along steam's slider set 25 %, and
+  its right end then a step up set 100 % again. Not built: dragging the slider,
+  plan 10's 150 % (with a Linux source), wiremix's card configuration tab, and
+  routing a stream to another device (no public API on Windows). Not built: the
+  other Windows sources (Bluetooth, workspaces, both waiting on the owner's
+  questions above) and the native menus plan 10 names; macOS's
+  `x-apple.systempreferences:` fallbacks wait on M10.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace

@@ -1,13 +1,13 @@
 //! The audio menu (`docs/plan/10-popups-and-menus.md#audio-menu`): the
 //! playback and recording streams and the output and input devices, a tab
-//! each, every row with its mute, its volume stepped down and up, and on a
-//! device "make default". The platforms' sources fill it in
+//! each, every row with its mute, its volume as a slider stepped down and up,
+//! and on a device "make default". The platforms' sources fill it in
 //! (`lyr_sources::audio`). wiremix's fifth tab, card configuration, waits on
 //! a source that has cards (Linux).
 
 use lyr_config::Theme;
 
-use crate::draw::{DrawList, Size};
+use crate::draw::{DrawList, Item, Size};
 use crate::hit::{Rect, Regions};
 use crate::menu::{self, button_width};
 pub use crate::menu::{GAP, PADDING};
@@ -101,6 +101,8 @@ pub enum Target {
     Tab(Tab),
     Mute(usize),
     Step(usize, Step),
+    /// A row's slider: a click sets the volume where it lands.
+    Level(usize),
     /// A device's "make default" button.
     Default(usize),
 }
@@ -110,6 +112,48 @@ const DOWN: &str = "-";
 const UP: &str = "+";
 /// The default button's label.
 const MAKE_DEFAULT: &str = "Default";
+/// A slider's width.
+const SLIDER_WIDTH: f32 = 120.0;
+/// A slider's track, as a share of the row's height.
+const TRACK: f32 = 0.4;
+/// The volume a full slider stands for: Windows' endpoints stop at 100 %;
+/// plan 10's 150 % for PulseAudio comes with a Linux source.
+pub const MAX_PERCENT: u32 = 100;
+
+/// The volume a click `across` a slider sets, 0 – 1 of [`MAX_PERCENT`].
+#[must_use]
+pub fn level_at(across: f32) -> u32 {
+    // `across` is 0 – 1, so the product is in range and `as` cannot wrap.
+    (across.clamp(0.0, 1.0) * MAX_PERCENT as f32).round() as u32
+}
+
+/// A slider filling `rect` at `volume` percent: its track, and its level
+/// in the switch's on colour, or the border's when `muted`.
+fn slider(rect: Rect, volume: u32, muted: bool, theme: &Theme) -> [Item; 2] {
+    let track = Rect {
+        y: rect.y + rect.height * (1.0 - TRACK) / 2.0,
+        height: rect.height * TRACK,
+        ..rect
+    };
+    let shown = volume.min(MAX_PERCENT) as f32 / MAX_PERCENT as f32;
+    [
+        Item::Box {
+            rect: track,
+            radius: track.height / 2.0,
+            fill: theme.toast_background,
+            border: Some((theme.border_width as f32, theme.panel_border)),
+        },
+        Item::Box {
+            rect: Rect {
+                width: track.width * shown,
+                ..track
+            },
+            radius: track.height / 2.0,
+            fill: if muted { theme.border } else { theme.switch_on },
+            border: None,
+        },
+    ]
+}
 
 /// The menu showing `tab` of `nodes`: its draw list, its size, and what each
 /// click lands on, its text measured by `measure` in lines `line_height`
@@ -149,6 +193,8 @@ pub fn draw(
         + GAP
         + button_width(DOWN)
         + GAP
+        + SLIDER_WIDTH
+        + GAP
         + level_width
         + GAP
         + button_width(UP)
@@ -162,17 +208,18 @@ pub fn draw(
     let mut regions = Regions::default();
     let text =
         |text: String, x: f32, y: f32, colour| menu::text(text, x, y, measure, line_height, colour);
-    let mut button = |items: &mut Vec<_>, x: f32, y: f32, label: &str, target| {
-        let rect = Rect {
-            x,
-            y,
-            width: button_width(label),
-            height: row,
+    let button =
+        |items: &mut Vec<_>, regions: &mut Regions<Target>, x: f32, y: f32, label: &str, target| {
+            let rect = Rect {
+                x,
+                y,
+                width: button_width(label),
+                height: row,
+            };
+            items.extend(menu::button(rect, label, measure, line_height, theme));
+            regions.push(rect, target);
+            rect.width
         };
-        items.extend(menu::button(rect, label, measure, line_height, theme));
-        regions.push(rect, target);
-        rect.width
-    };
     let mut y = PADDING;
     let mut x = PADDING;
     for each in Tab::ALL {
@@ -180,7 +227,14 @@ pub fn draw(
             items.push(text(each.label().to_owned(), x, y, theme.workspace_active));
             measure(each.label())
         } else {
-            button(&mut items, x, y, each.label(), Target::Tab(each))
+            button(
+                &mut items,
+                &mut regions,
+                x,
+                y,
+                each.label(),
+                Target::Tab(each),
+            )
         } + GAP;
     }
     y += row + 2.0 * GAP;
@@ -197,9 +251,25 @@ pub fn draw(
         items.push(text(node.name.clone(), PADDING, y, colour));
         let mut x = PADDING + name_width + GAP;
         let mute = if node.muted { "Unmute" } else { "Mute" };
-        button(&mut items, x, y, mute, Target::Mute(index));
+        button(&mut items, &mut regions, x, y, mute, Target::Mute(index));
         x += mute_width + GAP;
-        x += button(&mut items, x, y, DOWN, Target::Step(index, Step::Down)) + GAP;
+        x += button(
+            &mut items,
+            &mut regions,
+            x,
+            y,
+            DOWN,
+            Target::Step(index, Step::Down),
+        ) + GAP;
+        let rect = Rect {
+            x,
+            y,
+            width: SLIDER_WIDTH,
+            height: row,
+        };
+        items.extend(slider(rect, node.volume, node.muted, theme));
+        regions.push(rect, Target::Level(index));
+        x += SLIDER_WIDTH + GAP;
         let level = format!("{}%", node.volume);
         // Right-aligned in its column, as a number reads.
         items.push(text(
@@ -209,9 +279,23 @@ pub fn draw(
             theme.foreground,
         ));
         x += level_width + GAP;
-        x += button(&mut items, x, y, UP, Target::Step(index, Step::Up)) + GAP;
+        x += button(
+            &mut items,
+            &mut regions,
+            x,
+            y,
+            UP,
+            Target::Step(index, Step::Up),
+        ) + GAP;
         if tab.devices() && !node.default {
-            button(&mut items, x, y, MAKE_DEFAULT, Target::Default(index));
+            button(
+                &mut items,
+                &mut regions,
+                x,
+                y,
+                MAKE_DEFAULT,
+                Target::Default(index),
+            );
         }
         y += row + GAP;
     }

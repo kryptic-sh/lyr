@@ -29,7 +29,7 @@ use windows::Win32::System::Com::{
 };
 use windows::core::{HRESULT, HSTRING, PCWSTR, PWSTR, implement};
 
-use super::win32::{percent, port, stepped};
+use super::win32::{percent, port, scalar, stepped};
 
 /// Joins the calling thread to COM's multithreaded apartment, which the
 /// audio objects are made and called in.
@@ -237,6 +237,15 @@ impl Audio {
         let control = self.control(which)?;
         let (_, muted) = control.read()?;
         control.set_mute(!muted)
+    }
+
+    /// Sets the volume of what `which` names to `percent`, held to 100.
+    ///
+    /// # Errors
+    ///
+    /// When there is no such endpoint or stream, or it refuses.
+    pub fn set(&self, which: &Which, percent: u32) -> io::Result<()> {
+        self.control(which)?.set_scalar(scalar(percent))
     }
 
     /// Moves the volume of what `which` names by `delta` percent.
