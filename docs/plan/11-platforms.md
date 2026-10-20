@@ -36,6 +36,7 @@ supported (left out of that platform's defaults).
 | Tray           | ✓ StatusNotifierItem         | ✗ owned by Explorer                  | ✗ owned by the menu bar          |
 | Volume / mic   | ✓ PulseAudio protocol        | ✓ WASAPI                             | ✓ CoreAudio                      |
 | Clock          | ✓                            | ✓                                    | ✓                                |
+| Window title   | ✓ Hyprland                   | ✓ foreground window (WinEvent hooks) | ✗ not built                      |
 | Notifications  | ✓ lyr is the daemon          | ◐ opens Action Center, no state      | ✗ no API                         |
 | Wi-Fi menu     | ✓ NetworkManager             | ◐ Native Wifi                        | ◐ CoreWLAN, Location permission  |
 | Bluetooth menu | ✓ BlueZ                      | ◐ pairing only, no connect           | ◐ IOBluetooth                    |
