@@ -630,10 +630,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   reversed mouse scrolling on (`ReverseMouseWheelDirection` = 1 under
   `HKCU\Control Panel\Mouse`), which Windows applies before any program sees the
   event; lyr follows it as every other program does, so it is not a bug. The
-  mute click has not been run, since it cuts what is heard, A Bluetooth endpoint
-  is told apart by its device's bus enumerator (`PKEY_Device_EnumeratorName`
-  among `BTHENUM`, `BTHHFENUM`, `BTHLEDEVICE`; `audio::win32::bluetooth`, tested
-  and mutation-checked). Read on this machine, the USB headset's property store
+  mute click was run on the mic (2026-10-20): a click on the module muted the
+  default input and a second unmuted it, read back between clicks through
+  `Audio::source` from another process (this machine draws the icons as missing
+  glyphs, so the bar could not show it). The output's mute takes the same path
+  and was not clicked, since it cuts what is heard. A Bluetooth endpoint is told
+  apart by its device's bus enumerator (`PKEY_Device_EnumeratorName` among
+  `BTHENUM`, `BTHHFENUM`, `BTHLEDEVICE`; `audio::win32::bluetooth`, tested and
+  mutation-checked). Read on this machine, the USB headset's property store
   names `USB`, which shows the key gives the device's bus rather than the
   endpoint's own `SWD`; no Bluetooth endpoint has been seen. The notifications
   module is plan 09's Windows bell: always the `none` icon
