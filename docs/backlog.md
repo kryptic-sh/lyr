@@ -810,13 +810,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   50 px bottom one in place, then a bad `bar.height` refused with the bar still
   running). `lyr toggle` hides the bars by closing them, so their space is given
   back on every platform, and shows them by creating them again (run on Windows:
-  the work area grew by 50 px and shrank back). `lyr dnd` and `lyr clear` act on
-  the notification daemon on Linux and answer that lyr is not the daemon
-  elsewhere. `lyr panel clock`, `lyr panel bluetooth` and `lyr panel wifi` open
-  their panels; `lyr panel audio` opens the audio menu on Windows and answers
-  that there is no audio source elsewhere (M7). `lyr event workspace` has the
-  macOS bar read AeroSpace's workspaces again, and answers with an error
-  elsewhere.
+  the work area grew by 50 px and shrank back). Run on a nested Hyprland 0.56.2
+  too (2026-10-20): a reload from a 30 px top bar to a 50 px bottom one moved it
+  in place (no new surface), a reload with `bar.height = -5` was refused with
+  the bar kept, and `lyr toggle` took the reserved 50 px to 0 and back.
+  `lyr dnd` and `lyr clear` act on the notification daemon on Linux and answer
+  that lyr is not the daemon elsewhere. `lyr panel clock`, `lyr panel bluetooth`
+  and `lyr panel wifi` open their panels; `lyr panel audio` opens the audio menu
+  on Windows and answers that there is no audio source elsewhere (M7).
+  `lyr event workspace` has the macOS bar read AeroSpace's workspaces again, and
+  answers with an error elsewhere.
 - **Config, rest of M3.** Built in `lyr-config`: the schema for `[bar]`,
   `[layout]`, `[workspaces]`, `[clock]`, `[theme]` and every module's table, the
   embedded defaults, `[platform.*]` layering on both the defaults and the user
