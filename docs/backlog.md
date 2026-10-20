@@ -339,34 +339,38 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   v0.56.2's formats: the event parser, the `Tracker` that folds events into the
   shared `lyr_wm::State`, the JSON seed, and `Hyprland` (socket I/O, `from_env`,
   `subscribe`, `focus`). Its tests run against a fake Hyprland on Unix sockets,
-  not a real one. Not verified on a running Hyprland: the Lua focus request (the
-  framing was read from hyprctl's source). The dialect comes from Hyprland
-  itself (`j/status`'s `configProvider`, as ironbar reads it), tested against
-  the fake on Linux under WSL. A named workspace is `name:NAME` in Lua too,
-  quoted as a Lua long string (`request::lua_long_string`), after Hyprland's
-  `hlFocus` (main `12f2425`); not run against a real Hyprland. Click is
-  `focus_request` and scroll is `State::step`, both pure and tested. The bar
+  and one against a real Hyprland
+  (`ipc::tests::a_real_hyprland_switches_and_logs_out`, ignored unless
+  `LYR_E2E_HYPRLAND` names a Hyprland started for it, since it logs that one
+  out; deliberately not `HYPRLAND_INSTANCE_SIGNATURE`). Run against a nested
+  Hyprland 0.56.2 with a Lua config on the owner's machine (2026-10-20): the
+  dialect read from `j/status`'s `configProvider`, a switch by number, a switch
+  to a name holding `]]` and `;` (`name:NAME` as a Lua long string,
+  `request::lua_long_string`), and Log out (`hl.dsp.exit()`) ending the event
+  stream; with the hyprlang form sent instead, that Hyprland refused it, so the
+  test reaches the real thing. No CI job runs it: no runner has Hyprland. Click
+  is `focus_request` and scroll is `State::step`, both pure and tested. The bar
   shows the workspaces (`apps/lyr/src/sources.rs` runs the backend and hands its
   `State` to the main loop), and a click on a button or, with
   `workspaces.scroll`, a wheel step sends the switch through the same task
-  (`apps/lyr/src/input.rs`, `lyr_core::pointer`). Not run against a real
-  Hyprland. `lyr --stats` logs the idle counts (`apps/lyr/src/stats.rs`); on
-  Windows an idle bar showed 3 wake-ups, 2 events and 2 presents over 86 s (the
-  start and one per clock minute). The idle test on Hyprland (nested, the
-  owner's Arch machine, every Linux source running, 2026-10-20): presents now
-  meet plan 12's target, one a minute for the clock, since a bar whose new draw
-  list equals the one on screen presents nothing (`Window::shown`) and every
-  D-Bus watcher hands on only a value that changed
-  (`lyr_sources::bus::publish`); before, UPower's identical 30 s re-sends and
-  every Wi-Fi or BlueZ change the bar does not show each presented a frame.
-  Wake-ups do not meet it yet: 5 in an idle minute, down from 13 once a Wi-Fi
-  change (NetworkManager's background scans move it every few seconds) stopped
-  waking the bar while the menu is closed (`Commands::wifi_menu`; the change
-  waits in the channel for the next wake-up, which drains it before handling its
-  own events, so a click opening the menu still sees it). The rest are UPower's
-  power reading, which only the battery's tooltip shows, and the clock.
-  `lyr_wm::Compositor` picks it, or sway or niri, at start. Hyprland main's
-  changes for the next release are in
+  (`apps/lyr/src/input.rs`, `lyr_core::pointer`); the bar's own click has not
+  been made on Hyprland, for want of pointer injection. `lyr --stats` logs the
+  idle counts (`apps/lyr/src/stats.rs`); on Windows an idle bar showed 3
+  wake-ups, 2 events and 2 presents over 86 s (the start and one per clock
+  minute). The idle test on Hyprland (nested, the owner's Arch machine, every
+  Linux source running, 2026-10-20): presents now meet plan 12's target, one a
+  minute for the clock, since a bar whose new draw list equals the one on screen
+  presents nothing (`Window::shown`) and every D-Bus watcher hands on only a
+  value that changed (`lyr_sources::bus::publish`); before, UPower's identical
+  30 s re-sends and every Wi-Fi or BlueZ change the bar does not show each
+  presented a frame. Wake-ups do not meet it yet: 5 in an idle minute, down from
+  13 once a Wi-Fi change (NetworkManager's background scans move it every few
+  seconds) stopped waking the bar while the menu is closed
+  (`Commands::wifi_menu`; the change waits in the channel for the next wake-up,
+  which drains it before handling its own events, so a click opening the menu
+  still sees it). The rest are UPower's power reading, which only the battery's
+  tooltip shows, and the clock. `lyr_wm::Compositor` picks it, or sway or niri,
+  at start. Hyprland main's changes for the next release are in
   [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Render, rest of M1.** `lyr-render` has the GPU-free half: the bar font found
   with crcbl-font and given the system's fallback faces (`fonts::load`), text

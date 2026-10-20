@@ -447,4 +447,91 @@ mod tests {
             Err(Error::Refused { request, .. }) if request == "/dispatch exit"
         ));
     }
+
+    /// The variable naming the Hyprland [`a_real_hyprland_switches_and_logs_out`]
+    /// runs against. Not `HYPRLAND_INSTANCE_SIGNATURE`: the test logs that
+    /// Hyprland out, so it must be one started for it, never the session's
+    /// own.
+    const E2E_SIGNATURE: &str = "LYR_E2E_HYPRLAND";
+
+    #[tokio::test]
+    #[ignore = "needs a Hyprland started for it, named by LYR_E2E_HYPRLAND; it logs that Hyprland out"]
+    async fn a_real_hyprland_switches_and_logs_out() {
+        use std::time::Duration;
+
+        use crate::Workspace;
+        use crate::hyprland::Tracker;
+
+        const CHANGE_TIMEOUT: Duration = Duration::from_secs(10);
+
+        async fn until(
+            tracker: &mut Tracker,
+            events: &mut super::Events,
+            shown: impl Fn(&Tracker) -> bool,
+        ) {
+            tokio::time::timeout(CHANGE_TIMEOUT, async {
+                while !shown(tracker) {
+                    let event = events.next().await.expect("read").expect("still running");
+                    tracker.apply(event);
+                }
+            })
+            .await
+            .expect("the change in time");
+        }
+        let active_name = |tracker: &Tracker| {
+            let state = tracker.state();
+            state
+                .workspaces()
+                .find(|workspace| Some(workspace.id) == state.active())
+                .map(|workspace| workspace.name.clone())
+        };
+
+        let hyprland = Hyprland::from_vars(|name| match name {
+            "HYPRLAND_INSTANCE_SIGNATURE" => std::env::var_os(E2E_SIGNATURE),
+            _ => std::env::var_os(name),
+        })
+        .await
+        .expect("LYR_E2E_HYPRLAND names a running Hyprland");
+        assert_eq!(hyprland.dialect(), Dialect::Lua, "0.55+ with a Lua config");
+        let (mut tracker, mut events) = hyprland.subscribe().await.expect("subscribed");
+
+        let numbered = Workspace {
+            id: 7,
+            name: "7".to_owned(),
+            monitor: None,
+            urgent: false,
+        };
+        hyprland.focus(&numbered).await.expect("switched by number");
+        until(&mut tracker, &mut events, |tracker| {
+            tracker.state().active() == Some(7)
+        })
+        .await;
+
+        // A name a Lua string could be closed by, and a `;`.
+        let name = "lyr e2e ]] one; two";
+        let named = Workspace {
+            id: 0,
+            name: name.to_owned(),
+            monitor: None,
+            urgent: false,
+        };
+        hyprland.focus(&named).await.expect("switched by name");
+        until(&mut tracker, &mut events, |tracker| {
+            active_name(tracker).as_deref() == Some(name)
+        })
+        .await;
+
+        hyprland.exit().await.expect("Hyprland took the exit");
+        let end = tokio::time::timeout(CHANGE_TIMEOUT, async {
+            loop {
+                match events.next().await {
+                    Ok(Some(_)) => {}
+                    ended => return ended,
+                }
+            }
+        })
+        .await
+        .expect("the stream ended in time");
+        assert!(matches!(end, Ok(None)), "{end:?}");
+    }
 }
