@@ -110,7 +110,6 @@ fn what_lyr_cannot_carry_is_listed() {
     for expected in [
         "`cpu` has no lyr module",
         "tray.icon-size",
-        "tray.spacing",
         "clock.tooltip-format",
         "custom/notification.exec",
         "custom/notification.tooltip",
@@ -129,7 +128,11 @@ fn what_lyr_cannot_carry_is_listed() {
         "waybar's own bar keys are listed"
     );
     assert!(imported.toml.starts_with("# Converted from waybar"));
-    assert!(imported.toml.contains("#   tray.spacing"));
+    assert!(imported.toml.contains("#   tray.icon-size"));
+    assert!(
+        !skipped.contains("tray.spacing"),
+        "lyr's tray takes waybar's spacing"
+    );
 }
 
 #[test]

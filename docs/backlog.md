@@ -334,25 +334,24 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `crates/crcbl-app/examples/ui_window.rs` does), and `lyr` with no command now
   runs the main loop (`apps/lyr/src/bar.rs`): the config and font, a bar per
   output, a surface opened on each bar's first resize, and a redraw on the
-  clock's tick, or on a source's update. It draws the clock, and on Linux the
-  battery and workspaces; the other modules wait on their sources. **Run once,
-  on Windows** (2026-10-19, with the owner's go-ahead): Windows 11 at 2560 ×
-  1440, D3D12 on an AMD Radeon RX 7900 XTX as asked, the bar an appbar reserving
-  50 px. It drew the transparent bar and the clock box with its border, radius
-  and text, as a screenshot showed, and the work area came back when the process
-  was killed. Hack Nerd Font Propo is not installed on that machine, so it drew
-  in the monospace fallback, and lyr said so. Not run on Hyprland, which is M1's
-  real check. `lyr quit` stops it. It repaints only when something it shows
-  changed (plan 04), but not yet paced by Wayland's frame callback, which plan
-  04 requires for an output that is off (hypridle's DPMS); see "crcbl: Wayland
-  present path". It logs through `tracing` to `~/.local/state/lyr/logs/lyr.log`
-  and to stderr (`apps/lyr/src/log.rs`, `RUST_LOG` to filter), capped at
-  `log::MAX_BYTES` by moving it to `lyr.log.1` (tested on Windows and Linux, not
-  watched rotating in a running bar). Colours go through crcbl-ui's
-  `style::from_srgb8`, and a module's opacity is a crcbl-ui opacity group
-  (`DrawList::push_opacity`), faded as one layer as CSS `opacity` is (crcbl
-  0.6.0); neither has been seen on screen since the change. crcbl's CI had not
-  verified the opacity layer on Metal when it reported it.
+  clock's tick, or on a source's update. It draws every module whose source the
+  platform has (the per-platform entries below). **Run once, on Windows**
+  (2026-10-19, with the owner's go-ahead): Windows 11 at 2560 × 1440, D3D12 on
+  an AMD Radeon RX 7900 XTX as asked, the bar an appbar reserving 50 px. It drew
+  the transparent bar and the clock box with its border, radius and text, as a
+  screenshot showed, and the work area came back when the process was killed.
+  Hack Nerd Font Propo is not installed on that machine, so it drew in the
+  monospace fallback, and lyr said so. Not run on Hyprland, which is M1's real
+  check. `lyr quit` stops it. It repaints only when something it shows changed
+  (plan 04), and presents only when the window system asks for a frame (crcbl's
+  frame gate, its own entry above). It logs through `tracing` to
+  `~/.local/state/lyr/logs/lyr.log` and to stderr (`apps/lyr/src/log.rs`,
+  `RUST_LOG` to filter), capped at `log::MAX_BYTES` by moving it to `lyr.log.1`
+  (tested on Windows and Linux, not watched rotating in a running bar). Colours
+  go through crcbl-ui's `style::from_srgb8`, and a module's opacity is a
+  crcbl-ui opacity group (`DrawList::push_opacity`), faded as one layer as CSS
+  `opacity` is (crcbl 0.6.0); neither has been seen on screen since the change.
+  crcbl's CI had not verified the opacity layer on Metal when it reported it.
 - **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors
@@ -546,11 +545,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   CI's Mac has a controller: its test reads it and registers and unregisters the
   observers, and found that `objc2-io-bluetooth` 0.3.2 binds `powerState` as
   unsigned where the runtime declares an `int`, so lyr sends that message
-  itself. The Bluetooth menu answers that it is not built on macOS, since its
-  actions are BlueZ's. The audio menu is built too: `audio::macos::nodes` lists
-  every device with output or input streams (`kAudioHardwarePropertyDevices`,
-  `kAudioDevicePropertyStreams`), each with its volume, mute and default mark;
-  its actions take a device (`audio::macos::Which`), and Default sets
+  itself. The Bluetooth menu, whose actions are BlueZ's, opens System Settings'
+  Bluetooth pane on macOS instead. The audio menu is built too:
+  `audio::macos::nodes` lists every device with output or input streams
+  (`kAudioHardwarePropertyDevices`, `kAudioDevicePropertyStreams`), each with
+  its volume, mute and default mark; its actions take a device
+  (`audio::macos::Which`), and Default sets
   `kAudioHardwarePropertyDefault…Device`. The device list's changes come through
   a system listener, and while the menu is open it reads again each second, as
   on Windows (`MENU_REFRESH`). The stream tabs are empty, since macOS has no
@@ -651,7 +651,7 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   tab, and routing a stream to another device (no public API on Windows). Not
   built: the other Windows sources (Bluetooth, workspaces, both waiting on the
   owner's questions above) and the native menus plan 10 names; macOS's
-  `x-apple.systempreferences:` fallbacks wait on M10.
+  `x-apple.systempreferences:` fallbacks are built (the macOS entry).
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace
@@ -659,31 +659,33 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (`apps/lyr/src/exec.rs`), `cycle_profile` and `cycle_profile_back` switch the
   power profile, `open_power_menu` opens the power menu, `toggle_dnd` flips
   do-not-disturb as `lyr dnd` does (the bell's right click; not run end to end,
-  since Windows draws no bell and WSL has no compositor), and the other
-  built-ins say they are not implemented yet. Touchpad scrolling makes one step
-  per 50 device pixels (`PIXELS_PER_STEP`, lyr's own choice; crcbl leaves it to
-  the application). Scrolling away from the user steps to the previous
-  workspace. Not tried with a real click: the tests cover the resolution and the
-  step arithmetic, and the Windows run had no pointer input. Hover is built: the
-  workspace button under the pointer takes the active colour, as waybar's style
-  colours both (`apps/lyr/src/modules.rs`), and moving onto another button
-  redraws the bar. Tooltips are built (`apps/lyr/src/tooltips.rs`): timed as GTK
-  3 does (`lyr_core::tooltip`), a passthrough popup below the module (above it
-  on a bottom bar) drawn by `lyr_core::draw::tooltip`, for the power button,
-  clock, battery, power profile and Bluetooth; tested on crcbl's headless shell
-  and mutation-checked. Seen on Windows: the clock's `UTC+08:00` and the power
-  button's "Power Button" tooltips opened below them. **Known issue on
-  Windows:** once the popup is open, the bar gets no pointer-leave from crcbl
-  0.5.0's Win32 backend, so the tooltip stays up after the pointer leaves the
-  bar (with no popup, the leave arrives). Seen with a scripted `SetCursorPos`,
-  not a physical mouse; reported to crcbl on 2026-10-19, which found the cause
-  (`TME_LEAVE` armed only on the first move after a leave, so nothing re-arms it
-  once the popup cancels it). Its test with an ordinary parent window did not
-  reproduce the bug; trying a panel parent, as lyr's bar is, is next in crcbl's
-  backlog, so the fix has no release yet. A tooltip follows its module when the
-  module moves (repositioned where the window system can, opened again
-  elsewhere). A tooltip of several lines (a format with line breaks) is drawn a
-  row per line.
+  since Windows draws no bell and WSL has no compositor), and every other
+  built-in is handled; `cycle_profile` on Windows and macOS and the volume
+  built-ins on Linux say they are not implemented, each waiting on a question
+  above. Touchpad scrolling makes one step per 50 device pixels
+  (`PIXELS_PER_STEP`, lyr's own choice; crcbl leaves it to the application).
+  Scrolling away from the user steps to the previous workspace. Not tried with a
+  real click: the tests cover the resolution and the step arithmetic, and the
+  Windows run had no pointer input. Hover is built: the workspace button under
+  the pointer takes the active colour, as waybar's style colours both
+  (`apps/lyr/src/modules.rs`), and moving onto another button redraws the bar.
+  Tooltips are built (`apps/lyr/src/tooltips.rs`): timed as GTK 3 does
+  (`lyr_core::tooltip`), a passthrough popup below the module (above it on a
+  bottom bar) drawn by `lyr_core::draw::tooltip`, for every module that has one;
+  tested on crcbl's headless shell and mutation-checked. Seen on Windows: the
+  clock's `UTC+08:00` and the power button's "Power Button" tooltips opened
+  below them. **Known issue on Windows:** once the popup is open, the bar gets
+  no pointer-leave from crcbl 0.5.0's Win32 backend, so the tooltip stays up
+  after the pointer leaves the bar (with no popup, the leave arrives). Seen with
+  a scripted `SetCursorPos`, not a physical mouse; reported to crcbl on
+  2026-10-19, which found the cause (`TME_LEAVE` armed only on the first move
+  after a leave, so nothing re-arms it once the popup cancels it). Its test with
+  an ordinary parent window did not reproduce the bug; trying a panel parent, as
+  lyr's bar is, is next in crcbl's backlog, so the fix has no release yet. Seen
+  again on crcbl 0.7.0 (2026-10-20, scripted cursor, screenshots before and
+  after) and reported again. A tooltip follows its module when the module moves
+  (repositioned where the window system can, opened again elsewhere). A tooltip
+  of several lines (a format with line breaks) is drawn a row per line.
 - **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second
@@ -709,11 +711,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   platform cannot run, colours, ranges, format placeholders, the clock's
   strftime format), with tests that were each broken and seen to fail. The
   `[<module>.on]` action bindings (`actions.rs`) are checked against the module
-  they are bound in, and the main loop runs them (see "Pointer input"). Not
-  built: the tray's table (M8), the file watcher that reloads on save (it needs
-  a crate such as `notify`, new to lyr, so the owner's call), a finer diff (a
-  reload redraws everything, and reshapes the bars only when `[bar]` changed),
-  the control socket (its own entry above), and the defaults-parity test against
+  they are bound in, and the main loop runs them (see "Pointer input"). The
+  tray's table is `[tray] spacing` (the dotfiles' 10 px between items, which
+  `lyr import-waybar` now carries); waybar's `icon-size` waits on images. Not
+  built: the file watcher that reloads on save (it needs a crate such as
+  `notify`, new to lyr, so the owner's call), a finer diff (a reload redraws
+  everything, and reshapes the bars only when `[bar]` changed), the control
+  socket (its own entry above), and the defaults-parity test against
   `config.jsonc`. The dotfiles are at `~/Projects/mxaddict/dotfiles` on the
   owner's Windows machine, not next to lyr, and not on CI, so the test needs
   either a path from the environment or a copy of `config.jsonc` checked into
@@ -743,7 +747,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   Written from memory and the dotfiles, with each item to read when its
   milestone starts: the Windows Wi-Fi and Bluetooth menu APIs (M9; the audio
   menu's WASAPI calls were read in `windows` 0.62.2 and are built) and macOS's
-  (M10).
+  CoreWLAN and IOBluetooth menus (M10; CoreAudio's were read in
+  `objc2-core-audio` 0.3.2 and are built). Both wait on the questions above
+  about building menus no machine here can show.
 - **Power menu, M5.** Built: the Linux actions
   (`lyr_sources::power::linux::Logind`): Lock, Sleep, Hibernate, Reboot and
   Power off as systemd v262.1's `loginctl` and `systemctl` call logind, with the

@@ -29,6 +29,7 @@ pub struct Config {
     pub mic: Mic,
     pub notifications: Notifications,
     pub window: Window,
+    pub tray: Tray,
     pub theme: Theme,
 }
 
@@ -191,6 +192,15 @@ pub struct Window {
     /// What a click or a scroll does.
     #[serde(default)]
     pub on: On,
+}
+
+/// The tray (`docs/plan/08-tray.md`).
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Tray {
+    /// Logical pixels between two items (waybar's `spacing`). waybar's
+    /// `icon-size` waits for lyr to draw icons.
+    pub spacing: u32,
 }
 
 /// The power button (`docs/plan/07-modules.md#power-button`).

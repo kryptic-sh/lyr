@@ -132,19 +132,68 @@ fn each_box_is_faded_as_a_group_over_the_bar_background() {
 }
 
 #[test]
+fn buttons_keep_their_gap_apart_and_the_gap_is_the_modules() {
+    let row = |gap| {
+        [Module {
+            content: Content::Buttons {
+                buttons: vec![
+                    Button {
+                        text: "a".to_owned(),
+                        colour: theme().foreground,
+                    },
+                    Button {
+                        text: "b".to_owned(),
+                        colour: theme().foreground,
+                    },
+                    Button {
+                        text: "c".to_owned(),
+                        colour: theme().foreground,
+                    },
+                ],
+                gap,
+            },
+            target: "tray",
+        }]
+    };
+    let (list, _) = build(&bar(&[], &row(0.0), &[]), &theme(), measure);
+    let tight = boxes(&list)[0];
+    let (list, regions) = build(&bar(&[], &row(10.0), &[]), &theme(), measure);
+    let spaced = boxes(&list)[0];
+    assert!(
+        (spaced.width - tight.width - 20.0).abs() < f32::EPSILON,
+        "two gaps between three buttons"
+    );
+    // Each button is 30 px (10 of text, 10 of padding each side) after the
+    // 14 px of border and padding; the second starts a gap after the first.
+    let second = spaced.x + 14.0 + 30.0 + 10.0;
+    assert_eq!(
+        regions.hit(second + 1.0, 20.0),
+        Some(&Target::Button("tray", 1))
+    );
+    assert_eq!(
+        regions.hit(second - 5.0, 20.0),
+        Some(&Target::Module("tray")),
+        "the gap belongs to the module"
+    );
+}
+
+#[test]
 fn a_click_on_a_workspace_button_names_the_button() {
     let active = Colour::parse("#2bc5e3").expect("colour");
     let center = [Module {
-        content: Content::Buttons(vec![
-            Button {
-                text: "1".to_owned(),
-                colour: active,
-            },
-            Button {
-                text: "2".to_owned(),
-                colour: theme().foreground,
-            },
-        ]),
+        content: Content::Buttons {
+            buttons: vec![
+                Button {
+                    text: "1".to_owned(),
+                    colour: active,
+                },
+                Button {
+                    text: "2".to_owned(),
+                    colour: theme().foreground,
+                },
+            ],
+            gap: 0.0,
+        },
         target: "workspaces",
     }];
     let (list, regions) = build(&bar(&[], &center, &[]), &theme(), measure);

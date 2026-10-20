@@ -52,6 +52,7 @@ fn the_defaults_are_the_waybar_port() {
     );
     assert_eq!(config.theme.bar_background.a, 0, "transparent bar");
     assert_eq!(config.clock.format, "%Y/%m/%d %H:%M");
+    assert_eq!(config.tray.spacing, 10, "the dotfiles' tray spacing");
 }
 
 #[test]

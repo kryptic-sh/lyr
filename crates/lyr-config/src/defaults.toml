@@ -63,6 +63,10 @@ click = "cycle_profile"
 click_right = "cycle_profile_back"
 click_middle = "cycle_profile_back"
 
+[tray]
+# Between two items, as the dotfiles' waybar tray has it.
+spacing = 10
+
 [window]
 # The focused window's title, as waybar's hyprland/window shows it. Not in the
 # default layout; add "window" to a zone to show it.

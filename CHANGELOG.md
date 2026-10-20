@@ -111,6 +111,8 @@ and this project adheres to
   `pmset sleepnow`, and Logout, Reboot and Shutdown ask System Events, with no
   Hibernate. `[power.menu]` sets an entry to a command instead
   (`lock = { exec = "hyprlock" }`).
+- `[tray] spacing` sets the gap between the tray's items, 10 px by default as in
+  the dotfiles' waybar, and `lyr import-waybar` carries waybar's `spacing`.
 - `lyr import-waybar FILE` prints a waybar `config.jsonc` as a lyr config: the
   bar's settings, the layout and the modules lyr has, with what it could not
   carry listed at the top; waybar's Hyprland, sway and niri workspace and window

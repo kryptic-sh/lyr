@@ -291,7 +291,10 @@ fn content(
                     },
                 })
                 .collect();
-            (!buttons.is_empty()).then_some(Content::Buttons(buttons))
+            (!buttons.is_empty()).then_some(Content::Buttons {
+                buttons,
+                gap: config.tray.spacing as f32,
+            })
         }
         #[cfg(target_os = "linux")]
         Module::Notifications => {
@@ -329,7 +332,7 @@ fn content(
                     },
                 })
                 .collect();
-            Some(Content::Buttons(buttons))
+            Some(Content::Buttons { buttons, gap: 0.0 })
         }
         // Every module has an arm on Linux; elsewhere some are not built yet.
         #[cfg(not(target_os = "linux"))]

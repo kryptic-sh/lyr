@@ -153,6 +153,7 @@ fn typed(mut merged: toml::Table) -> Result<Config, String> {
         mic: section(&mut merged, "mic")?,
         notifications: section(&mut merged, "notifications")?,
         window: section(&mut merged, "window")?,
+        tray: section(&mut merged, "tray")?,
         theme: section(&mut merged, "theme")?,
     };
     match merged.keys().next() {

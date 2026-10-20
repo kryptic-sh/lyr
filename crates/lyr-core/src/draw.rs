@@ -120,8 +120,9 @@ pub enum Content {
         compact: Option<String>,
         colour: Colour,
     },
-    /// A row of buttons, each with its own text and colour: the workspaces.
-    Buttons(Vec<Button>),
+    /// A row of buttons, each with its own text and colour, `gap` logical
+    /// pixels apart: the workspaces, the tray's items.
+    Buttons { buttons: Vec<Button>, gap: f32 },
 }
 
 /// One button in a [`Content::Buttons`] row.
@@ -189,12 +190,13 @@ pub fn build<T: Clone>(
                 box_width(measure(text)),
                 compact.as_deref().map(|icon| box_width(measure(icon))),
             ),
-            Content::Buttons(buttons) => (
+            Content::Buttons { buttons, gap } => (
                 box_width(
                     buttons
                         .iter()
                         .map(|button| measure(&button.text) + 2.0 * button_padding)
-                        .sum(),
+                        .sum::<f32>()
+                        + gap * buttons.len().saturating_sub(1) as f32,
                 ),
                 None,
             ),
@@ -296,7 +298,7 @@ pub fn build<T: Clone>(
                         style: TextStyle::PLAIN,
                     });
                 }
-                Content::Buttons(buttons) => {
+                Content::Buttons { buttons, gap } => {
                     let mut x = rect.x + border_width + padding;
                     for (i, button) in buttons.iter().enumerate() {
                         let width = measure(&button.text) + 2.0 * button_padding;
@@ -312,7 +314,7 @@ pub fn build<T: Clone>(
                             style: TextStyle::PLAIN,
                         });
                         regions.push(button_rect, Target::Button(module.target.clone(), i));
-                        x += width;
+                        x += width + gap;
                     }
                 }
             }
