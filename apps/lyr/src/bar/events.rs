@@ -128,6 +128,7 @@ impl App {
                     open.width = width;
                     open.scale = scale;
                     open.dirty = true;
+                    open.shown = None;
                 } else {
                     let surface = Surface::open(shell, window, device, scale)
                         .context("opening a bar's surface")?;
@@ -150,6 +151,7 @@ impl App {
                             workspaces: Vec::new(),
                             hovered: None,
                             dirty: true,
+                            shown: None,
                             tooltips: Tooltips::default(),
                         },
                     );

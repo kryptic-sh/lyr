@@ -81,10 +81,7 @@ impl TimeDate {
         let wanted = |change: PropertiesChanged| Ok(change.args()?.interface_name() == &interface);
         zones.send_replace(changes.during(self.zone(), wanted).await??);
         while changes.changed(wanted).await? {
-            if zones
-                .send(changes.during(self.zone(), wanted).await??)
-                .is_err()
-            {
+            if !crate::bus::publish(zones, changes.during(self.zone(), wanted).await??) {
                 break;
             }
         }

@@ -132,6 +132,10 @@ impl App {
                 self.next_tick = next_tick(self.tick);
                 self.config = new;
                 self.redraw_all();
+                // A new font can draw the same list differently.
+                for window in self.windows.values_mut() {
+                    window.shown = None;
+                }
                 tracing::info!("reload: config reloaded");
                 incoming.reply(control::OK);
             }

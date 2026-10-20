@@ -4,6 +4,7 @@ use std::pin::pin;
 
 use futures_util::future::{Either, select};
 use futures_util::{FutureExt, Stream, StreamExt};
+use tokio::sync::watch;
 use zbus::Connection;
 use zbus::fdo::{RequestNameFlags, RequestNameReply};
 
@@ -121,6 +122,20 @@ impl<S: Stream + Unpin> Follow<S> {
     }
 }
 
+/// Hands `value` to `sender`'s receivers only when it differs from what
+/// they hold, so a service re-sending what it had (UPower does every 30 s)
+/// wakes nobody; whether any receiver is left.
+pub fn publish<T: PartialEq>(sender: &watch::Sender<T>, value: T) -> bool {
+    sender.send_if_modified(|held| {
+        let changed = *held != value;
+        if changed {
+            *held = value;
+        }
+        changed
+    });
+    !sender.is_closed()
+}
+
 /// A private message bus for tests that need names, which the
 /// peer-to-peer connections the other tests use do not have.
 #[cfg(test)]
@@ -180,10 +195,11 @@ pub mod test {
 
 #[cfg(test)]
 mod tests {
+    use tokio::sync::watch;
     use zbus::fdo::RequestNameFlags;
 
-    use super::claim;
     use super::test::Bus;
+    use super::{claim, publish};
 
     const NAME: &str = "sh.kryptic.lyr.Test";
 
@@ -214,6 +230,18 @@ mod tests {
                 .await
                 .unwrap()
         );
+    }
+
+    #[test]
+    fn only_a_new_value_reaches_the_receivers() {
+        let (sender, mut receiver) = watch::channel(1);
+        assert!(publish(&sender, 1));
+        assert!(!receiver.has_changed().unwrap(), "the same value again");
+        assert!(publish(&sender, 2));
+        assert!(receiver.has_changed().unwrap());
+        assert_eq!(*receiver.borrow_and_update(), 2);
+        drop(receiver);
+        assert!(!publish(&sender, 3), "nobody is left");
     }
 }
 

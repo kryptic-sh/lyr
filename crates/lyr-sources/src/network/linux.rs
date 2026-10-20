@@ -279,7 +279,7 @@ impl NetworkManager {
                 .during(self.read(), |change| from(&paths, change))
                 .await??;
             paths = read_from;
-            if readings.send(Some(reading)).is_err() {
+            if !crate::bus::publish(readings, Some(reading)) {
                 break;
             }
         }

@@ -334,10 +334,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (`apps/lyr/src/input.rs`, `lyr_core::pointer`). Not run against a real
   Hyprland. `lyr --stats` logs the idle counts (`apps/lyr/src/stats.rs`); on
   Windows an idle bar showed 3 wake-ups, 2 events and 2 presents over 86 s (the
-  start and one per clock minute). The idle test itself, on Hyprland with every
-  source running, has not been run. `lyr_wm::Compositor` picks it, or sway or
-  niri, at start. Hyprland main's changes for the next release are in
-  [plan/06](plan/06-workspaces.md#linux--hyprland).
+  start and one per clock minute). The idle test on Hyprland (nested, the
+  owner's Arch machine, every Linux source running, 2026-10-20): presents now
+  meet plan 12's target, one a minute for the clock, since a bar whose new draw
+  list equals the one on screen presents nothing (`Window::shown`) and every
+  D-Bus watcher hands on only a value that changed
+  (`lyr_sources::bus::publish`); before, UPower's identical 30 s re-sends and
+  every Wi-Fi or BlueZ change the bar does not show each presented a frame.
+  Wake-ups do not meet it yet: about 13 a minute, from UPower's power reading
+  (which the battery module's icon does not show) and the Wi-Fi state, which
+  NetworkManager's background scans move every few seconds though only the
+  closed Wi-Fi menu shows it. Following the Wi-Fi state only while the menu is
+  open (a request to the source, as Windows' audio menu does with
+  `Commands::audio_menu`) would remove most of them. `lyr_wm::Compositor` picks
+  it, or sway or niri, at start. Hyprland main's changes for the next release
+  are in [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Render, rest of M1.** `lyr-render` has the GPU-free half: the bar font found
   with crcbl-font and given the system's fallback faces (`fonts::load`), text
   measured and drawn as one glyph run per face (`text::Text`), sRGB colours in

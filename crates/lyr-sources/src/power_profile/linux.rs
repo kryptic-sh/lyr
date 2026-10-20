@@ -149,10 +149,7 @@ impl PowerProfiles {
         let wanted = |change: PropertiesChanged| Ok(change.args()?.interface_name() == &interface);
         states.send_replace(changes.during(self.profiles(), wanted).await??);
         while changes.changed(wanted).await? {
-            if states
-                .send(changes.during(self.profiles(), wanted).await??)
-                .is_err()
-            {
+            if !crate::bus::publish(states, changes.during(self.profiles(), wanted).await??) {
                 break;
             }
         }

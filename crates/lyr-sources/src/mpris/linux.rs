@@ -166,10 +166,7 @@ impl Players {
         let wanted = |()| Ok(true);
         players.send_replace(changes.during(self.all(), wanted).await??);
         while changes.changed(wanted).await? {
-            if players
-                .send(changes.during(self.all(), wanted).await??)
-                .is_err()
-            {
+            if !crate::bus::publish(players, changes.during(self.all(), wanted).await??) {
                 break;
             }
         }

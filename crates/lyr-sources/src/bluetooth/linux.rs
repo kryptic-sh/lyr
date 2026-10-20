@@ -235,10 +235,7 @@ impl BlueZ {
         };
         snapshots.send_replace(changes.during(snapshot(), wanted).await??);
         while changes.changed(wanted).await? {
-            if snapshots
-                .send(changes.during(snapshot(), wanted).await??)
-                .is_err()
-            {
+            if !crate::bus::publish(snapshots, changes.during(snapshot(), wanted).await??) {
                 break;
             }
         }

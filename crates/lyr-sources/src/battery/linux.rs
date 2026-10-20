@@ -108,10 +108,10 @@ impl UPower {
         let wanted = |change: PropertiesChanged| Ok(change.args()?.interface_name() == &interface);
         readings.send_replace(changes.during(self.device(), wanted).await??.reading());
         while changes.changed(wanted).await? {
-            if readings
-                .send(changes.during(self.device(), wanted).await??.reading())
-                .is_err()
-            {
+            if !crate::bus::publish(
+                readings,
+                changes.during(self.device(), wanted).await??.reading(),
+            ) {
                 break;
             }
         }

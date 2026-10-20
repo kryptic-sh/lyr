@@ -385,7 +385,7 @@ impl NetworkManager {
                     followed(wifi.device.as_deref(), change)
                 })
                 .await??;
-            if states.send(wifi.clone()).is_err() {
+            if !crate::bus::publish(states, wifi.clone()) {
                 break;
             }
         }

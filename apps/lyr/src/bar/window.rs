@@ -1,7 +1,7 @@
 //! One bar window's state.
 
 use lyr_config::Module;
-use lyr_core::draw::Target;
+use lyr_core::draw::{DrawList, Target};
 use lyr_core::hit::Regions;
 use lyr_render::surface::Surface;
 
@@ -27,6 +27,9 @@ pub(super) struct Window {
     pub(super) hovered: Option<usize>,
     /// Whether it must be drawn again: what it shows changed since.
     pub(super) dirty: bool,
+    /// What is on screen, so a redraw that comes out the same presents
+    /// nothing; `None` when the surface needs a frame whatever it shows.
+    pub(super) shown: Option<DrawList>,
     pub(super) tooltips: Tooltips,
 }
 

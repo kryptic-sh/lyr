@@ -529,12 +529,19 @@ impl App {
                 data,
                 &now,
             );
-            let presented = window.surface.draw(shell, &translate(&drawn.list, text))?;
             window.regions = drawn.regions;
             window.workspaces = drawn.workspaces;
             window.hovered = hovered;
+            // A source that re-sent what it had, or one the bar does not
+            // show, changes nothing on screen.
+            if window.shown.as_ref() == Some(&drawn.list) {
+                window.dirty = false;
+                continue;
+            }
+            let presented = window.surface.draw(shell, &translate(&drawn.list, text))?;
             window.dirty = !presented;
             if presented {
+                window.shown = Some(drawn.list);
                 stats.presented(window.monitor.as_deref());
             }
         }

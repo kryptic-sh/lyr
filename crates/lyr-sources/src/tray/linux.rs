@@ -21,6 +21,8 @@ use zbus::names::{BusName, InterfaceName};
 use zbus::object_server::SignalEmitter;
 use zbus::{Connection, MatchRule, MessageStream, OwnedObjectPath, OwnedVariant, Variant};
 
+use crate::bus::Follow;
+
 /// The watcher's well-known name, and its object.
 pub const WATCHER: &str = "org.kde.StatusNotifierWatcher";
 pub const WATCHER_PATH: &str = "/StatusNotifierWatcher";
@@ -540,13 +542,14 @@ impl Host {
             .interface(ITEM)
             .build()?;
         // Subscribed before the first read, so a change in between is not lost.
-        let mut changes = select(
+        let mut changes = Follow::new(select(
             MessageStream::for_match_rule(listed, &self.connection, None).await?,
             MessageStream::for_match_rule(changed, &self.connection, None).await?,
-        );
-        items.send_replace(self.items().await?);
-        while changes.next().await.is_some() {
-            if items.send(self.items().await?).is_err() {
+        ));
+        let wanted = |_| Ok(true);
+        items.send_replace(changes.during(self.items(), wanted).await??);
+        while changes.changed(wanted).await? {
+            if !crate::bus::publish(items, changes.during(self.items(), wanted).await??) {
                 break;
             }
         }
