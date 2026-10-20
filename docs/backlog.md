@@ -22,11 +22,12 @@ implementation follows meanwhile.
   the streams followed only while the menu is open. Seen in a nested Hyprland
   (2026-10-20): it listed this machine's five sinks with the default marked, and
   a silent `pacat` stream on Playback, which a keyboard Enter on its Mute muted
-  (read back with `pactl`). Not built: plan 10's 150 % slider (the slider scale,
-  `audio_menu::MAX_PERCENT`, is shared with Windows' 100 %), moving a stream to
-  another device (`move-sink-input`), and wiremix's card tab. Keep `pactl`, or
-  take `libpulse-binding` (plan 07's default: one connection, no processes) or
-  native PipeWire with WirePlumber metadata?
+  (read back with `pactl`). Its sliders run to 150 % on Linux
+  (`audio_menu::MAX_PERCENT`, wiremix's scale; 100 % on Windows and macOS, where
+  the endpoints stop). Not built: moving a stream to another device
+  (`move-sink-input`) and wiremix's card tab. Keep `pactl`, or take
+  `libpulse-binding` (plan 07's default: one connection, no processes) or native
+  PipeWire with WirePlumber metadata?
 - **Network without NetworkManager: build the rtnetlink fallback?** (M4.) **Q:**
   The network module reads NetworkManager over zbus, which the dotfiles use.
   Should lyr also support machines without it, through a new rtnetlink crate
@@ -580,13 +581,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mean rounded, the active port and form factor for the icon, Bluetooth told by
   the monitor's name, re-read on `pactl subscribe`'s sink, source and server
   events only (drained through `bus::Follow`, so a burst is one re-read); a
-  click mutes and a wheel step moves the volume, held to 100 % and never
-  lowering a boost (`step_argument`). The parsing is tested on JSON from the
-  owner's machine and mutation-checked; the subprocess side is not. Run in a
-  nested Hyprland (2026-10-20): the bar showed the headset at 50 % and the mic
-  at 29 %, as waybar did, and the mic's change to 40 % and back within a second.
-  A click and a scroll have not been made (no pointer injection here). The
-  network source is built over NetworkManager
+  click mutes and a wheel step moves the volume by `pactl`'s relative `±N%`,
+  with no ceiling at 100 % (plan 07, as the dotfiles' bindings had it). The
+  parsing is tested on JSON from the owner's machine and mutation-checked; the
+  subprocess side is not. Run in a nested Hyprland (2026-10-20): the bar showed
+  the headset at 50 % and the mic at 29 %, as waybar did, and the mic's change
+  to 40 % and back within a second. A click and a scroll have not been made (no
+  pointer injection here). The network source is built over NetworkManager
   (`lyr_sources::network::linux::NetworkManager`): the device of
   `PrimaryConnection` (the default route, as waybar picks it), else of
   `ActivatingConnection`, its IPv4 address, prefix and gateway, and on Wi-Fi the

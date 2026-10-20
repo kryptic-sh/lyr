@@ -92,17 +92,10 @@ fn only_device_and_server_events_count() {
 }
 
 #[test]
-fn a_step_stops_at_100_and_never_lowers_a_boost() {
-    assert_eq!(step_argument(50, 5).as_deref(), Some("+5%"));
-    assert_eq!(step_argument(97, 5).as_deref(), Some("100%"), "held to 100");
-    assert_eq!(step_argument(150, 5), None, "a boost is left as it is");
-    assert_eq!(step_argument(150, -5).as_deref(), Some("-5%"));
-    assert_eq!(
-        step_argument(3, -5).as_deref(),
-        Some("-5%"),
-        "pactl stops at 0"
-    );
-    assert_eq!(step_argument(50, 0), None);
+fn a_step_is_relative_with_no_ceiling() {
+    assert_eq!(step_argument(5).as_deref(), Some("+5%"));
+    assert_eq!(step_argument(-5).as_deref(), Some("-5%"));
+    assert_eq!(step_argument(0), None);
 }
 
 /// `pactl --format=json list sink-inputs` with one stream, as `pacat`

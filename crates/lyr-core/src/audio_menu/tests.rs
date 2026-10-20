@@ -190,27 +190,27 @@ fn level_width(items: &[Item], slider: crate::hit::Rect) -> f32 {
 #[test]
 fn a_slider_fills_to_the_level_and_sits_between_the_steps() {
     let mut nodes = nodes();
-    nodes.outputs[1].volume = 150;
+    nodes.outputs[1].volume = MAX_PERCENT + 50;
     let (list, _, regions) = draw(&nodes, Tab::Output, None, &measure, LINE, &theme());
     let slider = regions.rect(&Target::Level(0)).expect("drawn");
     let down = regions.rect(&Target::Step(0, Step::Down)).expect("drawn");
     let up = regions.rect(&Target::Step(0, Step::Up)).expect("drawn");
     assert!(down.x + down.width <= slider.x && slider.x + slider.width <= up.x);
     assert!(
-        (level_width(&list.items, slider) - slider.width * 0.4).abs() < 0.01,
-        "40 %"
+        (level_width(&list.items, slider) - slider.width * 40.0 / MAX_PERCENT as f32).abs() < 0.01,
+        "40 % of the scale"
     );
     let boosted = regions.rect(&Target::Level(1)).expect("drawn");
     assert!(
         (level_width(&list.items, boosted) - boosted.width).abs() < 0.01,
-        "a boost fills it, no further"
+        "past the scale fills it, no further"
     );
 }
 
 #[test]
 fn a_click_across_a_slider_is_a_percent() {
     assert_eq!(level_at(0.0), 0);
-    assert_eq!(level_at(0.404), 40);
+    assert_eq!(level_at(0.404), (0.404 * MAX_PERCENT as f32).round() as u32);
     assert_eq!(level_at(1.0), MAX_PERCENT);
     assert_eq!(level_at(1.5), MAX_PERCENT);
     assert_eq!(level_at(-0.5), 0);

@@ -2,7 +2,7 @@ use crcbl_shell::{
     ButtonState, HeadlessShell, KeyCode, PhysicalPoint, PointerButton, Shell, ShellEvent,
 };
 use lyr_config::{Platform, Theme, from_sources};
-use lyr_core::audio_menu::{self, Node, Nodes, Step, Tab, Target};
+use lyr_core::audio_menu::{self, Node, Nodes, Step, Tab, Target, level_at};
 
 use super::{Action, AudioMenu, Outcome};
 use crate::menu_panel::Place;
@@ -145,7 +145,11 @@ fn a_click_on_a_slider_sets_where_it_lands_and_enter_there_does_nothing() {
     let mut setup = setup(Tab::Output);
     assert_eq!(
         setup.click(Tab::Output, Target::Level(1)),
-        Outcome::Act(Tab::Output, "headphones".to_owned(), Action::Set(50)),
+        Outcome::Act(
+            Tab::Output,
+            "headphones".to_owned(),
+            Action::Set(level_at(0.5))
+        ),
         "the middle"
     );
     let (_, _, regions) =
@@ -195,12 +199,12 @@ fn a_drag_on_a_slider_sets_as_it_moves_until_let_go() {
             Some(at(0.25)),
         )
         .expect("pressed");
-    assert_eq!(setup.pump(), set(25));
+    assert_eq!(setup.pump(), set(level_at(0.25)));
     setup
         .shell
         .move_pointer(window, at(0.75), (0.0, 0.0))
         .expect("moved");
-    assert_eq!(setup.pump(), set(75), "followed the drag");
+    assert_eq!(setup.pump(), set(level_at(0.75)), "followed the drag");
     setup
         .shell
         .button(

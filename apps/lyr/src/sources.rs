@@ -1231,7 +1231,7 @@ mod linux {
         use std::sync::atomic::{AtomicBool, Ordering};
 
         use lyr_core::audio_menu::Nodes;
-        use lyr_sources::audio::pactl::{self, Flow, Target};
+        use lyr_sources::audio::pactl;
 
         let (states, mut changed) = watch::channel(((None, None), Nodes::default()));
         let menu = AtomicBool::new(false);
@@ -1245,30 +1245,11 @@ mod linux {
                 }
             }
         };
-        // The level a step starts from: the module's device's, or the
-        // menu's row's, as last read.
-        let current = |target: &Target| {
-            let ((sink, source), nodes) = &*states.borrow();
-            let row = |rows: &[lyr_core::audio_menu::Node], id: &str| {
-                rows.iter().find(|row| row.id == id).map(|row| row.volume)
-            };
-            match target {
-                Target::Default(Flow::Output) => sink.as_ref().map(|sink| sink.volume),
-                Target::Default(Flow::Input) => source.as_ref().map(|source| source.volume),
-                Target::Device(Flow::Output, name) => row(&nodes.outputs, name),
-                Target::Device(Flow::Input, name) => row(&nodes.inputs, name),
-                Target::Stream(Flow::Output, index) => row(&nodes.playback, &index.to_string()),
-                Target::Stream(Flow::Input, index) => row(&nodes.recording, &index.to_string()),
-            }
-        };
         let act = async {
             while let Some(request) = requests.recv().await {
                 let done = match request {
                     AudioRequest::ToggleMute(target) => pactl::toggle_mute(&target).await,
-                    AudioRequest::Step(target, delta) => match current(&target) {
-                        Some(level) => pactl::step(&target, level, delta).await,
-                        None => Ok(()),
-                    },
+                    AudioRequest::Step(target, delta) => pactl::step(&target, delta).await,
                     AudioRequest::Set(target, percent) => pactl::set(&target, percent).await,
                     AudioRequest::Default(flow, name) => pactl::make_default(flow, &name).await,
                     AudioRequest::Menu(open) => {

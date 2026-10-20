@@ -25,10 +25,6 @@ use crate::bus::{Follow, publish};
 /// PulseAudio's `PA_VOLUME_NORM`: a channel at 100 %.
 const VOLUME_NORM: u64 = 0x1_0000;
 
-/// The most a wheel step raises a volume to, in percent: waybar's
-/// `max-volume` default, which `pa_cvolume_inc_clamp` holds a step to.
-const MAX_STEP_PERCENT: u32 = 100;
-
 /// What a sink's monitor source is called when the sink is Bluetooth
 /// (waybar's `isBluetooth`: PulseAudio's, PipeWire's, and BlueZ's own).
 const BLUETOOTH_MONITORS: [&str; 3] = ["a2dp_sink", "a2dp-sink", "bluez"];
@@ -273,17 +269,14 @@ pub fn streams(line: &str) -> bool {
         .any(|on| line.contains(on))
 }
 
-/// `pactl`'s volume argument for a step of `delta` percent from `current`:
-/// up to [`MAX_STEP_PERCENT`] and no further, and never down from a volume
-/// already above it; `None` when the step changes nothing.
+/// `pactl`'s volume argument for a step of `delta` percent, or `None` for
+/// no step. Relative and with no ceiling at 100 %, as the dotfiles'
+/// `pactl set-sink-volume @DEFAULT_SINK@ +5%` has none (plan 07); `pactl`
+/// stops a step down at 0.
 #[must_use]
-pub fn step_argument(current: u32, delta: i32) -> Option<String> {
+pub fn step_argument(delta: i32) -> Option<String> {
     match delta.signum() {
-        1 if current >= MAX_STEP_PERCENT => None,
-        1 => Some(match current.saturating_add(delta.unsigned_abs()) {
-            target if target >= MAX_STEP_PERCENT => format!("{MAX_STEP_PERCENT}%"),
-            _ => format!("+{delta}%"),
-        }),
+        1 => Some(format!("+{delta}%")),
         -1 => Some(format!("{delta}%")),
         _ => None,
     }
@@ -387,14 +380,13 @@ pub async fn toggle_mute(target: &Target) -> io::Result<()> {
     pactl(&[mute, &id, "toggle"]).await.map(drop)
 }
 
-/// Moves `target`'s volume by `delta` percent from `current`, as
-/// [`step_argument`] has it.
+/// Moves `target`'s volume by `delta` percent, as [`step_argument`] has it.
 ///
 /// # Errors
 ///
 /// When `pactl` fails.
-pub async fn step(target: &Target, current: u32, delta: i32) -> io::Result<()> {
-    let Some(volume) = step_argument(current, delta) else {
+pub async fn step(target: &Target, delta: i32) -> io::Result<()> {
+    let Some(volume) = step_argument(delta) else {
         return Ok(());
     };
     let (_, set, id) = target.commands();

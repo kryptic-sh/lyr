@@ -116,9 +116,10 @@ const MAKE_DEFAULT: &str = "Default";
 const SLIDER_WIDTH: f32 = 120.0;
 /// A slider's track, as a share of the row's height.
 const TRACK: f32 = 0.4;
-/// The volume a full slider stands for: Windows' endpoints stop at 100 %;
-/// plan 10's 150 % for PulseAudio comes with a Linux source.
-pub const MAX_PERCENT: u32 = 100;
+/// The volume a full slider stands for: on Linux 150 %, wiremix's
+/// `max_volume_percent` (plan 10), since PulseAudio's volumes go past 100 %;
+/// elsewhere 100 %, where Windows' and macOS' endpoints stop.
+pub const MAX_PERCENT: u32 = if cfg!(target_os = "linux") { 150 } else { 100 };
 
 /// The volume a click `across` a slider sets, 0 – 1 of [`MAX_PERCENT`].
 #[must_use]
