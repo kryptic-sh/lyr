@@ -166,6 +166,19 @@ implementation follows meanwhile.
   pane, where the mode is set (another undocumented pane id), build a
   click-triggered tooltip, or leave the hover tooltip as the whole module?
 
+- **Reload: start and stop sources by the layout?** (M3.) **Q:** Plan 05 says a
+  layout or module change on reload starts and stops only the affected sources.
+  Today every source the platform has starts at launch and runs whatever the
+  layout shows; a reload re-lays out and redraws. Doing it as planned means each
+  source becomes its own abortable task (Linux runs them in one `tokio::join!`
+  now) with request channels made again on each start, so `Commands` swaps
+  senders while the bar runs, on all three platforms; the notification daemon
+  and the power menu stay up regardless, since toasts and Log out do not depend
+  on a module. A smaller step: start only the layout's sources at launch, and
+  have a reload that needs another one say a restart starts it. Build it as
+  planned, take the smaller step, or leave every source running (a source whose
+  module is hidden still wakes the bar on its changes)?
+
 ## Cross-repo work
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
@@ -716,18 +729,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `lyr import-waybar` now carries); waybar's `icon-size` waits on images. Not
   built: the file watcher that reloads on save (it needs a crate such as
   `notify`, new to lyr, so the owner's call), a finer diff (a reload redraws
-  everything, and reshapes the bars only when `[bar]` changed), the control
-  socket (its own entry above), and the defaults-parity test against
-  `config.jsonc`. The dotfiles are at `~/Projects/mxaddict/dotfiles` on the
-  owner's Windows machine, not next to lyr, and not on CI, so the test needs
-  either a path from the environment or a copy of `config.jsonc` checked into
-  lyr as a fixture; that is open. Format strings are one `Format` type
-  (`lyr-config`'s `format.rs`), parsed when the config loads and rendered with
-  `Format::render`, so validation and drawing will share one parser. Every error
-  names its full key (`layout.right[0]: …`, `theme.border: …`, the latter
-  through `serde_path_to_error`). `lyr-config` keeps its own copy of the table
-  merge, because `hjkl_config`'s `deep_merge` and `locate` are private in
-  0.42.2; if hjkl exports them, lyr drops the copy.
+  everything, and reshapes the bars only when `[bar]` changed; starting and
+  stopping sources is a question above), the control socket (its own entry
+  above), and the defaults-parity test against `config.jsonc`. The dotfiles are
+  at `~/Projects/mxaddict/dotfiles` on the owner's Windows machine, not next to
+  lyr, and not on CI, so the test needs either a path from the environment or a
+  copy of `config.jsonc` checked into lyr as a fixture; that is open. Format
+  strings are one `Format` type (`lyr-config`'s `format.rs`), parsed when the
+  config loads and rendered with `Format::render`, so validation and drawing
+  will share one parser. Every error names its full key (`layout.right[0]: …`,
+  `theme.border: …`, the latter through `serde_path_to_error`). `lyr-config`
+  keeps its own copy of the table merge, because `hjkl_config`'s `deep_merge`
+  and `locate` are private in 0.42.2; if hjkl exports them, lyr drops the copy.
 - **Waybar parity, still to check.** The plan was reviewed against the dotfiles'
   `config.jsonc` and `style.css` (2026-10-16), with waybar's own defaults read
   in its 0.15.0 source. The calendar is drawn in `theme.calendar_font` at
