@@ -10,8 +10,10 @@
 //! ([`power_profile`]), media-player ([`mpris`]) and tray ([`tray`])
 //! sources and the notification daemon ([`notifications`]), with their
 //! Linux backends, and the power menu's actions ([`power`]), which are not a
-//! module's source but sit with the other system-bus clients. Audio waits on
-//! a dependency decision (`docs/backlog.md`).
+//! module's source but sit with the other system-bus clients; Windows has
+//! the battery, network, power-profile and audio ([`audio`]) sources and the
+//! power menu's actions. Linux audio waits on a dependency decision
+//! (`docs/backlog.md`). [`program`] names the program a process runs.
 
 pub mod audio;
 pub mod battery;
@@ -22,4 +24,5 @@ pub mod network;
 pub mod notifications;
 pub mod power;
 pub mod power_profile;
+pub mod program;
 pub mod tray;

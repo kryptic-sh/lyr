@@ -59,16 +59,10 @@ pub fn session_name(system_sounds: bool, display: &str, program: Option<&str>) -
     if !display.is_empty() && !display.starts_with('@') {
         return display.to_owned();
     }
-    let Some(program) = program else {
-        return "Unknown".to_owned();
-    };
-    // Split on both separators, so the tests run the same everywhere.
-    let file = program.rsplit(['\\', '/']).next().unwrap_or(program);
-    let stem = file.len().checked_sub(".exe".len()).filter(|&end| {
-        file.get(end..)
-            .is_some_and(|extension| extension.eq_ignore_ascii_case(".exe"))
-    });
-    stem.map_or(file, |end| &file[..end]).to_owned()
+    program.map_or_else(
+        || "Unknown".to_owned(),
+        |path| crate::program::name(path).to_owned(),
+    )
 }
 
 /// The audio menu's row for a stream named `name`, on the default endpoint

@@ -15,10 +15,6 @@ use windows::Win32::Media::Audio::{
 };
 use windows::Win32::System::Com::CLSCTX_ALL;
 use windows::core::Interface as _;
-use windows_sys::Win32::Foundation::CloseHandle;
-use windows_sys::Win32::System::Threading::{
-    OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
-};
 
 use super::super::win32::{session_name, stream_row};
 use super::{Audio, Control, Flow, id, name, take, volume};
@@ -100,7 +96,10 @@ impl Audio {
                         control.cast().map_err(io::Error::other)?;
                     let system_sounds = control.IsSystemSoundsSession() == S_OK;
                     let display = control.GetDisplayName().ok().and_then(take);
-                    let program = control.GetProcessId().ok().and_then(program);
+                    let program = control
+                        .GetProcessId()
+                        .ok()
+                        .and_then(crate::program::windows::path);
                     let Some(name) = stream_row(
                         session_name(
                             system_sounds,
@@ -150,25 +149,5 @@ impl Audio {
             .find(|session| session.id == id)
             .map(|session| session.volume)
             .ok_or_else(|| io::Error::other("the stream has gone"))
-    }
-}
-
-/// The path of the program process `pid` runs, when it can be read: a
-/// process of another user's or a protected one cannot.
-fn program(pid: u32) -> Option<String> {
-    // SAFETY: the handle is checked, read through, and closed once; the
-    // buffer and its length agree.
-    unsafe {
-        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
-        if process.is_null() {
-            return None;
-        }
-        let mut path = [0_u16; 1024];
-        let mut length = path.len() as u32;
-        let read =
-            QueryFullProcessImageNameW(process, PROCESS_NAME_WIN32, path.as_mut_ptr(), &mut length);
-        // A failed close leaks one handle; the path is read either way.
-        let _closed = CloseHandle(process);
-        (read != 0).then(|| String::from_utf16_lossy(&path[..length as usize]))
     }
 }
