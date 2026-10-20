@@ -74,9 +74,8 @@ Windows and macOS with the modules those platforms support:
   [backend research](https://github.com/kryptic-sh/pikr/blob/main/docs/gui-backend-research.md)
   rejected a general toolkit for the same reason.
 - **X11.** Wayland only on Linux.
-- **Compositors other than Hyprland** on Linux for MVP. The workspace backend is
-  a trait ([06](06-workspaces.md)), so sway and niri are additions, not a
-  redesign.
+- **Compositors other than Hyprland** on Linux for MVP. sway and niri follow
+  after it ([06](06-workspaces.md)), as additions rather than a redesign.
 - **Hosting other apps' tray icons on Windows and macOS.** Neither platform
   allows it ([08](08-tray.md)).
 

@@ -44,9 +44,9 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
 7. **Theme palette.** The current CSS mixes Tokyo Night and Catppuccin colours.
    Default: copy it exactly. Say if it should become pure Tokyo Night (the rest
    of the desktop) ([04](04-rendering-and-theme.md#theme)).
-8. **Compositors** (draft Q4). Default: Hyprland only on Linux, behind the
-   `WorkspaceBackend` trait. sway (i3 IPC) and niri (JSON socket) are each one
-   backend.
+8. **Compositors** (draft Q4). Answered 2026-10-20: Hyprland, sway and niri on
+   Linux, each one backend in `lyr-wm` ([06](06-workspaces.md#linux--sway)).
+   Other compositors leave the workspace module out.
 9. **Windows workspaces.** Default: native virtual desktops through the
    undocumented COM interfaces, with a per-build table. The alternative is
    targeting komorebi or GlazeWM, if one of them gets used

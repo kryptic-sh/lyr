@@ -14,19 +14,20 @@ scroll moves to the next or previous button in id order, wrapping at the ends
 (`State::step`). A bar showing only its own output's workspaces steps through
 those, and does nothing while the active workspace is on another output.
 
-What a "workspace" is differs per platform, so the module talks to a
-`WorkspaceBackend` trait in `lyr-wm`. Each platform has one implementation
-selected at runtime: the first backend whose detection succeeds wins. When none
-does, the module logs why and is left out of the bar. It never shows an empty
-zone that looks like it works.
+What a "workspace" is differs per platform, so every backend in `lyr-wm`
+produces the same `lyr_wm::State`: the buttons in display order (each with an
+id, a name, its output and whether it is urgent), the active one, and the
+focused window's class and title. On Linux `lyr_wm::Compositor` picks the
+backend at runtime: the first of Hyprland, sway and niri whose environment
+variable is set wins. It subscribes (a first `State`, then each changed one,
+pushed, never polled), switches workspaces, and ends the session for the power
+menu's Log out. When no backend is found, the module logs why and is left out of
+the bar. It never shows an empty zone that looks like it works.
 
-```rust
-trait WorkspaceBackend {
-    fn snapshot(&self) -> Workspaces;        // ids, names, active, urgent, output
-    fn focus(&self, id: WorkspaceId) -> Result<()>;
-    fn subscribe(&self, tx: EventSender);    // pushes WorkspaceEvent, never polled
-}
-```
+There is no trait: the backends are an enum, since the set is closed and each
+lives in `lyr-wm`. Hyprland folds its events into the state one by one; sway and
+niri build a new state from their own replies and hand it on only when it
+differs from the last.
 
 ## Linux — Hyprland
 
@@ -69,9 +70,65 @@ Detected by `HYPRLAND_INSTANCE_SIGNATURE`. Both sockets live in
   an earlier guess from `~/.config/hypr/hyprland.lua` existing, which missed
   `hyprland --config`. The legacy form is kept for hyprlang configs so lyr also
   works for people who have not migrated.
-- **Window title** (waybar's `hyprland/window`) is **not** in the current bar
-  and is not planned for MVP. The `activewindowv2` event makes it cheap to add
-  later; see the backlog.
+- **Window title** (waybar's `hyprland/window`) is not in the current bar. The
+  `window` module, built after the MVP and left out of the default layout,
+  follows the `activewindow` event, seeded from `j/activeworkspace` and
+  `j/clients`.
+
+## Linux — sway
+
+Detected by `SWAYSOCK`, the path of sway's IPC socket. The protocol is i3's
+(`sway-ipc(7)`, read at sway 1.12): each message is `i3-ipc`, a 32-bit payload
+length and a 32-bit type in native byte order, then the JSON payload; replies
+and events are framed the same, events with the type's high bit set.
+
+- **State:** `GET_WORKSPACES` (type 1) gives each workspace's `id`, `num` (`-1`
+  for a name that does not start with a number), `name`, `output`, `focused` and
+  `urgent`. The buttons are ordered numbered first by `num`, then named by name,
+  as sway orders an output's workspaces. The active workspace is the `focused`
+  one. The focused window is the node with `focused: true` in `GET_TREE`
+  (type 4) that is a window (`type` `con` or `floating_con`): its `app_id`, or
+  `window_properties.class` under Xwayland, and its `name` as the title. An
+  empty workspace has the focus itself, and then there is no window.
+- **Events:** a second connection sends `SUBSCRIBE` (type 2) with
+  `["workspace","window","output"]`. Any workspace or output event re-reads both
+  replies; a window event re-reads the tree only for the changes that can move
+  focus or retitle it (`focus`, `title`, `close`, `new`). The state is handed on
+  only when it differs from the last.
+- **Switching:** `RUN_COMMAND` (type 0) with
+  `workspace --no-auto-back-and-forth "NAME"`, so a click on the shown workspace
+  does not bounce back where `workspace_auto_back_and_forth` is on. sway keeps
+  backslashes inside quotes, replaces `$variables` in arguments, and reads
+  `next`, `prev`, `next_on_output`, `prev_on_output`, `current`,
+  `back_and_forth` and `number` as keywords (`sway/commands.c`,
+  `sway/commands/workspace.c`). A name with `"`, `\` or `$`, or one equal to a
+  keyword, could reach a different workspace, so lyr refuses to send it and logs
+  why, as it does for a Hyprland name it cannot quote.
+- **Log out:** `RUN_COMMAND` with `exit`.
+
+## Linux — niri
+
+Detected by `NIRI_SOCKET`. Each request is one JSON line and gets one JSON line
+back, `{"Ok": …}` or `{"Err": "…"}`; after `"EventStream"` the connection
+carries only events, one JSON object per line, so switching uses a connection of
+its own (`niri-ipc`'s `lib.rs` and `socket.rs`, read at niri v26.04).
+
+- **State:** the event stream starts with the full state (`WorkspacesChanged`,
+  `WindowsChanged`), so there is no separate query. lyr folds
+  `WorkspacesChanged`, `WorkspaceActivated`, `WorkspaceUrgencyChanged`,
+  `WindowsChanged`, `WindowOpenedOrChanged`, `WindowClosed` and
+  `WindowFocusChanged`, as `niri_ipc::state` does, and skips every other event,
+  including ones newer than v26.04.
+- **Buttons:** niri's workspaces belong to an output and are numbered on it
+  (`idx`), so the buttons are ordered by output, then `idx`, and labelled by
+  their `name` when they have one, else by `idx`. The active workspace is the
+  `is_focused` one; `is_urgent` marks urgency. The id is niri's own workspace
+  id, which stays fixed while workspaces move.
+- **Switching:** `{"Action":{"FocusWorkspace":{"reference":{"Id":N}}}}`, by id,
+  so no name is ever quoted.
+- **Log out:** `{"Action":{"Quit":{"skip_confirmation":true}}}`: the power menu
+  has already asked.
+- **Focused window:** the window with `is_focused`, its `app_id` and `title`.
 
 ## Windows — virtual desktops
 
@@ -104,4 +161,5 @@ the module is left out on macOS. See [16](16-open-questions.md).
 One bar per output ([03](03-surfaces-and-input.md#outputs)). With
 `all-outputs = true` (the default, matching waybar), every bar lists every
 workspace. With `false`, each bar lists only the workspaces on its own output,
-using the output name the backend reports (Hyprland's `monitor` field).
+using the output name the backend reports (Hyprland's `monitor` field, sway's
+and niri's `output`).

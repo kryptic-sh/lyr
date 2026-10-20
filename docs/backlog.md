@@ -116,13 +116,6 @@ implementation follows meanwhile.
   Build it with a table for the released builds, or keep the module read-only on
   Windows, as on macOS? Until then a click logs that `cycle_profile` is not
   implemented.
-- **sway and niri workspace backends: build them?** (Post-MVP.) **Q:** Plan 16's
-  question 8 defaults to Hyprland only on Linux, behind `lyr-wm`'s workspace
-  backend, with sway (i3 IPC: a binary header and JSON over a Unix socket) and
-  niri (a JSON socket) one backend each. Both could be built with what `lyr-wm`
-  already depends on (`serde_json`, `tokio`) and tested against recorded
-  replies, but neither is run here and the dotfiles use Hyprland. Build either,
-  both, or neither until someone uses them?
 - **`lyr import-waybar`: carry `style.css` into `[theme]`?** (Post-MVP.) **Q:**
   The importer carries `config.jsonc` only. Mapping `style.css` means parsing
   CSS and choosing which of waybar's selectors (`#battery`, `window#waybar`,
@@ -920,7 +913,30 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `defaults.toml`, the differences being waybar's `on-click` commands, which
   lyr's built-ins replace. Not built: `style.css` to `[theme]`, which would mean
   mapping waybar's selectors onto lyr's theme keys.
-- **sway and niri workspace backends**, and komorebi or GlazeWM on Windows.
+- **sway and niri workspace backends: being built** (the owner asked for both,
+  2026-10-20; plan [06](plan/06-workspaces.md#linux--sway) has the design). The
+  slices, each pushed on its own:
+  1. Move `State`, `Workspace` and `Step` out of `lyr_wm::hyprland` into a
+     shared `lyr_wm::state`, the buttons kept in display order rather than id
+     order, so a backend can hand over its own order. A move, no behaviour
+     change; `lyr_wm::hyprland` re-exports them.
+  2. `lyr_wm::sway`: i3 IPC over `$SWAYSOCK`, `GET_WORKSPACES` and `GET_TREE`
+     for the state, `workspace`/`window`/`output` events to re-read it, and
+     `workspace --no-auto-back-and-forth "NAME"` to switch (names sway would
+     read differently are refused, see plan 06); `exit` for Log out.
+  3. `lyr_wm::niri`: niri's JSON socket at `$NIRI_SOCKET`, its event stream
+     folded into the state, `FocusWorkspace` by id to switch and `Quit` for Log
+     out.
+  4. `lyr_wm::Compositor`: the first of Hyprland, sway and niri whose variable
+     is set wins; the app's workspace, window and Log out paths use it, and
+     `lyr import-waybar` maps `sway/*` and `niri/*` modules too.
+
+  Neither compositor runs here (no sway or niri in WSL, and no sudo to install
+  them), so the tests are against replies written from each one's source and
+  documentation (sway 1.12's `sway-ipc.7.scd`, niri v26.04's `niri-ipc`). A
+  headless sway in CI, as crcbl's CI runs, would be a real check of the sway
+  half. komorebi or GlazeWM on Windows stay unbuilt (the Windows workspaces
+  question above).
 
 ## Not yet verified
 
