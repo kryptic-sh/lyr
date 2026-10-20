@@ -16,7 +16,7 @@ mod log;
 mod menu_panel;
 mod modules;
 mod power_menu;
-#[cfg(any(windows, test))]
+#[cfg(any(windows, target_os = "macos", test))]
 mod settings;
 mod sources;
 mod stats;

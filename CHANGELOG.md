@@ -68,7 +68,9 @@ and this project adheres to
   the workspaces; only macOS acts on it.
 - On macOS the Bluetooth module shows the controller's power and the last device
   to connect, from IOBluetooth, updated when the controller powers on or off or
-  a device connects or disconnects. The Bluetooth menu is not built there yet.
+  a device connects or disconnects.
+- On macOS the Wi-Fi and Bluetooth menus open System Settings' Wi-Fi and
+  Bluetooth panes, as Windows opens its Settings pages.
 - On macOS the audio menu lists every output and input device with mute, a
   volume slider and steps, and a device's Default button makes it the default
   through CoreAudio. macOS has no per-program volume, so the Playback and

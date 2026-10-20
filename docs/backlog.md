@@ -133,6 +133,39 @@ implementation follows meanwhile.
   `{title}`, `{class}` and `max_length`? (Its app icon waits on images, the
   `crcbl-image` question above.)
 
+- **The `objc2` framework crates on macOS: keep them?** (M10.) **Q:** The macOS
+  sources take `objc2-io-kit`, `objc2-core-audio`, `objc2-core-foundation`,
+  `objc2-foundation`, `objc2`, `block2`, `objc2-system-configuration`,
+  `objc2-core-wlan` and `objc2-io-bluetooth`, under plan 02's "`objc2` +
+  `objc2-core-audio`, …" row, read as covering the `objc2` family (the row
+  carries no "needs the owner's approval" note, as `libpulse-binding`'s does;
+  crcbl uses `objc2`, `objc2-core-foundation` and `objc2-foundation`). Keep
+  them, or name the ones the row did not mean, and those sources come out until
+  a decision?
+- **Running lyr on the real thing: when, and on what?** (M1, M10.) **Q:**
+  Everything compositor-, radio- or Mac-specific is tested against fakes, a
+  headless sway in CI and CI's macOS runner, which has no battery, Wi-Fi or
+  AeroSpace. The checks only you can run: lyr on your Hyprland (plan 15's M1
+  check: the Lua dispatch, the window title, the notification daemon, the tray,
+  the frame gate on a monitor hypridle turns off); on a Mac with a battery,
+  Wi-Fi and AeroSpace (the macOS sources, the Settings fallbacks, whether
+  IOBluetooth's notifications arrive on crcbl's AppKit run loop); and on niri if
+  you use it. Which can you run, and should lyr hold any milestone for them?
+- **macOS Wi-Fi and Bluetooth menus: build them natively without a Mac to try
+  them?** (M10.) **Q:** Plan 10 wants native menus wherever there is a public
+  API: CoreWLAN can scan and join (the scan's names need Location permission),
+  IOBluetooth can list, connect and pair. Nothing here can run them, and CI's
+  Mac has no Wi-Fi, so they could be checked only to compile and to find no
+  networks. Build them blind, wait for a Mac, or keep the System Settings panes
+  that open now (`settings::Page`, URLs from Ventura-era community sources, not
+  Apple's documentation)?
+- **macOS power profile: what does a click do?** (M10.) **Q:** Low Power Mode is
+  read-only to lyr (setting it needs `pmset` as root). Plan 07 says a click
+  shows a tooltip saying so; lyr has no click-triggered tooltip, so a click now
+  logs that `cycle_profile` is not implemented. Open System Settings' Battery
+  pane, where the mode is set (another undocumented pane id), build a
+  click-triggered tooltip, or leave the hover tooltip as the whole module?
+
 ## Cross-repo work
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
@@ -462,50 +495,45 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   battery's description turned into the reading by `battery::iops` (tested and
   mutation-checked on every platform), re-read on each
   `IOPSNotificationCreateRunLoopSource` notification on a run-loop thread of its
-  own. `objc2-io-kit`, `objc2-core-foundation`, `objc2-core-audio`,
-  `objc2-foundation`, `objc2`, `block2`, `objc2-system-configuration`,
-  `objc2-core-wlan` and `objc2-io-bluetooth` were taken under plan 02's `objc2`
-  row, read as covering the `objc2` framework crates; say so if that row did not
-  mean them. Checked by `cargo clippy` for `aarch64-apple-darwin` from WSL. On
-  CI's macOS runner, which has no battery, its test reads the power sources and
-  starts and stops the watch; no Mac with a battery has run it. Volume and mic
-  are built too (`lyr_sources::audio::macos`): CoreAudio's default output and
-  input, their volume (the main element's, else the mean of channels 1 and 2,
-  set on each) and mute, and the transport type's port (`audio::coreaudio`,
-  tested and mutation-checked everywhere); property listeners on the system
-  object and on the default devices, moved when a default changes, run on
-  CoreAudio's own notification thread, and their callback is leaked once per
-  watch so a call in flight after a listener goes stays valid. Cross-checked
-  with clippy for `aarch64-apple-darwin`; CI's macOS runner, whatever audio
-  devices it has, runs its read and the listeners' start, follow and stop; no
-  Mac has played through it. The power menu's actions are built too (the Power
-  menu entry below), and the power profile
-  (`lyr_sources::power_profile::macos`): Low Power Mode from `NSProcessInfo`, as
-  power-saver or balanced (`power_profile::lowpower`, tested everywhere),
-  re-read on `NSProcessInfoPowerStateDidChangeNotification` through
+  own. The `objc2` framework crates it takes are a question above. Checked by
+  `cargo clippy` for `aarch64-apple-darwin` from WSL. On CI's macOS runner,
+  which has no battery, its test reads the power sources and starts and stops
+  the watch; no Mac with a battery has run it. Volume and mic are built too
+  (`lyr_sources::audio::macos`): CoreAudio's default output and input, their
+  volume (the main element's, else the mean of channels 1 and 2, set on each)
+  and mute, and the transport type's port (`audio::coreaudio`, tested and
+  mutation-checked everywhere); property listeners on the system object and on
+  the default devices, moved when a default changes, run on CoreAudio's own
+  notification thread, and their callback is leaked once per watch so a call in
+  flight after a listener goes stays valid. Cross-checked with clippy for
+  `aarch64-apple-darwin`; CI's macOS runner, whatever audio devices it has, runs
+  its read and the listeners' start, follow and stop; no Mac has played through
+  it. The power menu's actions are built too (the Power menu entry below), and
+  the power profile (`lyr_sources::power_profile::macos`): Low Power Mode from
+  `NSProcessInfo`, as power-saver or balanced (`power_profile::lowpower`, tested
+  everywhere), re-read on `NSProcessInfoPowerStateDidChangeNotification` through
   `NSNotificationCenter` with no queue, so the block runs on the posting thread;
   CI's Mac reads it and starts and stops the observer, but nothing has turned
   the mode on and off under it. A click on it logs that `cycle_profile` is not
-  implemented, where plan 07 asks for a tooltip saying the mode is read-only.
-  The network is built too (`lyr_sources::network::macos`): the primary
-  interface, router and first address from the dynamic store's global and
-  interface IPv4 entities (keys made with the framework's own key functions),
-  Wi-Fi's name, signal (waybar's dBm scale, `network::scdynamic::signal`) and
-  power from CoreWLAN, re-read on the store's notifications for the global IPv4
-  entity and every interface's IPv4, link and AirPort entities, on the shared
-  run loop thread (`macos_runloop`). `lyr_core::network::Link::wireless` keeps a
-  Wi-Fi link whose name macOS withholds (no Location permission) showing as
-  Wi-Fi, and the radio being off shows as disabled when there is no link. The
-  signal is read only on those changes, since no notification follows it; plan
-  07 has waybar re-reading it on an interval. `scdynamic` is tested and
-  mutation-checked everywhere; CI's Mac reads the store and starts and stops the
-  watch, and no Mac on Wi-Fi has run it. The workspaces are AeroSpace's
-  (`lyr_wm::aerospace`): `list-workspaces` and `list-windows --focused` as JSON,
-  read on a thread at start, on each `lyr event workspace` (AeroSpace's
-  `on-focus-changed`, plan 06) and after a click's
-  `aerospace workspace -- NAME`; the parsing and arguments are tested and
-  mutation-checked on every platform, from AeroSpace v0.21.3-Beta's docs and its
-  `formatToJson.swift`. No AeroSpace has run it: CI's Mac has none, and its
+  implemented (a question above). The network is built too
+  (`lyr_sources::network::macos`): the primary interface, router and first
+  address from the dynamic store's global and interface IPv4 entities (keys made
+  with the framework's own key functions), Wi-Fi's name, signal (waybar's dBm
+  scale, `network::scdynamic::signal`) and power from CoreWLAN, re-read on the
+  store's notifications for the global IPv4 entity and every interface's IPv4,
+  link and AirPort entities, on the shared run loop thread (`macos_runloop`).
+  `lyr_core::network::Link::wireless` keeps a Wi-Fi link whose name macOS
+  withholds (no Location permission) showing as Wi-Fi, and the radio being off
+  shows as disabled when there is no link. The signal is read only on those
+  changes, since no notification follows it; plan 07 has waybar re-reading it on
+  an interval. `scdynamic` is tested and mutation-checked everywhere; CI's Mac
+  reads the store and starts and stops the watch, and no Mac on Wi-Fi has run
+  it. The workspaces are AeroSpace's (`lyr_wm::aerospace`): `list-workspaces`
+  and `list-windows --focused` as JSON, read on a thread at start, on each
+  `lyr event workspace` (AeroSpace's `on-focus-changed`, plan 06) and after a
+  click's `aerospace workspace -- NAME`; the parsing and arguments are tested
+  and mutation-checked on every platform, from AeroSpace v0.21.3-Beta's docs and
+  its `formatToJson.swift`. No AeroSpace has run it: CI's Mac has none, and its
   process calls run nowhere in the tests. A window's title changing alone tells
   lyr nothing, so the window module can lag it. Bluetooth is built too
   (`lyr_sources::bluetooth::macos`): IOBluetooth's default controller and paired
@@ -526,8 +554,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `kAudioHardwarePropertyDefault…Device`. The device list's changes come through
   a system listener, and while the menu is open it reads again each second, as
   on Windows (`MENU_REFRESH`). The stream tabs are empty, since macOS has no
-  per-program volume. No Mac has shown the menu. Not built: the Wi-Fi and
-  Bluetooth menus on macOS.
+  per-program volume. No Mac has shown the menu. The Wi-Fi and Bluetooth menus
+  open System Settings' Wi-Fi and Bluetooth panes instead
+  (`settings::Page::command`, as Windows opens `ms-settings:`), tested and
+  mutation-checked for the command; native menus are a question above.
 - **Windows sources, M9.** Built: the battery (`lyr_sources::battery::windows`):
   `GetSystemPowerStatus` read at start and again whenever
   `PowerSettingRegisterNotification` reports a change of power source or

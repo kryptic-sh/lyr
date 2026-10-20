@@ -363,15 +363,14 @@ impl App {
             return Ok(Ok(()));
         }
         let Some(adapter) = &self.data.bluetooth_adapter else {
-            // Windows has no Bluetooth menu yet: its Settings page stands in.
-            #[cfg(windows)]
+            // Windows and macOS have no Bluetooth menu yet (its actions are
+            // BlueZ's, so macOS hands it no adapter): their Settings page
+            // stands in.
+            #[cfg(any(windows, target_os = "macos"))]
             {
                 crate::settings::open(crate::settings::Page::Bluetooth);
                 return Ok(Ok(()));
             }
-            // The menu's actions are BlueZ's, so macOS hands it no adapter.
-            #[cfg(target_os = "macos")]
-            return Ok(Err("the Bluetooth menu is not built on macOS yet"));
             #[cfg(target_os = "linux")]
             return Ok(Err("there is no Bluetooth adapter"));
         };

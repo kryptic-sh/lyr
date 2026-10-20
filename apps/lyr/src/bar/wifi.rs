@@ -33,13 +33,14 @@ impl App {
             return Ok(Ok(()));
         }
         let Some(wifi) = self.data.wifi.as_ref().filter(|wifi| wifi.device.is_some()) else {
-            // Windows has no Wi-Fi menu yet: its Settings page stands in.
-            #[cfg(windows)]
+            // Windows and macOS have no Wi-Fi menu yet: their Settings page
+            // stands in.
+            #[cfg(any(windows, target_os = "macos"))]
             {
                 crate::settings::open(crate::settings::Page::Network);
                 return Ok(Ok(()));
             }
-            #[cfg(not(windows))]
+            #[cfg(target_os = "linux")]
             return Ok(Err("there is no Wi-Fi device"));
         };
         // A rescan on every open, so the list is current.
