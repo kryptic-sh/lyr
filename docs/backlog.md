@@ -916,10 +916,7 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 - **sway and niri workspace backends: being built** (the owner asked for both,
   2026-10-20; plan [06](plan/06-workspaces.md#linux--sway) has the design). The
   slices, each pushed on its own:
-  1. `lyr_wm::niri`: niri's JSON socket at `$NIRI_SOCKET`, its event stream
-     folded into the state, `FocusWorkspace` by id to switch and `Quit` for Log
-     out.
-  2. `lyr_wm::Compositor`: the first of Hyprland, sway and niri whose variable
+  1. `lyr_wm::Compositor`: the first of Hyprland, sway and niri whose variable
      is set wins; the app's workspace, window and Log out paths use it, and
      `lyr import-waybar` maps `sway/*` and `niri/*` modules too.
 

@@ -116,11 +116,13 @@ carries only events, one JSON object per line, so switching uses a connection of
 its own (`niri-ipc`'s `lib.rs` and `socket.rs`, read at niri v26.04).
 
 - **State:** the event stream starts with the full state (`WorkspacesChanged`,
-  `WindowsChanged`), so there is no separate query. lyr folds
-  `WorkspacesChanged`, `WorkspaceActivated`, `WorkspaceUrgencyChanged`,
-  `WindowsChanged`, `WindowOpenedOrChanged`, `WindowClosed` and
-  `WindowFocusChanged`, as `niri_ipc::state` does, and skips every other event,
-  including ones newer than v26.04.
+  `WindowsChanged`), so there is no separate query: the bar's first state is the
+  one both lists make, which niri must send within the request timeout
+  (`niri::ipc`'s `REQUEST_TIMEOUT`). lyr folds `WorkspacesChanged`,
+  `WorkspaceActivated`, `WorkspaceUrgencyChanged`, `WindowsChanged`,
+  `WindowOpenedOrChanged`, `WindowClosed` and `WindowFocusChanged`, as
+  `niri_ipc::state` does, and skips every other event, including ones newer than
+  v26.04.
 - **Buttons:** niri's workspaces belong to an output and are numbered on it
   (`idx`), so the buttons are ordered by output, then `idx`, and labelled by
   their `name` when they have one, else by `idx`. The active workspace is the

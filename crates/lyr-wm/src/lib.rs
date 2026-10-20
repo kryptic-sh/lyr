@@ -4,10 +4,12 @@
 //! niri IPC on Linux, Windows virtual desktops and AeroSpace on macOS
 //! (`docs/plan/06-workspaces.md`).
 //!
-//! So far it holds the Hyprland ([`hyprland`]) and sway ([`sway`]) backends.
-//! Each produces the same [`State`], the buttons the workspace module draws.
+//! So far it holds the Hyprland ([`hyprland`]), sway ([`sway`]) and niri
+//! ([`niri`]) backends. Each produces the same [`State`], the buttons the
+//! workspace module draws.
 
 pub mod hyprland;
+pub mod niri;
 mod state;
 pub mod sway;
 
