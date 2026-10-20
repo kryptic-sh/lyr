@@ -85,8 +85,7 @@ impl App {
 
     /// When the Wi-Fi menu has to be drawn again on its own.
     pub(super) fn wifi_wake(&self) -> Option<Instant> {
-        let menu = self.wifi_menu.as_ref()?;
-        menu.next_wake(self.data.wifi.as_ref()?, Instant::now())
+        self.wifi_menu.as_ref()?.next_wake()
     }
 
     /// Shows how a join ended in the menu; with the menu closed, a failure

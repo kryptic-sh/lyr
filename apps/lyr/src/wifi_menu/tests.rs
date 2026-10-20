@@ -266,13 +266,12 @@ fn a_stale_list_waits_for_a_fresh_scan_or_the_cap() {
     )
     .expect("opened");
     assert_eq!(menu.scan(&stale, opened), Scan::Scanning);
-    assert_eq!(menu.next_wake(&stale, opened), Some(opened + SCAN_WAIT));
+    assert_eq!(menu.next_wake(), Some(opened + SCAN_WAIT));
     let scanned = Wifi {
         last_scan: Some(Duration::from_secs(205)),
         ..wifi()
     };
     assert_eq!(menu.scan(&scanned, opened), Scan::Ready);
-    assert_eq!(menu.next_wake(&scanned, opened), None);
     assert_eq!(menu.scan(&stale, opened + SCAN_WAIT), Scan::Ready, "capped");
     let gone = Wifi {
         available: false,
@@ -302,4 +301,51 @@ fn the_network_joined_stays_while_the_scan_moves_on() {
     setup.menu.joined(Joined::NewPassword);
     setup.refresh(&moved_on, setup.opened);
     assert_eq!(setup.typing(), Some(TextPurpose::Password), "still asked");
+}
+
+#[test]
+fn the_wait_stays_due_until_the_list_is_drawn() {
+    let stale = wifi();
+    let mut setup = setup(&stale);
+    // Opened 110 s after boot on a scan from 100 s: fresh, no wait.
+    assert_eq!(setup.menu.next_wake(), None);
+
+    let mut setup = Setup {
+        menu: WifiMenu::open(
+            &mut setup.shell,
+            Place::EDGE,
+            &look(&setup.theme),
+            &stale,
+            setup.opened,
+            Some(Duration::from_secs(200)),
+        )
+        .expect("opened"),
+        ..setup
+    };
+    let deadline = setup.opened + SCAN_WAIT;
+    assert_eq!(setup.menu.next_wake(), Some(deadline));
+    // The loop wakes after the deadline: it is still due, so it redraws.
+    assert_eq!(setup.menu.next_wake(), Some(deadline), "past the cap");
+    setup.refresh(&stale, deadline);
+    assert_eq!(setup.menu.next_wake(), None, "the list is drawn");
+
+    // A scan landing before the cap ends the wait the same way.
+    let mut setup = Setup {
+        menu: WifiMenu::open(
+            &mut setup.shell,
+            Place::EDGE,
+            &look(&setup.theme),
+            &stale,
+            setup.opened,
+            Some(Duration::from_secs(200)),
+        )
+        .expect("opened"),
+        ..setup
+    };
+    let scanned = Wifi {
+        last_scan: Some(Duration::from_secs(205)),
+        ..wifi()
+    };
+    setup.refresh(&scanned, setup.opened);
+    assert_eq!(setup.menu.next_wake(), None);
 }

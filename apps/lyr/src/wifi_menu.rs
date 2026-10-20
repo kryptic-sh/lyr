@@ -38,6 +38,9 @@ pub struct WifiMenu {
     /// What has been typed into the password field.
     typed: String,
     waiting: Waiting,
+    /// The list's state when last drawn: "Scanning…" stays on screen past
+    /// [`SCAN_WAIT`] until something draws the menu again.
+    drawn_scan: Scan,
 }
 
 /// The wait for a fresh scan, which a rescan on opening the menu starts.
@@ -131,10 +134,11 @@ impl WifiMenu {
             fresh_at_open: since_boot.is_some_and(|boot| scan_is_fresh(wifi.last_scan, boot)),
         };
         let networks = wifi.networks();
+        let drawn_scan = waiting.scan(wifi, now);
         let drawn = wifi_menu::draw(
             &Shown {
                 radio: wifi.radio,
-                scan: waiting.scan(wifi, now),
+                scan: drawn_scan,
                 networks: &networks,
                 header: None,
             },
@@ -150,6 +154,7 @@ impl WifiMenu {
             shown: None,
             typed: String::new(),
             waiting,
+            drawn_scan,
         })
     }
 
@@ -159,9 +164,10 @@ impl WifiMenu {
     }
 
     /// When the menu has to be drawn again on its own: when the wait for a
-    /// scan is up.
-    pub fn next_wake(&self, wifi: &Wifi, now: Instant) -> Option<Instant> {
-        (self.scan(wifi, now) == Scan::Scanning).then_some(self.waiting.opened + SCAN_WAIT)
+    /// scan is up, while it still shows the wait. Past that time it stays
+    /// due, until a redraw shows the list.
+    pub fn next_wake(&self) -> Option<Instant> {
+        (self.drawn_scan == Scan::Scanning).then_some(self.waiting.opened + SCAN_WAIT)
     }
 
     /// When it opened.
@@ -249,6 +255,7 @@ impl WifiMenu {
         }
         let drawn = self.drawn(look, wifi, now);
         self.panel.show(shell, drawn)?;
+        self.drawn_scan = self.scan(wifi, now);
         // A new header needs its text input set.
         self.take_typing(shell)
     }
