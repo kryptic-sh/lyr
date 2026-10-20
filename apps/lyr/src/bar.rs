@@ -340,7 +340,10 @@ impl App {
                 crate::settings::open(crate::settings::Page::Bluetooth);
                 return Ok(Ok(()));
             }
-            #[cfg(not(windows))]
+            // The menu's actions are BlueZ's, so macOS hands it no adapter.
+            #[cfg(target_os = "macos")]
+            return Ok(Err("the Bluetooth menu is not built on macOS yet"));
+            #[cfg(target_os = "linux")]
             return Ok(Err("there is no Bluetooth adapter"));
         };
         let look = Look {

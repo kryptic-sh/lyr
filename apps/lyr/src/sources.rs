@@ -41,8 +41,9 @@ pub enum Update {
     /// How a join the Wi-Fi menu asked for ended.
     #[cfg(target_os = "linux")]
     WifiJoined(crate::wifi_menu::Joined),
-    /// BlueZ: the module's reading and the menu's adapter and devices.
-    #[cfg(target_os = "linux")]
+    /// BlueZ's (IOBluetooth's on macOS): the module's reading and the menu's
+    /// adapter and devices.
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     Bluetooth(lyr_sources::bluetooth::Snapshot),
     /// The pairing agent asks, about the device at this path, under this
     /// id.
@@ -176,6 +177,9 @@ pub struct Commands {
     _network: Option<lyr_sources::network::macos::Watch>,
     #[cfg(target_os = "macos")]
     workspaces: std::sync::mpsc::Sender<macos::WorkspaceRequest>,
+    /// macOS: IOBluetooth's notifications, registered on this thread.
+    #[cfg(target_os = "macos")]
+    _bluetooth: lyr_sources::bluetooth::macos::Watch,
     #[cfg(windows)]
     _network: Option<lyr_sources::network::windows::Watch>,
     #[cfg(windows)]
@@ -434,6 +438,7 @@ pub fn start(
         let power_profile = macos::power_profile(sender.clone(), waker.clone());
         let network = macos::network(sender.clone(), waker.clone());
         let workspaces = macos::workspaces(sender.clone(), waker.clone())?;
+        let bluetooth = macos::bluetooth(sender.clone(), waker.clone());
         let battery = macos::battery(sender, waker);
         Ok((
             receiver,
@@ -443,13 +448,14 @@ pub fn start(
                 _power_profile: power_profile,
                 audio,
                 workspaces,
+                _bluetooth: bluetooth,
             },
         ))
     }
 }
 
 /// The sources macOS has so far: the battery, the default audio devices,
-/// Low Power Mode, the network and AeroSpace's workspaces.
+/// Low Power Mode, the network, Bluetooth and AeroSpace's workspaces.
 #[cfg(target_os = "macos")]
 mod macos {
     use std::sync::mpsc;
@@ -552,6 +558,29 @@ mod macos {
                 }
             })?;
         Ok(requests)
+    }
+
+    /// Hands Bluetooth to the main loop now and after each change IOBluetooth
+    /// reports, while the returned watch lives. IOBluetooth calls back on the
+    /// run loop of the thread that registers, so this runs on the bar's main
+    /// thread, and the watch stays there.
+    pub(super) fn bluetooth(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+    ) -> lyr_sources::bluetooth::macos::Watch {
+        use lyr_sources::bluetooth::Tracker;
+        use lyr_sources::bluetooth::macos::{Watch, snapshot};
+        let tracker = std::cell::RefCell::new(Tracker::default());
+        let deliver = move || {
+            let snapshot = snapshot(&mut tracker.borrow_mut());
+            // The main loop has gone when this fails: nothing is left to do.
+            let _gone = sender.send(Update::Bluetooth(snapshot));
+            if let Some(waker) = &waker {
+                waker.wake();
+            }
+        };
+        deliver();
+        Watch::new(deliver)
     }
 
     /// What the bar asks of the workspaces thread.

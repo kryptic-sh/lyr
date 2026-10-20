@@ -24,7 +24,7 @@ pub struct Data {
     /// The Wi-Fi device, its networks and profiles, for the Wi-Fi menu.
     /// `None` where there is no source for them.
     pub wifi: Option<lyr_core::wifi_menu::Wifi>,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     pub bluetooth: Option<lyr_core::bluetooth::Reading>,
     /// The adapter and devices, for the Bluetooth menu. Empty where there
     /// is no source for them.
@@ -104,11 +104,15 @@ impl Data {
             }
             #[cfg(target_os = "linux")]
             Update::BluetoothCancel => self.bluetooth_ask = None,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "macos"))]
             Update::Bluetooth(snapshot) => {
                 self.bluetooth = snapshot.reading;
-                self.bluetooth_adapter = snapshot.adapter;
-                self.bluetooth_devices = snapshot.devices;
+                // The menu's actions are BlueZ's: macOS shows the module only.
+                #[cfg(target_os = "linux")]
+                {
+                    self.bluetooth_adapter = snapshot.adapter;
+                    self.bluetooth_devices = snapshot.devices;
+                }
             }
             #[cfg(any(target_os = "linux", target_os = "macos"))]
             Update::Workspaces(state) => self.workspaces = Some(state),
@@ -249,7 +253,7 @@ fn content(
             let shown = data.network.as_ref()?.view(&config.network);
             Some(label(shown.text, theme.foreground))
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         Module::Bluetooth => {
             let shown = lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth);
             Some(label(shown.text, theme.foreground))
@@ -380,7 +384,7 @@ pub fn tooltip(
             Some(lyr_core::audio::volume(data.sink.as_ref()?, &config.volume).tooltip)
         }
         Module::Mic => Some(lyr_core::audio::mic(data.source.as_ref()?, &config.mic).tooltip),
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         Module::Bluetooth => {
             Some(lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth).tooltip)
         }

@@ -956,6 +956,7 @@ dependencies = [
  "objc2-core-foundation",
  "objc2-core-wlan",
  "objc2-foundation",
+ "objc2-io-bluetooth",
  "objc2-io-kit",
  "objc2-system-configuration",
  "thiserror",
@@ -1095,6 +1096,17 @@ dependencies = [
  "bitflags",
  "block2",
  "objc2",
+]
+
+[[package]]
+name = "objc2-io-bluetooth"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "558b52e7b77f6a68e1e2cc700ff2266779ede47bacb260a33d363b9a623cc761"
+dependencies = [
+ "objc2",
+ "objc2-core-foundation",
+ "objc2-foundation",
 ]
 
 [[package]]

@@ -1,14 +1,17 @@
 //! The bluetooth module's source (`docs/plan/07-modules.md#bluetooth`).
 //!
 //! [`Tracker`] turns BlueZ's adapter and devices into the view's reading, on
-//! every platform's tests; [`linux`] reads them over D-Bus. Windows and macOS
-//! come with milestones M9 and M10.
+//! every platform's tests; [`linux`] reads them over D-Bus, and `macos`
+//! IOBluetooth's controller and devices in the same shape. Windows waits on
+//! the radios question (`docs/backlog.md`).
 
 use lyr_core::bluetooth::{Device as Shown, Reading, State};
 pub use lyr_core::bluetooth_menu::{Adapter, Device, DeviceAction, Switch};
 
 #[cfg(target_os = "linux")]
 pub mod linux;
+#[cfg(target_os = "macos")]
+pub mod macos;
 
 /// BlueZ as the bar sees it at one moment: the module's reading, and the
 /// adapter and devices the Bluetooth menu lists.
