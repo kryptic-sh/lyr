@@ -83,14 +83,19 @@ implementation follows meanwhile.
 - **The dotfiles' standalone tools** (M8). **Q:** When the dotfiles switch to
   lyr, do `wiremix` and `bluetui` stay installed, and do the `krypt menu` names
   stay as wrappers?
-- **Windows Bluetooth: build it on a machine that cannot show it?** (M9.) **Q:**
-  The development machine's Bluetooth adapter is in a PnP error state and
-  WinRT's `Radio::GetRadiosAsync` lists no radios (checked 2026-10-20), so a
-  Windows source (`Windows.Devices.Radios` for on/off/disabled, a
+- **Windows Bluetooth and Wi-Fi menu: build them on a machine that cannot show
+  them?** (M9.) **Q:** The development machine's Bluetooth adapter is in a PnP
+  error state and WinRT's `Radio::GetRadiosAsync` lists no radios at all
+  (checked 2026-10-20), Wi-Fi included: it is on Ethernet. So a Windows
+  Bluetooth source (`Windows.Devices.Radios` for on/off/disabled, a
   `DeviceWatcher` on `BluetoothDevice` and `BluetoothLEDevice`'s connected
-  selectors for the devices) could only be seen hiding the module. Build it
-  checked only that far, wait for a working adapter or dongle, or leave the
-  module out on Windows? Until then a click opens `ms-settings:bluetooth`.
+  selectors for the devices) could only be seen hiding the module, and the
+  native Wi-Fi menu (Native Wifi's `WlanScan`, `WlanGetAvailableNetworkList` and
+  `WlanConnect`, plan 10) only seen finding no interface; the network module's
+  own Wi-Fi reading (`WlanQueryInterface`) is built and equally unseen. Build
+  them checked only that far, wait for a machine or dongle with working radios,
+  or leave them out on Windows? Until then a click opens `ms-settings:bluetooth`
+  or `ms-settings:network`.
 - **Windows workspaces: native virtual desktops on an Insider build?** (M9.)
   **Q:** Plan 06's default is the undocumented `IVirtualDesktopManagerInternal`
   with a per-build IID table, refusing an unknown build. The development machine
