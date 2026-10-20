@@ -117,8 +117,39 @@ impl App {
         }
     }
 
-    /// Linux and macOS: no source lists streams or devices yet, so the menu
-    /// never opens.
-    #[cfg(not(windows))]
+    /// macOS: carries out a click in the audio menu on a device, as on
+    /// Windows; "make default" sets the default through CoreAudio. macOS
+    /// lists no streams, so their tabs never ask.
+    #[cfg(target_os = "macos")]
+    fn audio_act(&self, tab: Tab, id: String, action: Action) {
+        use lyr_core::audio_menu::Step;
+        use lyr_sources::audio::macos::{Flow, Which};
+        let flow = match tab {
+            Tab::Output | Tab::Playback => Flow::Output,
+            Tab::Input | Tab::Recording => Flow::Input,
+        };
+        let Ok(device) = id.parse::<u32>() else {
+            tracing::warn!("audio menu: `{id}` is not a CoreAudio device");
+            return;
+        };
+        let which = Which::Device(flow, device);
+        let step = if flow == Flow::Input {
+            self.config.mic.scroll_step
+        } else {
+            self.config.volume.scroll_step
+        };
+        let step = i32::try_from(step).unwrap_or(i32::MAX);
+        match action {
+            Action::Mute => self.commands.toggle_mute(which),
+            Action::Step(Step::Up) => self.commands.step_volume(which, step),
+            Action::Step(Step::Down) => self.commands.step_volume(which, -step),
+            Action::Set(percent) => self.commands.set_volume(which, percent),
+            Action::Default => self.commands.set_default(flow, device),
+        }
+    }
+
+    /// Linux: no source lists streams or devices yet, so the menu never
+    /// opens.
+    #[cfg(target_os = "linux")]
     fn audio_act(&self, _tab: Tab, _id: String, _action: Action) {}
 }

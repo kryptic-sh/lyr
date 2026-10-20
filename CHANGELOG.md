@@ -60,6 +60,10 @@ and this project adheres to
 - On macOS the Bluetooth module shows the controller's power and the last device
   to connect, from IOBluetooth, updated when the controller powers on or off or
   a device connects or disconnects. The Bluetooth menu is not built there yet.
+- On macOS the audio menu lists every output and input device with mute, a
+  volume slider and steps, and a device's Default button makes it the default
+  through CoreAudio. macOS has no per-program volume, so the Playback and
+  Recording tabs are empty.
 - Clicking a workspace switches to it, and with `workspaces.scroll = true` the
   wheel steps through them. A module's `[<module>.on]` table binds clicks and
   scrolling to a command (`{ exec = "…" }`) or a built-in action. Of the

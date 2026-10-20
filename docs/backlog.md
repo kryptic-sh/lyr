@@ -528,8 +528,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   loop under crcbl's AppKit backend runs those deliveries is assumed, not seen.
   CI's Mac has no controller, so it shows only that the module hides and the
   observers register and unregister. The Bluetooth menu answers that it is not
-  built on macOS, since its actions are BlueZ's. Not built: the audio menu and
-  the other menus on macOS.
+  built on macOS, since its actions are BlueZ's. The audio menu is built too:
+  `audio::macos::nodes` lists every device with output or input streams
+  (`kAudioHardwarePropertyDevices`, `kAudioDevicePropertyStreams`), each with
+  its volume, mute and default mark; its actions take a device
+  (`audio::macos::Which`), and Default sets
+  `kAudioHardwarePropertyDefault…Device`. The device list's changes come through
+  a system listener, and while the menu is open it reads again each second, as
+  on Windows (`MENU_REFRESH`). The stream tabs are empty, since macOS has no
+  per-program volume. No Mac has shown the menu. Not built: the Wi-Fi and
+  Bluetooth menus on macOS.
 - **Windows sources, M9.** Built: the battery (`lyr_sources::battery::windows`):
   `GetSystemPowerStatus` read at start and again whenever
   `PowerSettingRegisterNotification` reports a change of power source or

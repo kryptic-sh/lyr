@@ -216,7 +216,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             app.event(shell.as_mut(), event, instant)?;
         }
         // The source reads the streams again while the menu is open.
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         app.commands.audio_menu(app.audio_menu.is_some());
         app.draw(shell.as_mut())?;
     }

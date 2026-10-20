@@ -169,8 +169,8 @@ pub fn act(
             };
             #[cfg(target_os = "macos")]
             let which = {
-                use lyr_sources::audio::macos::Flow;
-                if input { Flow::Input } else { Flow::Output }
+                use lyr_sources::audio::macos::{Flow, Which};
+                Which::Default(if input { Flow::Input } else { Flow::Output })
             };
             match builtin {
                 Builtin::ToggleMute => commands.toggle_mute(which),

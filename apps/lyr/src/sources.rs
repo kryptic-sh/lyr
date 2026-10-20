@@ -25,7 +25,7 @@ pub enum Update {
         Option<lyr_core::audio::Source>,
     ),
     /// What the audio menu lists.
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     AudioNodes(lyr_core::audio_menu::Nodes),
     /// The foreground window.
     #[cfg(windows)]
@@ -191,7 +191,7 @@ pub struct Commands {
     #[cfg(target_os = "macos")]
     audio: std::sync::mpsc::Sender<macos::AudioRequest>,
     /// Whether the audio source was last told the menu is open.
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     audio_menu: std::cell::Cell<bool>,
     #[cfg(target_os = "linux")]
     focus: tokio::sync::mpsc::UnboundedSender<lyr_wm::Workspace>,
@@ -339,17 +339,37 @@ impl Commands {
         let _stopped = self.workspaces.send(macos::WorkspaceRequest::Refresh);
     }
 
-    /// macOS: mutes or unmutes the default device of `flow`.
+    /// macOS: mutes or unmutes what `which` names.
     #[cfg(target_os = "macos")]
-    pub fn toggle_mute(&self, flow: lyr_sources::audio::macos::Flow) {
-        let _stopped = self.audio.send(macos::AudioRequest::ToggleMute(flow));
+    pub fn toggle_mute(&self, which: lyr_sources::audio::macos::Which) {
+        let _stopped = self.audio.send(macos::AudioRequest::ToggleMute(which));
     }
 
-    /// macOS: moves the volume of the default device of `flow` by `delta`
-    /// percent.
+    /// macOS: moves the volume of what `which` names by `delta` percent.
     #[cfg(target_os = "macos")]
-    pub fn step_volume(&self, flow: lyr_sources::audio::macos::Flow, delta: i32) {
-        let _stopped = self.audio.send(macos::AudioRequest::Step(flow, delta));
+    pub fn step_volume(&self, which: lyr_sources::audio::macos::Which, delta: i32) {
+        let _stopped = self.audio.send(macos::AudioRequest::Step(which, delta));
+    }
+
+    /// macOS: sets the volume of what `which` names to `percent`.
+    #[cfg(target_os = "macos")]
+    pub fn set_volume(&self, which: lyr_sources::audio::macos::Which, percent: u32) {
+        let _stopped = self.audio.send(macos::AudioRequest::Set(which, percent));
+    }
+
+    /// macOS: makes `device` the default of `flow`.
+    #[cfg(target_os = "macos")]
+    pub fn set_default(&self, flow: lyr_sources::audio::macos::Flow, device: u32) {
+        let _stopped = self.audio.send(macos::AudioRequest::Default(flow, device));
+    }
+
+    /// macOS: tells the audio source whether the menu is open, when that
+    /// changed.
+    #[cfg(target_os = "macos")]
+    pub fn audio_menu(&self, open: bool) {
+        if self.audio_menu.replace(open) != open {
+            let _stopped = self.audio.send(macos::AudioRequest::Menu(open));
+        }
     }
 
     /// Windows and macOS: no media players are read there yet, so there is
@@ -447,12 +467,19 @@ pub fn start(
                 _network: network,
                 _power_profile: power_profile,
                 audio,
+                audio_menu: std::cell::Cell::new(false),
                 workspaces,
                 _bluetooth: bluetooth,
             },
         ))
     }
 }
+
+/// How often the open audio menu's streams and devices are read again: a
+/// stream starting or a volume other than the defaults' changing has no
+/// callback wired on Windows or macOS.
+#[cfg(any(windows, target_os = "macos"))]
+const MENU_REFRESH: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// The sources macOS has so far: the battery, the default audio devices,
 /// Low Power Mode, the network, Bluetooth and AeroSpace's workspaces.
@@ -461,24 +488,28 @@ mod macos {
     use std::sync::mpsc;
 
     use crcbl_shell::ShellWaker;
-    use lyr_sources::audio::macos::Flow;
+    use lyr_sources::audio::macos::{Flow, Which};
     use lyr_sources::battery::macos::{Watch, power_source};
 
-    use super::Update;
+    use super::{MENU_REFRESH, Update};
 
     /// What the bar asks of the audio source.
     #[derive(Debug)]
     pub(super) enum AudioRequest {
         /// Something changed: read again.
         Changed,
-        ToggleMute(Flow),
-        Step(Flow, i32),
+        /// The audio menu opened or closed.
+        Menu(bool),
+        ToggleMute(Which),
+        Step(Which, i32),
+        Set(Which, u32),
+        Default(Flow, u32),
     }
 
-    /// Hands the default output and input to the main loop now and after
-    /// every change that alters them, and carries out what the bar asks of
-    /// them, on a thread of its own. A Mac whose audio cannot be read logs
-    /// why, and the modules stay out.
+    /// Hands the default output and input, and what the audio menu lists, to
+    /// the main loop now and after every change that alters them, and
+    /// carries out what the bar asks of them, on a thread of its own. A Mac
+    /// whose audio cannot be read logs why, and the modules stay out.
     ///
     /// # Errors
     ///
@@ -507,8 +538,10 @@ mod macos {
                 // The devices the listeners are on, to move them when a
                 // default changes.
                 let mut followed = None;
+                let mut menu = false;
                 // What was last handed over, so only a change wakes the loop.
                 let mut sent = None;
+                let mut sent_nodes = None;
                 loop {
                     let sink = audio::sink()
                         .inspect_err(|error| tracing::warn!("audio: the output: {error}"))
@@ -528,6 +561,7 @@ mod macos {
                         tracing::warn!("audio: following the new device: {error}");
                     }
                     followed = devices;
+                    let mut changed = false;
                     let readings = Some((sink, source));
                     if readings != sent {
                         sent = readings;
@@ -536,20 +570,49 @@ mod macos {
                         {
                             break;
                         }
-                        if let Some(waker) = &waker {
-                            waker.wake();
+                        changed = true;
+                    }
+                    let nodes = audio::nodes()
+                        .inspect_err(|error| tracing::warn!("audio: the menu's rows: {error}"))
+                        .ok();
+                    if nodes.is_some() && nodes != sent_nodes {
+                        sent_nodes = nodes;
+                        if let Some(nodes) = sent_nodes.clone()
+                            && sender.send(Update::AudioNodes(nodes)).is_err()
+                        {
+                            break;
                         }
+                        changed = true;
+                    }
+                    if changed && let Some(waker) = &waker {
+                        waker.wake();
                     }
                     // A request changes the volume, which comes back as a
-                    // change; a run of changes reads once.
-                    let Ok(request) = incoming.recv() else {
-                        break;
+                    // change; a run of changes reads once. While the menu is
+                    // open, a quiet second reads again too.
+                    let request = if menu {
+                        match incoming.recv_timeout(MENU_REFRESH) {
+                            Ok(request) => request,
+                            Err(mpsc::RecvTimeoutError::Timeout) => AudioRequest::Changed,
+                            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                        }
+                    } else {
+                        let Ok(request) = incoming.recv() else {
+                            break;
+                        };
+                        request
                     };
                     for request in std::iter::once(request).chain(incoming.try_iter()) {
                         let done = match request {
                             AudioRequest::Changed => Ok(()),
-                            AudioRequest::ToggleMute(flow) => audio::toggle_mute(flow),
-                            AudioRequest::Step(flow, delta) => audio::step(flow, delta),
+                            AudioRequest::Menu(open) => {
+                                menu = open;
+                                Ok(())
+                            }
+                            AudioRequest::ToggleMute(which) => audio::toggle_mute(which),
+                            AudioRequest::Step(which, delta) => audio::step(which, delta),
+                            AudioRequest::Set(which, percent) => audio::set_percent(which, percent),
+                            AudioRequest::Default(flow, device) => audio::set_default(flow, device),
                         };
                         if let Err(error) = done {
                             tracing::warn!("audio: {error}");
@@ -730,7 +793,7 @@ mod windows {
     use crcbl_shell::ShellWaker;
     use lyr_sources::battery::windows::{Watch, status};
 
-    use super::Update;
+    use super::{MENU_REFRESH, Update};
 
     /// Hands the network to the main loop now and after every change, read on
     /// a thread of its own, since a WLAN callback must not call into the WLAN
@@ -785,11 +848,6 @@ mod windows {
         Step(lyr_sources::audio::windows::Which, i32),
         Set(lyr_sources::audio::windows::Which, u32),
     }
-
-    /// How often the open audio menu's streams and devices are read again: a
-    /// stream starting or a volume other than the defaults' changing has no
-    /// callback wired here.
-    const MENU_REFRESH: std::time::Duration = std::time::Duration::from_secs(1);
 
     /// Hands the default output and input, and what the audio menu lists, to
     /// the main loop now and after every change that alters them, and carries

@@ -15,13 +15,15 @@ use std::mem::size_of;
 use std::ptr::NonNull;
 
 use lyr_core::audio::{Sink, Source};
+use lyr_core::audio_menu::{Node, Nodes};
 use objc2_core_audio::{
-    AudioObjectAddPropertyListener, AudioObjectGetPropertyData, AudioObjectHasProperty,
-    AudioObjectID, AudioObjectPropertyAddress, AudioObjectPropertyElement,
+    AudioObjectAddPropertyListener, AudioObjectGetPropertyData, AudioObjectGetPropertyDataSize,
+    AudioObjectHasProperty, AudioObjectID, AudioObjectPropertyAddress, AudioObjectPropertyElement,
     AudioObjectPropertyScope, AudioObjectPropertySelector, AudioObjectRemovePropertyListener,
     AudioObjectSetPropertyData, kAudioDevicePropertyDeviceUID, kAudioDevicePropertyMute,
-    kAudioDevicePropertyTransportType, kAudioDevicePropertyVolumeScalar,
-    kAudioHardwarePropertyDefaultInputDevice, kAudioHardwarePropertyDefaultOutputDevice,
+    kAudioDevicePropertyStreams, kAudioDevicePropertyTransportType,
+    kAudioDevicePropertyVolumeScalar, kAudioHardwarePropertyDefaultInputDevice,
+    kAudioHardwarePropertyDefaultOutputDevice, kAudioHardwarePropertyDevices,
     kAudioObjectPropertyElementMain, kAudioObjectPropertyElementWildcard, kAudioObjectPropertyName,
     kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyScopeInput,
     kAudioObjectPropertyScopeOutput, kAudioObjectSystemObject, kAudioObjectUnknown,
@@ -29,7 +31,7 @@ use objc2_core_audio::{
 use objc2_core_foundation::{CFRetained, CFString};
 
 use super::coreaudio::{bluetooth, mean, port};
-use super::level::{percent, stepped};
+use super::level::{percent, scalar, stepped};
 
 /// Which way sound goes through a default device.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -267,39 +269,164 @@ pub fn source() -> io::Result<Option<Source>> {
     }))
 }
 
-/// The default device of `flow`, or an error saying there is none.
-fn required(flow: Flow) -> io::Result<AudioObjectID> {
-    default_device(flow)?.ok_or_else(|| io::Error::other(format!("no default {flow:?} device")))
+/// What an action is on: a flow's default device, or a device of the
+/// audio menu's, by its id.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Which {
+    Default(Flow),
+    Device(Flow, AudioObjectID),
 }
 
-/// Mutes the default device of `flow`, or unmutes it.
+/// The device `which` names and its flow, or an error saying there is none.
+fn target(which: Which) -> io::Result<(AudioObjectID, Flow)> {
+    match which {
+        Which::Default(flow) => default_device(flow)?
+            .map(|device| (device, flow))
+            .ok_or_else(|| io::Error::other(format!("no default {flow:?} device"))),
+        Which::Device(flow, device) => Ok((device, flow)),
+    }
+}
+
+/// Mutes what `which` names, or unmutes it.
 ///
 /// # Errors
 ///
 /// When there is no such device, it has no mute control, or it refuses.
-pub fn toggle_mute(flow: Flow) -> io::Result<()> {
-    let device = required(flow)?;
+pub fn toggle_mute(which: Which) -> io::Result<()> {
+    let (device, flow) = target(which)?;
     if !has(device, mute_address(flow)) {
-        return Err(io::Error::other(format!(
-            "the default {flow:?} device has no mute"
-        )));
+        return Err(io::Error::other(format!("the {flow:?} device has no mute")));
     }
     let muted = muted(device, flow)?;
     // SAFETY: mute is a `UInt32`.
     unsafe { set(device, mute_address(flow), u32::from(!muted), "mute") }
 }
 
-/// Moves the volume of the default device of `flow` by `delta` percent,
-/// held to 0 – 100: CoreAudio's scalar volume does not boost.
+/// Moves the volume of what `which` names by `delta` percent, held to
+/// 0 – 100: CoreAudio's scalar volume does not boost.
 ///
 /// # Errors
 ///
 /// When there is no such device, it has no volume control, or it refuses.
-pub fn step(flow: Flow, delta: i32) -> io::Result<()> {
-    let device = required(flow)?;
+pub fn step(which: Which, delta: i32) -> io::Result<()> {
+    let (device, flow) = target(which)?;
     let now = volume(device, flow)?
-        .ok_or_else(|| io::Error::other(format!("the default {flow:?} device has no volume")))?;
+        .ok_or_else(|| io::Error::other(format!("the {flow:?} device has no volume")))?;
     set_volume(device, flow, stepped(now, delta))
+}
+
+/// Sets the volume of what `which` names to `percent`, held to 100.
+///
+/// # Errors
+///
+/// When there is no such device, it has no volume control, or it refuses.
+pub fn set_percent(which: Which, percent: u32) -> io::Result<()> {
+    let (device, flow) = target(which)?;
+    set_volume(device, flow, scalar(percent))
+}
+
+/// Makes `device` the default of `flow`, as Sound settings does.
+///
+/// # Errors
+///
+/// When CoreAudio refuses.
+pub fn set_default(flow: Flow, device: AudioObjectID) -> io::Result<()> {
+    let at = address(
+        flow.default_device(),
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain,
+    );
+    // SAFETY: the default device properties are an `AudioObjectID`.
+    unsafe { set(SYSTEM, at, device, "the default device") }
+}
+
+/// The size in bytes of `object`'s property at `at`, or `None` when it has
+/// none.
+fn size(object: AudioObjectID, at: AudioObjectPropertyAddress) -> Option<u32> {
+    let mut size = 0_u32;
+    // SAFETY: `at` and `size` are live for the call.
+    let status = unsafe {
+        AudioObjectGetPropertyDataSize(
+            object,
+            NonNull::from(&at),
+            0,
+            std::ptr::null(),
+            NonNull::from(&mut size),
+        )
+    };
+    (status == 0).then_some(size)
+}
+
+/// Every audio device.
+fn devices() -> io::Result<Vec<AudioObjectID>> {
+    let at = address(
+        kAudioHardwarePropertyDevices,
+        kAudioObjectPropertyScopeGlobal,
+        kAudioObjectPropertyElementMain,
+    );
+    let mut bytes =
+        size(SYSTEM, at).ok_or_else(|| io::Error::other("CoreAudio: the devices' count"))?;
+    let mut devices =
+        vec![kAudioObjectUnknown; usize::try_from(bytes).unwrap_or(0) / size_of::<AudioObjectID>()];
+    if devices.is_empty() {
+        return Ok(devices);
+    }
+    // SAFETY: `devices` holds `bytes` bytes of `AudioObjectID`s, the
+    // property's type; a list that shrank since writes fewer, and `bytes`
+    // then says how many.
+    let status = unsafe {
+        AudioObjectGetPropertyData(
+            SYSTEM,
+            NonNull::from(&at),
+            0,
+            std::ptr::null(),
+            NonNull::from(&mut bytes),
+            NonNull::from(&mut devices[0]).cast(),
+        )
+    };
+    checked(status, "the devices")?;
+    devices.truncate(usize::try_from(bytes).unwrap_or(0) / size_of::<AudioObjectID>());
+    Ok(devices)
+}
+
+/// Whether `device` has streams going `flow`'s way.
+fn carries(device: AudioObjectID, flow: Flow) -> bool {
+    let at = address(
+        kAudioDevicePropertyStreams,
+        flow.scope(),
+        kAudioObjectPropertyElementMain,
+    );
+    size(device, at).is_some_and(|bytes| bytes > 0)
+}
+
+/// What the audio menu lists: every output and input device, the defaults
+/// marked. macOS has no per-program volume, so the stream tabs are empty.
+///
+/// # Errors
+///
+/// When CoreAudio does not answer.
+pub fn nodes() -> io::Result<Nodes> {
+    let output = default_device(Flow::Output)?;
+    let input = default_device(Flow::Input)?;
+    let mut nodes = Nodes::default();
+    for device in devices()? {
+        for (flow, default, list) in [
+            (Flow::Output, output, &mut nodes.outputs),
+            (Flow::Input, input, &mut nodes.inputs),
+        ] {
+            if !carries(device, flow) {
+                continue;
+            }
+            list.push(Node {
+                id: device.to_string(),
+                name: text(device, kAudioObjectPropertyName).unwrap_or_default(),
+                volume: volume(device, flow)?.map_or(0, percent),
+                muted: muted(device, flow)?,
+                default: default == Some(device),
+            });
+        }
+    }
+    Ok(nodes)
 }
 
 /// Sets every element the volume is read through, so the channels stay
@@ -338,15 +465,21 @@ unsafe extern "C-unwind" fn changed(
     0
 }
 
-/// The properties a watch listens to on the system object: the defaults.
-fn system_addresses() -> [AudioObjectPropertyAddress; 2] {
-    [Flow::Output, Flow::Input].map(|flow| {
+/// The properties a watch listens to on the system object: the defaults,
+/// and the device list, which the audio menu shows.
+fn system_addresses() -> [AudioObjectPropertyAddress; 3] {
+    let global = |selector| {
         address(
-            flow.default_device(),
+            selector,
             kAudioObjectPropertyScopeGlobal,
             kAudioObjectPropertyElementMain,
         )
-    })
+    };
+    [
+        global(Flow::Output.default_device()),
+        global(Flow::Input.default_device()),
+        global(kAudioHardwarePropertyDevices),
+    ]
 }
 
 /// The properties a watch listens to on a default device: its volume, on
