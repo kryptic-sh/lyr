@@ -5,8 +5,8 @@
 //! order drawn, and Escape, losing focus or the window system closing it.
 //!
 //! It is a panel rather than a popup so `lyr panel …` can open it: a
-//! Wayland popup's grab needs the serial of the input that opened it. It is
-//! recreated when its size changes, since crcbl 0.5.0 cannot resize a panel.
+//! Wayland popup's grab needs the serial of the input that opened it. It
+//! follows its content's size in place (`Shell::set_panel`).
 
 use crcbl_shell::{
     ButtonState, CloseReply, KeyCode, LogicalSize, Margins, PanelAnchor, PanelDesc, PanelKeyboard,
@@ -89,30 +89,41 @@ impl Place {
     }
 }
 
+/// The panel, `size` big at `place`: kept inside the output, so its left
+/// margin moves with its width.
+fn panel_desc(size: Size, place: Place) -> PanelDesc<'static> {
+    PanelDesc {
+        namespace: NAMESPACE,
+        monitor: None,
+        layer: PanelLayer::Overlay,
+        anchor: PanelAnchor::TOP | PanelAnchor::LEFT,
+        reserve: Reserve::None,
+        margins: Margins {
+            top: EDGE_MARGIN,
+            right: 0.0,
+            bottom: 0.0,
+            left: place.left(size),
+        },
+        keyboard: PanelKeyboard::Exclusive,
+    }
+}
+
+/// `size` as the window system's logical size.
+fn logical(size: Size) -> LogicalSize {
+    LogicalSize {
+        width: f64::from(size.width),
+        height: f64::from(size.height),
+    }
+}
+
 /// The panel's window, `size` big, at `place`.
 fn create(shell: &mut dyn Shell, size: Size, place: Place) -> anyhow::Result<WindowId> {
     Ok(shell.create_window(&WindowDesc {
         title: NAMESPACE,
         app_id: NAMESPACE,
-        size: LogicalSize {
-            width: f64::from(size.width),
-            height: f64::from(size.height),
-        },
+        size: logical(size),
         transparent: true,
-        role: WindowRole::Panel(PanelDesc {
-            namespace: NAMESPACE,
-            monitor: None,
-            layer: PanelLayer::Overlay,
-            anchor: PanelAnchor::TOP | PanelAnchor::LEFT,
-            reserve: Reserve::None,
-            margins: Margins {
-                top: EDGE_MARGIN,
-                right: 0.0,
-                bottom: 0.0,
-                left: place.left(size),
-            },
-            keyboard: PanelKeyboard::Exclusive,
-        }),
+        role: WindowRole::Panel(panel_desc(size, place)),
         ..WindowDesc::default()
     })?)
 }
@@ -210,28 +221,23 @@ impl<T: Copy> MenuPanel<T> {
     }
 
     /// Shows `list`, `size` big, with its input `regions`, keeping the
-    /// keyboard's place within them, and recreating the window if its size
-    /// changed. Returns whether it did, which turns its text input off.
+    /// keyboard's place within them, and resizing the window in place if its
+    /// size changed; the new size comes back as its next `Resized`.
     pub fn show(
         &mut self,
         shell: &mut dyn Shell,
         (list, size, regions): (DrawList, Size, Regions<T>),
-    ) -> anyhow::Result<bool> {
+    ) -> anyhow::Result<()> {
         let count = regions.targets().count();
         self.focus = self.focus.filter(|_| count > 0).map(|at| at.min(count - 1));
-        let resized = size != self.size;
-        if resized {
-            if let Some(surface) = self.surface.take() {
-                surface.destroy()?;
-            }
-            shell.destroy_window(self.window)?;
-            self.window = create(shell, size, self.place)?;
+        if size != self.size {
+            shell.set_panel(self.window, logical(size), &panel_desc(size, self.place))?;
             self.size = size;
         }
         self.list = list;
         self.regions = regions;
         self.dirty = true;
-        Ok(resized)
+        Ok(())
     }
 
     /// Applies an event for the panel's window. A menu that types takes

@@ -1,6 +1,6 @@
 use crcbl_shell::{
-    HeadlessShell, MonitorId, MonitorInfo, PanelAnchor, PhysicalRect, Reserve, Shell, ShellEvent,
-    WindowRole,
+    HeadlessShell, MonitorId, MonitorInfo, PanelAnchor, PanelLayer, PhysicalRect, Reserve, Shell,
+    ShellEvent, WindowRole,
 };
 use lyr_config::{Bar, Layer, Position};
 
@@ -44,6 +44,31 @@ fn drain(shell: &mut HeadlessShell, bars: &mut Bars, config: &Bar) {
     shell.pump(&mut |event| events.push(event));
     for event in &events {
         bars.handle(shell, config, event).expect("handled");
+    }
+}
+
+#[test]
+fn a_reshape_moves_the_bars_in_place() {
+    let mut shell = two_monitors();
+    let mut bars = Bars::default();
+    bars.sync(&mut shell, &bar(&[])).expect("sync");
+    let before: Vec<_> = bars.windows().collect();
+    let mut config = bar(&[]);
+    config.position = Position::Bottom;
+    config.layer = Layer::Overlay;
+    bars.reshape(&mut shell, &config).expect("reshaped");
+    assert_eq!(
+        bars.windows().collect::<Vec<_>>(),
+        before,
+        "the same windows"
+    );
+    for (_, window) in bars.windows() {
+        let panel = shell.panel(window).expect("live").expect("a panel");
+        assert_eq!(
+            panel.anchor,
+            PanelAnchor::BOTTOM | PanelAnchor::LEFT | PanelAnchor::RIGHT
+        );
+        assert_eq!(panel.layer, PanelLayer::Overlay);
     }
 }
 

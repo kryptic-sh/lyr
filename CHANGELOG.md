@@ -22,6 +22,9 @@ and this project adheres to
 - Each bar, menu, panel and toast presents only when the window system asks for
   its next frame (crcbl 0.7.0's frame gate), so an output the compositor has
   turned off cannot block the bar.
+- The toast stack, the menus and, on a reload that changes `[bar]`, the bars
+  change size and place in place (crcbl 0.7.0's `set_panel`) instead of closing
+  and reopening their windows.
 - On Windows the notifications module shows a bell, and either click opens
   Windows' notification centre.
 - On Windows the Wi-Fi and Bluetooth menus open the matching Settings page, from

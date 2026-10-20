@@ -249,7 +249,7 @@ impl WifiMenu {
         }
         let drawn = self.drawn(look, wifi, now);
         self.panel.show(shell, drawn)?;
-        // A recreated window, or a new header, needs its text input set.
+        // A new header needs its text input set.
         self.take_typing(shell)
     }
 

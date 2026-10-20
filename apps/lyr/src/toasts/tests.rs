@@ -118,10 +118,27 @@ fn a_second_toast_grows_the_panel_and_the_same_size_keeps_it() {
     let start = Instant::now();
     setup.notify("first", start);
     let first = setup.sync(start).expect("a panel");
+    // The panel's size, as the window system configured it; the headless
+    // shell holds a configure back for its delay's pumps, then sends it.
+    let height = |setup: &mut Setup| {
+        let mut height = None;
+        for _ in 0..=crcbl_shell::headless::DEFAULT_CONFIGURE_DELAY {
+            setup.shell.pump(&mut |event| {
+                if let ShellEvent::Resized { window, size, .. } = event
+                    && window == first
+                {
+                    height = Some(size.height);
+                }
+            });
+        }
+        height
+    };
+    let before = height(&mut setup).expect("configured");
     setup.notify("second", start);
     let grown = setup.sync(start).expect("a panel");
-    assert_ne!(first, grown, "recreated at its new size");
-    assert!(setup.shell.title(first).is_err());
+    assert_eq!(first, grown, "resized in place, not recreated");
+    let after = height(&mut setup).expect("configured again");
+    assert!(after > before, "grown from {before} to {after}");
     let id = setup.store.lock().expect("store").notify(
         Incoming {
             summary: "replaced".to_owned(),

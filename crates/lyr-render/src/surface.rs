@@ -141,6 +141,10 @@ impl Surface {
     /// When the swapchain cannot be rebuilt.
     pub fn resize(&mut self, size: (u32, u32), scale: f32) -> Result<(), Error> {
         self.scale = scale;
+        // D3D12 refuses to resize a swapchain whose back buffers frames in
+        // flight still use (seen on Windows: `ResizeBuffers` failed after a
+        // panel resized in place), and crcbl-app's resize does not wait.
+        self.presenter.drain()?;
         self.presenter.resize(size)?;
         Ok(())
     }

@@ -15,35 +15,44 @@ pub const NAMESPACE: &str = "lyr";
 /// stretched across the output and reserving its own height.
 #[must_use]
 pub fn window_desc(bar: &Bar, monitor: MonitorId) -> WindowDesc<'static> {
+    WindowDesc {
+        title: NAMESPACE,
+        app_id: NAMESPACE,
+        size: size(bar),
+        transparent: true,
+        role: WindowRole::Panel(panel_desc(bar, monitor)),
+        ..WindowDesc::default()
+    }
+}
+
+/// A bar's size: the width is the output's, since a panel anchored to both
+/// sides takes its size along that axis from the monitor, not from here.
+fn size(bar: &Bar) -> LogicalSize {
+    LogicalSize {
+        width: 0.0,
+        height: f64::from(bar.height),
+    }
+}
+
+/// The panel a bar on `monitor` is.
+fn panel_desc(bar: &Bar, monitor: MonitorId) -> PanelDesc<'static> {
     let edge = match bar.position {
         Position::Top => PanelAnchor::TOP,
         Position::Bottom => PanelAnchor::BOTTOM,
     };
-    WindowDesc {
-        title: NAMESPACE,
-        app_id: NAMESPACE,
-        // The width is the output's: a panel anchored to both sides takes its
-        // size along that axis from the monitor, not from here.
-        size: LogicalSize {
-            width: 0.0,
-            height: f64::from(bar.height),
+    PanelDesc {
+        namespace: NAMESPACE,
+        monitor: Some(monitor),
+        layer: match bar.layer {
+            Layer::Background => PanelLayer::Background,
+            Layer::Bottom => PanelLayer::Bottom,
+            Layer::Top => PanelLayer::Top,
+            Layer::Overlay => PanelLayer::Overlay,
         },
-        transparent: true,
-        role: WindowRole::Panel(PanelDesc {
-            namespace: NAMESPACE,
-            monitor: Some(monitor),
-            layer: match bar.layer {
-                Layer::Background => PanelLayer::Background,
-                Layer::Bottom => PanelLayer::Bottom,
-                Layer::Top => PanelLayer::Top,
-                Layer::Overlay => PanelLayer::Overlay,
-            },
-            anchor: edge | PanelAnchor::LEFT | PanelAnchor::RIGHT,
-            reserve: Reserve::OwnExtent,
-            margins: Margins::default(),
-            keyboard: PanelKeyboard::None,
-        }),
-        ..WindowDesc::default()
+        anchor: edge | PanelAnchor::LEFT | PanelAnchor::RIGHT,
+        reserve: Reserve::OwnExtent,
+        margins: Margins::default(),
+        keyboard: PanelKeyboard::None,
     }
 }
 
@@ -114,6 +123,21 @@ impl Bars {
             changed = true;
         }
         Ok(changed)
+    }
+
+    /// Gives every bar `bar`'s height, layer and edge in place, the window
+    /// and its surface kept: the new size comes back as each window's next
+    /// `Resized`. [`Bars::sync`] then adds or removes bars if `bar` changed
+    /// which outputs have one.
+    ///
+    /// # Errors
+    ///
+    /// When the shell refuses a change; the bars before it have changed.
+    pub fn reshape(&mut self, shell: &mut dyn Shell, bar: &Bar) -> Result<(), ShellError> {
+        for &(monitor, window) in &self.windows {
+            shell.set_panel(window, size(bar), &panel_desc(bar, monitor))?;
+        }
+        Ok(())
     }
 
     /// Applies a shell event that concerns the set of bars. Returns whether

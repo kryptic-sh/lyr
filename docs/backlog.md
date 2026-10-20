@@ -220,22 +220,19 @@ implementation follows meanwhile.
   presents (the first and one per minute tick) over 7 wake-ups. Not seen: a
   Wayland compositor holding the answer back, or an output that is off, which is
   the case this exists for (crcbl has not run it either).
-- **crcbl: changing a panel in place.** crcbl-shell 0.5.0 sets a panel's size
-  and margins only when it is created, so lyr's toast stack, whose height
-  changes with every toast, recreates its panel. Asked crcbl on 2026-10-19;
-  crcbl built `Shell::set_panel(window, size, &PanelDesc)`, on its main at
-  `0c562bb5` (reported 2026-10-20), unreleased, shipping in the next release
-  with frame pacing and `font::breaks`. It changes size, anchor, margins,
-  reserve, layer and keyboard in place: layer-surface setters and a commit on
-  Wayland (the new size arrives as the usual `Resized`), `SetWindowPos` with the
-  appbar re-registered or removed on Win32, frame and level on AppKit. Namespace
-  or monitor changes, or a non-panel window, are `InvalidDescriptor`; X11 and
-  the web are `Unsupported`, as for panels. crcbl's CI ran it on sway, a real
-  Win32 desktop (an appbar growing from 30 to 50 px and giving the edge back)
-  and macOS. Once lyr is on that release: the toast stack resizes its panel
-  instead of recreating it, so do the menus (`MenuPanel::show` recreates on a
-  size change, `Place` then a set margin), and the bar changes height on reload
-  without recreating.
+- **crcbl's `set_panel`: adopted.** crcbl 0.7.0's `Shell::set_panel` resizes a
+  panel in place, and lyr uses it where it used to recreate one: the toast stack
+  as toasts come and go (`toasts::panel_desc`), the Bluetooth, Wi-Fi and audio
+  menus as their content's size changes (`menu_panel::panel_desc`), and the bars
+  on a reload that changes `[bar]` (`Bars::reshape`, then `sync` for the
+  outputs). Tested on the headless shell, each mutation-checked: the toast panel
+  and the Bluetooth menu keep their window and are configured taller, and
+  reshaped bars keep theirs with the new anchor and layer. Run on Windows
+  (2026-10-20): a reload from a 30 px top bar to a 50 px bottom one moved it in
+  place, seen in a screenshot. That run found that D3D12 refuses `ResizeBuffers`
+  while frames in flight use the back buffers, and crcbl-app's
+  `Presenter::resize` does not wait, so the bar exited; `Surface::resize` now
+  drains first. Reported to crcbl, whose resize could drain itself.
 - **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
   the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
   S8 – S27. pikr's session tracks the move in pikr's own backlog and
@@ -515,13 +512,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   an Objective-C observer class (`define_class!`), registered on the bar's main
   thread, whose run loop IOBluetooth delivers on. That the main thread's run
   loop under crcbl's AppKit backend runs those deliveries is assumed, not seen.
-  CI's Mac has no controller, so it shows only that the module hides and the
-  observers register and unregister. The Bluetooth menu answers that it is not
-  built on macOS, since its actions are BlueZ's. The audio menu is built too:
-  `audio::macos::nodes` lists every device with output or input streams
-  (`kAudioHardwarePropertyDevices`, `kAudioDevicePropertyStreams`), each with
-  its volume, mute and default mark; its actions take a device
-  (`audio::macos::Which`), and Default sets
+  CI's Mac has a controller: its test reads it and registers and unregisters the
+  observers, and found that `objc2-io-bluetooth` 0.3.2 binds `powerState` as
+  unsigned where the runtime declares an `int`, so lyr sends that message
+  itself. The Bluetooth menu answers that it is not built on macOS, since its
+  actions are BlueZ's. The audio menu is built too: `audio::macos::nodes` lists
+  every device with output or input streams (`kAudioHardwarePropertyDevices`,
+  `kAudioDevicePropertyStreams`), each with its volume, mute and default mark;
+  its actions take a device (`audio::macos::Which`), and Default sets
   `kAudioHardwarePropertyDefault…Device`. The device list's changes come through
   a system listener, and while the menu is open it reads again each second, as
   on Windows (`MENU_REFRESH`). The stream tabs are empty, since macOS has no

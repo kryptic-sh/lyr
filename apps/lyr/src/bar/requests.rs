@@ -117,7 +117,13 @@ impl App {
                     self.text = new_text;
                 }
                 if new.bar != self.config.bar && !self.hidden {
-                    self.close_all(shell)?;
+                    // The power menu hangs from a bar that may move.
+                    if let Some(menu) = self.power_menu.take() {
+                        menu.close(shell, false)?;
+                    }
+                    self.bars
+                        .reshape(shell, &new.bar)
+                        .context("reshaping the bars")?;
                     self.bars
                         .sync(shell, &new.bar)
                         .context("creating the bars")?;

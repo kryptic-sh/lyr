@@ -106,7 +106,7 @@ fn a_click_on_a_switch_is_the_caller_s_and_escape_closes() {
 }
 
 #[test]
-fn a_refresh_keeps_the_window_unless_the_size_changes() {
+fn a_refresh_keeps_the_window_and_a_new_size_resizes_it() {
     let mut setup = setup(&[device("Buds")]);
     let first = setup.menu.panel.window();
     let renamed = [Device {
@@ -126,6 +126,7 @@ fn a_refresh_keeps_the_window_unless_the_size_changes() {
         .refresh(&mut setup.shell, &look, &adapter(), &renamed, None)
         .expect("refreshed");
     assert_eq!(setup.menu.panel.window(), first, "the same size");
+    let one = setup.menu.panel.size().height;
     setup
         .menu
         .refresh(
@@ -136,9 +137,27 @@ fn a_refresh_keeps_the_window_unless_the_size_changes() {
             None,
         )
         .expect("refreshed");
-    let second = setup.menu.panel.window();
-    assert_ne!(second, first, "taller: recreated");
-    assert!(setup.shell.title(first).is_err() && setup.shell.title(second).is_ok());
+    assert_eq!(setup.menu.panel.window(), first, "taller: the same window");
+    assert!(
+        setup.menu.panel.size().height > one,
+        "the taller size is kept"
+    );
+    // The headless shell sends the new size after its configure delay.
+    let mut height = None;
+    for _ in 0..=crcbl_shell::headless::DEFAULT_CONFIGURE_DELAY {
+        setup.shell.pump(&mut |event| {
+            if let ShellEvent::Resized { window, size, .. } = event
+                && window == first
+            {
+                height = Some(size.height);
+            }
+        });
+    }
+    let taller = height.expect("resized");
+    assert!(
+        f64::from(taller) > f64::from(one),
+        "configured {taller} px, past the one-device {one}"
+    );
 }
 
 #[test]

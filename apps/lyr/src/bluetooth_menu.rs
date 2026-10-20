@@ -186,7 +186,8 @@ impl BluetoothMenu {
             look.line_height,
             look.theme,
         );
-        if self.panel.show(shell, drawn)? || new_header {
+        self.panel.show(shell, drawn)?;
+        if new_header {
             self.take_typing(shell)?;
         }
         Ok(())

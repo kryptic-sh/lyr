@@ -4,9 +4,9 @@
 //!
 //! A click on a toast invokes its `default` action when it has one and takes
 //! the toast down; a middle click, or a click on the close button the toast
-//! under the pointer shows, dismisses the notification. The panel is
-//! recreated whenever the stack's size changes, since crcbl 0.5.0 cannot
-//! resize a panel in place.
+//! under the pointer shows, dismisses the notification. The panel follows
+//! the stack's size in place (`Shell::set_panel`), so a toast arriving or
+//! going does not flicker the others.
 
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
@@ -65,6 +65,33 @@ pub struct Toasts {
     changed: bool,
     /// When a toast's "N mins ago" next changes, so the panel is rebuilt.
     relabel_at: Option<Instant>,
+}
+
+/// The toasts' panel: an overlay at the top right of the output the user is
+/// on (the focused one on Hyprland), clear of the screen's edges.
+const fn panel_desc() -> PanelDesc<'static> {
+    PanelDesc {
+        namespace: NAMESPACE,
+        monitor: None,
+        layer: PanelLayer::Overlay,
+        anchor: PanelAnchor::TOP.union(PanelAnchor::RIGHT),
+        reserve: Reserve::None,
+        margins: Margins {
+            top: EDGE_MARGIN,
+            right: EDGE_MARGIN,
+            bottom: 0.0,
+            left: 0.0,
+        },
+        keyboard: PanelKeyboard::None,
+    }
+}
+
+/// `size` as the window system's logical size.
+fn logical(size: Size) -> crcbl_shell::LogicalSize {
+    crcbl_shell::LogicalSize {
+        width: f64::from(size.width),
+        height: f64::from(size.height),
+    }
 }
 
 impl Toasts {
@@ -151,8 +178,8 @@ impl Toasts {
             .collect()
     }
 
-    /// Brings the panel in line with the stack at `now`: rebuilt, recreated
-    /// at a new size, or closed.
+    /// Brings the panel in line with the stack at `now`: rebuilt, resized in
+    /// place, opened or closed.
     pub fn sync(
         &mut self,
         shell: &mut dyn Shell,
@@ -180,38 +207,23 @@ impl Toasts {
         if size.height == 0.0 {
             return self.close(shell);
         }
-        if let Some(panel) = &mut self.panel
-            && panel.size == size
-        {
+        if let Some(panel) = &mut self.panel {
+            // The new size comes back as the window's next `Resized`.
+            if panel.size != size {
+                shell.set_panel(panel.window, logical(size), &panel_desc())?;
+                panel.size = size;
+            }
             panel.list = list;
             panel.regions = regions;
             panel.dirty = true;
             return Ok(());
         }
-        self.close(shell)?;
         let window = shell.create_window(&WindowDesc {
             title: NAMESPACE,
             app_id: NAMESPACE,
-            size: crcbl_shell::LogicalSize {
-                width: f64::from(size.width),
-                height: f64::from(size.height),
-            },
+            size: logical(size),
             transparent: true,
-            role: WindowRole::Panel(PanelDesc {
-                namespace: NAMESPACE,
-                // Where the user is: the focused output on Hyprland.
-                monitor: None,
-                layer: PanelLayer::Overlay,
-                anchor: PanelAnchor::TOP | PanelAnchor::RIGHT,
-                reserve: Reserve::None,
-                margins: Margins {
-                    top: EDGE_MARGIN,
-                    right: EDGE_MARGIN,
-                    bottom: 0.0,
-                    left: 0.0,
-                },
-                keyboard: PanelKeyboard::None,
-            }),
+            role: WindowRole::Panel(panel_desc()),
             ..WindowDesc::default()
         })?;
         self.panel = Some(Panel {
