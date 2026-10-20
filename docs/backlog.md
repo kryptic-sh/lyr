@@ -471,31 +471,36 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `IAudioEndpointVolumeCallback` wake a COM thread of lyr's own, which also
   carries out `toggle_mute`, `volume_up` and `volume_down` (by `scroll_step`,
   held to 100 %, since Windows' endpoint volume has no boost). Run on Windows
-  (2026-10-20): the bar showed the output at 40 % and the input at 100 %. The
-  mute and volume clicks have not been run (they change this machine's real
-  volume), and a Bluetooth endpoint is not told apart (`Sink::bluetooth` is
-  false). The Wi-Fi and Bluetooth menus open Windows' Settings pages in their
-  place (`apps/lyr/src/settings.rs`, `ms-settings:network` and `:bluetooth`
-  through `cmd /C start`), from their bindings and from `lyr panel`; run on
-  Windows (2026-10-20), `lyr panel bluetooth` brought up a Settings window,
-  though which page it showed was not seen (it opened behind the terminal). The
-  audio menu is native on Windows (`lyr_core::audio_menu`,
-  `apps/lyr/src/audio_menu.rs`, `lyr_sources::audio::windows::menu`): tabs for
-  playback and recording streams (WASAPI's audio sessions on every active
-  endpoint, named by the session, else its program's file name,
-  `audio::win32::session_name`; every endpoint has a system-sounds session, so
-  those off the default endpoint are left out, and another stream there names
-  its endpoint, `stream_row`) and output and input devices, each row with mute,
-  a step down and up by the module's `scroll_step`, and on a device that is not
-  the default a Default button, which opens `ms-settings:sound` since Windows
-  has no public API for setting it. The source re-reads the rows on each
-  endpoint change and once a second while the menu is open, since session
-  changes have no callbacks wired. Run on Windows (2026-10-20):
-  `lyr panel audio` opened it listing this machine's four output devices, the
-  default in the active colour; a menu panel now stays inside its output
-  (`menu_panel::Place`, from the clicked bar's width; `lyr panel` with no bar
-  showing the module opens at the left edge), and the audio menu opened ending
-  16 px from the screen's right edge, its Playback tab clicked for real
+  (2026-10-20): the bar showed the output at 40 % and the input at 100 %. A
+  wheel step over the volume module was run (2026-10-20): it took the output
+  from 40 % to 35 %, and was set back through the audio menu. The step went down
+  for an injected forward (+120) wheel event because this machine has Windows'
+  reversed mouse scrolling on (`ReverseMouseWheelDirection` = 1 under
+  `HKCU\Control Panel\Mouse`), which Windows applies before any program sees the
+  event; lyr follows it as every other program does, so it is not a bug. The
+  mute click has not been run, since it cuts what is heard, and a Bluetooth
+  endpoint is not told apart (`Sink::bluetooth` is false). The Wi-Fi and
+  Bluetooth menus open Windows' Settings pages in their place
+  (`apps/lyr/src/settings.rs`, `ms-settings:network` and `:bluetooth` through
+  `cmd /C start`), from their bindings and from `lyr panel`; run on Windows
+  (2026-10-20), `lyr panel bluetooth` brought up a Settings window, though which
+  page it showed was not seen (it opened behind the terminal). The audio menu is
+  native on Windows (`lyr_core::audio_menu`, `apps/lyr/src/audio_menu.rs`,
+  `lyr_sources::audio::windows::menu`): tabs for playback and recording streams
+  (WASAPI's audio sessions on every active endpoint, named by the session, else
+  its program's file name, `audio::win32::session_name`; every endpoint has a
+  system-sounds session, so those off the default endpoint are left out, and
+  another stream there names its endpoint, `stream_row`) and output and input
+  devices, each row with mute, a step down and up by the module's `scroll_step`,
+  and on a device that is not the default a Default button, which opens
+  `ms-settings:sound` since Windows has no public API for setting it. The source
+  re-reads the rows on each endpoint change and once a second while the menu is
+  open, since session changes have no callbacks wired. Run on Windows
+  (2026-10-20): `lyr panel audio` opened it listing this machine's four output
+  devices, the default in the active colour; a menu panel now stays inside its
+  output (`menu_panel::Place`, from the clicked bar's width; `lyr panel` with no
+  bar showing the module opens at the left edge), and the audio menu opened
+  ending 16 px from the screen's right edge, its Playback tab clicked for real
   redrawing it there. Each control's lookup was tested by a 0 % step on every
   device and stream; on the real machine (2026-10-20) a click on the steam
   stream's step down showed 95 % and its step up 100 % again, so a click reaches
