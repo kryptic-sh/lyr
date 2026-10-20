@@ -124,7 +124,7 @@ impl Data {
             Update::Players(players) => self.players = players,
             #[cfg(target_os = "linux")]
             Update::Tray(items) => self.tray = items,
-            #[cfg(windows)]
+            #[cfg(any(windows, target_os = "macos"))]
             Update::Audio(sink, source) => {
                 self.sink = sink;
                 self.source = source;

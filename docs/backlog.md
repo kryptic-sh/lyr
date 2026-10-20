@@ -473,13 +473,23 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   battery's description turned into the reading by `battery::iops` (tested and
   mutation-checked on every platform), re-read on each
   `IOPSNotificationCreateRunLoopSource` notification on a run-loop thread of its
-  own. `objc2-io-kit` and `objc2-core-foundation` were taken under plan 02's
-  `objc2` row, read as covering the `objc2` framework crates; say so if that row
-  did not mean them. Checked by `cargo clippy` for `aarch64-apple-darwin` from
-  WSL. On CI's macOS runner, which has no battery, its test reads the power
-  sources and starts and stops the watch; no Mac with a battery has run it. Not
-  built: the other macOS sources (network, Bluetooth, volume and mic, power
-  profile) and the menus.
+  own. `objc2-io-kit`, `objc2-core-foundation` and `objc2-core-audio` were taken
+  under plan 02's `objc2` row, read as covering the `objc2` framework crates;
+  say so if that row did not mean them. Checked by `cargo clippy` for
+  `aarch64-apple-darwin` from WSL. On CI's macOS runner, which has no battery,
+  its test reads the power sources and starts and stops the watch; no Mac with a
+  battery has run it. Volume and mic are built too
+  (`lyr_sources::audio::macos`): CoreAudio's default output and input, their
+  volume (the main element's, else the mean of channels 1 and 2, set on each)
+  and mute, and the transport type's port (`audio::coreaudio`, tested and
+  mutation-checked everywhere); property listeners on the system object and on
+  the default devices, moved when a default changes, run on CoreAudio's own
+  notification thread, and their callback is leaked once per watch so a call in
+  flight after a listener goes stays valid. Cross-checked with clippy for
+  `aarch64-apple-darwin`; CI's macOS runner, whatever audio devices it has, runs
+  its read and the listeners' start, follow and stop; no Mac has played through
+  it. Not built: the other macOS sources (network, Bluetooth, power profile),
+  the audio menu and the other menus.
 - **Windows sources, M9.** Built: the battery (`lyr_sources::battery::windows`):
   `GetSystemPowerStatus` read at start and again whenever
   `PowerSettingRegisterNotification` reports a change of power source or

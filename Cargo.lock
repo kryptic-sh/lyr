@@ -950,6 +950,7 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "lyr-core",
+ "objc2-core-audio",
  "objc2-core-foundation",
  "objc2-io-kit",
  "thiserror",
@@ -1042,6 +1043,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08849bbd4767dfae9457696856ae1c84fe4e0281bbe4a7abff2d0e06fb7981f8"
 dependencies = [
  "objc2-encode",
+]
+
+[[package]]
+name = "objc2-core-audio"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1eebcea8b0dbff5f7c8504f3107c68fc061a3eb44932051c8cf8a68d969c3b2"
+dependencies = [
+ "objc2-core-foundation",
 ]
 
 [[package]]

@@ -147,11 +147,10 @@ pub fn act(
         ) => {
             return Some(builtin);
         }
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "macos"))]
         Action::Builtin(
             builtin @ (Builtin::ToggleMute | Builtin::VolumeUp | Builtin::VolumeDown),
         ) => {
-            use lyr_sources::audio::windows::{Flow, Which};
             // The mic's bindings act on the input, the volume's on the output.
             let input = matches!(
                 target,
@@ -163,7 +162,16 @@ pub fn act(
                 config.volume.scroll_step
             };
             let step = i32::try_from(step).unwrap_or(i32::MAX);
-            let which = Which::Default(if input { Flow::Input } else { Flow::Output });
+            #[cfg(windows)]
+            let which = {
+                use lyr_sources::audio::windows::{Flow, Which};
+                Which::Default(if input { Flow::Input } else { Flow::Output })
+            };
+            #[cfg(target_os = "macos")]
+            let which = {
+                use lyr_sources::audio::macos::Flow;
+                if input { Flow::Input } else { Flow::Output }
+            };
             match builtin {
                 Builtin::ToggleMute => commands.toggle_mute(which),
                 Builtin::VolumeUp => commands.step_volume(which, step),

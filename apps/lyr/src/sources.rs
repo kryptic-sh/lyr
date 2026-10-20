@@ -19,7 +19,7 @@ pub enum Update {
     /// The battery, or `None` when there is none to show.
     Battery(Option<lyr_core::battery::Reading>),
     /// The default output and input, or `None` where there is none.
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     Audio(
         Option<lyr_core::audio::Sink>,
         Option<lyr_core::audio::Source>,
@@ -177,6 +177,8 @@ pub struct Commands {
     _window: Option<lyr_sources::window::windows::Watch>,
     #[cfg(windows)]
     audio: std::sync::mpsc::Sender<windows::AudioRequest>,
+    #[cfg(target_os = "macos")]
+    audio: std::sync::mpsc::Sender<macos::AudioRequest>,
     /// Whether the audio source was last told the menu is open.
     #[cfg(windows)]
     audio_menu: std::cell::Cell<bool>,
@@ -307,6 +309,19 @@ impl Commands {
         }
     }
 
+    /// macOS: mutes or unmutes the default device of `flow`.
+    #[cfg(target_os = "macos")]
+    pub fn toggle_mute(&self, flow: lyr_sources::audio::macos::Flow) {
+        let _stopped = self.audio.send(macos::AudioRequest::ToggleMute(flow));
+    }
+
+    /// macOS: moves the volume of the default device of `flow` by `delta`
+    /// percent.
+    #[cfg(target_os = "macos")]
+    pub fn step_volume(&self, flow: lyr_sources::audio::macos::Flow, delta: i32) {
+        let _stopped = self.audio.send(macos::AudioRequest::Step(flow, delta));
+    }
+
     /// macOS: the power menu's actions are not built yet (M10).
     #[cfg(target_os = "macos")]
     pub fn power(&self, entry: lyr_core::power_menu::Entry) {
@@ -398,20 +413,123 @@ pub fn start(
     }
     #[cfg(target_os = "macos")]
     {
+        let audio = macos::audio(sender.clone(), waker.clone())?;
         let battery = macos::battery(sender, waker);
-        Ok((receiver, Commands { _battery: battery }))
+        Ok((
+            receiver,
+            Commands {
+                _battery: battery,
+                audio,
+            },
+        ))
     }
 }
 
-/// The sources macOS has so far: the battery.
+/// The sources macOS has so far: the battery and the default audio
+/// devices.
 #[cfg(target_os = "macos")]
 mod macos {
     use std::sync::mpsc;
 
     use crcbl_shell::ShellWaker;
+    use lyr_sources::audio::macos::Flow;
     use lyr_sources::battery::macos::{Watch, power_source};
 
     use super::Update;
+
+    /// What the bar asks of the audio source.
+    #[derive(Debug)]
+    pub(super) enum AudioRequest {
+        /// Something changed: read again.
+        Changed,
+        ToggleMute(Flow),
+        Step(Flow, i32),
+    }
+
+    /// Hands the default output and input to the main loop now and after
+    /// every change that alters them, and carries out what the bar asks of
+    /// them, on a thread of its own. A Mac whose audio cannot be read logs
+    /// why, and the modules stay out.
+    ///
+    /// # Errors
+    ///
+    /// When the thread cannot start.
+    pub(super) fn audio(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+    ) -> std::io::Result<mpsc::Sender<AudioRequest>> {
+        use lyr_sources::audio::macos::{self as audio, Watch};
+        let (requests, incoming) = mpsc::channel();
+        let changes = requests.clone();
+        std::thread::Builder::new()
+            .name("lyr audio".to_owned())
+            .spawn(move || {
+                let watch = Watch::new(move || {
+                    // The thread has gone when this fails: nothing to tell.
+                    let _gone = changes.send(AudioRequest::Changed);
+                });
+                let mut watch = match watch {
+                    Ok(watch) => Some(watch),
+                    Err(error) => {
+                        tracing::warn!("audio: changes will not show: {error}");
+                        None
+                    }
+                };
+                // The devices the listeners are on, to move them when a
+                // default changes.
+                let mut followed = None;
+                // What was last handed over, so only a change wakes the loop.
+                let mut sent = None;
+                loop {
+                    let sink = audio::sink()
+                        .inspect_err(|error| tracing::warn!("audio: the output: {error}"))
+                        .ok()
+                        .flatten();
+                    let source = audio::source()
+                        .inspect_err(|error| tracing::warn!("audio: the input: {error}"))
+                        .ok()
+                        .flatten();
+                    let devices = sink
+                        .as_ref()
+                        .map(|sink| (sink.name.clone(), sink.source_name.clone()));
+                    if devices != followed
+                        && let Some(watch) = &mut watch
+                        && let Err(error) = watch.follow()
+                    {
+                        tracing::warn!("audio: following the new device: {error}");
+                    }
+                    followed = devices;
+                    let readings = Some((sink, source));
+                    if readings != sent {
+                        sent = readings;
+                        if let Some((sink, source)) = sent.clone()
+                            && sender.send(Update::Audio(sink, source)).is_err()
+                        {
+                            break;
+                        }
+                        if let Some(waker) = &waker {
+                            waker.wake();
+                        }
+                    }
+                    // A request changes the volume, which comes back as a
+                    // change; a run of changes reads once.
+                    let Ok(request) = incoming.recv() else {
+                        break;
+                    };
+                    for request in std::iter::once(request).chain(incoming.try_iter()) {
+                        let done = match request {
+                            AudioRequest::Changed => Ok(()),
+                            AudioRequest::ToggleMute(flow) => audio::toggle_mute(flow),
+                            AudioRequest::Step(flow, delta) => audio::step(flow, delta),
+                        };
+                        if let Err(error) = done {
+                            tracing::warn!("audio: {error}");
+                        }
+                    }
+                }
+            })?;
+        Ok(requests)
+    }
 
     /// Hands the battery to the main loop now and after every power source
     /// change, while the returned watch lives. `None` when IOKit gives no
