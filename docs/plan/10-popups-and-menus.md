@@ -229,11 +229,12 @@ It replaces bluetui in a floating terminal, over BlueZ's D-Bus API
 
 The list matches bluetui 0.8.2's documented actions (its README and default key
 bindings, read 2026-10-18): adapter power, pairing and discovery, a scan toggle,
-and for paired devices unpair, trust, favourite and rename. Its source (master
-`ff92b24`, read 2026-10-19) renames a paired device by setting its alias from a
-text field, and keeps favourites as addresses in a file of its own, sorted first
-among paired devices; where lyr would keep them is open
-([backlog](../backlog.md)).
+and for paired devices unpair, trust, favourite and rename. The same list is the
+key configuration in its source at v0.8.2 (`src/config.rs`, `e4d30d3`, read
+2026-10-20). Its source (master `ff92b24`, read 2026-10-19) renames a paired
+device by setting its alias from a text field, and keeps favourites as addresses
+in a file of its own, sorted first among paired devices; where lyr would keep
+them is open ([backlog](../backlog.md)).
 
 ## Audio menu
 
@@ -257,7 +258,12 @@ connection as the volume module ([07](07-modules.md#audio-sources)).
 
 This matches wiremix 0.11.0's documented features (its README, read 2026-10-18):
 volume, mute, set default, routing a stream through a dropdown, ports and
-profiles, and the five tabs. Its source was not read.
+profiles, and the five tabs. Its source at v0.11.0 (`9f113c1`, read 2026-10-20)
+agrees: the five tabs are `TabKind` in `src/config.rs`, `--tab` picks the first,
+and `max_volume_percent` defaults to 150 as the sliders' full scale, with
+`enforce_max_volume` off, so stepping past it is allowed. wiremix speaks
+PipeWire itself (the `pipewire` crate), where lyr's menu would go through the
+PulseAudio protocol, which PipeWire serves through `pipewire-pulse`.
 
 ## Windows and macOS
 

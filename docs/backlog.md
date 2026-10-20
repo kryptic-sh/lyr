@@ -649,8 +649,7 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 - **Native notification centre and menus, not yet researched**
   ([plan/09](plan/09-notifications.md), [plan/10](plan/10-popups-and-menus.md)).
   Written from memory and the dotfiles, with each item to read when its
-  milestone starts: bluetui's and wiremix's source, beyond the READMEs plan 10
-  now follows (M7); the Windows Wi-Fi and Bluetooth menu APIs (M9; the audio
+  milestone starts: the Windows Wi-Fi and Bluetooth menu APIs (M9; the audio
   menu's WASAPI calls were read in `windows` 0.62.2 and are built) and macOS's
   (M10).
 - **Power menu, M5.** Built: the Linux actions
