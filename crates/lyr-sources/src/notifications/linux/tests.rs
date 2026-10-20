@@ -303,3 +303,45 @@ async fn lyr_s_own_notice_reaches_the_daemon() {
     assert_eq!(held.content.summary, "Wi-Fi");
     assert_eq!(held.content.body, "a &amp; b");
 }
+
+fn fresh_daemon() -> Daemon {
+    let (sender, _changes) = mpsc::unbounded_channel();
+    Daemon {
+        store: Arc::new(Mutex::new(Store::default())),
+        changes: sender,
+    }
+}
+
+#[tokio::test]
+async fn a_name_another_daemon_holds_is_left_to_it_and_named() {
+    let bus = crate::bus::test::Bus::start();
+    let theirs = bus.connect().await;
+    let ours = bus.connect().await;
+    super::serve(&theirs, fresh_daemon(), false)
+        .await
+        .expect("the first daemon takes the name");
+
+    let refused = super::serve(&ours, fresh_daemon(), false).await;
+    let Err(super::ServeError::Owned { owner, pid }) = refused else {
+        panic!("expected the name to be owned, got {refused:?}");
+    };
+    assert_eq!(owner, theirs.unique_name().expect("a bus name").as_str());
+    assert_eq!(pid, Some(std::process::id()));
+    // lyr took its object down again.
+    let interface = ours.object_server().interface::<_, Daemon>(PATH).await;
+    assert!(interface.is_err());
+}
+
+#[tokio::test]
+async fn replacing_takes_the_name_from_the_daemon_holding_it() {
+    let bus = crate::bus::test::Bus::start();
+    let theirs = bus.connect().await;
+    let ours = bus.connect().await;
+    super::serve(&theirs, fresh_daemon(), false)
+        .await
+        .expect("the first daemon takes the name");
+
+    super::serve(&ours, fresh_daemon(), true)
+        .await
+        .expect("replacing takes the name");
+}

@@ -12,7 +12,7 @@ use std::time::Instant;
 
 use lyr_core::notifications::{CloseReason, Expiry, Incoming, Store, Urgency};
 use tokio::sync::mpsc::UnboundedSender;
-use zbus::fdo::{DBusProxy, RequestNameFlags, RequestNameReply};
+use zbus::fdo::{DBusProxy, RequestNameFlags};
 use zbus::names::BusName;
 use zbus::object_server::SignalEmitter;
 use zbus::{Connection, OwnedVariant};
@@ -185,23 +185,21 @@ pub async fn serve(
     if replace {
         flags |= RequestNameFlags::REPLACE_EXISTING;
     }
-    match connection.request_name_with_flags(NAME, flags).await? {
-        RequestNameReply::PrimaryOwner | RequestNameReply::AlreadyOwner => Ok(served),
-        RequestNameReply::InQueue | RequestNameReply::Exists => {
-            connection.object_server().remove::<Daemon, _>(PATH).await?;
-            let dbus = DBusProxy::new(connection).await?;
-            let name = BusName::try_from(NAME)?;
-            let owner = dbus.get_name_owner(name).await.map_err(zbus::Error::from)?;
-            let pid = dbus
-                .get_connection_unix_process_id(owner.clone().into())
-                .await
-                .ok();
-            Err(ServeError::Owned {
-                owner: owner.to_string(),
-                pid,
-            })
-        }
+    if crate::bus::claim(connection, NAME, flags).await? {
+        return Ok(served);
     }
+    connection.object_server().remove::<Daemon, _>(PATH).await?;
+    let dbus = DBusProxy::new(connection).await?;
+    let name = BusName::try_from(NAME)?;
+    let owner = dbus.get_name_owner(name).await.map_err(zbus::Error::from)?;
+    let pid = dbus
+        .get_connection_unix_process_id(owner.clone().into())
+        .await
+        .ok();
+    Err(ServeError::Owned {
+        owner: owner.to_string(),
+        pid,
+    })
 }
 
 /// [`serve`] on the session bus.

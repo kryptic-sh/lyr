@@ -430,10 +430,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   peer-to-peer connection. Claiming the name is `notifications::linux::serve`:
   `DO_NOT_QUEUE`, so a name another daemon holds comes back as `Exists` and lyr
   takes its object down and names the owner and its pid, or `REPLACE_EXISTING`
-  when told to replace; it allows being replaced in turn. Not run against a real
-  bus (the tests use peer-to-peer connections, which have no names).
-  `Served::close` and `Served::invoke` are lyr's side, with their signals (an
-  invoked action closes a notification that is not `resident`), tested and
+  when told to replace; it allows being replaced in turn. Claiming is tested on
+  a private `dbus-daemon` (`lyr_sources::bus::test::Bus`), since zbus 6 reports
+  a taken name as `Error::NameTaken` on a bus and never as `Exists`, which the
+  peer-to-peer tests could not show (`bus::claim` handles both). On the owner's
+  Hyprland (2026-10-20) lyr named swaync (`:1.6`, its pid) and left the name to
+  it. `Served::close` and `Served::invoke` are lyr's side, with their signals
+  (an invoked action closes a notification that is not `resident`), tested and
   mutation-checked. The toast stack is `lyr_core::toast::stack::Stack` (newest
   on top, timeouts paused under the pointer) and a toast's draw list
   `lyr_core::toast` (swaync's look with the `toast_*` theme keys, its body
@@ -930,8 +933,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   with `GetAll` (one that does not answer is named in `Listing::unreadable`),
   re-reads on the watcher's or any item's signal, and sends `Activate`,
   `SecondaryActivate`, `ContextMenu` and `Scroll`. Tested against a fake item on
-  a peer-to-peer connection and mutation-checked; `follow_names` and
-  `Host::register` need a bus and are untested. DBusMenu is read too
+  a peer-to-peer connection and mutation-checked; `serve` leaving the name to
+  another watcher is tested on a private `dbus-daemon`; `follow_names` and
+  `Host::register` are not. Run on the owner's Hyprland next to waybar's watcher
+  (2026-10-20): Steam, Discord and Teams showed as letters, Spotify (passive)
+  hidden. lyr draws items in the watcher's order; waybar 0.15.0 draws each as
+  its properties finish loading (`Tray::onAdd`'s `pack_start`), so its order is
+  whichever item answers first and can differ from lyr's. Not a bug; master's
+  `Tray::reorderBox` sorts by a configured order. DBusMenu is read too
   (`Host::menu`: `AboutToShow`, then the whole `GetLayout`, into
   `lyr_core::tray::menu::Entry` with the interface's defaults, access-key
   underscores taken out, separators and toggles; `Host::menu_clicked` sends
@@ -1070,9 +1079,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Not yet verified
 
-- Nothing has run on Linux under a real compositor: everything Wayland, D-Bus
-  and Hyprland is tested against fakes and crcbl's headless shell, so the
-  owner's Hyprland is the first real run (M1's check).
+- First run on the owner's Hyprland 0.56.2 (Arch, 2026-10-20, Intel RPL-U GPU,
+  one 2560 × 1440 output, next to the running waybar): the layer panel reserved
+  its 50 px under waybar's, and drew the power button, battery, power profile,
+  network, Bluetooth, the workspaces (matching waybar's, the active one
+  coloured) and the clock, as a screenshot showed. Not yet exercised there:
+  clicks, tooltips, menus, toasts (swaync holds the name), and the idle counts
+  with `--stats`.
 - The sway backend runs against a real sway only in CI's `sway e2e` job
   (headless, two outputs; first green 2026-10-20, run 39371299842): the first
   state with a workspace on each output, a switch to a name with a space and a

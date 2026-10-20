@@ -539,3 +539,18 @@ async fn an_item_without_its_menu_is_an_error() {
     let host = Host::on(&running.client).await.expect("host");
     assert!(host.menu(BUS, "/MenuBar").await.is_err());
 }
+
+#[tokio::test]
+async fn a_watcher_another_process_has_is_left_to_it() {
+    let bus = crate::bus::test::Bus::start();
+    let theirs = bus.connect().await;
+    let ours = bus.connect().await;
+
+    assert!(super::serve(&theirs).await.expect("served").is_some());
+    assert!(
+        super::serve(&ours)
+            .await
+            .expect("left to the other")
+            .is_none()
+    );
+}

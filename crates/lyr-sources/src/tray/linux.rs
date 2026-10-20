@@ -15,7 +15,7 @@ use futures_util::stream::select;
 use lyr_core::tray::menu::{self, Entry};
 use lyr_core::tray::{Item, Registry, Status, item_address};
 use tokio::sync::watch;
-use zbus::fdo::{DBusProxy, PropertiesProxy, RequestNameFlags, RequestNameReply};
+use zbus::fdo::{DBusProxy, PropertiesProxy, RequestNameFlags};
 use zbus::message::{Header, Type};
 use zbus::names::{BusName, InterfaceName};
 use zbus::object_server::SignalEmitter;
@@ -216,19 +216,14 @@ impl Served {
 /// When the bus does not answer.
 pub async fn serve(connection: &Connection) -> zbus::Result<Option<Served>> {
     let served = Served::at(connection).await?;
-    match connection
-        .request_name_with_flags(WATCHER, RequestNameFlags::DO_NOT_QUEUE)
-        .await?
-    {
-        RequestNameReply::PrimaryOwner | RequestNameReply::AlreadyOwner => Ok(Some(served)),
-        RequestNameReply::InQueue | RequestNameReply::Exists => {
-            connection
-                .object_server()
-                .remove::<Watcher, _>(WATCHER_PATH)
-                .await?;
-            Ok(None)
-        }
+    if crate::bus::claim(connection, WATCHER, RequestNameFlags::DO_NOT_QUEUE).await? {
+        return Ok(Some(served));
     }
+    connection
+        .object_server()
+        .remove::<Watcher, _>(WATCHER_PATH)
+        .await?;
+    Ok(None)
 }
 
 /// The tray on the session bus: lyr's watcher when no other process has

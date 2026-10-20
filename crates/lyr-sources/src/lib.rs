@@ -19,6 +19,8 @@
 pub mod audio;
 pub mod battery;
 pub mod bluetooth;
+#[cfg(target_os = "linux")]
+mod bus;
 pub mod clock;
 pub mod locale;
 #[cfg(target_os = "macos")]
