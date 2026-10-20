@@ -22,6 +22,7 @@ fn node(name: &str, default: bool) -> Node {
         volume: 50,
         muted: false,
         default,
+        device: None,
     }
 }
 
@@ -38,6 +39,8 @@ struct Setup {
     shell: HeadlessShell,
     theme: Theme,
     menu: AudioMenu,
+    /// What the menu was last given to show.
+    nodes: Nodes,
 }
 
 impl Setup {
@@ -45,7 +48,7 @@ impl Setup {
     /// the last outcome of the events that queued, sizing ones left out
     /// (they open a GPU surface).
     fn click(&mut self, tab: Tab, target: Target) -> Outcome {
-        let (_, _, regions) = audio_menu::draw(&nodes(), tab, None, &measure, LINE, &self.theme);
+        let (_, _, regions) = audio_menu::draw(&self.nodes, tab, None, &measure, LINE, &self.theme);
         let rect = regions.rect(&target).expect("drawn");
         let at = PhysicalPoint {
             x: f64::from(rect.x + rect.width / 2.0),
@@ -86,7 +89,7 @@ impl Setup {
             calendar_line_height: LINE,
         };
         self.menu
-            .refresh(&mut self.shell, &look, &nodes())
+            .refresh(&mut self.shell, &look, &self.nodes)
             .expect("refreshed");
     }
 }
@@ -104,7 +107,12 @@ fn setup(tab: Tab) -> Setup {
         calendar_line_height: LINE,
     };
     let menu = AudioMenu::open(&mut shell, Place::EDGE, &look, &nodes(), tab).expect("opened");
-    Setup { shell, theme, menu }
+    Setup {
+        shell,
+        theme,
+        menu,
+        nodes: nodes(),
+    }
 }
 
 #[test]
@@ -235,4 +243,17 @@ fn a_drag_from_a_button_does_not_press_it_again() {
         .move_pointer(window, PhysicalPoint { x: 20.0, y: 20.0 }, (0.0, 0.0))
         .expect("moved");
     assert_eq!(setup.pump(), Outcome::Kept);
+}
+
+#[test]
+fn a_click_on_a_stream_s_device_routes_it() {
+    let mut setup = setup(Tab::Playback);
+    let mut moving = nodes();
+    moving.playback[0].device = Some("speakers".to_owned());
+    setup.nodes = moving;
+    setup.refresh();
+    assert_eq!(
+        setup.click(Tab::Playback, Target::Route(0)),
+        Outcome::Act(Tab::Playback, "firefox".to_owned(), Action::Route)
+    );
 }

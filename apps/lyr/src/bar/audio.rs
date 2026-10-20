@@ -114,6 +114,8 @@ impl App {
             Action::Step(Step::Down) => self.commands.step_volume(which, -step),
             Action::Set(percent) => self.commands.set_volume(which, percent),
             Action::Default => crate::settings::open(crate::settings::Page::Sound),
+            // Its streams carry no device, so the menu draws no route.
+            Action::Route => {}
         }
     }
 
@@ -145,7 +147,30 @@ impl App {
             Action::Step(Step::Down) => self.commands.step_volume(which, -step),
             Action::Set(percent) => self.commands.set_volume(which, percent),
             Action::Default => self.commands.set_default(flow, device),
+            // Its streams carry no device, so the menu draws no route.
+            Action::Route => {}
         }
+    }
+
+    /// Linux: the device after the one the stream `id` on `tab` plays on,
+    /// among its flow's, wrapping; `None` when there is no other.
+    #[cfg(target_os = "linux")]
+    fn next_device(&self, tab: Tab, id: &str) -> Option<String> {
+        let nodes = self.data.audio_nodes.as_ref()?;
+        let current = nodes
+            .of(tab)
+            .iter()
+            .find(|node| node.id == id)?
+            .device
+            .as_deref()?;
+        let devices = match tab {
+            Tab::Playback => &nodes.outputs,
+            Tab::Recording => &nodes.inputs,
+            Tab::Output | Tab::Input => return None,
+        };
+        let at = devices.iter().position(|device| device.id == current)?;
+        let next = &devices.get(at + 1).unwrap_or(&devices[0]).id;
+        (next != current).then(|| next.clone())
     }
 
     /// Linux: carries out a click in the audio menu on a stream or device,
@@ -181,6 +206,14 @@ impl App {
             Action::Step(Step::Down) => self.commands.step_volume(target, -step),
             Action::Set(percent) => self.commands.set_volume(target, percent),
             Action::Default => self.commands.set_default(flow, id),
+            Action::Route => {
+                let Target::Stream(_, index) = target else {
+                    return;
+                };
+                if let Some(next) = self.next_device(tab, &id) {
+                    self.commands.move_stream(flow, index, next);
+                }
+            }
         }
     }
 }

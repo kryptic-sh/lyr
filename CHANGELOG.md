@@ -42,9 +42,9 @@ and this project adheres to
   100 %, as the dotfiles' `pactl … +5%` bindings did.
 - On Linux the audio menu lists the playing and recording streams and the output
   and input devices through `pactl`, each with mute, a slider to 150 %
-  (wiremix's scale) and steps, and a device's Default button makes it the
-  default; a right click on the volume or mic module, or `lyr panel audio`,
-  opens it.
+  (wiremix's scale) and steps, a device's Default button makes it the default,
+  and a stream's device button moves it to the next device; a right click on the
+  volume or mic module, or `lyr panel audio`, opens it.
 - On Windows the volume and mic modules show the default output and input, their
   level and mute, updated as they change, and their click and scroll bindings
   mute and step them; an output on Bluetooth (by its device's bus) takes the

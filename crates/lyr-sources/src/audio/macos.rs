@@ -423,6 +423,7 @@ pub fn nodes() -> io::Result<Nodes> {
                 volume: volume(device, flow)?.map_or(0, percent),
                 muted: muted(device, flow)?,
                 default: default == Some(device),
+                device: None,
             });
         }
     }

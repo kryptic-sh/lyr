@@ -24,8 +24,16 @@ implementation follows meanwhile.
   a silent `pacat` stream on Playback, which a keyboard Enter on its Mute muted
   (read back with `pactl`). Its sliders run to 150 % on Linux
   (`audio_menu::MAX_PERCENT`, wiremix's scale; 100 % on Windows and macOS, where
-  the endpoints stop). Not built: moving a stream to another device
-  (`move-sink-input`) and wiremix's card tab. Keep `pactl`, or take
+  the endpoints stop). A stream's row names the device it plays on or records
+  from as a button, and a click moves it to the next device of its flow,
+  wrapping (`move-sink-input`, `move-source-output`), where plan 10 has
+  wiremix's dropdown; seen in a nested Hyprland (2026-10-20), a keyboard Enter
+  moved a silent `pacat` stream from the headset to HDMI 3, read back with
+  `pactl`. Windows has no public API for it, so its streams carry no device and
+  draw no button. Not built: wiremix's card tab, and the dropdown. Worth
+  knowing: PipeWire's stream-restore remembers a stream's mute and device per
+  application, so a test that mutes or moves a probe stream changes what that
+  application next starts with; the probe's were put back. Keep `pactl`, or take
   `libpulse-binding` (plan 07's default: one connection, no processes) or native
   PipeWire with WirePlumber metadata?
 - **Network without NetworkManager: build the rtnetlink fallback?** (M4.) **Q:**

@@ -100,7 +100,7 @@ fn a_step_is_relative_with_no_ceiling() {
 
 /// `pactl --format=json list sink-inputs` with one stream, as `pacat`
 /// playing silence showed it on the owner's machine (2026-10-20).
-const SINK_INPUTS: &str = r#"[{"index":1469,"driver":"PipeWire","sink":731,"mute":false,
+const SINK_INPUTS: &str = r#"[{"index":1469,"driver":"PipeWire","sink":71,"mute":false,
     "corked":false,"volume":{"front-left":{"value":65536},"front-right":{"value":32768}},
     "properties":{"application.name":"lyr-probe","media.name":"silence",
                   "application.process.binary":"pacat"}}]"#;
@@ -114,6 +114,11 @@ fn the_menu_lists_streams_and_devices_without_monitors() {
     assert_eq!(stream.id, "1469");
     assert_eq!(stream.name, "lyr-probe", "its application");
     assert_eq!(stream.volume, 75, "the channels' mean");
+    assert_eq!(
+        stream.device.as_deref(),
+        Some("alsa_output.usb-SteelSeries_Arctis_Nova_7-00.analog-stereo"),
+        "the sink it plays to, by name"
+    );
     assert!(!stream.default);
     assert!(listed.recording.is_empty());
     assert_eq!(listed.outputs.len(), 2);
@@ -136,6 +141,7 @@ fn a_stream_with_no_names_is_named_by_index() {
     let unnamed = r#"[{"index":9,"mute":true,"volume":{"mono":{"value":0}},"properties":{}}]"#;
     let listed = nodes(INFO, SINKS, SOURCES, "[]", unnamed).expect("read");
     assert_eq!(listed.recording[0].name, "Stream 9");
+    assert_eq!(listed.recording[0].device, None, "no source named");
 }
 
 #[test]

@@ -70,6 +70,7 @@ impl Audio {
                     name: name(device),
                     volume,
                     muted,
+                    device: None,
                 })
             })
             .collect()
@@ -137,6 +138,8 @@ impl Audio {
                     volume,
                     muted,
                     default: false,
+                    // No public API moves a session to another endpoint.
+                    device: None,
                 })
             })
             .collect()

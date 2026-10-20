@@ -131,6 +131,8 @@ pub enum AudioRequest {
     Set(lyr_sources::audio::pactl::Target, u32),
     /// Make the device with this name the flow's default.
     Default(lyr_sources::audio::pactl::Flow, String),
+    /// Move the stream with this index to the device with this name.
+    Move(lyr_sources::audio::pactl::Flow, u32, String),
     /// The audio menu opened or closed.
     Menu(bool),
 }
@@ -290,6 +292,11 @@ impl Commands {
     /// Sets the volume of `target` to `percent`.
     pub fn set_volume(&self, target: lyr_sources::audio::pactl::Target, percent: u32) {
         let _stopped = self.audio.send(AudioRequest::Set(target, percent));
+    }
+
+    /// Moves the stream `index` of `flow` to the device `name`.
+    pub fn move_stream(&self, flow: lyr_sources::audio::pactl::Flow, index: u32, name: String) {
+        let _stopped = self.audio.send(AudioRequest::Move(flow, index, name));
     }
 
     /// Makes the device `name` the default for `flow`.
@@ -1252,6 +1259,9 @@ mod linux {
                     AudioRequest::Step(target, delta) => pactl::step(&target, delta).await,
                     AudioRequest::Set(target, percent) => pactl::set(&target, percent).await,
                     AudioRequest::Default(flow, name) => pactl::make_default(flow, &name).await,
+                    AudioRequest::Move(flow, index, name) => {
+                        pactl::move_stream(flow, index, &name).await
+                    }
                     AudioRequest::Menu(open) => {
                         menu.store(open, Ordering::Relaxed);
                         if open {

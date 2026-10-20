@@ -32,6 +32,8 @@ pub enum Action {
     Set(u32),
     /// Make the device the default.
     Default,
+    /// Move the stream to the next device of its flow.
+    Route,
 }
 
 /// What an event did to the menu.
@@ -130,6 +132,7 @@ impl AudioMenu {
             Target::Mute(index) => (index, Action::Mute),
             Target::Step(index, step) => (index, Action::Step(step)),
             Target::Default(index) => (index, Action::Default),
+            Target::Route(index) => (index, Action::Route),
             Target::Level(index) => match self.panel.picked_across(&target) {
                 Some(across) => (index, Action::Set(level_at(across))),
                 None => return Outcome::Kept,

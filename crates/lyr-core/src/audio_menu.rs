@@ -1,7 +1,8 @@
 //! The audio menu (`docs/plan/10-popups-and-menus.md#audio-menu`): the
 //! playback and recording streams and the output and input devices, a tab
 //! each, every row with its mute, its volume as a slider stepped down and up,
-//! and on a device "make default". The platforms' sources fill it in
+//! on a device "make default", and on a stream that can move the device it
+//! plays on, which a click moves on to the next. The platforms' sources fill it in
 //! (`lyr_sources::audio`). wiremix's fifth tab, card configuration, waits on
 //! a source that has cards (Linux).
 
@@ -63,6 +64,10 @@ pub struct Node {
     pub muted: bool,
     /// The default device; never set on a stream.
     pub default: bool,
+    /// The device a stream plays to or records from, by its id, where the
+    /// source can move it to another; `None` on a device, and on a stream
+    /// that cannot move.
+    pub device: Option<String>,
 }
 
 /// Everything the menu lists, a list per tab.
@@ -105,6 +110,8 @@ pub enum Target {
     Level(usize),
     /// A device's "make default" button.
     Default(usize),
+    /// A stream's device: a click moves it to the next of its flow.
+    Route(usize),
 }
 
 /// The step buttons' labels.
@@ -126,6 +133,18 @@ pub const MAX_PERCENT: u32 = if cfg!(target_os = "linux") { 150 } else { 100 };
 pub fn level_at(across: f32) -> u32 {
     // `across` is 0 – 1, so the product is in range and `as` cannot wrap.
     (across.clamp(0.0, 1.0) * MAX_PERCENT as f32).round() as u32
+}
+
+/// The name `node`'s device goes by among `devices`, or its id when they
+/// do not list it; `None` for a node with no device.
+fn device_name<'a>(node: &'a Node, devices: &'a [Node]) -> Option<&'a str> {
+    let id = node.device.as_deref()?;
+    Some(
+        devices
+            .iter()
+            .find(|device| device.id == id)
+            .map_or(id, |device| device.name.as_str()),
+    )
 }
 
 /// A slider filling `rect` at `volume` percent: its track, and its level
@@ -204,6 +223,18 @@ pub fn draw(
         } else {
             0.0
         };
+    // A stream's device by its name, as its flow's tab lists it.
+    let devices = match tab {
+        Tab::Playback => &nodes.outputs[..],
+        Tab::Recording => &nodes.inputs[..],
+        Tab::Output | Tab::Input => &[],
+    };
+    let route_width = rows
+        .iter()
+        .filter_map(|node| device_name(node, devices))
+        .map(|name| GAP + button_width(name))
+        .fold(0.0, f32::max);
+    let controls_width = controls_width + route_width;
     let width = 2.0 * PADDING + tabs_width.max(name_width + GAP + controls_width);
     let mut items = Vec::new();
     let mut regions = Regions::default();
@@ -297,6 +328,9 @@ pub fn draw(
                 MAKE_DEFAULT,
                 Target::Default(index),
             );
+        }
+        if let Some(name) = device_name(node, devices) {
+            button(&mut items, &mut regions, x, y, name, Target::Route(index));
         }
         y += row + GAP;
     }

@@ -97,6 +97,8 @@ struct Channel {
 /// A sink or a source, as `pactl --format=json list` writes it.
 #[derive(Deserialize)]
 struct Device {
+    /// What a stream names it by; only the menu needs it.
+    index: Option<u32>,
     name: String,
     description: String,
     mute: bool,
@@ -169,6 +171,10 @@ pub fn reading(info: &str, sinks: &str, sources: &str) -> serde_json::Result<Rea
 #[derive(Deserialize)]
 struct Stream {
     index: u32,
+    /// The index of the sink a sink input plays to, or of the source a
+    /// source output records from.
+    #[serde(alias = "source")]
+    sink: Option<u32>,
     mute: bool,
     volume: HashMap<String, Channel>,
     #[serde(default)]
@@ -189,13 +195,15 @@ impl Stream {
         .map_or_else(|| format!("Stream {}", self.index), str::to_owned)
     }
 
-    fn node(&self) -> Node {
+    /// Its row, its device named by `name_of` from the device's index.
+    fn node(&self, name_of: impl Fn(u32) -> Option<String>) -> Node {
         Node {
             id: self.index.to_string(),
             name: self.name(),
             volume: percent(&self.volume),
             muted: self.mute,
             default: false,
+            device: self.sink.and_then(name_of),
         }
     }
 }
@@ -225,9 +233,10 @@ pub fn nodes(
     source_outputs: &str,
 ) -> serde_json::Result<Nodes> {
     let info: Info = serde_json::from_str(info)?;
-    let devices = |text: &str, default: &str| -> serde_json::Result<Vec<Node>> {
-        let devices: Vec<Device> = serde_json::from_str(text)?;
-        Ok(devices
+    let sinks: Vec<Device> = serde_json::from_str(sinks)?;
+    let sources: Vec<Device> = serde_json::from_str(sources)?;
+    let devices = |devices: &[Device], default: &str| -> Vec<Node> {
+        devices
             .iter()
             .filter(|device| !monitor(device))
             .map(|device| Node {
@@ -236,18 +245,25 @@ pub fn nodes(
                 volume: percent(&device.volume),
                 muted: device.mute,
                 default: device.name == default,
+                device: None,
             })
-            .collect())
+            .collect()
     };
-    let streams = |text: &str| -> serde_json::Result<Vec<Node>> {
+    let streams = |text: &str, devices: &[Device]| -> serde_json::Result<Vec<Node>> {
         let streams: Vec<Stream> = serde_json::from_str(text)?;
-        Ok(streams.iter().map(Stream::node).collect())
+        let name_of = |index| {
+            devices
+                .iter()
+                .find(|device| device.index == Some(index))
+                .map(|device| device.name.clone())
+        };
+        Ok(streams.iter().map(|stream| stream.node(name_of)).collect())
     };
     Ok(Nodes {
-        playback: streams(sink_inputs)?,
-        recording: streams(source_outputs)?,
-        outputs: devices(sinks, &info.default_sink_name)?,
-        inputs: devices(sources, &info.default_source_name)?,
+        playback: streams(sink_inputs, &sinks)?,
+        recording: streams(source_outputs, &sources)?,
+        outputs: devices(&sinks, &info.default_sink_name),
+        inputs: devices(&sources, &info.default_source_name),
     })
 }
 
@@ -402,6 +418,19 @@ pub async fn step(target: &Target, delta: i32) -> io::Result<()> {
 pub async fn set(target: &Target, percent: u32) -> io::Result<()> {
     let (_, set, id) = target.commands();
     pactl(&[set, &id, &format!("{percent}%")]).await.map(drop)
+}
+
+/// Moves the stream `index` of `flow` to the device `name`.
+///
+/// # Errors
+///
+/// When `pactl` fails.
+pub async fn move_stream(flow: Flow, index: u32, name: &str) -> io::Result<()> {
+    let command = match flow {
+        Flow::Output => "move-sink-input",
+        Flow::Input => "move-source-output",
+    };
+    pactl(&[command, &index.to_string(), name]).await.map(drop)
 }
 
 /// Makes the device `name` of `flow` the default.

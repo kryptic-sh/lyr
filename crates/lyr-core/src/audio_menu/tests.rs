@@ -25,6 +25,7 @@ fn node(name: &str, volume: u32, muted: bool, default: bool) -> Node {
         volume,
         muted,
         default,
+        device: None,
     }
 }
 
@@ -214,4 +215,31 @@ fn a_click_across_a_slider_is_a_percent() {
     assert_eq!(level_at(1.0), MAX_PERCENT);
     assert_eq!(level_at(1.5), MAX_PERCENT);
     assert_eq!(level_at(-0.5), 0);
+}
+
+#[test]
+fn a_stream_that_can_move_shows_its_device_by_name() {
+    let mut nodes = nodes();
+    nodes.playback[0].device = Some("headphones".to_owned());
+    let (list, _, regions) = draw(&nodes, Tab::Playback, None, &measure, LINE, &theme());
+    let route = regions.rect(&Target::Route(0)).expect("a route button");
+    let up = regions.rect(&Target::Step(0, Step::Up)).expect("drawn");
+    assert!(route.x >= up.x + up.width, "after the steps");
+    assert_eq!(
+        texts_at(&list.items, FIRST).last().map(String::as_str),
+        Some("Headphones"),
+        "the device's name, not its id"
+    );
+    // A stream that cannot move, and a device, have none.
+    let (_, _, regions) = draw(
+        &self::nodes(),
+        Tab::Playback,
+        None,
+        &measure,
+        LINE,
+        &theme(),
+    );
+    assert_eq!(regions.rect(&Target::Route(0)), None);
+    let (_, _, regions) = draw(&self::nodes(), Tab::Output, None, &measure, LINE, &theme());
+    assert_eq!(regions.rect(&Target::Route(0)), None);
 }
