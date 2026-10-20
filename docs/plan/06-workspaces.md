@@ -84,17 +84,19 @@ and events are framed the same, events with the type's high bit set.
 
 - **State:** `GET_WORKSPACES` (type 1) gives each workspace's `id`, `num` (`-1`
   for a name that does not start with a number), `name`, `output`, `focused` and
-  `urgent`. The buttons are ordered numbered first by `num`, then named by name,
-  as sway orders an output's workspaces. The active workspace is the `focused`
-  one. The focused window is the node with `focused: true` in `GET_TREE`
-  (type 4) that is a window (`type` `con` or `floating_con`): its `app_id`, or
-  `window_properties.class` under Xwayland, and its `name` as the title. An
-  empty workspace has the focus itself, and then there is no window.
+  `urgent`. The buttons keep the reply's order, which is sway's own: by output,
+  and on each output numbered workspaces by number, then named ones in the order
+  they were made (`output_sort_workspaces`). The active workspace is the
+  `focused` one. The focused window is the node with `focused: true` in
+  `GET_TREE` (type 4) that is a window (`type` `con` or `floating_con`): its
+  `app_id`, or `window_properties.class` under Xwayland, and its `name` as the
+  title. An empty workspace has the focus itself, and then there is no window.
 - **Events:** a second connection sends `SUBSCRIBE` (type 2) with
-  `["workspace","window","output"]`. Any workspace or output event re-reads both
-  replies; a window event re-reads the tree only for the changes that can move
-  focus or retitle it (`focus`, `title`, `close`, `new`). The state is handed on
-  only when it differs from the last.
+  `["workspace","window","output","shutdown"]`. Any workspace or output event
+  re-reads both replies, and a window event does only for the changes that can
+  move focus or retitle it (`focus`, `title`, `close`, `new`). The state is
+  handed on only when it differs from the last. A `shutdown` event, or the
+  socket closing, ends the stream.
 - **Switching:** `RUN_COMMAND` (type 0) with
   `workspace --no-auto-back-and-forth "NAME"`, so a click on the shown workspace
   does not bounce back where `workspace_auto_back_and_forth` is on. sway keeps
