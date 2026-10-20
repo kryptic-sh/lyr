@@ -513,11 +513,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   its right end then a step up set 100 % again. A drag that starts on a slider
   sets it at every move until the button is let go (`MenuPanel::with_drags`),
   dragged on the real machine from a quarter to three quarters of steam's slider
-  for 75 %. Not built: plan 10's 150 % (with a Linux source), wiremix's card
-  configuration tab, and routing a stream to another device (no public API on
-  Windows). Not built: the other Windows sources (Bluetooth, workspaces, both
-  waiting on the owner's questions above) and the native menus plan 10 names;
-  macOS's `x-apple.systempreferences:` fallbacks wait on M10.
+  for 75 %. A right click on the mic module opened it on Input devices, listing
+  this machine's two microphones with the default in the active colour. Not
+  built: plan 10's 150 % (with a Linux source), wiremix's card configuration
+  tab, and routing a stream to another device (no public API on Windows). Not
+  built: the other Windows sources (Bluetooth, workspaces, both waiting on the
+  owner's questions above) and the native menus plan 10 names; macOS's
+  `x-apple.systempreferences:` fallbacks wait on M10.
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace
