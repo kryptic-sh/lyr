@@ -206,10 +206,16 @@ implementation follows meanwhile.
   `Keysym::ESCAPE` and the rest and drops its own numbers.
 - **crcbl: Linux and Vulkan parity for 0.6 – 0.8.** Also at the owner's request
   (2026-10-20): every crcbl feature developed on the Windows machine to be
-  implemented and tested on Wayland, X11 and Vulkan. On crcbl's backlog,
-  starting with a per-feature table; lyr reported what its Hyprland runs showed
-  (`set_panel` and the frame gate working; the DPMS-off present, the
-  `Presenter::resize` drain and the opacity group unchecked on Vulkan).
+  implemented and tested on Wayland, X11 and Vulkan. The per-feature table is on
+  crcbl's main (its backlog, "Raised by lyr on 2026-10-20"). By crcbl's report
+  the same day, verified on this machine's Intel Vulkan: `Presenter::resize`
+  with frames in flight, `push_opacity` groups, premultiplied transparent
+  windows through sway, the real popup-reposition path on sway 1.12, and a layer
+  panel at 1.5 scale. lyr's own runs showed `set_panel` and the frame gate
+  working, the latter with an output turned off. Still open in crcbl:
+  pointer-leave between an app's own windows on Wayland and X11, X11's
+  `display_adapter`, and the scripted resize and read-back as CI jobs. On crcbl
+  0.8.0, lyr's `Surface::resize` drain can go.
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
   `=0.7.0` (published 2026-10-20, with `set_panel`, frame pacing and
