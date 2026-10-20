@@ -183,7 +183,6 @@ fn cards_list_their_available_profiles_best_first() {
     );
     assert_eq!(card.kind, lyr_core::audio_menu::Kind::Profile);
     assert_eq!(card.chosen(), "Analog Stereo Output + Mono Input");
-    assert_eq!(card.next(), Some("output:analog-stereo"));
 }
 
 #[test]
@@ -220,7 +219,6 @@ fn a_device_with_ports_to_choose_is_a_setting() {
         ["analog-output-speaker", "analog-output-headphones"],
         "the unplugged line out left out"
     );
-    assert_eq!(port.next(), Some("analog-output-headphones"));
     // A device with one port has nothing to choose.
     let single = nodes(INFO, SINKS, SOURCES, "[]", "[]", "[]").expect("read");
     assert_eq!(single.settings, Some(Vec::new()));

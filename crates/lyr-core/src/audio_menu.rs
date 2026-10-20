@@ -116,16 +116,6 @@ impl Setting {
             .find(|(id, _)| *id == self.active)
             .map_or(&self.active, |(_, description)| description)
     }
-
-    /// The option after the chosen one, wrapping; `None` when there is no
-    /// other.
-    #[must_use]
-    pub fn next(&self) -> Option<&str> {
-        let at = self.options.iter().position(|(id, _)| *id == self.active);
-        let next = at.map_or(0, |at| (at + 1) % self.options.len());
-        let (id, _) = self.options.get(next)?;
-        (*id != self.active).then_some(id.as_str())
-    }
 }
 
 /// Everything the menu lists, a list per tab.

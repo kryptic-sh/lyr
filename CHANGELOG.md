@@ -43,9 +43,9 @@ and this project adheres to
 - On Linux the audio menu lists the playing and recording streams and the output
   and input devices through `pactl`, each with mute, a slider to 150 %
   (wiremix's scale) and steps, a device's Default button makes it the default, a
-  stream's device button moves it to the next device, and a Configuration tab
-  moves a sound card to its next profile and a device with several ports to its
-  next port; a right click on the volume or mic module, or `lyr panel audio`,
+  stream's device button opens a dropdown of the devices to move it to, and a
+  Configuration tab chooses a sound card's profile and a device's port from
+  dropdowns; a right click on the volume or mic module, or `lyr panel audio`,
   opens it.
 - On Windows the volume and mic modules show the default output and input, their
   level and mute, updated as they change, and their click and scroll bindings

@@ -25,29 +25,38 @@ implementation follows meanwhile.
   (read back with `pactl`). Its sliders run to 150 % on Linux
   (`audio_menu::MAX_PERCENT`, wiremix's scale; 100 % on Windows and macOS, where
   the endpoints stop). A stream's row names the device it plays on or records
-  from as a button, and a click moves it to the next device of its flow,
-  wrapping (`move-sink-input`, `move-source-output`), where plan 10 has
-  wiremix's dropdown; seen in a nested Hyprland (2026-10-20), a keyboard Enter
-  moved a silent `pacat` stream from the headset to HDMI 3, read back with
-  `pactl`. Windows has no public API for it, so its streams carry no device and
-  draw no button. The Configuration tab lists the sound cards with their active
-  profile as a button, and a click moves a card to its next available profile,
-  best first by PulseAudio's priority (`set-card-profile`); seen in a nested
-  Hyprland (2026-10-20), a keyboard Enter moved the Intel card (none of whose
-  sinks was in use) to its next profile, which was then set back with `pactl`. A
-  device with more than one usable port is a row of that tab too, its port
-  stepped through the same way (`set-sink-port`, `set-source-port`; ports
-  reported "not available" left out unless active); each row is an
-  `audio_menu::Setting` of its `Kind`. The ports are tested on `pactl`-shaped
-  JSON only: every device on the owner's machine has one port, so no real port
-  has been switched. The tab shows only where a source lists settings
-  (`Nodes::settings`, `None` on Windows and macOS). Not built: wiremix's
-  dropdowns in place of the cycling buttons. Worth knowing: PipeWire's
-  stream-restore remembers a stream's mute and device per application, so a test
-  that mutes or moves a probe stream changes what that application next starts
-  with; the probe's were put back. Keep `pactl`, or take `libpulse-binding`
-  (plan 07's default: one connection, no processes) or native PipeWire with
-  WirePlumber metadata?
+  from as a button, which opens the dropdown below to move it
+  (`move-sink-input`, `move-source-output`); seen in a nested Hyprland
+  (2026-10-20), a keyboard Enter moved a silent `pacat` stream from the headset
+  to HDMI 3, read back with `pactl`. Windows has no public API for it, so its
+  streams carry no device and draw no button. The Configuration tab lists the
+  sound cards with their active profile as a button, which opens the dropdown of
+  their available profiles, best first by PulseAudio's priority
+  (`set-card-profile`); seen in a nested Hyprland (2026-10-20), a keyboard Enter
+  moved the Intel card (none of whose sinks was in use) to its next profile,
+  which was then set back with `pactl`. A device with more than one usable port
+  is a row of that tab too, its port chosen the same way (`set-sink-port`,
+  `set-source-port`; ports reported "not available" left out unless active);
+  each row is an `audio_menu::Setting` of its `Kind`. The ports are tested on
+  `pactl`-shaped JSON only: every device on the owner's machine has one port, so
+  no real port has been switched. The tab shows only where a source lists
+  settings (`Nodes::settings`, `None` on Windows and macOS). A stream's device
+  and a configuration row's choice open a dropdown of every option over the
+  button, the chosen one selected, as wiremix's do (`AudioMenu`'s `Choice`, a
+  `ListPopup` parented to the menu's panel); choosing one acts on it, Escape or
+  a click outside closes only the dropdown. Seen in a nested Hyprland
+  (2026-10-20): opened by keyboard over the layer panel, it moved a silent
+  `pacat` stream to HDMI 3 (read back with `pactl`). Two things that run found:
+  Hyprland keeps a layer panel's exclusive keyboard under its grabbing popup, so
+  the menu forwards its panel's keys to the open dropdown; and crcbl's grab
+  closes a popup on a key whose `key_code` is Escape whatever its keysym, so
+  `wtype`'s first key (keycode 1) closes it (reported to office-crcbl; real
+  keyboards are not affected). Worth knowing: PipeWire's stream-restore
+  remembers a stream's mute and device per application, so a test that mutes or
+  moves a probe stream changes what that application next starts with; the
+  probe's were put back. Keep `pactl`, or take `libpulse-binding` (plan 07's
+  default: one connection, no processes) or native PipeWire with WirePlumber
+  metadata?
 - **Network without NetworkManager: build the rtnetlink fallback?** (M4.) **Q:**
   The network module reads NetworkManager over zbus, which the dotfiles use.
   Should lyr also support machines without it, through a new rtnetlink crate

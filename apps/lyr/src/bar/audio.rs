@@ -72,7 +72,14 @@ impl App {
             }
             return Ok(());
         }
-        match menu.event(shell, event)? {
+        let look = Look {
+            theme: &self.config.theme,
+            measure: &|s: &str| self.text.measure(s),
+            measure_in: &|s: &str, style| self.text.measure_in(s, style),
+            line_height: self.text.line_height(),
+            calendar_line_height: self.text.calendar_line_height(),
+        };
+        match menu.event(shell, event, &look)? {
             Outcome::Kept => Ok(()),
             outcome @ (Outcome::Close | Outcome::Closed) => {
                 if let Some(menu) = self.audio_menu.take() {
@@ -119,7 +126,7 @@ impl App {
             Action::Default => crate::settings::open(crate::settings::Page::Sound),
             // Its streams carry no device and it lists nothing to configure,
             // so the menu draws neither button.
-            Action::Route | Action::Setting => {}
+            Action::Route(_) | Action::Setting(_) => {}
         }
     }
 
@@ -156,29 +163,8 @@ impl App {
             Action::Default => self.commands.set_default(flow, device),
             // Its streams carry no device and it lists nothing to configure,
             // so the menu draws neither button.
-            Action::Route | Action::Setting => {}
+            Action::Route(_) | Action::Setting(_) => {}
         }
-    }
-
-    /// Linux: the device after the one the stream `id` on `tab` plays on,
-    /// among its flow's, wrapping; `None` when there is no other.
-    #[cfg(target_os = "linux")]
-    fn next_device(&self, tab: Tab, id: &str) -> Option<String> {
-        let nodes = self.data.audio_nodes.as_ref()?;
-        let current = nodes
-            .of(tab)
-            .iter()
-            .find(|node| node.id == id)?
-            .device
-            .as_deref()?;
-        let devices = match tab {
-            Tab::Playback => &nodes.outputs,
-            Tab::Recording => &nodes.inputs,
-            Tab::Output | Tab::Input | Tab::Configuration => return None,
-        };
-        let at = devices.iter().position(|device| device.id == current)?;
-        let next = &devices.get(at + 1).unwrap_or(&devices[0]).id;
-        (next != current).then(|| next.clone())
     }
 
     /// Linux: carries out a click in the audio menu on a stream or device,
@@ -194,16 +180,16 @@ impl App {
             Tab::Recording | Tab::Input => Flow::Input,
             Tab::Configuration => {
                 // A row's only control is its choice: a card's profile or a
-                // device's port.
-                let next = self
+                // device's port, its kind as the source listed it.
+                let kind = self
                     .data
                     .audio_nodes
                     .as_ref()
                     .and_then(|nodes| nodes.settings.as_ref())
                     .and_then(|settings| settings.iter().find(|setting| setting.id == id))
-                    .and_then(|setting| Some((setting.kind, setting.next()?)));
-                if let (Action::Setting, Some((kind, option))) = (action, next) {
-                    self.commands.choose(kind, id, option.to_owned());
+                    .map(|setting| setting.kind);
+                if let (Action::Setting(option), Some(kind)) = (action, kind) {
+                    self.commands.choose(kind, id, option);
                 }
                 return;
             }
@@ -229,16 +215,13 @@ impl App {
             Action::Step(Step::Down) => self.commands.step_volume(target, -step),
             Action::Set(percent) => self.commands.set_volume(target, percent),
             Action::Default => self.commands.set_default(flow, id),
-            Action::Route => {
-                let Target::Stream(_, index) = target else {
-                    return;
-                };
-                if let Some(next) = self.next_device(tab, &id) {
-                    self.commands.move_stream(flow, index, next);
+            Action::Route(device) => {
+                if let Target::Stream(_, index) = target {
+                    self.commands.move_stream(flow, index, device);
                 }
             }
             // On the configuration tab, handled above.
-            Action::Setting => {}
+            Action::Setting(_) => {}
         }
     }
 }

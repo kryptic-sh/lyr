@@ -190,6 +190,14 @@ impl<T: Clone + PartialEq> ListPopup<T> {
         Ok(Outcome::Kept)
     }
 
+    /// Selects the row standing for `value`, if there is one: the option
+    /// already chosen, when the menu opens.
+    pub fn select(&mut self, value: &T, look: &Look<'_>) {
+        if self.menu.select(value) {
+            self.redrawn(look);
+        }
+    }
+
     /// Moves the selection with `step` and redraws.
     fn moved(&mut self, look: &Look<'_>, step: fn(&mut Menu<T>)) {
         step(&mut self.menu);

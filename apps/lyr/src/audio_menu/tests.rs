@@ -68,6 +68,14 @@ impl Setup {
     fn pump(&mut self) -> Outcome {
         let mut events = Vec::new();
         self.shell.pump(&mut |event| events.push(event));
+        let theme = self.theme.clone();
+        let look = Look {
+            theme: &theme,
+            measure: &measure,
+            measure_in: &|text, _| measure(text),
+            line_height: LINE,
+            calendar_line_height: LINE,
+        };
         let mut outcome = Outcome::Kept;
         for event in events.iter().filter(|event| {
             !matches!(
@@ -75,7 +83,10 @@ impl Setup {
                 ShellEvent::Resized { .. } | ShellEvent::ScaleFactorChanged { .. }
             )
         }) {
-            outcome = self.menu.event(&mut self.shell, event).expect("applied");
+            outcome = self
+                .menu
+                .event(&mut self.shell, event, &look)
+                .expect("applied");
         }
         outcome
     }
@@ -255,6 +266,95 @@ fn a_click_on_a_stream_s_device_routes_it() {
     setup.refresh();
     assert_eq!(
         setup.click(Tab::Playback, Target::Route(0)),
-        Outcome::Act(Tab::Playback, "firefox".to_owned(), Action::Route)
+        Outcome::Kept,
+        "a dropdown opens"
     );
+    let popup = setup
+        .menu
+        .choice
+        .as_ref()
+        .expect("a dropdown")
+        .popup
+        .window();
+    // The current device is selected; the next is a key away.
+    setup
+        .shell
+        .key_press(popup, KeyCode::ArrowDown)
+        .expect("a key");
+    setup.shell.key_press(popup, KeyCode::Enter).expect("a key");
+    assert_eq!(
+        setup.pump(),
+        Outcome::Act(
+            Tab::Playback,
+            "firefox".to_owned(),
+            Action::Route("headphones".to_owned())
+        )
+    );
+    assert!(setup.menu.choice.is_none(), "the dropdown closed");
+}
+
+#[test]
+fn the_dropdown_s_grab_does_not_close_the_menu_and_escape_closes_only_it() {
+    let mut setup = setup(Tab::Playback);
+    let mut moving = nodes();
+    moving.playback[0].device = Some("speakers".to_owned());
+    setup.nodes = moving;
+    setup.refresh();
+    setup.click(Tab::Playback, Target::Route(0));
+    let panel = setup.menu.panel.window();
+    // The grab takes the keyboard from the panel.
+    setup.shell.set_focus(panel, false).expect("focus moved");
+    assert_eq!(setup.pump(), Outcome::Kept, "the menu stays");
+    let popup = setup
+        .menu
+        .choice
+        .as_ref()
+        .expect("still open")
+        .popup
+        .window();
+    setup
+        .shell
+        .key_press(popup, KeyCode::Escape)
+        .expect("a key");
+    assert_eq!(setup.pump(), Outcome::Kept, "nothing chosen");
+    assert!(setup.menu.choice.is_none(), "the dropdown closed");
+    // With no dropdown, losing focus closes the menu as before.
+    setup.shell.set_focus(panel, false).expect("focus moved");
+    assert_eq!(setup.pump(), Outcome::Close);
+}
+
+#[test]
+fn the_panel_s_keys_go_to_its_dropdown() {
+    let mut setup = setup(Tab::Playback);
+    let mut moving = nodes();
+    moving.playback[0].device = Some("speakers".to_owned());
+    setup.nodes = moving;
+    setup.refresh();
+    setup.click(Tab::Playback, Target::Route(0));
+    let panel = setup.menu.panel.window();
+    // As Hyprland delivers them: to the panel, under the dropdown's grab.
+    setup
+        .shell
+        .key_press(panel, KeyCode::ArrowDown)
+        .expect("a key");
+    setup.shell.key_press(panel, KeyCode::Enter).expect("a key");
+    assert_eq!(
+        setup.pump(),
+        Outcome::Act(
+            Tab::Playback,
+            "firefox".to_owned(),
+            Action::Route("headphones".to_owned())
+        )
+    );
+    setup.click(Tab::Playback, Target::Route(0));
+    setup
+        .shell
+        .key_press(panel, KeyCode::Escape)
+        .expect("a key");
+    assert_eq!(
+        setup.pump(),
+        Outcome::Kept,
+        "Escape closes the dropdown only"
+    );
+    assert!(setup.menu.choice.is_none());
 }

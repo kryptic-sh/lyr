@@ -262,14 +262,10 @@ fn card(active: &str) -> Setting {
 }
 
 #[test]
-fn a_card_steps_through_its_profiles_and_wraps() {
+fn a_setting_shows_its_chosen_option_by_description() {
     assert_eq!(card("stereo").chosen(), "Stereo");
-    assert_eq!(card("stereo").next(), Some("mono"));
-    assert_eq!(card("off").next(), Some("stereo"), "wraps");
-    assert_eq!(card("gone").next(), Some("stereo"), "from the first");
-    let mut only = card("stereo");
-    only.options.truncate(1);
-    assert_eq!(only.next(), None, "no other");
+    assert_eq!(card("off").chosen(), "Off");
+    assert_eq!(card("gone").chosen(), "gone", "its id when not listed");
 }
 
 #[test]

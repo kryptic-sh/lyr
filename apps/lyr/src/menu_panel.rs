@@ -248,8 +248,7 @@ impl<T: Copy> MenuPanel<T> {
         self.window == window
     }
 
-    /// Its window, which a recreation replaces.
-    #[cfg(test)]
+    /// Its window, which a popup over it is anchored to.
     pub const fn window(&self) -> WindowId {
         self.window
     }
@@ -345,6 +344,19 @@ impl<T: Copy> MenuPanel<T> {
         } else if rect.y + rect.height > self.scroll + self.size.height {
             self.scroll_to(rect.y + rect.height - self.size.height);
         }
+    }
+
+    /// Where `target` is in the window, through the scroll: what a popup
+    /// over it is anchored to. `None` when it is not drawn.
+    pub fn rect_of(&self, target: &T) -> Option<Rect>
+    where
+        T: PartialEq,
+    {
+        let rect = self.regions.rect(target)?;
+        Some(Rect {
+            y: rect.y - self.scroll,
+            ..rect
+        })
     }
 
     /// The target under the pointer, through the scroll.
