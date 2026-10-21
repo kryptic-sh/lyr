@@ -128,9 +128,6 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
     let text = load_text(&config)?;
     let tick = Tick::of(&config.clock.format);
 
-    let mut bars = Bars::default();
-    bars.sync(shell.as_mut(), &config.bar)
-        .context("creating the bars")?;
     // Read once: a reload does not hand the daemon's name over.
     let (updates, commands) = sources::start(shell.waker(), config.notifications.replace)
         .context("starting the sources")?;
@@ -140,7 +137,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         text,
         tick,
         next_tick: next_tick(tick),
-        bars,
+        bars: Bars::default(),
         windows: HashMap::new(),
         data: Data::default(),
         commands,
@@ -155,6 +152,9 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         hidden: false,
         stats: Stats::new(Instant::now()),
     };
+    let bar = app.config.bar.clone();
+    app.keep_bars(shell.as_mut(), &bar, None)
+        .context("creating the bars")?;
 
     loop {
         shell.wait_events(Some(app.wait()));
@@ -452,6 +452,53 @@ impl App {
             shell.destroy_window(bar)?;
         }
         self.bars = Bars::default();
+        Ok(())
+    }
+
+    /// Brings the bars in step with `bar` and the outputs, or with `event`
+    /// when there is one ([`Bars::handle`]), each bar that goes taken down
+    /// by [`App::drop_bar`] while its window is still open.
+    fn keep_bars(
+        &mut self,
+        shell: &mut dyn Shell,
+        bar: &lyr_config::Bar,
+        event: Option<&ShellEvent>,
+    ) -> anyhow::Result<()> {
+        // Out of `self` while it runs, so the hook can borrow the rest.
+        let mut bars = std::mem::take(&mut self.bars);
+        let retire = |shell: &mut dyn Shell, window| self.drop_bar(shell, window, false);
+        let kept = match event {
+            Some(event) => bars.handle(shell, bar, event, retire),
+            None => bars.sync(shell, bar, retire),
+        };
+        self.bars = bars;
+        kept.map(drop)
+    }
+
+    /// Drops what draws into the bar `window`: its surface, its tooltip and
+    /// the menus opened from it. Before its window closes, or after the
+    /// window system destroyed it (`window_gone`), its popups with it.
+    fn drop_bar(
+        &mut self,
+        shell: &mut dyn Shell,
+        window: WindowId,
+        window_gone: bool,
+    ) -> anyhow::Result<()> {
+        let Some(mut gone) = self.windows.remove(&window) else {
+            return Ok(());
+        };
+        if window_gone {
+            gone.tooltips.destroyed()?;
+        } else {
+            gone.tooltips.close(shell)?;
+        }
+        gone.surface.destroy()?;
+        if let Some(menu) = self.power_menu.take_if(|menu| menu.opened_from(window)) {
+            menu.close(shell, window_gone)?;
+        }
+        if let Some(menu) = self.tray_menu.take_if(|menu| menu.opened_from(window)) {
+            menu.close(shell, window_gone)?;
+        }
         Ok(())
     }
 

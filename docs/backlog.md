@@ -491,7 +491,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   positions and clips stayed in logical pixels. `translate` now records the
   whole list at the window's scale (`DrawList::set_scale`), so text, boxes and
   clips scale together, and the bar and the clock panel drew whole and sharp at
-  1.5; tested in `translate` and mutation-checked.
+  1.5; tested in `translate` and mutation-checked. Removing an output under a
+  running bar (a headless output in a nested Hyprland, added and removed,
+  2026-10-21) stopped lyr with "invalid or stale window handle": `Bars`
+  destroyed the bar's window (or answered its close request) while its surface
+  lived on in `App.windows` until the `WindowDestroyed` that followed, so the
+  same loop drew into the dead window, and crcbl wants a window's surface
+  destroyed before the window anyway. `Bars::sync` and `Bars::handle` now take a
+  `retire` hook that runs while the window is still open, and the app's
+  (`App::drop_bar`) drops the bar's surface, tooltip and menus there; the `Bars`
+  tests check each retired window is still open (mutation-checked). After it, 60
+  rounds of adding and removing the output at random intervals left lyr running
+  with its one bar, where it had died within two before, and five reloads
+  between one bar and two raised no error.
 - **Core, rest of M1.** `lyr-core` has the zone layout (`layout::layout`, tested
   and mutation-checked). Icon ramps are `icon::ramp`, transcribing waybar
   0.15.0's `ALabel::getIcon` and tested against its integer steps. Hit testing

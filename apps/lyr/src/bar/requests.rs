@@ -29,8 +29,8 @@ impl App {
             Request::Reload => self.reload(shell, incoming)?,
             Request::Toggle => {
                 if self.hidden {
-                    self.bars
-                        .sync(shell, &self.config.bar)
+                    let bar = self.config.bar.clone();
+                    self.keep_bars(shell, &bar, None)
                         .context("creating the bars")?;
                 } else {
                     self.close_all(shell)?;
@@ -130,8 +130,7 @@ impl App {
                     self.bars
                         .reshape(shell, &new.bar)
                         .context("reshaping the bars")?;
-                    self.bars
-                        .sync(shell, &new.bar)
+                    self.keep_bars(shell, &new.bar, None)
                         .context("creating the bars")?;
                 }
                 self.tick = Tick::of(&new.clock.format);

@@ -1,6 +1,6 @@
 use crcbl_shell::{
     HeadlessShell, MonitorId, MonitorInfo, PanelAnchor, PanelLayer, PhysicalRect, Reserve, Shell,
-    ShellEvent, WindowRole,
+    ShellError, ShellEvent, WindowId, WindowRole,
 };
 use lyr_config::{Bar, Layer, Position};
 
@@ -38,20 +38,40 @@ fn monitors_with_bars(bars: &Bars) -> Vec<u32> {
     ids
 }
 
-/// Hands every queued shell event to `bars`, as the main loop does.
-fn drain(shell: &mut HeadlessShell, bars: &mut Bars, config: &Bar) {
+/// A `retire` hook that records the bars it is handed, each checked to be
+/// still open then, as the bar's surface needs.
+fn retire_into(
+    retired: &mut Vec<WindowId>,
+) -> impl FnMut(&mut dyn Shell, WindowId) -> Result<(), ShellError> + '_ {
+    |shell, window| {
+        assert!(
+            shell.window_state(window).is_ok(),
+            "{window:?} retired after its window closed"
+        );
+        retired.push(window);
+        Ok(())
+    }
+}
+
+/// Hands every queued shell event to `bars`, as the main loop does, and
+/// returns the bars retired.
+fn drain(shell: &mut HeadlessShell, bars: &mut Bars, config: &Bar) -> Vec<WindowId> {
     let mut events = Vec::new();
     shell.pump(&mut |event| events.push(event));
+    let mut retired = Vec::new();
     for event in &events {
-        bars.handle(shell, config, event).expect("handled");
+        bars.handle(shell, config, event, retire_into(&mut retired))
+            .expect("handled");
     }
+    retired
 }
 
 #[test]
 fn a_reshape_moves_the_bars_in_place() {
     let mut shell = two_monitors();
     let mut bars = Bars::default();
-    bars.sync(&mut shell, &bar(&[])).expect("sync");
+    bars.sync(&mut shell, &bar(&[]), retire_into(&mut Vec::new()))
+        .expect("sync");
     let before: Vec<_> = bars.windows().collect();
     let mut config = bar(&[]);
     config.position = Position::Bottom;
@@ -76,10 +96,15 @@ fn a_reshape_moves_the_bars_in_place() {
 fn every_output_gets_one_bar() {
     let mut shell = two_monitors();
     let mut bars = Bars::default();
-    assert!(bars.sync(&mut shell, &bar(&[])).expect("sync"));
+    assert!(
+        bars.sync(&mut shell, &bar(&[]), retire_into(&mut Vec::new()))
+            .expect("sync")
+    );
     assert_eq!(monitors_with_bars(&bars), [1, 2]);
     assert!(
-        !bars.sync(&mut shell, &bar(&[])).expect("sync"),
+        !bars
+            .sync(&mut shell, &bar(&[]), retire_into(&mut Vec::new()))
+            .expect("sync"),
         "no change"
     );
     assert_eq!(monitors_with_bars(&bars), [1, 2]);
@@ -89,7 +114,12 @@ fn every_output_gets_one_bar() {
 fn named_outputs_limit_the_bars() {
     let mut shell = two_monitors();
     let mut bars = Bars::default();
-    bars.sync(&mut shell, &bar(&["HDMI-A-1"])).expect("sync");
+    bars.sync(
+        &mut shell,
+        &bar(&["HDMI-A-1"]),
+        retire_into(&mut Vec::new()),
+    )
+    .expect("sync");
     assert_eq!(monitors_with_bars(&bars), [2]);
 }
 
@@ -97,15 +127,21 @@ fn named_outputs_limit_the_bars() {
 fn a_config_change_removes_bars_no_longer_wanted() {
     let mut shell = two_monitors();
     let mut bars = Bars::default();
-    bars.sync(&mut shell, &bar(&[])).expect("sync");
+    bars.sync(&mut shell, &bar(&[]), retire_into(&mut Vec::new()))
+        .expect("sync");
     let dropped = bars
         .windows()
         .find(|(monitor, _)| monitor.0 == 1)
         .map(|(_, window)| window)
         .expect("a bar on DP-1");
 
-    assert!(bars.sync(&mut shell, &bar(&["HDMI-A-1"])).expect("sync"));
+    let mut retired = Vec::new();
+    assert!(
+        bars.sync(&mut shell, &bar(&["HDMI-A-1"]), retire_into(&mut retired))
+            .expect("sync")
+    );
     assert_eq!(monitors_with_bars(&bars), [2]);
+    assert_eq!(retired, [dropped], "retired before it went");
     assert!(
         shell.window_state(dropped).is_err(),
         "its window was destroyed"
@@ -117,15 +153,21 @@ fn a_plugged_output_gets_a_bar_and_an_unplugged_one_loses_it() {
     let mut shell = two_monitors();
     let mut bars = Bars::default();
     let config = bar(&[]);
-    bars.sync(&mut shell, &config).expect("sync");
+    bars.sync(&mut shell, &config, retire_into(&mut Vec::new()))
+        .expect("sync");
     drain(&mut shell, &mut bars, &config);
 
     let third = shell.plug_monitor(monitor(0, "DP-3"));
     drain(&mut shell, &mut bars, &config);
     assert_eq!(monitors_with_bars(&bars), [1, 2, third.0]);
 
+    let unplugged = bars
+        .windows()
+        .find(|(monitor, _)| monitor.0 == 1)
+        .map(|(_, window)| window)
+        .expect("a bar on DP-1");
     shell.unplug_monitor(MonitorId(1)).expect("connected");
-    drain(&mut shell, &mut bars, &config);
+    assert_eq!(drain(&mut shell, &mut bars, &config), [unplugged]);
     assert_eq!(monitors_with_bars(&bars), [2, third.0]);
 }
 
@@ -134,12 +176,13 @@ fn a_bar_the_compositor_closes_comes_back_on_the_next_output_change() {
     let mut shell = two_monitors();
     let mut bars = Bars::default();
     let config = bar(&[]);
-    bars.sync(&mut shell, &config).expect("sync");
+    bars.sync(&mut shell, &config, retire_into(&mut Vec::new()))
+        .expect("sync");
     drain(&mut shell, &mut bars, &config);
     let (_, window) = bars.windows().next().expect("a bar");
 
     shell.request_close(window).expect("open");
-    drain(&mut shell, &mut bars, &config);
+    assert_eq!(drain(&mut shell, &mut bars, &config), [window]);
     assert!(!bars.contains(window));
 
     shell.inject(ShellEvent::MonitorsChanged);

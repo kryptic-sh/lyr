@@ -34,8 +34,8 @@ impl App {
         instant: Instant,
     ) -> anyhow::Result<()> {
         if !self.hidden {
-            self.bars
-                .handle(shell, &self.config.bar, event)
+            let bar = self.config.bar.clone();
+            self.keep_bars(shell, &bar, Some(event))
                 .context("keeping a bar on every output")?;
         }
         if self
@@ -166,19 +166,8 @@ impl App {
                     );
                 }
             }
-            ShellEvent::WindowDestroyed { window } => {
-                if let Some(mut gone) = self.windows.remove(&window) {
-                    // Its tooltip's and menu's windows went with it.
-                    gone.tooltips.destroyed()?;
-                    gone.surface.destroy()?;
-                    if let Some(menu) = self.power_menu.take_if(|menu| menu.opened_from(window)) {
-                        menu.close(shell, true)?;
-                    }
-                    if let Some(menu) = self.tray_menu.take_if(|menu| menu.opened_from(window)) {
-                        menu.close(shell, true)?;
-                    }
-                }
-            }
+            // A bar the window system destroyed without asking.
+            ShellEvent::WindowDestroyed { window } => self.drop_bar(shell, window, true)?,
             _ => {
                 let Some((id, window)) = event
                     .window()

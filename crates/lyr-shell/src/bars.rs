@@ -84,31 +84,38 @@ impl Bars {
     /// monitor that should have one and none on any other. Returns whether a
     /// window was created or destroyed.
     ///
+    /// `retire` runs for each bar about to go, while its window is still
+    /// open: crcbl wants what draws into a window destroyed before the window
+    /// is.
+    ///
     /// # Errors
     ///
-    /// When the shell refuses to create or destroy a window. The bars made
-    /// before the error are kept and tracked.
-    pub fn sync(&mut self, shell: &mut dyn Shell, bar: &Bar) -> Result<bool, ShellError> {
+    /// When `retire` fails, or the shell refuses to create or destroy a
+    /// window. The bars made or removed before the error stay so.
+    pub fn sync<E: From<ShellError>>(
+        &mut self,
+        shell: &mut dyn Shell,
+        bar: &Bar,
+        mut retire: impl FnMut(&mut dyn Shell, WindowId) -> Result<(), E>,
+    ) -> Result<bool, E> {
         let mut changed = false;
-        let mut keep = Vec::with_capacity(self.windows.len());
-        for (monitor, window) in std::mem::take(&mut self.windows) {
-            let still_wanted = shell.monitor(monitor).is_some_and(|info| wanted(bar, info));
-            if still_wanted {
-                keep.push((monitor, window));
-            } else {
-                // The window may already be on its way out (its monitor was
-                // unplugged), in which case the handle is stale and there is
-                // nothing left to destroy.
-                match shell.destroy_window(window) {
-                    Ok(()) | Err(ShellError::InvalidWindow { .. }) => changed = true,
-                    Err(error) => {
-                        self.windows = keep;
-                        return Err(error);
-                    }
-                }
+        let unwanted: Vec<WindowId> = self
+            .windows
+            .iter()
+            .filter(|&&(monitor, _)| !shell.monitor(monitor).is_some_and(|info| wanted(bar, info)))
+            .map(|&(_, window)| window)
+            .collect();
+        for window in unwanted {
+            retire(shell, window)?;
+            self.forget(window);
+            // The window may already be on its way out (its monitor was
+            // unplugged), in which case the handle is stale and there is
+            // nothing left to destroy.
+            match shell.destroy_window(window) {
+                Ok(()) | Err(ShellError::InvalidWindow { .. }) => changed = true,
+                Err(error) => return Err(error.into()),
             }
         }
-        self.windows = keep;
 
         let missing: Vec<MonitorId> = shell
             .monitors()
@@ -144,21 +151,24 @@ impl Bars {
     /// the bars changed, so the caller can lay out and draw the new ones.
     ///
     /// A bar asked to close (its monitor was unplugged, or the compositor took
-    /// it away) is closed and forgotten, and the next monitor change puts back
-    /// any bar that is still wanted.
+    /// it away) is retired, closed and forgotten, and the next monitor change
+    /// puts back any bar that is still wanted. `retire` is as for
+    /// [`Bars::sync`].
     ///
     /// # Errors
     ///
     /// As [`Bars::sync`], and when the shell refuses the close reply.
-    pub fn handle(
+    pub fn handle<E: From<ShellError>>(
         &mut self,
         shell: &mut dyn Shell,
         bar: &Bar,
         event: &ShellEvent,
-    ) -> Result<bool, ShellError> {
+        mut retire: impl FnMut(&mut dyn Shell, WindowId) -> Result<(), E>,
+    ) -> Result<bool, E> {
         match *event {
-            ShellEvent::MonitorsChanged => self.sync(shell, bar),
+            ShellEvent::MonitorsChanged => self.sync(shell, bar, retire),
             ShellEvent::CloseRequested { window } if self.contains(window) => {
+                retire(shell, window)?;
                 self.forget(window);
                 shell.reply_close_request(window, CloseReply::Close)?;
                 Ok(true)
