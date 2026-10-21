@@ -1039,7 +1039,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   gives back the device's own name), and Cancel or Escape drops it; the agent's
   question takes the top over from it. Tested on the headless shell and against
   a recording device on a peer-to-peer connection, mutation-checked; not run
-  against a real BlueZ.
+  against a real BlueZ. The menu's reading and its scan are: the
+  `system_services` test reads the owner's laptop's adapter and starts and stops
+  a scan, seen in the adapter's `Discovering` (2026-10-21, mutation-checked).
+  Pairing, connecting and renaming need a device, and it has none paired.
 - **Wi-Fi menu, M7.** Built: the menu's model and drawing
   (`lyr_core::wifi_menu`): an access point's security from its `Flags`,
   `WpaFlags` and `RsnFlags` (`Security::of`; WEP and 802.1X refused with a

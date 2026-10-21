@@ -2,8 +2,9 @@
 //! power-profiles-daemon, NetworkManager, BlueZ, timedate1 and the sound
 //! server. Every other test of them runs against a fake written from the
 //! service's documentation; these say what the installed services answer.
-//! They only read, except one that steps the default sink's volume down and
-//! up and then sets it back to the whole percent it was.
+//! They only read, except two that change something and put it back: one
+//! steps the default sink's volume down and up and then sets it to the
+//! whole percent it was, and one starts and stops a Bluetooth scan.
 //!
 //! Ignored by default, since CI's runners have none of the services. On a
 //! desktop that runs them: `cargo test -p lyr-sources --test system_services
@@ -159,4 +160,41 @@ async fn pactl_steps_the_default_sink_both_ways() {
         "{before}% stepped down to {lowered}%"
     );
     assert!(raised > lowered, "{lowered}% stepped up to {raised}%");
+}
+
+#[tokio::test]
+#[ignore = "starts and stops this machine's Bluetooth scan; run with --ignored"]
+async fn bluez_scans_and_stops() {
+    let bluez = BlueZ::system().await.expect("BlueZ answers");
+    let (snapshots, mut seen) = watch::channel(Snapshot::default());
+    let discovering = |snapshot: &Snapshot| snapshot.adapter.as_ref().map(|a| a.discovering);
+    let steps = async {
+        let adapter = seen
+            .wait_for(|snapshot| snapshot.adapter.is_some())
+            .await
+            .expect("a reading")
+            .adapter
+            .clone()
+            .expect("an adapter");
+        assert!(adapter.powered, "a scan needs the adapter on");
+        bluez
+            .scan(&adapter.path, true)
+            .await
+            .expect("a scan starts");
+        seen.wait_for(|snapshot| discovering(snapshot) == Some(true))
+            .await
+            .expect("the scan seen");
+        bluez
+            .scan(&adapter.path, false)
+            .await
+            .expect("the scan stops");
+        seen.wait_for(|snapshot| discovering(snapshot) == Some(false))
+            .await
+            .expect("the stop seen");
+    };
+    tokio::select! {
+        () = steps => {}
+        ended = bluez.watch(&snapshots) => panic!("the watch ended first: {ended:?}"),
+        () = tokio::time::sleep(4 * FIRST_READING) => panic!("not seen in time"),
+    }
 }
