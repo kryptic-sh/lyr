@@ -582,30 +582,35 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (`dbus-run-session`, so swaync kept the real one): a critical toast with its
   red border and a Reply button, a markup body (bold, italic, an entity) wrapped
   over three lines above it, newest on top; the clock panel's centre listing
-  them critical first; `lyr dnd` and `lyr clear` acting on them. Not tried
-  there: a click on a toast or a button, and the timeouts' pause under the
-  pointer; `wlrctl` can click there now ("Clicking lyr in tests"). The bell is
-  drawn from the store while lyr is the daemon. A toast shows when it arrived as
-  swaync words it ("Now", "2 mins ago", from `get_relative_time` at v0.12.6),
-  redrawn as the words change; a summary long enough to reach the time is cut
-  short of it (`toast::TIME_GAP`), where swaync ellipsizes. The toast under the
-  pointer shows swaync's close button (`toast::close_button`: red, 20 px, 6 px
-  in from the top right, from swaync 0.12.6's `NotificationCloseButton` and the
-  dotfiles' style; the `toast_close` theme keys), which dismisses; tested on the
-  headless shell and mutation-checked. The notification centre's entries show it
-  too, in the same place (`centre::Shown::hovered`): swaync's
-  `.control-center .close-button` margins (10 px top, 6 px right) would put it
-  partly outside the entry, since lyr's entries do not keep the 18 px
-  notification margin they count from, so lyr keeps the toast's placement there.
-  A body's markup is drawn (`lyr_core::markup`: the spec's `<b>`, `<i>`, `<u>`
-  and `<a href>`, XML's entities, `<img>` left out, anything else shown as text;
-  `toast::wrap` wraps the styled spans), and `body-markup` is advertised. Not
-  built: a toast's images (the panel's Clear All, switch and media players work;
-  `lyr dnd` and `lyr clear` work; on Windows they answer that lyr is not the
-  daemon, run there). Each action but `default` gets a button under the body
-  (swaync's style, at the bar's text size until the owner rules on swaync's
-  `0.2rem`), in toasts and the panel's history; a click invokes it. A transient
-  notification, kept in no history, closes as expired when its toast times out.
+  them critical first; `lyr dnd` and `lyr clear` acting on them. Clicked there
+  through `wlrctl` too (2026-10-21): the Later button of a
+  `notify-send -A reply=Reply -A later=Later` toast made `notify-send` print
+  `later` and exit, so the action went back over D-Bus; and a toast with a 3 s
+  timeout stayed 6 s under the pointer and went within 5 s of the pointer
+  leaving. A toast that appears under a pointer that does not move gets no
+  pointer enter from Hyprland, so it expires on time; moving the pointer onto it
+  pauses it. The bell is drawn from the store while lyr is the daemon. A toast
+  shows when it arrived as swaync words it ("Now", "2 mins ago", from
+  `get_relative_time` at v0.12.6), redrawn as the words change; a summary long
+  enough to reach the time is cut short of it (`toast::TIME_GAP`), where swaync
+  ellipsizes. The toast under the pointer shows swaync's close button
+  (`toast::close_button`: red, 20 px, 6 px in from the top right, from swaync
+  0.12.6's `NotificationCloseButton` and the dotfiles' style; the `toast_close`
+  theme keys), which dismisses; tested on the headless shell and
+  mutation-checked. The notification centre's entries show it too, in the same
+  place (`centre::Shown::hovered`): swaync's `.control-center .close-button`
+  margins (10 px top, 6 px right) would put it partly outside the entry, since
+  lyr's entries do not keep the 18 px notification margin they count from, so
+  lyr keeps the toast's placement there. A body's markup is drawn
+  (`lyr_core::markup`: the spec's `<b>`, `<i>`, `<u>` and `<a href>`, XML's
+  entities, `<img>` left out, anything else shown as text; `toast::wrap` wraps
+  the styled spans), and `body-markup` is advertised. Not built: a toast's
+  images (the panel's Clear All, switch and media players work; `lyr dnd` and
+  `lyr clear` work; on Windows they answer that lyr is not the daemon, run
+  there). Each action but `default` gets a button under the body (swaync's
+  style, at the bar's text size until the owner rules on swaync's `0.2rem`), in
+  toasts and the panel's history; a click invokes it. A transient notification,
+  kept in no history, closes as expired when its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading
