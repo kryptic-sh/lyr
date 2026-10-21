@@ -42,10 +42,12 @@ impl App {
                         menu: menu.clone(),
                         root: lyr_core::tray::menu::Entry::default(),
                         bar,
-                        // Where every menu of the bar's opens.
+                        // Where every menu of the bar's opens: under the
+                        // module's box, not the item's button inside it.
                         anchor: self.windows.get(&bar).map_or(rect, |window| {
+                            let tray = lyr_core::draw::Target::Module(lyr_config::Module::Tray);
                             crate::menu_panel::popup_anchor(
-                                rect,
+                                window.regions.rect(&tray).unwrap_or(rect),
                                 window.height,
                                 self.config.bar.position,
                             )

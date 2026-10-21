@@ -1121,21 +1121,22 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   popup (`apps/lyr/src/tray_menu.rs` over `ListPopup`), a submenu opening in
   place with a Back row, a click sending `clicked`; with no menu served, the
   item's `ContextMenu`. The popup is tested on crcbl's headless shell and
-  mutation-checked; the glue joining source and bar is untested, and none of it
-  has met a real item. Wayland gives a window no place on the screen, so
-  `Activate` and `ContextMenu` get the point under the button on the bar, not on
-  the screen. Each item's button has its tooltip, its `ToolTip` title or else
-  its `Title` (`Item::tooltip_text`, as waybar falls back), through the bar's
-  tooltips, now keyed by the hovered target rather than the module. Icons wait
-  on images (the decision above); until then an item is drawn as its title's
-  first letter (`Item::letter`), where plan 08 asks for a generic icon.
-- **The tray menu's new place is unseen.** The power and tray menus open where
-  the panels do (`menu_panel::popup_anchor`: the module's box stretched 16 px
-  past the bar). The power menu's place was seen in a nested Hyprland
-  (2026-10-21), clicked through `wlrctl`: it opened 16 px under the bar, level
-  with the clock panel, and closed on a click on the empty desktop, as a
-  grabbing popup does. The tray menu was not: in that session waybar owns the
-  StatusNotifierWatcher, so lyr's tray is empty.
+  mutation-checked; the glue joining source and bar has no unit test. It has met
+  an item over a real bus (2026-10-21): in a nested Hyprland on a private
+  session bus, where lyr was the watcher, a test StatusNotifierItem with a
+  one-entry DBusMenu (a Gio script, not in the repo) showed as its title's
+  letter, a right click opened its menu 16 px under the bar, and a click on the
+  entry reached the item as `clicked`. That run found the menu 14 px right of
+  the tray's box, anchored to the item's button inside it; it now opens under
+  the module's box as every other menu does. Not met: a real application's item,
+  submenus served by one, or icons. Wayland gives a window no place on the
+  screen, so `Activate` and `ContextMenu` get the point under the button on the
+  bar, not on the screen. Each item's button has its tooltip, its `ToolTip`
+  title or else its `Title` (`Item::tooltip_text`, as waybar falls back),
+  through the bar's tooltips, now keyed by the hovered target rather than the
+  module. Icons wait on images (the decision above); until then an item is drawn
+  as its title's first letter (`Item::letter`), where plan 08 asks for a generic
+  icon.
 - **Clicking lyr in tests.** The owner installed `wlrctl` (2026-10-20), which
   moves and clicks a virtual pointer in the compositor named by
   `WAYLAND_DISPLAY` alone, so a nested Hyprland can be clicked without touching
