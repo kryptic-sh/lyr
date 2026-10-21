@@ -465,10 +465,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   the transparent bar and the clock box with its border, radius and text, as a
   screenshot showed, and the work area came back when the process was killed.
   Hack Nerd Font Propo is not installed on that machine, so it drew in the
-  monospace fallback, and lyr said so. Not run on Hyprland, which is M1's real
-  check. `lyr quit` stops it. It repaints only when something it shows changed
-  (plan 04), and presents only when the window system asks for a frame (crcbl's
-  frame gate, its own entry above). It logs through `tracing` to
+  monospace fallback, and lyr said so. It has run on Hyprland 0.56.2 since (the
+  entries below). `lyr quit` stops it. It repaints only when something it shows
+  changed (plan 04), and presents only when the window system asks for a frame
+  (crcbl's frame gate, its own entry above). It logs through `tracing` to
   `~/.local/state/lyr/logs/lyr.log` and to stderr (`apps/lyr/src/log.rs`,
   `RUST_LOG` to filter), capped at `log::MAX_BYTES` by moving it to `lyr.log.1`
   (tested on Windows and Linux, not watched rotating in a running bar). Colours
@@ -583,14 +583,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   red border and a Reply button, a markup body (bold, italic, an entity) wrapped
   over three lines above it, newest on top; the clock panel's centre listing
   them critical first; `lyr dnd` and `lyr clear` acting on them. Not tried
-  there: a click on a toast or a button (no pointer injection on this machine),
-  and the timeouts' pause under the pointer. The bell is drawn from the store
-  while lyr is the daemon. A toast shows when it arrived as swaync words it
-  ("Now", "2 mins ago", from `get_relative_time` at v0.12.6), redrawn as the
-  words change; a summary long enough to reach the time is cut short of it
-  (`toast::TIME_GAP`), where swaync ellipsizes. The toast under the pointer
-  shows swaync's close button (`toast::close_button`: red, 20 px, 6 px in from
-  the top right, from swaync 0.12.6's `NotificationCloseButton` and the
+  there: a click on a toast or a button, and the timeouts' pause under the
+  pointer; `wlrctl` can click there now ("Clicking lyr in tests"). The bell is
+  drawn from the store while lyr is the daemon. A toast shows when it arrived as
+  swaync words it ("Now", "2 mins ago", from `get_relative_time` at v0.12.6),
+  redrawn as the words change; a summary long enough to reach the time is cut
+  short of it (`toast::TIME_GAP`), where swaync ellipsizes. The toast under the
+  pointer shows swaync's close button (`toast::close_button`: red, 20 px, 6 px
+  in from the top right, from swaync 0.12.6's `NotificationCloseButton` and the
   dotfiles' style; the `toast_close` theme keys), which dismisses; tested on the
   headless shell and mutation-checked. The notification centre's entries show it
   too, in the same place (`centre::Shown::hovered`): swaync's
@@ -1124,24 +1124,45 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   tooltips, now keyed by the hovered target rather than the module. Icons wait
   on images (the decision above); until then an item is drawn as its title's
   first letter (`Item::letter`), where plan 08 asks for a generic icon.
-- **The power and tray menus' new place is unseen.** They now open where the
-  panels do (`menu_panel::popup_anchor`: the module's box stretched 16 px past
-  the bar), tested for the arithmetic only. A Wayland popup's anchor reaching
-  past its parent's surface is not something xdg-shell forbids, but how Hyprland
-  places it has not been seen: both open only from a click, and this machine has
-  no pointer injection. A headless sway now runs here (sway 1.12,
-  `WLR_RENDER_DRM_DEVICE` set to the Intel render node, since the NVIDIA driver
-  is broken until a reboot, and a short `XDG_RUNTIME_DIR` under `/run/user`,
-  since a socket path over 108 bytes fails), and lyr draws there, but its seat
-  has no pointer (`capabilities: 0`), so `swaymsg seat … cursor press` reaches
-  nothing. `wlrctl` (AUR) would inject through the virtual-pointer protocol into
-  that compositor alone; `ydotool` (in extra) goes through uinput and would
-  click on the owner's real desktop too. Installing one is the owner's call.
-  Win32 and AppKit place popups themselves from the same anchor.
+- **The tray menu's new place is unseen.** The power and tray menus open where
+  the panels do (`menu_panel::popup_anchor`: the module's box stretched 16 px
+  past the bar). The power menu's place was seen in a nested Hyprland
+  (2026-10-21), clicked through `wlrctl`: it opened 16 px under the bar, level
+  with the clock panel, and closed on a click on the empty desktop, as a
+  grabbing popup does. The tray menu was not: in that session waybar owns the
+  StatusNotifierWatcher, so lyr's tray is empty.
+- **Clicking lyr in tests.** The owner installed `wlrctl` (2026-10-20), which
+  moves and clicks a virtual pointer in the compositor named by
+  `WAYLAND_DISPLAY` alone, so a nested Hyprland can be clicked without touching
+  the real desktop (`wlrctl pointer move -5000 -5000` then `move X Y` puts the
+  cursor at X, Y; `wlrctl pointer click left`). Headless sway still has no
+  pointer on its seat. Clicks reach lyr late: crcbl-shell 0.7.0's Wayland
+  `wait_events` sleeps through events already read off the socket (Mesa's Vulkan
+  presentation reads the shared connection during a present), so a press can
+  wait for the next input, and two clicks a second apart can arrive in one
+  batch, where the second cancels the first. office-crcbl confirmed it from the
+  code and fixes it in crcbl 0.8.1; until then a test clicking lyr sees erratic
+  toggles (one run: the clock panel opened in two rounds of five). A lyr-side
+  workaround, pumping before the wait, delivered no pointer events at all in two
+  runs, unexplained; it was not kept.
 - **Closing a panel on an outside click.** A panel opened from a key binding
-  cannot be an `xdg_popup` with a grab, because there is no input serial. Losing
-  keyboard focus (S17) closes it on a click into another window, but not on a
-  click on the empty desktop. M5 records what Hyprland does and picks a fix.
+  cannot be an `xdg_popup` with a grab, because there is no input serial, so it
+  closes when it loses keyboard focus (S17). On Hyprland 0.56.2 it never did: an
+  exclusive keyboard is held for as long as a layer surface is mapped, so
+  neither a click into another window (alacritty, nested, 2026-10-21) nor one on
+  the empty desktop closed the clock panel, whether a click or `lyr panel clock`
+  had opened it; only Escape and the toggle did. Panels now take the keyboard on
+  demand on Linux (`menu_panel::KEYBOARD`): Hyprland still focuses one as it
+  maps (Escape closed a panel `lyr panel clock` opened), and a click into a
+  window now takes the focus and closes the clock panel and the Bluetooth menu.
+  Still open: a click on the empty desktop does not close them, since no window
+  takes the focus. The usual fix is a transparent layer over the output under
+  the panel that closes it when clicked, as swaync's control centre does; it
+  costs a swapchain the size of the output while a panel is open, and its click
+  goes to it, not what lies under (as a grabbing popup's outside click does).
+  The owner's call. Sway is untried: a key from a new `wtype` keyboard closed an
+  on-demand panel there, which shows input reached it but not whether it took
+  the focus on mapping.
 
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,

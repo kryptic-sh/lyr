@@ -172,9 +172,23 @@ pub fn panel_desc(size: Size, place: Place) -> PanelDesc<'static> {
         anchor: edge | PanelAnchor::LEFT,
         reserve: Reserve::None,
         margins,
-        keyboard: PanelKeyboard::Exclusive,
+        keyboard: KEYBOARD,
     }
 }
+
+/// How a panel takes the keyboard. It needs keys from the moment it opens,
+/// and must hear focus leave to close on a click elsewhere. A layer surface's
+/// exclusive keyboard is held for as long as it is mapped, so a click into
+/// another window never took focus from it on Hyprland 0.56; on demand,
+/// Hyprland still focuses it on mapping, and a click into a window takes the
+/// focus and closes it (2026-10-21). Elsewhere `Exclusive` already lets
+/// focus go (crcbl's `PanelKeyboard` docs), and on demand would not take the
+/// keyboard on opening. Sway and niri are untried.
+const KEYBOARD: PanelKeyboard = if cfg!(target_os = "linux") {
+    PanelKeyboard::OnDemand
+} else {
+    PanelKeyboard::Exclusive
+};
 
 /// The window's size for `content` at `place`: as big, but no taller than
 /// the room beside the bar.
