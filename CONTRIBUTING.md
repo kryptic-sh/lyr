@@ -53,6 +53,11 @@ cargo test -p lyr-sources --test system_services -- --ignored --nocapture
 # out), never the session's own
 LYR_E2E_HYPRLAND=<signature> cargo test -p lyr-wm --lib a_real_hyprland -- --ignored
 
+# the niri backend against a niri started for it (it quits that one), named
+# by its socket; niri needs a visible window or a window on an output that
+# renders, or it stalls on its first frame
+LYR_E2E_NIRI=$XDG_RUNTIME_DIR/niri.<display>.<pid>.sock cargo test -p lyr-wm --lib a_real_niri -- --ignored
+
 # lyr's defaults against the waybar config they port
 LYR_WAYBAR_CONFIG=path/to/config.jsonc cargo test -p lyr-config the_defaults_match -- --ignored
 ```

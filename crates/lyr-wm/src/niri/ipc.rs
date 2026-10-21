@@ -396,4 +396,54 @@ mod tests {
             assert!(matches!(Niri::from_env(), Err(Error::NotRunning)));
         }
     }
+    /// The variable naming the niri socket [`a_real_niri_switches_and_quits`]
+    /// runs against. Not `NIRI_SOCKET`: the test quits that niri, so it must
+    /// be one started for it, never the session's own.
+    const E2E_SOCKET: &str = "LYR_E2E_NIRI";
+
+    #[tokio::test]
+    #[ignore = "needs a niri started for it, its socket named by LYR_E2E_NIRI; it quits that niri"]
+    async fn a_real_niri_switches_and_quits() {
+        const CHANGE_TIMEOUT: Duration = Duration::from_secs(10);
+
+        let niri = Niri::from_vars(|name| match name {
+            "NIRI_SOCKET" => std::env::var_os(E2E_SOCKET),
+            _ => std::env::var_os(name),
+        })
+        .expect("LYR_E2E_NIRI names a niri socket");
+        let (state, mut events) = niri.subscribe().await.expect("subscribed");
+        // niri keeps an empty workspace after the last one in use, so there
+        // is always another to go to.
+        let other = state
+            .workspaces()
+            .find(|workspace| Some(workspace.id) != state.active())
+            .expect("a second workspace")
+            .clone();
+        niri.focus(&other).await.expect("switched");
+        tokio::time::timeout(CHANGE_TIMEOUT, async {
+            loop {
+                let state = events.next().await.expect("read").expect("still running");
+                if state.active() == Some(other.id) {
+                    break;
+                }
+            }
+        })
+        .await
+        .expect("the switch in time");
+
+        // niri closes the socket before it can answer Quit, which `exit`
+        // takes as done.
+        niri.exit().await.expect("niri took the quit");
+        let end = tokio::time::timeout(CHANGE_TIMEOUT, async {
+            loop {
+                match events.next().await {
+                    Ok(Some(_)) => {}
+                    ended => return ended,
+                }
+            }
+        })
+        .await
+        .expect("the stream ended in time");
+        assert!(matches!(end, Ok(None)), "{end:?}");
+    }
 }

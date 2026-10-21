@@ -1318,9 +1318,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `;`, a refused `$` name, and Log out. Its first runs found that sway quits
   without answering `exit` and sends events after its socket is gone, both
   handled since. Not exercised there: the focused window's title (a headless
-  sway has no window open) and urgency. The niri backend is tested only against
-  a fake socket written from niri v26.04's `niri-ipc`; its Quit handling is read
-  from niri's source. Neither runs on a desktop yet.
+  sway has no window open) and urgency. The niri backend is tested against a
+  fake socket written from niri v26.04's `niri-ipc`, and against a real niri
+  26.04 by `a_real_niri_switches_and_quits` (ignored; `LYR_E2E_NIRI` names the
+  socket of a niri started for it, which it quits): run on the owner's laptop
+  (2026-10-21) with niri nested in a nested Hyprland, where a niri on a hidden
+  special workspace stalls without frame callbacks. It switched workspace, saw
+  the switch, and quit niri, which closed the socket without answering, as read
+  from its source (mutation-checked: without that handling the quit fails with
+  `Closed`). The bar ran in that niri too, the workspace module following
+  switches made with `niri msg`, its panel reserving its height. The sway
+  backend has not run on a desktop yet.
 - The GPU choice (the owner's rule: `CRCBL_ADAPTER`, else the adapter driving
   the bar's display when it is discrete, else low power) is crcbl-app's
   `adapter::choose` inside the `Presenter`, with `PowerPreference::LowPower`
