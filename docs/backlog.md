@@ -1150,6 +1150,24 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   panel by clicks all toggled (2026-10-21). Moving lyr to 0.8.0 waits on its
   publication; it brings Wayland's answer to which GPU drives the display (the
   GPU entry below) and keysym constants that `apps/lyr/src/keys.rs` can take.
+- **Bug: panels vanish when they lose focus (reported by the owner,
+  2026-10-21).** The clock panel and the Wi-Fi, Bluetooth and audio menus
+  disappear on losing focus; the power menu does not. Suspected cause, not yet
+  reproduced: the owner's Hyprland has `follow_mouse = true`, so moving the
+  pointer over a window hands it the keyboard, and since panels take the
+  keyboard on demand on Linux (`menu_panel::KEYBOARD`, the fix for closing on a
+  click into a window, below) that focus change closes them through their
+  `Focus { focused: false }` arm in `MenuPanel::event` and `ClockPanel::event`,
+  with no click at all. The power menu is a grabbing popup
+  (`list_popup::ListPopup`), which closes on an outside click rather than on
+  focus, so it is unaffected. To confirm: open a panel in a nested Hyprland with
+  `follow_mouse` on, move the pointer over a window with `wlrctl`, and see it
+  close; then again with the exclusive keyboard. Possible fixes, which trade
+  against each other: close on focus loss only after a click (a press outside,
+  which `menu_panel::pressed_outside` already catches on Hyprland) rather than
+  on any focus change, keeping on demand; or go back to the exclusive keyboard
+  and accept that a click into a window does not close the panel; or make the
+  panels grabbing popups when a click opened them, as the power menu is.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial, so it
   closes when it loses keyboard focus (S17). On Hyprland 0.56.2 it never did: an
