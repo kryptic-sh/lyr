@@ -1136,21 +1136,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `WAYLAND_DISPLAY` alone, so a nested Hyprland can be clicked without touching
   the real desktop (`wlrctl pointer move -5000 -5000` then `move X Y` puts the
   cursor at X, Y; `wlrctl pointer click left`). Headless sway still has no
-  pointer on its seat. Clicks reach lyr late: crcbl-shell 0.7.0's Wayland
-  `wait_events` sleeps through events already read off the socket (Mesa's Vulkan
-  presentation reads the shared connection during a present), so a press can
-  wait for the next input, and two clicks a second apart can arrive in one
-  batch, where the second cancels the first. office-crcbl fixed it on crcbl main
-  after 0.8.0 ("fix(shell): end a Wayland wait on events in hand"), with an e2e
-  test; a 0.8.1 with it waits on the owner's go-ahead. Until lyr is on it, a
-  test clicking lyr sees erratic toggles (one run: the clock panel opened in two
-  rounds of five). Built locally against crcbl main through an uncommitted
-  `[patch]` (lyr's pins moved to 0.8.0, no source change needed), presses
-  arrived within about 50 ms and ten rounds of opening and closing the clock
-  panel by clicks all toggled (2026-10-21). lyr is on crcbl 0.8.0
-  (`apps/lyr/src/keys.rs` now takes its keysym constants); the owner approved
-  0.8.1, which office-crcbl is cutting, and lyr moves to it once it is on
-  crates.io.
+  pointer on its seat. Before crcbl 0.8.1, clicks reached lyr late (a Wayland
+  wait slept through events Mesa had read off the shared connection), so a
+  toggle test was erratic; on 0.8.1 ten rounds of opening and closing the clock
+  panel by clicks all toggled (2026-10-21).
 - **Bug: panels vanish when they lose focus (reported by the owner,
   2026-10-21).** The clock panel and the Wi-Fi, Bluetooth and audio menus
   disappear on losing focus; the power menu does not. Suspected cause, not yet
