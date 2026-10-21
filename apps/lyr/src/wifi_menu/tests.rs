@@ -51,6 +51,8 @@ struct Setup {
     theme: Theme,
     menu: WifiMenu,
     opened: Instant,
+    /// What NetworkManager reports, which every redraw shows.
+    wifi: Wifi,
 }
 
 impl Setup {
@@ -66,7 +68,8 @@ impl Setup {
     fn pump(&mut self) -> Outcome {
         let outcome = self.events();
         if !matches!(outcome, Outcome::Close | Outcome::Closed) {
-            self.refresh(&wifi(), self.opened);
+            let wifi = self.wifi.clone();
+            self.refresh(&wifi, self.opened);
         }
         outcome
     }
@@ -146,6 +149,7 @@ fn setup(wifi: &Wifi) -> Setup {
         theme,
         menu,
         opened,
+        wifi: wifi.clone(),
     }
 }
 
@@ -234,6 +238,16 @@ fn forget_is_confirmed_and_the_radio_is_the_caller_s() {
     assert_eq!(setup.choose(1), Outcome::Forget("home".to_owned()));
     setup.refresh(&wifi(), setup.opened);
     assert_eq!(setup.choose(RADIO), Outcome::ToggleRadio);
+}
+
+#[test]
+fn the_network_in_use_disconnects() {
+    let mut on_home = wifi();
+    on_home.active = Some("/ap/2".to_owned());
+    let mut setup = setup(&on_home);
+    // The radio, cafe's Connect, then home's Disconnect and Forget.
+    assert_eq!(setup.choose(2), Outcome::Disconnect);
+    assert_eq!(setup.choose(3), Outcome::Redraw, "Forget, to confirm");
 }
 
 #[test]

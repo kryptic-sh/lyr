@@ -150,6 +150,8 @@ pub enum WifiRequest {
     Join(JoinRequest),
     /// The saved profiles at these paths are to go.
     Forget(Vec<String>),
+    /// The device at this path is to leave its network.
+    Disconnect(String),
 }
 
 /// A join the Wi-Fi menu asked for.
@@ -1360,6 +1362,7 @@ mod linux {
                     WifiRequest::Radio(on) => network.set_radio(on).await,
                     WifiRequest::Scan(device) => network.scan(&device).await,
                     WifiRequest::Forget(profiles) => network.forget(&profiles).await,
+                    WifiRequest::Disconnect(device) => network.disconnect(&device).await,
                     WifiRequest::Join(request) => {
                         let joined = join(&network, request).await;
                         if !deliver(&sender, waker.as_ref(), Update::WifiJoined(joined)) {

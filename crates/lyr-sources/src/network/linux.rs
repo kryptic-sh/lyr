@@ -84,6 +84,7 @@ trait Device {
     fn ip4_config(&self) -> zbus::Result<OwnedObjectPath>;
     #[zbus(property)]
     fn state(&self) -> zbus::Result<u32>;
+    fn disconnect(&self) -> zbus::Result<()>;
     /// `StateChanged`, named apart from `State`'s change stream.
     #[zbus(signal, name = "StateChanged")]
     fn device_state_changed(&self, new_state: u32, old_state: u32, reason: u32)

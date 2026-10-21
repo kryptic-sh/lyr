@@ -1083,31 +1083,34 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   is now skipped (`unless_gone`), NetworkManager's answer for such a path
   (`UnknownMethod`) is pinned by the `system_services` test, and a watch that
   ends says so at once rather than when all the Wi-Fi tasks end. Not run: a
-  successful join, the radio switch. **The menu has no Disconnect**: the owner
-  looked for one; a network in use offers only Forget, which deletes its
-  profile. Disconnecting would be NetworkManager's `DeactivateConnection` on the
-  device's active connection, as a button on the row in use. A menu taller than
-  the room beside the bar is held to it and scrolls (`MenuPanel`: three lines a
-  wheel step, the arrow keys bringing the outlined control into view, the frame
-  kept at the window's size); seen on a nested Hyprland whose output was cut to
-  500 px, the Wi-Fi menu held to 418 px and scrolled by keys typed with `wtype`.
-  The panel is up (`apps/lyr/src/wifi_menu.rs`, its glue in
-  `apps/lyr/src/bar/wifi.rs`): opened by `open_wifi_menu` or `lyr panel wifi`
-  under the network module, a rescan asked for on every open and "Scanning…"
-  until a newer scan lands or `wifi_menu::SCAN_WAIT` (lyr's own 15 s) is up,
-  unless the last scan is under 30 s old; a password typed with text input
-  `Password`, spaces kept; `recovery` applied to a failure by the source task; a
-  second click on the module within GTK's default double-click time leaves it
-  open. Tested on crcbl's headless shell and mutation-checked. A failure while
-  the menu is closed is a notice from lyr
-  (`notifications::linux::notify_session`, to whichever daemon holds the name,
-  lyr's own included), its text escaped for markup (`lyr_core::markup::escape`);
-  the call is tested against lyr's daemon on a peer-to-peer connection, the glue
-  that sends it is not. Two equally strong access points of one SSID: the first
-  listed is joined, which either would do. The header's buttons take the arrow
-  keys from the right (No before Yes), as in the Bluetooth menu. Both menus drop
-  the keyboard's outline when a question appears (`MenuPanel::unfocus`), so
-  Enter answers it.
+  successful join, the radio switch. The owner looked for a Disconnect, and the
+  network in use offered only Forget, which deletes its profile; its row now has
+  Disconnect in place of Connect, which calls the device's `Disconnect`
+  (NetworkManager then joins nothing on its own until asked), tested on the fake
+  and mutation-checked at each layer. The real daemon answered `Disconnect` on
+  the idle device with "This device is not active", so the call is the right
+  one; a disconnect from a network in use was not run, since the laptop was on
+  its wired connection. A menu taller than the room beside the bar is held to it
+  and scrolls (`MenuPanel`: three lines a wheel step, the arrow keys bringing
+  the outlined control into view, the frame kept at the window's size); seen on
+  a nested Hyprland whose output was cut to 500 px, the Wi-Fi menu held to 418
+  px and scrolled by keys typed with `wtype`. The panel is up
+  (`apps/lyr/src/wifi_menu.rs`, its glue in `apps/lyr/src/bar/wifi.rs`): opened
+  by `open_wifi_menu` or `lyr panel wifi` under the network module, a rescan
+  asked for on every open and "Scanning…" until a newer scan lands or
+  `wifi_menu::SCAN_WAIT` (lyr's own 15 s) is up, unless the last scan is under
+  30 s old; a password typed with text input `Password`, spaces kept; `recovery`
+  applied to a failure by the source task; a second click on the module within
+  GTK's default double-click time leaves it open. Tested on crcbl's headless
+  shell and mutation-checked. A failure while the menu is closed is a notice
+  from lyr (`notifications::linux::notify_session`, to whichever daemon holds
+  the name, lyr's own included), its text escaped for markup
+  (`lyr_core::markup::escape`); the call is tested against lyr's daemon on a
+  peer-to-peer connection, the glue that sends it is not. Two equally strong
+  access points of one SSID: the first listed is joined, which either would do.
+  The header's buttons take the arrow keys from the right (No before Yes), as in
+  the Bluetooth menu. Both menus drop the keyboard's outline when a question
+  appears (`MenuPanel::unfocus`), so Enter answers it.
 - **Tray, M8.** Built: the rules (`lyr_core::tray`, after waybar's
   `src/modules/sni` at master `c15ec02`): an item's status (passive items
   hidden, as waybar hides them by default), a click (left activates, or opens

@@ -162,6 +162,7 @@ impl App {
         };
         let request = match outcome {
             Outcome::ToggleRadio => WifiRequest::Radio(!wifi.radio.enabled),
+            Outcome::Disconnect => WifiRequest::Disconnect(device),
             Outcome::Forget(ssid) => WifiRequest::Forget(
                 wifi.profiles_for(&ssid)
                     .iter()

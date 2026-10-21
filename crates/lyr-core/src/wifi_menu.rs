@@ -351,6 +351,8 @@ pub enum Target {
     Radio,
     /// A network's Connect button, by its index in the rows.
     Join(usize),
+    /// The Disconnect button of the network in use.
+    Disconnect(usize),
     /// A known network's Forget button.
     Forget(usize),
 }
@@ -391,11 +393,13 @@ fn label(network: &Network) -> String {
     format!("{mark}{} {}%", network.ssid, network.strength)
 }
 
-/// A row's buttons: Connect unless it is in use, then Forget when it is
-/// known.
+/// A row's buttons: Connect, or Disconnect when it is in use, then Forget
+/// when it is known.
 fn buttons(network: &Network, index: usize) -> Vec<(&'static str, Target)> {
     let mut buttons = Vec::new();
-    if !network.in_use {
+    if network.in_use {
+        buttons.push(("Disconnect", Target::Disconnect(index)));
+    } else {
         buttons.push(("Connect", Target::Join(index)));
     }
     if network.known {

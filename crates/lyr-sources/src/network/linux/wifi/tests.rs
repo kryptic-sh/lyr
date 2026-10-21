@@ -132,6 +132,7 @@ impl FakeManager {
 
 /// A device of `kind` (`NM_DEVICE_TYPE_*`) in `state`.
 struct FakeDevice {
+    shared: Shared,
     kind: u32,
     state: u32,
 }
@@ -145,6 +146,11 @@ impl FakeDevice {
     #[zbus(property)]
     fn state(&self) -> u32 {
         self.state
+    }
+    fn disconnect(&self) {
+        asked(&self.shared)
+            .calls
+            .push(format!("disconnect {}", self.kind));
     }
 
     #[zbus(signal, name = "StateChanged")]
@@ -310,11 +316,19 @@ async fn fake(state: u32, outcome: (u32, u32)) -> (Connection, Connection, Share
         .serve_at(
             WIRED,
             FakeDevice {
+                shared: shared.clone(),
                 kind: 1,
                 state: 100,
             },
         )
-        .serve_at(DEVICE, FakeDevice { kind: 2, state })
+        .serve_at(
+            DEVICE,
+            FakeDevice {
+                shared: shared.clone(),
+                kind: 2,
+                state,
+            },
+        )
         .serve_at(
             DEVICE,
             FakeWireless {
@@ -406,6 +420,17 @@ async fn a_profile_or_access_point_gone_before_it_is_read_is_left_out() {
     assert_eq!(paths, [HOME_PROFILE]);
     let points: Vec<&str> = wifi.points.iter().map(|p| p.path.as_str()).collect();
     assert_eq!(points, [HOME, CAFE]);
+}
+
+#[tokio::test]
+async fn disconnecting_asks_the_wifi_device() {
+    let (_server, client, shared) = fake(ACTIVATED, (ACTIVATED, 0)).await;
+    network(&client)
+        .await
+        .disconnect(DEVICE)
+        .await
+        .expect("disconnected");
+    assert_eq!(asked(&shared).calls, ["disconnect 2"], "the Wi-Fi one");
 }
 
 #[tokio::test]

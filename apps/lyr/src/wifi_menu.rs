@@ -103,6 +103,8 @@ pub enum Outcome {
     NewPassword(Network, String),
     /// The saved profiles of the network with this SSID are to go.
     Forget(String),
+    /// The device is to leave the network it is on.
+    Disconnect,
     /// The menu is to be drawn again.
     Redraw,
 }
@@ -327,6 +329,7 @@ impl WifiMenu {
     fn act(&mut self, target: Target) -> Outcome {
         match target {
             Target::Radio => Outcome::ToggleRadio,
+            Target::Disconnect(_) => Outcome::Disconnect,
             Target::Join(index) => {
                 let Some(network) = self.networks.get(index).cloned() else {
                     return Outcome::Kept;

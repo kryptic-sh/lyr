@@ -153,8 +153,13 @@ fn each_network_has_its_row_and_buttons() {
     let targets: Vec<Target> = regions.targets().copied().collect();
     assert_eq!(
         targets,
-        [Target::Radio, Target::Forget(0), Target::Join(1)],
-        "no Connect on the network in use, no Forget on an unknown one"
+        [
+            Target::Radio,
+            Target::Disconnect(0),
+            Target::Forget(0),
+            Target::Join(1)
+        ],
+        "Disconnect, not Connect, on the network in use; no Forget on an unknown one"
     );
     // The switch, then a gap before the rows, each a row and a gap apart.
     let first = PADDING + ROW + 2.0 * GAP;

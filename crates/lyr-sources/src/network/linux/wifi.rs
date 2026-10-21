@@ -316,6 +316,18 @@ impl NetworkManager {
         ))
     }
 
+    /// Takes the device at `device` off its network, keeping the profile.
+    /// NetworkManager does not join again on its own until a join is asked
+    /// for, as `nmcli device disconnect` does.
+    ///
+    /// # Errors
+    ///
+    /// When NetworkManager refuses.
+    pub async fn disconnect(&self, device: &str) -> zbus::Result<()> {
+        let device = OwnedObjectPath::try_from(device)?;
+        self.proxy::<DeviceProxy>(&device).await?.disconnect().await
+    }
+
     /// Deletes the saved profiles at `profiles`.
     ///
     /// # Errors
