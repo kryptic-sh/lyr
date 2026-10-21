@@ -172,16 +172,21 @@ pub fn panel_desc(size: Size, place: Place) -> PanelDesc<'static> {
         anchor: edge | PanelAnchor::LEFT,
         reserve: Reserve::None,
         margins,
-        keyboard: KEYBOARD,
+        // Keys from the moment it opens. On Hyprland 0.56 the keyboard is
+        // then held while the panel is mapped, and a click elsewhere closes
+        // it through `pressed_outside`; on demand, focus followed the
+        // pointer onto any window it crossed and closed the panel with no
+        // click (2026-10-21). Elsewhere the panel hears focus leave.
+        keyboard: PanelKeyboard::Exclusive,
     }
 }
 
 /// Whether `event` presses a button outside `window`: a click meant for
 /// something else, which closes a panel as it would a grabbing popup.
-/// Hyprland 0.56 hands the panel holding the keyboard every click, on the
-/// bar or a window or the desktop alike, at a position outside its surface
-/// (seen with an on-demand panel, 2026-10-21); elsewhere a panel only hears
-/// clicks on itself, and this never answers yes.
+/// Hyprland 0.56 hands a layer surface holding the exclusive keyboard every
+/// click, on the bar or a window or the desktop alike, at a position outside
+/// its surface (2026-10-21); elsewhere a panel only hears clicks on itself,
+/// and this never answers yes.
 pub fn pressed_outside(shell: &dyn Shell, window: WindowId, event: &ShellEvent) -> bool {
     let ShellEvent::Button {
         state: ButtonState::Pressed,
@@ -203,20 +208,6 @@ pub fn pressed_outside(shell: &dyn Shell, window: WindowId, event: &ShellEvent) 
         || position.x >= f64::from(size.width)
         || position.y >= f64::from(size.height)
 }
-
-/// How a panel takes the keyboard. It needs keys from the moment it opens,
-/// and must hear focus leave to close on a click elsewhere. A layer surface's
-/// exclusive keyboard is held for as long as it is mapped, so a click into
-/// another window never took focus from it on Hyprland 0.56; on demand,
-/// Hyprland still focuses it on mapping, and a click into a window takes the
-/// focus and closes it (2026-10-21). Elsewhere `Exclusive` already lets
-/// focus go (crcbl's `PanelKeyboard` docs), and on demand would not take the
-/// keyboard on opening. Sway and niri are untried.
-const KEYBOARD: PanelKeyboard = if cfg!(target_os = "linux") {
-    PanelKeyboard::OnDemand
-} else {
-    PanelKeyboard::Exclusive
-};
 
 /// The window's size for `content` at `place`: as big, but no taller than
 /// the room beside the bar.

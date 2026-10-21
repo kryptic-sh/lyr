@@ -1140,49 +1140,20 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   wait slept through events Mesa had read off the shared connection), so a
   toggle test was erratic; on 0.8.1 ten rounds of opening and closing the clock
   panel by clicks all toggled (2026-10-21).
-- **Bug: panels vanish when they lose focus (reported by the owner,
-  2026-10-21).** The clock panel and the Wi-Fi, Bluetooth and audio menus
-  disappear on losing focus; the power menu does not. Suspected cause, not yet
-  reproduced: the owner's Hyprland has `follow_mouse = true`, so moving the
-  pointer over a window hands it the keyboard, and since panels take the
-  keyboard on demand on Linux (`menu_panel::KEYBOARD`, the fix for closing on a
-  click into a window, below) that focus change closes them through their
-  `Focus { focused: false }` arm in `MenuPanel::event` and `ClockPanel::event`,
-  with no click at all. The power menu is a grabbing popup
-  (`list_popup::ListPopup`), which closes on an outside click rather than on
-  focus, so it is unaffected. To confirm: open a panel in a nested Hyprland with
-  `follow_mouse` on, move the pointer over a window with `wlrctl`, and see it
-  close; then again with the exclusive keyboard. Possible fixes, which trade
-  against each other: close on focus loss only after a click (a press outside,
-  which `menu_panel::pressed_outside` already catches on Hyprland) rather than
-  on any focus change, keeping on demand; or go back to the exclusive keyboard
-  and accept that a click into a window does not close the panel; or make the
-  panels grabbing popups when a click opened them, as the power menu is.
-- **Closing a panel on an outside click.** A panel opened from a key binding
-  cannot be an `xdg_popup` with a grab, because there is no input serial, so it
-  closes when it loses keyboard focus (S17). On Hyprland 0.56.2 it never did: an
-  exclusive keyboard is held for as long as a layer surface is mapped, so
-  neither a click into another window (alacritty, nested, 2026-10-21) nor one on
-  the empty desktop closed the clock panel, whether a click or `lyr panel clock`
-  had opened it; only Escape and the toggle did. Panels now take the keyboard on
-  demand on Linux (`menu_panel::KEYBOARD`): Hyprland still focuses one as it
-  maps (Escape closed a panel `lyr panel clock` opened), and a click into a
-  window now takes the focus and closes the clock panel and the Bluetooth menu.
-  Hyprland also moves the pointer onto a panel that takes the keyboard: until
-  the pointer moves, every click goes to the panel at a position outside its
-  surface (a second click on the clock arrived at 569, −41), so the bar never
-  saw it and the panel stayed open. A press outside the panel's window now
-  closes it (`menu_panel::pressed_outside`, tested in both panels and
-  mutation-checked); with crcbl main, clicking the clock again closed its panel
-  in ten rounds of ten, with or without the pointer moving between. Still open:
-  a click on the empty desktop after the pointer moves does not close them,
-  since it reaches no lyr surface and no window takes the focus. The usual fix
-  is a transparent layer over the output under the panel that closes it when
-  clicked, as swaync's control centre does; it costs a swapchain the size of the
-  output while a panel is open, and its click goes to it, not what lies under
-  (as a grabbing popup's outside click does). The owner's call. Sway is untried:
-  a key from a new `wtype` keyboard closed an on-demand panel there, which shows
-  input reached it but not whether it took the focus on mapping.
+- **How Hyprland treats a panel's keyboard and pointer (surprising, not a
+  bug).** A panel takes the exclusive keyboard so its keys work from the moment
+  it opens, and Hyprland 0.56 then holds it there while the panel is mapped and
+  hands the panel every click, on the bar, a window or the desktop, at a
+  position outside its surface. A click outside therefore never reached what it
+  was aimed at, and the panel closes on it (`menu_panel::pressed_outside`), as a
+  grabbing popup does; clicking another module while a panel is open closes the
+  panel without opening the other. Taking the keyboard on demand instead was
+  tried and reverted: with `follow_mouse` on (the owner's setting and Hyprland's
+  default) focus moved to any window the pointer crossed and closed the panel
+  with no click, which the owner reported. Seen in a nested Hyprland with
+  `wlrctl` (2026-10-21): hovering a window kept the clock panel open, and a
+  click in a window, on the desktop or on the clock closed it. Not tried on sway
+  or niri, where the panel closes when focus leaves.
 
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,
