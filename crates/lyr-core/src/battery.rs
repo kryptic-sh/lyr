@@ -15,8 +15,9 @@ pub enum Status {
     Discharging,
     /// On mains power and not charging, below 100 % (held at a charge limit).
     Plugged,
-    /// At 100 %.
+    /// At 100 %, on mains power: every platform reports it only there.
     Full,
+    /// On mains power and neither charging nor discharging.
     NotCharging,
     Unknown,
 }
@@ -82,11 +83,16 @@ pub fn view(reading: &Reading, config: &Config) -> View {
     } else {
         None
     };
+    // Plugged in and idle shows as plugged, full or not, where waybar shows
+    // a full or not-charging battery in `format`, as if on battery.
     let format = match reading.status {
         Status::Charging => config.format_charging.as_ref(),
-        Status::Plugged => config.format_plugged.as_ref(),
-        Status::Full => config.format_full.as_ref(),
-        Status::Discharging | Status::NotCharging | Status::Unknown => None,
+        Status::Plugged | Status::NotCharging => config.format_plugged.as_ref(),
+        Status::Full => config
+            .format_full
+            .as_ref()
+            .or(config.format_plugged.as_ref()),
+        Status::Discharging | Status::Unknown => None,
     }
     .unwrap_or(&config.format);
 

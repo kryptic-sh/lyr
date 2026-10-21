@@ -43,9 +43,23 @@ fn charging_adds_the_bolt_and_plugged_shows_the_plug_alone() {
 }
 
 #[test]
-fn full_has_no_format_of_its_own_so_shows_the_top_icon() {
-    let full = view(&reading(100, Status::Full, TimeTo::Unknown), &defaults());
-    assert_eq!(full.text, "\u{F240}");
+fn plugged_in_and_idle_shows_the_plug_full_or_not() {
+    let config = defaults();
+    let full = view(&reading(100, Status::Full, TimeTo::Unknown), &config);
+    assert_eq!(full.text, "\u{EE9E}");
+    let held = view(&reading(80, Status::NotCharging, TimeTo::Unknown), &config);
+    assert_eq!(held.text, "\u{EE9E}");
+    // On battery it is the ramp's icon, never the plug.
+    let discharging = view(&reading(100, Status::Discharging, TimeTo::Unknown), &config);
+    assert_eq!(discharging.text, "\u{F240}");
+}
+
+#[test]
+fn a_format_for_full_wins_over_the_plug() {
+    let mut config = defaults();
+    config.format_full = Some(lyr_config::Format::parse("{icon} full").expect("valid"));
+    let full = view(&reading(100, Status::Full, TimeTo::Unknown), &config);
+    assert_eq!(full.text, "\u{F240} full");
 }
 
 #[test]

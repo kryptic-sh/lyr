@@ -945,7 +945,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   systemd v262.1; the owner's installed systemd is not checked. The
   defaults-parity test (M3) should read the glyphs from `config.jsonc` itself,
   not from the plan: the plan once lost every BMP private-use glyph without
-  anyone noticing, and now writes them as code points.
+  anyone noticing, and now writes them as code points. One deliberate departure,
+  at the owner's request (2026-10-21): a battery on mains that is neither
+  charging nor discharging shows `format_plugged` (the dotfiles' plug), full or
+  held below full, where waybar shows a full or not-charging battery in `format`
+  as if on battery; `format_full`, when set, still wins at 100 %
+  (`lyr_core::battery::view`). Seen on the owner's laptop, full on mains: the
+  plug where the full battery was.
 
 - **Native notification centre and menus, not yet researched**
   ([plan/09](plan/09-notifications.md), [plan/10](plan/10-popups-and-menus.md)).

@@ -258,10 +258,11 @@ pub struct Battery {
     /// Used while charging instead of `format`.
     #[serde(default)]
     pub format_charging: Option<Format>,
-    /// Used while on mains power but not charging (held at a charge limit).
+    /// Used while on mains power and neither charging nor discharging: held
+    /// at a charge limit, or full when `format_full` is not set.
     #[serde(default)]
     pub format_plugged: Option<Format>,
-    /// Used at 100 % instead of `format`.
+    /// Used at 100 % on mains power, instead of `format_plugged`.
     #[serde(default)]
     pub format_full: Option<Format>,
     /// The icon ramp, emptiest first.
