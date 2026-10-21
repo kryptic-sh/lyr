@@ -262,6 +262,8 @@ impl Setup {
                 now: Instant::now(),
             },
         );
+        // As the bar's next draw does: the window takes the new size.
+        self.panel.ask_size(&mut self.shell).expect("resized");
     }
 }
 
@@ -500,4 +502,25 @@ fn the_calendar_is_laid_out_in_its_own_line_height() {
     let tall = bottom(&mut setup, 20.0);
     let short = bottom(&mut setup, 10.0);
     assert!(short < tall, "{short} < {tall}");
+}
+
+#[test]
+fn a_press_outside_the_panel_closes_it() {
+    let mut setup = setup();
+    setup.draw();
+    // The configure, which gives the window its size.
+    setup.pump();
+    let window = setup.panel.window;
+    // Where Hyprland put a click on the bar above it.
+    let outside = PhysicalPoint { x: 569.0, y: -41.0 };
+    setup
+        .shell
+        .button(
+            window,
+            PointerButton::Left,
+            ButtonState::Pressed,
+            Some(outside),
+        )
+        .expect("clicked");
+    assert_eq!(setup.pump(), Outcome::Close);
 }

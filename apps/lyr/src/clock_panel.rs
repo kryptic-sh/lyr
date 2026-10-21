@@ -30,7 +30,7 @@ use lyr_shell::bars::NAMESPACE;
 
 use crate::input::Pointer;
 use crate::keys::{self, Key};
-use crate::menu_panel::{Place, logical, panel_desc};
+use crate::menu_panel::{Place, logical, panel_desc, pressed_outside};
 use crate::tooltips::Look;
 
 /// swaync's `control-center-width`, the narrowest the notification centre
@@ -213,6 +213,9 @@ impl ClockPanel {
                 return Ok(Outcome::Closed);
             }
             ShellEvent::Focus { focused: false, .. } => return Ok(Outcome::Close),
+            ShellEvent::Button { .. } if pressed_outside(shell, self.window, event) => {
+                return Ok(Outcome::Close);
+            }
             ShellEvent::Key { .. } if keys::pressed(event) == Some(Key::Escape) => {
                 return Ok(Outcome::Close);
             }

@@ -1140,11 +1140,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `wait_events` sleeps through events already read off the socket (Mesa's Vulkan
   presentation reads the shared connection during a present), so a press can
   wait for the next input, and two clicks a second apart can arrive in one
-  batch, where the second cancels the first. office-crcbl confirmed it from the
-  code and fixes it in crcbl 0.8.1; until then a test clicking lyr sees erratic
-  toggles (one run: the clock panel opened in two rounds of five). A lyr-side
-  workaround, pumping before the wait, delivered no pointer events at all in two
-  runs, unexplained; it was not kept.
+  batch, where the second cancels the first. office-crcbl fixed it on crcbl main
+  after 0.8.0 ("fix(shell): end a Wayland wait on events in hand"), with an e2e
+  test; a 0.8.1 with it waits on the owner's go-ahead. Until lyr is on it, a
+  test clicking lyr sees erratic toggles (one run: the clock panel opened in two
+  rounds of five). Built locally against crcbl main through an uncommitted
+  `[patch]` (lyr's pins moved to 0.8.0, no source change needed), presses
+  arrived within about 50 ms and ten rounds of opening and closing the clock
+  panel by clicks all toggled (2026-10-21). Moving lyr to 0.8.0 waits on its
+  publication; it brings Wayland's answer to which GPU drives the display (the
+  GPU entry below) and keysym constants that `apps/lyr/src/keys.rs` can take.
 - **Closing a panel on an outside click.** A panel opened from a key binding
   cannot be an `xdg_popup` with a grab, because there is no input serial, so it
   closes when it loses keyboard focus (S17). On Hyprland 0.56.2 it never did: an
@@ -1155,14 +1160,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   demand on Linux (`menu_panel::KEYBOARD`): Hyprland still focuses one as it
   maps (Escape closed a panel `lyr panel clock` opened), and a click into a
   window now takes the focus and closes the clock panel and the Bluetooth menu.
-  Still open: a click on the empty desktop does not close them, since no window
-  takes the focus. The usual fix is a transparent layer over the output under
-  the panel that closes it when clicked, as swaync's control centre does; it
-  costs a swapchain the size of the output while a panel is open, and its click
-  goes to it, not what lies under (as a grabbing popup's outside click does).
-  The owner's call. Sway is untried: a key from a new `wtype` keyboard closed an
-  on-demand panel there, which shows input reached it but not whether it took
-  the focus on mapping.
+  Hyprland also moves the pointer onto a panel that takes the keyboard: until
+  the pointer moves, every click goes to the panel at a position outside its
+  surface (a second click on the clock arrived at 569, −41), so the bar never
+  saw it and the panel stayed open. A press outside the panel's window now
+  closes it (`menu_panel::pressed_outside`, tested in both panels and
+  mutation-checked); with crcbl main, clicking the clock again closed its panel
+  in ten rounds of ten, with or without the pointer moving between. Still open:
+  a click on the empty desktop after the pointer moves does not close them,
+  since it reaches no lyr surface and no window takes the focus. The usual fix
+  is a transparent layer over the output under the panel that closes it when
+  clicked, as swaync's control centre does; it costs a swapchain the size of the
+  output while a panel is open, and its click goes to it, not what lies under
+  (as a grabbing popup's outside click does). The owner's call. Sway is untried:
+  a key from a new `wtype` keyboard closed an on-demand panel there, which shows
+  input reached it but not whether it took the focus on mapping.
 
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,

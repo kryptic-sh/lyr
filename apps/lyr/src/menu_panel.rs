@@ -176,6 +176,34 @@ pub fn panel_desc(size: Size, place: Place) -> PanelDesc<'static> {
     }
 }
 
+/// Whether `event` presses a button outside `window`: a click meant for
+/// something else, which closes a panel as it would a grabbing popup.
+/// Hyprland 0.56 hands the panel holding the keyboard every click, on the
+/// bar or a window or the desktop alike, at a position outside its surface
+/// (seen with an on-demand panel, 2026-10-21); elsewhere a panel only hears
+/// clicks on itself, and this never answers yes.
+pub fn pressed_outside(shell: &dyn Shell, window: WindowId, event: &ShellEvent) -> bool {
+    let ShellEvent::Button {
+        state: ButtonState::Pressed,
+        position: Some(position),
+        ..
+    } = *event
+    else {
+        return false;
+    };
+    let Some(size) = shell
+        .window_state(window)
+        .ok()
+        .and_then(|state| state.size())
+    else {
+        return false;
+    };
+    position.x < 0.0
+        || position.y < 0.0
+        || position.x >= f64::from(size.width)
+        || position.y >= f64::from(size.height)
+}
+
 /// How a panel takes the keyboard. It needs keys from the moment it opens,
 /// and must hear focus leave to close on a click elsewhere. A layer surface's
 /// exclusive keyboard is held for as long as it is mapped, so a click into
@@ -464,6 +492,9 @@ impl<T: Copy> MenuPanel<T> {
                 return Ok(Event::Closed);
             }
             ShellEvent::Focus { focused: false, .. } => return Ok(Event::Close),
+            ShellEvent::Button { .. } if pressed_outside(shell, self.window, event) => {
+                return Ok(Event::Close);
+            }
             ShellEvent::Key { .. } if keys::pressed(event) == Some(Key::Escape) => {
                 return Ok(Event::Close);
             }
@@ -721,6 +752,36 @@ mod tests {
             "{}",
             panel.scroll
         );
+    }
+
+    #[test]
+    fn a_press_outside_the_panel_closes_it() {
+        let (mut panel, mut shell) = tall();
+        let window = panel.window;
+        pump(&mut panel, &mut shell);
+        let inside = PhysicalPoint { x: 50.0, y: 10.0 };
+        shell
+            .button(
+                window,
+                PointerButton::Left,
+                ButtonState::Pressed,
+                Some(inside),
+            )
+            .expect("clicked");
+        let events = pump(&mut panel, &mut shell);
+        assert!(!events.contains(&Event::Close), "{events:?}");
+
+        // Where Hyprland put a click on the bar above it.
+        let outside = PhysicalPoint { x: 569.0, y: -41.0 };
+        shell
+            .button(
+                window,
+                PointerButton::Left,
+                ButtonState::Pressed,
+                Some(outside),
+            )
+            .expect("clicked");
+        assert_eq!(pump(&mut panel, &mut shell), [Event::Close]);
     }
 
     #[test]
