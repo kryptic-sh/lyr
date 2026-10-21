@@ -6,15 +6,6 @@
 
 use crcbl_shell::{ButtonState, Keysym, ShellEvent};
 
-/// X11's keysyms for them (`xkbcommon-keysyms.h`), the numbering crcbl
-/// reports on every backend.
-const BACKSPACE: u32 = 0xFF08;
-const RETURN: u32 = 0xFF0D;
-const ESCAPE: u32 = 0xFF1B;
-const UP: u32 = 0xFF52;
-const DOWN: u32 = 0xFF54;
-const KP_ENTER: u32 = 0xFF8D;
-
 /// A key lyr's menus answer to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Key {
@@ -29,19 +20,19 @@ pub enum Key {
 /// The key `event` presses, of those lyr answers to.
 pub fn pressed(event: &ShellEvent) -> Option<Key> {
     let ShellEvent::Key {
-        keysym: Keysym(symbol),
+        keysym,
         state: ButtonState::Pressed,
         ..
     } = *event
     else {
         return None;
     };
-    Some(match symbol {
-        ESCAPE => Key::Escape,
-        RETURN | KP_ENTER => Key::Enter,
-        UP => Key::Up,
-        DOWN => Key::Down,
-        BACKSPACE => Key::Backspace,
+    Some(match keysym {
+        Keysym::ESCAPE => Key::Escape,
+        Keysym::RETURN | Keysym::KP_ENTER => Key::Enter,
+        Keysym::UP => Key::Up,
+        Keysym::DOWN => Key::Down,
+        Keysym::BACKSPACE => Key::Backspace,
         _ => return None,
     })
 }

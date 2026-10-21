@@ -71,10 +71,9 @@ and to stderr; `RUST_LOG` filters them.
 
 The bar draws on the GPU driving its display when that one is discrete, and on
 the low-power one otherwise, so a laptop with an integrated and a discrete GPU
-keeps the discrete one asleep. On Wayland, crcbl 0.7.0 cannot tell which GPU
-drives the display yet, so there the bar always takes the low-power one.
-`CRCBL_ADAPTER` picks one by kind instead: `integrated`, `discrete`, `cpu` or
-`virtual`. The log's `drawing on …` line names the one in use.
+keeps the discrete one asleep. `CRCBL_ADAPTER` picks one by kind instead:
+`integrated`, `discrete`, `cpu` or `virtual`. The log's `drawing on …` line
+names the one in use.
 
 ## Configuration
 

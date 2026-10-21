@@ -1147,9 +1147,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   rounds of five). Built locally against crcbl main through an uncommitted
   `[patch]` (lyr's pins moved to 0.8.0, no source change needed), presses
   arrived within about 50 ms and ten rounds of opening and closing the clock
-  panel by clicks all toggled (2026-10-21). Moving lyr to 0.8.0 waits on its
-  publication; it brings Wayland's answer to which GPU drives the display (the
-  GPU entry below) and keysym constants that `apps/lyr/src/keys.rs` can take.
+  panel by clicks all toggled (2026-10-21). lyr is on crcbl 0.8.0
+  (`apps/lyr/src/keys.rs` now takes its keysym constants); the owner approved
+  0.8.1, which office-crcbl is cutting, and lyr moves to it once it is on
+  crates.io.
 - **Bug: panels vanish when they lose focus (reported by the owner,
   2026-10-21).** The clock panel and the Wi-Fi, Bluetooth and audio menus
   disappear on losing focus; the power menu does not. Suspected cause, not yet
@@ -1333,12 +1334,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   set the bar drew on the Intel GPU, `CRCBL_ADAPTER=discrete` drew it on the
   MX550 (presented across GPUs, seen in a screenshot) and `integrated` on the
   Intel one. `CRCBL_ADAPTER` takes a device class, not a name:
-  `CRCBL_ADAPTER=NVIDIA` is refused with the classes listed. On Wayland the
+  `CRCBL_ADAPTER=NVIDIA` is refused with the classes listed. On Wayland that
   Intel choice came from low power, not from the display rule: crcbl 0.7.0's
-  `Instance::display_adapter` does not answer there (crcbl's main does, by
-  dmabuf's main device, per office-crcbl on 2026-10-20), and on this laptop both
-  give Intel. Not seen: a hybrid laptop whose panel is wired to the discrete
-  GPU, which is the case that tells them apart; on the crcbl release with the
-  Wayland answer, the README's GPU note loses its Wayland caveat.
+  `Instance::display_adapter` did not answer there. crcbl 0.8.0's does (the
+  compositor's dmabuf main device), and its `Presenter` ranks the adapters by
+  it; on 0.8.0 the bar still drew on the Intel GPU in a nested Hyprland
+  (2026-10-21), as both rules give on this laptop. Not seen: a hybrid laptop
+  whose panel is wired to the discrete GPU, which is the case that tells them
+  apart; that is the run that would show the display rule at work on Wayland.
 - The release pipeline (phase 2 of [plan/14](plan/14-ci-and-release.md)) does
   not exist yet.
