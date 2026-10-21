@@ -211,6 +211,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         let mut events = Vec::new();
         shell.pump(&mut |event| events.push(event));
         app.stats.events += events.len() as u64;
+        let events = crate::keys::settled_focus(events);
         let instant = Instant::now();
         for event in &events {
             app.observe(event);

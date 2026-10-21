@@ -4,7 +4,7 @@
 //! symbol, not the scancode crcbl names `key_code` after. `wtype`'s Down
 //! arrived as `key_code: Escape` and closed the Wi-Fi menu.
 
-use crcbl_shell::{ButtonState, Keysym, ShellEvent};
+use crcbl_shell::{ButtonState, Keysym, ShellEvent, WindowId};
 
 /// A key lyr's menus answer to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -37,11 +37,37 @@ pub fn pressed(event: &ShellEvent) -> Option<Key> {
     })
 }
 
+/// `events` without a keyboard focus that leaves a window and comes back to
+/// it later in the same batch, which never left as far as a panel cares.
+/// sway, following the mouse, sends a panel holding the exclusive keyboard
+/// a `leave` and at once an `enter` again when the pointer crosses a window
+/// (sway 1.12, 2026-10-21); heard alone, the `leave` closed the panel with
+/// no click.
+pub fn settled_focus(events: Vec<ShellEvent>) -> Vec<ShellEvent> {
+    let comes_back = |after: usize, window: WindowId| {
+        events[after + 1..].iter().any(|later| {
+            matches!(*later, ShellEvent::Focus { window: back, focused: true } if back == window)
+        })
+    };
+    let passing: Vec<bool> = events
+        .iter()
+        .enumerate()
+        .map(|(at, event)| {
+            !matches!(*event, ShellEvent::Focus { window, focused: false } if comes_back(at, window))
+        })
+        .collect();
+    events
+        .into_iter()
+        .zip(passing)
+        .filter_map(|(event, passes)| passes.then_some(event))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use crcbl_shell::{ButtonState, KeyCode, Keysym, ShellEvent};
 
-    use super::{Key, pressed};
+    use super::{Key, pressed, settled_focus};
 
     /// A key event as a keyboard whose keymap puts `keysym` on the scancode
     /// evdev calls Escape, as `wtype`'s does.
@@ -81,5 +107,28 @@ mod tests {
         );
         assert_eq!(pressed(&key(0x61, ButtonState::Pressed)), None, "a letter");
         assert_eq!(pressed(&key(0xFF54, ButtonState::Released)), None);
+    }
+
+    #[test]
+    fn a_focus_that_comes_back_in_the_batch_never_left() {
+        let mut shell = crcbl_shell::HeadlessShell::new();
+        let panel =
+            crcbl_shell::Shell::create_window(&mut shell, &Default::default()).expect("a window");
+        let other =
+            crcbl_shell::Shell::create_window(&mut shell, &Default::default()).expect("a window");
+        let focus = |window, focused| ShellEvent::Focus { window, focused };
+        let settled = settled_focus(vec![
+            focus(panel, false),
+            focus(other, false),
+            focus(panel, true),
+        ]);
+        assert_eq!(
+            settled,
+            [focus(other, false), focus(panel, true)],
+            "the panel's leave goes, the other window's stays"
+        );
+        // A leave with no enter after it is a real one.
+        let lost = vec![focus(panel, true), focus(panel, false)];
+        assert_eq!(settled_focus(lost.clone()), lost);
     }
 }

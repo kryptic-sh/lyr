@@ -1184,8 +1184,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   default) focus moved to any window the pointer crossed and closed the panel
   with no click, which the owner reported. Seen in a nested Hyprland with
   `wlrctl` (2026-10-21): hovering a window kept the clock panel open, and a
-  click in a window, on the desktop or on the clock closed it. Not tried on sway
-  or niri, where the panel closes when focus leaves.
+  click in a window, on the desktop or on the clock closed it. On sway 1.12
+  (nested, 2026-10-21) the panel keeps the keyboard too, but crossing a window
+  with the pointer made sway send its keyboard a `leave` and at once an `enter`,
+  which closed it with no click; a focus that comes back in the same batch is
+  now dropped (`keys::settled_focus`), and hovering keeps it open there. sway
+  hands a click outside to what is under it, not to the panel, so on sway a
+  click in a window or on the desktop does not close a panel; Escape and the
+  module's own click do. Not tried on niri.
 
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,
@@ -1328,7 +1334,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   from its source (mutation-checked: without that handling the quit fails with
   `Closed`). The bar ran in that niri too, the workspace module following
   switches made with `niri msg`, its panel reserving its height. The sway
-  backend has not run on a desktop yet.
+  backend ran on a desktop too, sway 1.12 nested on the owner's laptop
+  (2026-10-21): the bar showed its workspaces and followed a switch to a name
+  with a space made with `swaymsg`.
 - The GPU choice (the owner's rule: `CRCBL_ADAPTER`, else the adapter driving
   the bar's display when it is discrete, else low power) is crcbl-app's
   `adapter::choose` inside the `Presenter`, with `PowerPreference::LowPower`
