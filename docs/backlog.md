@@ -628,10 +628,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   passed on the owner's Dell Latitude 3440 (Arch, 2026-10-21): BAT0 full at 100
   % on mains (UPower reports a 153-day time to empty there, which the reading
   shows as unknown), the `performance` profile, the wired connection, the
-  adapter, Asia/Manila, and the headset as the default sink. Not exercised: a
-  battery charging or discharging, since the laptop stayed on mains, and
-  switching a power profile, which changes the machine's state. The
-  power-profile source is built the same way
+  adapter, Asia/Manila, and the headset as the default sink. A switch of power
+  profile through `PowerProfiles::set` ran there too, to power-saver and back,
+  read back from the daemon (mutation-checked). Not exercised: a battery
+  charging or discharging, since the laptop stayed on mains. The power-profile
+  source is built the same way
   (`lyr_sources::power_profile::linux::PowerProfiles`): the daemon found under
   `org.freedesktop.UPower.PowerProfiles` or its older `net.hadess` name,
   followed on `PropertiesChanged`, switched by the `cycle_profile` built-ins,

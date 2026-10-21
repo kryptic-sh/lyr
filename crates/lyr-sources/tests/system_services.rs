@@ -2,9 +2,10 @@
 //! power-profiles-daemon, NetworkManager, BlueZ, timedate1 and the sound
 //! server. Every other test of them runs against a fake written from the
 //! service's documentation; these say what the installed services answer.
-//! They only read, except two that change something and put it back: one
-//! steps the default sink's volume down and up and then sets it to the
-//! whole percent it was, and one starts and stops a Bluetooth scan.
+//! They only read, except three that change something and put it back:
+//! one steps the default sink's volume down and up and then sets it to the
+//! whole percent it was, one starts and stops a Bluetooth scan, and one
+//! switches the power profile and back.
 //!
 //! Ignored by default, since CI's runners have none of the services. On a
 //! desktop that runs them: `cargo test -p lyr-sources --test system_services
@@ -197,4 +198,33 @@ async fn bluez_scans_and_stops() {
         ended = bluez.watch(&snapshots) => panic!("the watch ended first: {ended:?}"),
         () = tokio::time::sleep(4 * FIRST_READING) => panic!("not seen in time"),
     }
+}
+
+#[tokio::test]
+#[ignore = "switches this machine's power profile and back; run with --ignored"]
+async fn power_profiles_daemon_switches_and_back() {
+    let daemon = PowerProfiles::system().await.expect("the daemon answers");
+    let read = || async {
+        daemon
+            .profiles()
+            .await
+            .expect("its state reads")
+            .expect("a profile is active")
+    };
+    let before = read().await;
+    let other = before
+        .available
+        .iter()
+        .find(|name| **name != before.active.name)
+        .expect("a second profile")
+        .clone();
+    let switched = daemon.set(&other).await;
+    let during = read().await.active.name;
+    // Back where it was, whatever the switch did.
+    daemon.set(&before.active.name).await.expect("restored");
+    let after = read().await.active.name;
+    eprintln!("{} -> {during} -> {after}", before.active.name);
+    switched.expect("the switch");
+    assert_eq!(during, other);
+    assert_eq!(after, before.active.name);
 }
