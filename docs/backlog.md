@@ -1251,8 +1251,20 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 - The GPU choice (the owner's rule: `CRCBL_ADAPTER`, else the adapter driving
   the bar's display when it is discrete, else low power) is crcbl-app's
   `adapter::choose` inside the `Presenter`, with `PowerPreference::LowPower`
-  named in `lyr_render::surface::Surface::open`. Seen on this Windows machine
-  only, where the display's discrete RX 7900 XTX was chosen (crcbl 0.6.0,
-  2026-10-20); a hybrid laptop with its panel on the integrated GPU is untried.
+  named in `lyr_render::surface::Surface::open`. Seen on the owner's Windows
+  machine, where the display's discrete RX 7900 XTX was chosen (crcbl 0.6.0,
+  2026-10-20), and on the owner's hybrid laptop, a Dell Latitude 3440 (Intel
+  Raptor Lake UHD and an NVIDIA GeForce MX550 with the proprietary driver, both
+  outputs on the Intel card), in a nested Hyprland (2026-10-21): with nothing
+  set the bar drew on the Intel GPU, `CRCBL_ADAPTER=discrete` drew it on the
+  MX550 (presented across GPUs, seen in a screenshot) and `integrated` on the
+  Intel one. `CRCBL_ADAPTER` takes a device class, not a name:
+  `CRCBL_ADAPTER=NVIDIA` is refused with the classes listed. On Wayland the
+  Intel choice came from low power, not from the display rule: crcbl 0.7.0's
+  `Instance::display_adapter` does not answer there (crcbl's main does, by
+  dmabuf's main device, per office-crcbl on 2026-10-20), and on this laptop both
+  give Intel. Not seen: a hybrid laptop whose panel is wired to the discrete
+  GPU, which is the case that tells them apart; on the crcbl release with the
+  Wayland answer, the README's GPU note loses its Wayland caveat.
 - The release pipeline (phase 2 of [plan/14](plan/14-ci-and-release.md)) does
   not exist yet.

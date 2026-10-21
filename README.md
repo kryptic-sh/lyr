@@ -28,21 +28,25 @@ on the GPU through [crcbl](https://github.com/kryptic-sh/crcbl). Part of the
 
 ## Status
 
-**Pre-alpha.** It runs, on Windows and (untried on a real compositor yet) on
-Linux under Wayland:
+**Pre-alpha.** It runs on Linux under Wayland (on Hyprland, and against a
+headless sway in CI) and on Windows; the macOS sources are built and run only on
+CI's Mac:
 
 - One transparent bar along the top of every output, with the power button, the
   clock and, on Linux, the battery (UPower), power profile
-  (power-profiles-daemon), network (NetworkManager), Bluetooth (BlueZ), the tray
-  (a letter per icon until lyr draws images), the notification bell and the
-  Hyprland, sway or niri workspaces. Volume and mic have sources on Windows only
-  so far.
-- Tooltips, the power menu (its actions are built on Linux only), and the clock
-  panel's calendar.
+  (power-profiles-daemon), network (NetworkManager), Bluetooth (BlueZ), volume
+  and mic (PulseAudio's `pactl`, which PipeWire serves through pipewire-pulse),
+  the tray (a letter per icon until lyr draws images), the notification bell and
+  the Hyprland, sway or niri workspaces. Windows and macOS have their own
+  battery, network, power-profile, volume and mic sources.
+- Tooltips, the power menu, and the clock panel's calendar.
 - On Linux, the notification daemon with toasts, when no other daemon (such as
   swaync) holds the name, and below the calendar the notification centre and the
   media players playing.
-- On Linux, the Bluetooth menu, with lyr as the pairing agent.
+- On Linux, the Bluetooth menu (with lyr as the pairing agent) and the Wi-Fi
+  menu (NetworkManager); on Windows and macOS those open the system's settings.
+- The audio menu: playing and recording streams, output and input devices, and
+  on Linux the sound cards' profiles and the devices' ports.
 
 The design lives in [docs/plan/](docs/plan/00-index.md), the build order in
 [docs/plan/15-milestones.md](docs/plan/15-milestones.md), and what is not done
@@ -53,17 +57,24 @@ yet in [docs/backlog.md](docs/backlog.md).
 `lyr` with no command runs the bar. Every other command talks to the running
 bar:
 
-| Command                 | Does                                                                              |
-| ----------------------- | --------------------------------------------------------------------------------- |
-| `lyr reload`            | Reloads the config, keeping the running one if it is bad                          |
-| `lyr toggle`            | Hides or shows the bars                                                           |
-| `lyr quit`              | Stops the bar                                                                     |
-| `lyr dnd` / `lyr clear` | Do-not-disturb on or off / dismiss every notification                             |
-| `lyr panel <name>`      | Opens a panel: `clock`, `bluetooth` (Linux); `wifi` and `audio` are not built yet |
+| Command                 | Does                                                     |
+| ----------------------- | -------------------------------------------------------- |
+| `lyr reload`            | Reloads the config, keeping the running one if it is bad |
+| `lyr toggle`            | Hides or shows the bars                                  |
+| `lyr quit`              | Stops the bar                                            |
+| `lyr dnd` / `lyr clear` | Do-not-disturb on or off / dismiss every notification    |
+| `lyr panel <name>`      | Opens a panel: `clock`, `bluetooth`, `wifi` or `audio`   |
 
 `lyr -c FILE` uses another config file, and `lyr --stats` logs the bar's
 wake-ups and redraws once a minute. Logs go to `~/.local/state/lyr/logs/lyr.log`
 and to stderr; `RUST_LOG` filters them.
+
+The bar draws on the GPU driving its display when that one is discrete, and on
+the low-power one otherwise, so a laptop with an integrated and a discrete GPU
+keeps the discrete one asleep. On Wayland, crcbl 0.7.0 cannot tell which GPU
+drives the display yet, so there the bar always takes the low-power one.
+`CRCBL_ADAPTER` picks one by kind instead: `integrated`, `discrete`, `cpu` or
+`virtual`. The log's `drawing on …` line names the one in use.
 
 ## Configuration
 
@@ -97,9 +108,10 @@ Every module also takes an `[<module>.on]` table binding `click`, `click_right`,
 run through the platform shell) or a built-in: `toggle_mute`, `volume_up`,
 `volume_down` (volume and mic), `cycle_profile`, `cycle_profile_back` (power
 profile), `open_clock_panel`, `open_power_menu`, `open_wifi_menu`,
-`open_bluetooth_menu`, `open_audio_menu`, `toggle_dnd`. Of these,
-`cycle_profile`, `cycle_profile_back`, `open_power_menu` and (on Linux, while
-lyr is the notification daemon) `toggle_dnd` work so far.
+`open_bluetooth_menu`, `open_audio_menu`, `toggle_dnd`. All of them work, except
+`cycle_profile` and `cycle_profile_back` off Linux (Windows' and macOS' power
+modes cannot be switched yet), and `toggle_dnd` needs lyr to be the notification
+daemon.
 
 A config file is code: its commands run as you ([SECURITY.md](SECURITY.md)).
 
