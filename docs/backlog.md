@@ -995,8 +995,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   table is tested and mutation-checked everywhere, and only Hibernate's refusal
   is run, on CI's Mac, since every other entry would lock, sleep or end the
   session. Not checked: that a Mac asks for its password after `displaysleepnow`
-  (a setting of the Mac's), and what Hyprland does with an outside click (M5's
-  open question for panels applies to this grab popup too).
+  (a setting of the Mac's), Hyprland closes it on a click on the bare desktop,
+  as a grabbing popup's outside click does (nested, `wlrctl`, 2026-10-21).
 - **Bluetooth menu, M7.** Built: its actions on Linux
   (`lyr_sources::bluetooth::linux::BlueZ`): the adapter's power, discoverable
   and pairable switches (`set`), the scan (`scan`), and connect, disconnect,
@@ -1209,8 +1209,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   its title, artist and previous, play/pause and next, the standard media
   symbols since Nerd Font codepoints were not checked; a click presses the
   control. Not built: a player's art (lyr draws no images), the day and month
-  names from the locale (the calendar locale question above), and checking what
-  Hyprland does with a click on the bare desktop while it is open.
+  names from the locale (the calendar locale question above), Hyprland's click
+  on the bare desktop while it is open closes it (nested, `wlrctl`, 2026-10-21;
+  "How Hyprland treats a panel's keyboard and pointer").
 - **Undocumented Windows APIs:** virtual desktops
   (`IVirtualDesktopManagerInternal`) and setting the power mode
   (`PowerSetActiveOverlayScheme`) can break with any Windows build.
