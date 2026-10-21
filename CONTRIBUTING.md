@@ -45,7 +45,8 @@ Some tests need what only a desktop has, and are ignored unless asked for:
 ```sh
 # the Linux sources against this machine's UPower, power-profiles-daemon,
 # NetworkManager, BlueZ, timedate1 and sound server (one steps the default
-# sink's volume by 5% down and back, one starts and stops a Bluetooth scan)
+# sink's volume by 5% down and back, one starts and stops a Bluetooth scan,
+# one switches the power profile and back)
 cargo test -p lyr-sources --test system_services -- --ignored --nocapture
 
 # the Hyprland backend against a Hyprland started for it (it logs that one
