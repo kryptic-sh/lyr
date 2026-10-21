@@ -228,3 +228,73 @@ async fn power_profiles_daemon_switches_and_back() {
     assert_eq!(during, other);
     assert_eq!(after, before.active.name);
 }
+
+#[tokio::test]
+#[ignore = "adds and deletes a Wi-Fi profile in this machine's NetworkManager; run with --ignored"]
+async fn network_manager_follows_a_profile_coming_and_going() {
+    use std::process::Command;
+
+    use lyr_core::wifi_menu::Wifi;
+
+    /// A profile no network has, never activated.
+    const SSID: &str = "lyr-test-profile";
+    let nmcli = |args: &[&str]| {
+        let status = Command::new("nmcli")
+            .args(args)
+            .status()
+            .expect("nmcli runs");
+        assert!(status.success(), "nmcli {args:?}");
+    };
+    let manager = NetworkManager::system()
+        .await
+        .expect("NetworkManager answers");
+    let (states, mut seen) = watch::channel(Wifi::default());
+    let known = |wifi: &Wifi| !wifi.profiles_for(SSID).is_empty();
+    let steps = async {
+        seen.wait_for(|wifi| wifi.device.is_some())
+            .await
+            .expect("a reading");
+        nmcli(&[
+            "connection",
+            "add",
+            "type",
+            "wifi",
+            "con-name",
+            SSID,
+            "ssid",
+            SSID,
+            "autoconnect",
+            "no",
+        ]);
+        let profile = seen
+            .wait_for(known)
+            .await
+            .expect("the new profile seen")
+            .profiles_for(SSID)[0]
+            .path
+            .clone();
+        nmcli(&["connection", "delete", SSID]);
+        seen.wait_for(|wifi| !known(wifi))
+            .await
+            .expect("its removal seen");
+        // How NetworkManager answers a path it no longer serves, which the
+        // Wi-Fi reads skip rather than fail on.
+        let gone = manager.forget(&[profile]).await.expect_err("already gone");
+        assert!(
+            matches!(&gone, zbus::Error::FDO(error)
+                if matches!(**error, zbus::fdo::Error::UnknownMethod(_))),
+            "{gone:?}"
+        );
+    };
+    let followed = tokio::select! {
+        () = steps => Ok(()),
+        ended = manager.watch_wifi(&states) => Err(format!("the watch ended first: {ended:?}")),
+        () = tokio::time::sleep(4 * FIRST_READING) => Err("not seen in time".to_owned()),
+    };
+    // Gone whatever happened above; a failure here is only a profile
+    // already deleted.
+    let _ = Command::new("nmcli")
+        .args(["connection", "delete", SSID])
+        .output();
+    followed.expect("followed");
+}

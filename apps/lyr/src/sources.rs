@@ -1373,18 +1373,19 @@ mod linux {
                 }
             }
         };
-        let (watched, watched_wifi, (), (), ()) = tokio::join!(
-            network.watch(&readings),
-            network.watch_wifi(&states),
-            forward,
-            forward_wifi,
-            act
-        );
-        for watched in [watched, watched_wifi] {
-            if let Err(error) = watched {
-                tracing::warn!("network: NetworkManager stopped answering: {error}");
+        // Each says when it stops, at once: the others run on, so the end of
+        // them all would never come.
+        let watch = async {
+            if let Err(error) = network.watch(&readings).await {
+                tracing::warn!("network: no longer following NetworkManager: {error}");
             }
-        }
+        };
+        let watch_wifi = async {
+            if let Err(error) = network.watch_wifi(&states).await {
+                tracing::warn!("wi-fi: no longer following NetworkManager: {error}");
+            }
+        };
+        tokio::join!(watch, watch_wifi, forward, forward_wifi, act);
     }
 
     /// Hosts the tray: serves the watcher when no other process does,

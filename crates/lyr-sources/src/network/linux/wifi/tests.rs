@@ -24,6 +24,10 @@ const HOTSPOT_PROFILE: &str = "/org/freedesktop/NetworkManager/Settings/2";
 const WIRED_PROFILE: &str = "/org/freedesktop/NetworkManager/Settings/3";
 /// The profile `AddAndActivateConnection` makes.
 const NEW_PROFILE: &str = "/org/freedesktop/NetworkManager/Settings/9";
+/// A profile and an access point listed but not served: gone before they
+/// are read.
+const GONE_PROFILE: &str = "/org/freedesktop/NetworkManager/Settings/5";
+const GONE_POINT: &str = "/org/freedesktop/NetworkManager/AccessPoint/9";
 
 const ACTIVATED: u32 = 100;
 const FAILED: u32 = 120;
@@ -43,6 +47,8 @@ struct Asked {
     updated: Option<HashMap<String, HashMap<String, OwnedVariant>>>,
     /// The saved profiles still there.
     profiles: Vec<&'static str>,
+    /// Whether the lists name a profile and an access point that are gone.
+    gone: bool,
 }
 
 type Shared = Arc<Mutex<Asked>>;
@@ -157,7 +163,11 @@ struct FakeWireless {
 #[zbus::interface(name = "org.freedesktop.NetworkManager.Device.Wireless")]
 impl FakeWireless {
     fn get_all_access_points(&self) -> Vec<OwnedObjectPath> {
-        vec![path(HOME), path(CAFE)]
+        let mut points = vec![path(HOME), path(CAFE)];
+        if asked(&self.shared).gone {
+            points.push(path(GONE_POINT));
+        }
+        points
     }
     fn request_scan(&self, _options: HashMap<String, OwnedVariant>) {
         asked(&self.shared).calls.push("scan".to_owned());
@@ -209,11 +219,12 @@ struct FakeSettings {
 #[zbus::interface(name = "org.freedesktop.NetworkManager.Settings")]
 impl FakeSettings {
     fn list_connections(&self) -> Vec<OwnedObjectPath> {
-        asked(&self.shared)
-            .profiles
-            .iter()
-            .map(|profile| path(profile))
-            .collect()
+        let asked = asked(&self.shared);
+        let mut profiles: Vec<_> = asked.profiles.iter().map(|profile| path(profile)).collect();
+        if asked.gone {
+            profiles.push(path(GONE_PROFILE));
+        }
+        profiles
     }
 
     #[zbus(signal)]
@@ -381,6 +392,20 @@ async fn the_wifi_device_its_networks_and_profiles_are_read() {
     assert!(rows[0].in_use && rows[0].known);
     assert_eq!(rows[1].ssid, "cafe");
     assert_eq!(rows[1].security, Security::Open);
+}
+
+#[tokio::test]
+async fn a_profile_or_access_point_gone_before_it_is_read_is_left_out() {
+    let (_server, client, shared) = fake(ACTIVATED, (ACTIVATED, 0)).await;
+    // Listed, then gone before its read: lyr deleted a failed join's
+    // profile, or an access point dropped out of a scan. That read failing
+    // ended the menu's watch, which kept showing a deleted profile.
+    asked(&shared).gone = true;
+    let wifi = network(&client).await.wifi().await.expect("read");
+    let paths: Vec<&str> = wifi.profiles.iter().map(|p| p.path.as_str()).collect();
+    assert_eq!(paths, [HOME_PROFILE]);
+    let points: Vec<&str> = wifi.points.iter().map(|p| p.path.as_str()).collect();
+    assert_eq!(points, [HOME, CAFE]);
 }
 
 #[tokio::test]

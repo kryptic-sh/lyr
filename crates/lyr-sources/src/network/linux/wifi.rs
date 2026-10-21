@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 
 use futures_util::StreamExt;
-use futures_util::future::try_join_all;
+use futures_util::future::join_all;
 use lyr_core::wifi_menu::{AccessPoint, Profile, Radio, Security, Wifi};
 use tokio::sync::watch;
 use zbus::fdo::PropertiesProxy;
@@ -145,14 +145,17 @@ impl NetworkManager {
         let active = wireless.active_access_point().await?;
         // One call an access point, all in flight at once: a busy place has
         // a hundred, and a call a property one after another took seconds.
-        let points = try_join_all(
+        let points = join_all(
             wireless
                 .get_all_access_points()
                 .await?
                 .into_iter()
-                .map(|path| self.access_point(path)),
+                .map(|path| async { unless_gone(self.access_point(path).await) }),
         )
-        .await?;
+        .await
+        .into_iter()
+        .filter_map(Result::transpose)
+        .collect::<zbus::Result<Vec<_>>>()?;
         Ok(Wifi {
             device: Some(device.to_string()),
             radio,
@@ -185,11 +188,15 @@ impl NetworkManager {
             .await?;
         let mut profiles = Vec::new();
         for path in list.list_connections().await? {
-            let settings = self
-                .proxy::<SavedProfileProxy>(&path)
-                .await?
-                .get_settings()
-                .await?;
+            let settings = async {
+                self.proxy::<SavedProfileProxy>(&path)
+                    .await?
+                    .get_settings()
+                    .await
+            };
+            let Some(settings) = unless_gone(settings.await)? else {
+                continue;
+            };
             if let Some(ssid) = client_ssid(&settings) {
                 profiles.push(Profile {
                     path: path.to_string(),
@@ -407,6 +414,29 @@ impl NetworkManager {
             }
         }
         Ok(())
+    }
+}
+
+/// `read`'s answer, or `None` when the object it read was gone. A profile
+/// or an access point NetworkManager listed can go before lyr reads it (lyr
+/// deleting a failed join's profile, an access point dropping out of a
+/// scan), and the change that removed it brings another read; failing the
+/// whole read instead ended the menu's watch.
+fn unless_gone<T>(read: zbus::Result<T>) -> zbus::Result<Option<T>> {
+    match read {
+        Ok(value) => Ok(Some(value)),
+        // NetworkManager answers a path it no longer serves with
+        // `UnknownMethod` ("Object does not exist at path"), zbus with
+        // `UnknownObject`.
+        Err(zbus::Error::FDO(error))
+            if matches!(
+                *error,
+                zbus::fdo::Error::UnknownMethod(_) | zbus::fdo::Error::UnknownObject(_)
+            ) =>
+        {
+            Ok(None)
+        }
+        Err(error) => Err(error),
     }
 }
 
