@@ -514,18 +514,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   the `/etc/localtime` link (`apps/lyr/src/modules.rs`); Windows and macOS show
   the offset alone. timedate1 is followed on `PropertiesChanged`
   (`lyr_sources::clock::linux::TimeDate`, tested against a fake timedated and
-  mutation-checked, not run against a real one), so a zone change redraws the
-  bar at once. The clock's text takes the new zone because chrono 0.4.45's
-  `Local` re-reads `/etc/localtime` when its mtime changes, checking at most
-  once a second (`src/offset/local/unix.rs`); a change within a second of the
-  last draw shows on the next tick instead. Text is cut at its rect's edges
-  (`lyr_render::translate` clips each text item), so a label wider than its box
-  no longer runs over its neighbours. Not built: images (tray, M8). A format
-  cannot drop the literal text around an empty placeholder; the one case that
-  came up, a battery with no power reading, now shows 0 W as waybar 0.15.0 does
-  (`total_power / 1e6`), and UPower always reports a rate. Measuring text (the
-  widths `layout` takes) needs crcbl-ui's font atlas, so it is done by the
-  caller in `lyr-render`.
+  mutation-checked, and read from the owner's real one by the `system_services`
+  test), so a zone change redraws the bar at once. The clock's text takes the
+  new zone because chrono 0.4.45's `Local` re-reads `/etc/localtime` when its
+  mtime changes, checking at most once a second (`src/offset/local/unix.rs`); a
+  change within a second of the last draw shows on the next tick instead. Text
+  is cut at its rect's edges (`lyr_render::translate` clips each text item), so
+  a label wider than its box no longer runs over its neighbours. Not built:
+  images (tray, M8). A format cannot drop the literal text around an empty
+  placeholder; the one case that came up, a battery with no power reading, now
+  shows 0 W as waybar 0.15.0 does (`total_power / 1e6`), and UPower always
+  reports a rate. Measuring text (the widths `layout` takes) needs crcbl-ui's
+  font atlas, so it is done by the caller in `lyr-render`.
 - **Notification daemon, M6.** Built: the store (`lyr_core::notifications`): ids
   from 1 that skip 0 and held ids, `replaces_id` kept as the id and replacing in
   place (even for an id lyr does not hold, as the spec says), swaync's timeouts
@@ -602,10 +602,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked; CI's Linux job runs the same test. The bar runs it, with the
   Hyprland workspaces, on a tokio runtime of its own thread
   (`apps/lyr/src/sources.rs`), each update handed to the main loop and the loop
-  woken through crcbl's `ShellWaker`. Not run against a real UPower or Hyprland,
-  which needs the owner's machine. The power-profile source is built the same
-  way (`lyr_sources::power_profile::linux::PowerProfiles`): the daemon found
-  under `org.freedesktop.UPower.PowerProfiles` or its older `net.hadess` name,
+  woken through crcbl's `ShellWaker`. Every Linux source's read also runs
+  against the machine's real services in
+  `crates/lyr-sources/tests/system_services.rs`, ignored unless asked for (CI
+  has none of them): UPower (its battery checked against the kernel's
+  `/sys/class/power_supply/BAT0/capacity`, mutation-checked),
+  power-profiles-daemon, NetworkManager, BlueZ, timedate1 and `pactl`. All
+  passed on the owner's Dell Latitude 3440 (Arch, 2026-10-21): BAT0 full at 100
+  % on mains (UPower reports a 153-day time to empty there, which the reading
+  shows as unknown), the `performance` profile, the wired connection, the
+  adapter, Asia/Manila, and the headset as the default sink. Not exercised: a
+  battery charging or discharging, since the laptop stayed on mains, and
+  switching a power profile, which changes the machine's state. The
+  power-profile source is built the same way
+  (`lyr_sources::power_profile::linux::PowerProfiles`): the daemon found under
+  `org.freedesktop.UPower.PowerProfiles` or its older `net.hadess` name,
   followed on `PropertiesChanged`, switched by the `cycle_profile` built-ins,
   and tested against a fake daemon that has only the old name. The bluetooth
   source too (`lyr_sources::bluetooth::linux::BlueZ`): BlueZ's managed objects

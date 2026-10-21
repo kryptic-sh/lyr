@@ -36,7 +36,24 @@ CI runs the same on Linux, macOS and Windows, plus `cargo nextest`,
 `cargo deny`, `cargo audit` and `cargo machete`. Platform-gated code
 (`#[cfg(windows)]`, `#[cfg(target_os = "macos")]`,
 `#[cfg(target_os = "linux")]`) is only compiled on its platform, so a green
-local run does not cover the others. CI does.
+local run does not cover the others. CI does;
+`cargo clippy --target x86_64-pc-windows-gnu` and
+`--target aarch64-apple-darwin` catch most of it locally first.
+
+Some tests need what only a desktop has, and are ignored unless asked for:
+
+```sh
+# the Linux sources against this machine's UPower, power-profiles-daemon,
+# NetworkManager, BlueZ, timedate1 and sound server
+cargo test -p lyr-sources --test system_services -- --ignored --nocapture
+
+# the Hyprland backend against a Hyprland started for it (it logs that one
+# out), never the session's own
+LYR_E2E_HYPRLAND=<signature> cargo test -p lyr-wm --lib a_real_hyprland -- --ignored
+
+# lyr's defaults against the waybar config they port
+LYR_WAYBAR_CONFIG=path/to/config.jsonc cargo test -p lyr-config the_defaults_match -- --ignored
+```
 
 MSRV is **Rust 1.98** (`rust-version` in the workspace `Cargo.toml`), crcbl's.
 The workspace is `edition = "2024"`, `resolver = "3"`.
