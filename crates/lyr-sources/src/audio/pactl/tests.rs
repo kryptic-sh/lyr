@@ -1,4 +1,4 @@
-use super::{nodes, reading, shows, step_argument, streams};
+use super::{Flow, Target, nodes, reading, shows, step_arguments, streams};
 
 /// `pactl --format=json info`, cut to what is read.
 const INFO: &str = r#"{"server_name":"PulseAudio (on PipeWire 1.6.8)",
@@ -93,9 +93,25 @@ fn only_device_and_server_events_count() {
 
 #[test]
 fn a_step_is_relative_with_no_ceiling() {
-    assert_eq!(step_argument(5).as_deref(), Some("+5%"));
-    assert_eq!(step_argument(-5).as_deref(), Some("-5%"));
-    assert_eq!(step_argument(0), None);
+    let sink = Target::Default(Flow::Output);
+    assert_eq!(
+        step_arguments(&sink, 5),
+        Some([
+            "set-sink-volume".into(),
+            "@DEFAULT_SINK@".into(),
+            "+5%".into()
+        ])
+    );
+    // No `--` before a step down: pactl 17.0 reads it as the volume.
+    assert_eq!(
+        step_arguments(&sink, -5),
+        Some([
+            "set-sink-volume".into(),
+            "@DEFAULT_SINK@".into(),
+            "-5%".into()
+        ])
+    );
+    assert_eq!(step_arguments(&sink, 0), None);
 }
 
 /// `pactl --format=json list sink-inputs` with one stream, as `pacat`

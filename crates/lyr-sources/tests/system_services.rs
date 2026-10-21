@@ -2,6 +2,8 @@
 //! power-profiles-daemon, NetworkManager, BlueZ, timedate1 and the sound
 //! server. Every other test of them runs against a fake written from the
 //! service's documentation; these say what the installed services answer.
+//! They only read, except one that steps the default sink's volume down and
+//! up and then sets it back to the whole percent it was.
 //!
 //! Ignored by default, since CI's runners have none of the services. On a
 //! desktop that runs them: `cargo test -p lyr-sources --test system_services
@@ -125,4 +127,36 @@ async fn pactl_reads_the_defaults_and_the_menu() {
         nodes.outputs.iter().filter(|node| node.default).count() == 1,
         "one output is the default"
     );
+}
+
+#[tokio::test]
+#[ignore = "steps this machine's default sink down and back; run with --ignored"]
+async fn pactl_steps_the_default_sink_both_ways() {
+    use lyr_sources::audio::pactl::{Flow, Target, read, set, step};
+
+    let volume = || async {
+        read()
+            .await
+            .expect("pactl reads")
+            .0
+            .0
+            .expect("a default sink")
+            .volume
+    };
+    let sink = Target::Default(Flow::Output);
+    let before = volume().await;
+    let down = step(&sink, -5).await;
+    let lowered = volume().await;
+    let up = step(&sink, 5).await;
+    let raised = volume().await;
+    // Back where it was, whatever the steps did.
+    set(&sink, before).await.expect("restored");
+    eprintln!("{before}% -> {lowered}% -> {raised}%");
+    down.expect("a step down");
+    up.expect("a step up");
+    assert!(
+        lowered < before || before == 0,
+        "{before}% stepped down to {lowered}%"
+    );
+    assert!(raised > lowered, "{lowered}% stepped up to {raised}%");
 }

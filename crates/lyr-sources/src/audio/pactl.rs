@@ -377,17 +377,20 @@ pub fn streams(line: &str) -> bool {
         .any(|on| line.contains(on))
 }
 
-/// `pactl`'s volume argument for a step of `delta` percent, or `None` for
-/// no step. Relative and with no ceiling at 100 %, as the dotfiles'
-/// `pactl set-sink-volume @DEFAULT_SINK@ +5%` has none (plan 07); `pactl`
-/// stops a step down at 0.
-#[must_use]
-pub fn step_argument(delta: i32) -> Option<String> {
-    match delta.signum() {
-        1 => Some(format!("+{delta}%")),
-        -1 => Some(format!("{delta}%")),
-        _ => None,
-    }
+/// `pactl`'s arguments for a step of `target`'s volume by `delta` percent,
+/// or `None` for no step. Relative and with no ceiling at 100 %, as the
+/// dotfiles' `pactl set-sink-volume @DEFAULT_SINK@ +5%` has none (plan 07);
+/// `pactl` stops a step down at 0. A step down goes as it is: `pactl` reads
+/// `-5%` after the device as the volume, and pactl 17.0 refuses a `--`
+/// before it as an "Invalid volume specification".
+fn step_arguments(target: &Target, delta: i32) -> Option<[String; 3]> {
+    let volume = match delta.signum() {
+        1 => format!("+{delta}%"),
+        -1 => format!("{delta}%"),
+        _ => return None,
+    };
+    let (_, set, id) = target.commands();
+    Some([set.to_owned(), id, volume])
 }
 
 /// Runs `pactl` with `args` and returns what it printed.
@@ -496,18 +499,19 @@ pub async fn toggle_mute(target: &Target) -> io::Result<()> {
     pactl(&[mute, &id, "toggle"]).await.map(drop)
 }
 
-/// Moves `target`'s volume by `delta` percent, as [`step_argument`] has it.
+/// Moves `target`'s volume by `delta` percent, as [`step_arguments`] has
+/// it.
 ///
 /// # Errors
 ///
 /// When `pactl` fails.
 pub async fn step(target: &Target, delta: i32) -> io::Result<()> {
-    let Some(volume) = step_argument(delta) else {
+    let Some(arguments) = step_arguments(target, delta) else {
         return Ok(());
     };
-    let (_, set, id) = target.commands();
-    // `--` so a step down is not read as an option.
-    pactl(&[set, &id, "--", &volume]).await.map(drop)
+    pactl(&arguments.each_ref().map(String::as_str))
+        .await
+        .map(drop)
 }
 
 /// Sets `target`'s volume to `percent`.
