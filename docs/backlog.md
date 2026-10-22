@@ -1319,17 +1319,23 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Post-MVP
 
-- **Window title module: built, run on Windows only.** `window`
-  (`lyr_core::window`, and `lyr_wm::State::active_window`) follows Hyprland's
-  `activewindow>>CLASS,TITLE` event, seeded at start from `j/activeworkspace`'s
-  `lastwindowtitle` (what waybar reads) and the client's class; `{title}` and
-  `{class}`, `max_length` cut with an ellipsis, the tooltip the text unless
-  `tooltip_format` is set. Not in the default layout. Tested and
-  mutation-checked against recorded lines, not against a running Hyprland. On
-  sway it is the focused window in `GET_TREE` (its app id, or its class under
-  Xwayland, and its name), re-read on focus and title events; on niri the window
-  niri reports focused, by app id and title. Both are tested against fake
-  sockets only; CI's real sway opens no window. waybar's `rewrite` rules,
+- **Window title module: built, run on Windows and on Linux's three
+  compositors.** `window` (`lyr_core::window`, and
+  `lyr_wm::State::active_window`) follows Hyprland's `activewindow>>CLASS,TITLE`
+  event, seeded at start from `j/activeworkspace`'s `lastwindowtitle` (what
+  waybar reads) and the client's class; `{title}` and `{class}`, `max_length`
+  cut with an ellipsis, the tooltip the text unless `tooltip_format` is set. Not
+  in the default layout. Tested and mutation-checked against recorded lines, and
+  run on Hyprland 0.56 (nested on the owner's laptop, 2026-10-22, `window` in
+  the centre zone): it showed a new alacritty's title, followed the focus to
+  another window, and a lyr started with that window focused showed its title at
+  once. On sway it is the focused window in `GET_TREE` (its app id, or its class
+  under Xwayland, and its name), re-read on focus and title events; on niri the
+  window niri reports focused, by app id and title. Both are tested against fake
+  sockets, and both ran the same day, sway 1.12 and niri 26.04 nested in a
+  nested Hyprland: two alacritty windows with set titles, the module following
+  the focus as `swaymsg focus left` and `niri msg action focus-column-left`
+  moved it. CI's real sway opens no window. waybar's `rewrite` rules,
   `separate-outputs` and app icon are not carried. On Windows
   (`lyr_sources::window::windows`) it shows the foreground window: its title,
   and its program's file name as `{class}` (`lyr_sources::program`), re-read
