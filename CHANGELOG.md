@@ -126,7 +126,8 @@ and this project adheres to
   Hibernate. `[power.menu]` sets an entry to a command instead
   (`lock = { exec = "hyprlock" }`).
 - The clock panel's calendar starts its weeks on the locale's first weekday: on
-  Linux from glibc's `LC_TIME` as waybar reads it (Sunday for `en_US`, numbering
+  Linux and the BSDs from the region of the locale `LC_TIME` follows, through
+  CLDR's week data and without running a program (Sunday for `en_US`, numbering
   weeks as waybar's `%U` then), on Windows and macOS from the system's setting.
 - `[tray] spacing` sets the gap between the tray's items, 10 px by default as in
   the dotfiles' waybar, and `lyr import-waybar` carries waybar's `spacing`.
@@ -176,8 +177,8 @@ and this project adheres to
   frames it presented on each output, once a minute, to check that an idle bar
   stays idle.
 - The bar logs to `~/.local/state/lyr/logs/lyr.log` and to stderr (`RUST_LOG`
-  filters it). The file is capped at 10 MiB: past it, it becomes `lyr.log.1`,
-  replacing the one before.
+  filters it), the window and GPU layers' messages with its own. The file is
+  capped at 10 MiB: past it, it becomes `lyr.log.1`, replacing the one before.
 - The config file `~/.config/lyr/config.toml` (`-c` to choose another), layered
   over built-in defaults that reproduce the waybar setup lyr replaces, with
   `[platform.linux]`, `[platform.windows]` and `[platform.macos]` override
