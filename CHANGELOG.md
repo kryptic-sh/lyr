@@ -58,6 +58,10 @@ and this project adheres to
   address and, on Wi-Fi, the network's name and signal, updated as they change;
   with no link and every Wi-Fi radio switched off, it shows Wi-Fi as off rather
   than disconnected.
+- On Windows the Wi-Fi menu is native: it lists the networks Native Wifi sees,
+  scans, switches the radio, joins (writing a profile for a new network, or a
+  new password for a saved one), leaves and forgets networks. A machine without
+  a wireless interface or the WLAN service opens Settings instead.
 - On Windows the bluetooth module shows the adapter's state and the device that
   connected last, from WinRT, updated as the radio switches and devices connect,
   disconnect, pair or unpair.

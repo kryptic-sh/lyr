@@ -38,7 +38,7 @@ supported (left out of that platform's defaults).
 | Clock          | ✓                            | ✓                                    | ✓                                 |
 | Window title   | ✓ Hyprland, sway, niri       | ✓ foreground window (WinEvent hooks) | ◐ AeroSpace only                  |
 | Notifications  | ✓ lyr is the daemon          | ◐ opens Action Center, no state      | ✗ no API                          |
-| Wi-Fi menu     | ✓ NetworkManager             | ◐ Native Wifi                        | ◐ Settings pane; CoreWLAN unbuilt |
+| Wi-Fi menu     | ✓ NetworkManager             | ◐ Native Wifi, not run on Wi-Fi yet  | ◐ Settings pane; CoreWLAN unbuilt |
 | Bluetooth menu | ✓ BlueZ                      | ◐ pairing only, no connect           | ◐ Settings pane; native unbuilt   |
 | Audio menu     | ✓ PulseAudio protocol        | ◐ default device opens Settings      | ◐ no per-app volume               |
 

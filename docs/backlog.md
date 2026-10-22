@@ -861,12 +861,27 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   2026-10-20), and it is on Ethernet. Run here, the source finds no adapter, so
   the module stays hidden, and its watchers start; nothing has shown a real
   adapter or device. Not seen: a radio switched on after start-up when no
-  adapter was there at start (its `StateChanged` is not followed then). Not
-  built: the native Wi-Fi menu (Native Wifi's `WlanScan`,
-  `WlanGetAvailableNetworkList` and `WlanConnect`, plan 10) and a native
-  Bluetooth menu; their clicks open the Settings pages. Workspaces are left out
-  on Windows (declined below); macOS's `x-apple.systempreferences:` fallbacks
-  are built (the macOS entry).
+  adapter was there at start (its `StateChanged` is not followed then). The
+  Wi-Fi menu is native on Windows too (2026-10-22):
+  `lyr_sources::network::windows::wlan` reads the first wireless interface, its
+  radio and `WlanGetAvailableNetworkList`'s networks (one entry per SSID, so an
+  SSID in hex stands for its access point's path), and scans, switches the
+  radio, leaves, forgets (`WlanDeleteProfile`) and joins with `WlanConnect`,
+  writing an all-user profile (`WlanSetProfile`) for a new network or a new
+  password; the profile, the security mapping, the listing and what a failed
+  join does with its profile are in `network::win32::wifi`, tested and
+  mutation-checked on every platform. The WLAN service's scan and connection
+  notifications end a scan and a join (a wrong password,
+  `WLAN_REASON_CODE_MSMSEC_PSK_MISMATCH_SUSPECTED`, offers a new one for a saved
+  profile and deletes a profile made for the attempt), and the bar is woken for
+  the menu's state only while it is open, as on Linux. None of it has run: this
+  machine's WLAN service is stopped (`WlanSvc`, manual start) and it has no
+  wireless interface, so the source logs that the service is not running and the
+  menu's click opens Settings; the read-and-watch test returns early here for
+  the same reason. Not seen either: whether `WlanSetInterface`'s software radio
+  switch needs elevation. Not built: a native Bluetooth menu; its click opens
+  Settings. Workspaces are left out on Windows (declined below); macOS's
+  `x-apple.systempreferences:` fallbacks are built (the macOS entry).
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace

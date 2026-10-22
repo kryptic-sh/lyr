@@ -40,6 +40,8 @@ use windows_sys::core::{GUID, PCSTR, PCWSTR};
 
 use super::win32::{Adapter, Wifi, link, parse_guid, radio_off};
 
+pub mod wlan;
+
 /// `GetAdaptersAddresses`'s first buffer: the 15 KB Microsoft's reference
 /// suggests, which holds most machines' adapters.
 const ADAPTERS_BUFFER: u32 = 15 * 1024;
@@ -254,12 +256,20 @@ fn wifi_radio_off() -> bool {
     unsafe { WlanFreeMemory(list.cast()) };
     !interfaces.is_empty()
         && interfaces.iter().all(|interface| {
-            radio_state(&wlan, &interface.InterfaceGuid).is_some_and(|phys| radio_off(&phys))
+            radio_state(&wlan, &interface.InterfaceGuid).is_some_and(|phys| {
+                radio_off(
+                    &phys
+                        .iter()
+                        .map(|&(_, software, hardware)| (software, hardware))
+                        .collect::<Vec<_>>(),
+                )
+            })
         })
 }
 
-/// Each phy's software and hardware radio state on the interface `guid`.
-fn radio_state(wlan: &Wlan, guid: &GUID) -> Option<Vec<(i32, i32)>> {
+/// Each phy's index, and its software and hardware radio state, on the
+/// interface `guid`.
+fn radio_state(wlan: &Wlan, guid: &GUID) -> Option<Vec<(u32, i32, i32)>> {
     let mut size = 0;
     let mut data: *mut c_void = ptr::null_mut();
     // SAFETY: the GUID and the outputs are locals; the call allocates `data`.
@@ -283,7 +293,11 @@ fn radio_state(wlan: &Wlan, guid: &GUID) -> Option<Vec<(i32, i32)>> {
     let phys = state.PhyRadioState[..count]
         .iter()
         .map(|phy: &WLAN_PHY_RADIO_STATE| {
-            (phy.dot11SoftwareRadioState, phy.dot11HardwareRadioState)
+            (
+                phy.dwPhyIndex,
+                phy.dot11SoftwareRadioState,
+                phy.dot11HardwareRadioState,
+            )
         })
         .collect();
     // SAFETY: allocated by `WlanQueryInterface`, freed once, after its last

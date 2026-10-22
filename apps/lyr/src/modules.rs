@@ -92,10 +92,10 @@ impl Data {
             Update::Battery(reading) => self.battery = reading,
             Update::PowerProfile(profiles) => self.power_profile = profiles,
             Update::Network(reading) => self.network = reading,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", windows))]
             Update::Wifi(wifi) => self.wifi = Some(wifi),
             // The Wi-Fi menu takes it.
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", windows))]
             Update::WifiJoined(_) => {}
             #[cfg(target_os = "linux")]
             Update::BluetoothAsk(id, device, question) => {

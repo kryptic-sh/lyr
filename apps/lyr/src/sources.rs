@@ -34,10 +34,10 @@ pub enum Update {
     /// Windows, the dynamic store's on macOS), or `None` before the first.
     Network(Option<lyr_core::network::Reading>),
     /// What the Wi-Fi menu shows.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     Wifi(lyr_core::wifi_menu::Wifi),
     /// How a join the Wi-Fi menu asked for ended.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     WifiJoined(crate::wifi_menu::Joined),
     /// BlueZ's (IOBluetooth's on macOS, WinRT's on Windows): the module's
     /// reading and the menu's adapter and devices.
@@ -139,8 +139,9 @@ pub enum AudioRequest {
     Menu(bool),
 }
 
-/// What the Wi-Fi menu asks of NetworkManager.
-#[cfg(target_os = "linux")]
+/// What the Wi-Fi menu asks of NetworkManager, or of Native Wifi on
+/// Windows.
+#[cfg(any(target_os = "linux", windows))]
 #[derive(Debug)]
 pub enum WifiRequest {
     Radio(bool),
@@ -154,7 +155,7 @@ pub enum WifiRequest {
 }
 
 /// A join the Wi-Fi menu asked for.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 #[derive(Debug)]
 pub struct JoinRequest {
     /// The device's path.
@@ -207,6 +208,11 @@ pub struct Commands {
     _window: Option<lyr_sources::window::windows::Watch>,
     #[cfg(windows)]
     audio: std::sync::mpsc::Sender<windows::AudioRequest>,
+    #[cfg(windows)]
+    wifi: std::sync::mpsc::Sender<windows::WifiWork>,
+    /// Windows: whether the Wi-Fi menu is open, as on Linux.
+    #[cfg(windows)]
+    wifi_menu: std::sync::Arc<std::sync::atomic::AtomicBool>,
     #[cfg(target_os = "macos")]
     audio: std::sync::mpsc::Sender<macos::AudioRequest>,
     /// Whether the audio source was last told the menu is open.
@@ -342,6 +348,20 @@ impl Commands {
         let _stopped = self
             .notifications
             .send(NotificationRequest::Invoke(id, key));
+    }
+}
+
+#[cfg(windows)]
+impl Commands {
+    /// Asks Native Wifi what the Wi-Fi menu wants.
+    pub fn wifi(&self, request: WifiRequest) {
+        let _stopped = self.wifi.send(windows::WifiWork::Request(request));
+    }
+
+    /// Tells the Wi-Fi source whether the menu is open.
+    pub fn wifi_menu(&self, open: bool) {
+        self.wifi_menu
+            .store(open, std::sync::atomic::Ordering::Relaxed);
     }
 }
 
@@ -517,6 +537,12 @@ pub fn start(
         let window = windows::window(sender.clone(), waker.clone());
         let audio = windows::audio(sender.clone(), waker.clone())?;
         windows::bluetooth(sender.clone(), waker.clone())?;
+        let wifi_menu = std::sync::Arc::default();
+        let wifi = windows::wifi(
+            sender.clone(),
+            waker.clone(),
+            std::sync::Arc::clone(&wifi_menu),
+        )?;
         let battery = windows::battery(sender, waker);
         Ok((
             receiver,
@@ -527,6 +553,8 @@ pub fn start(
                 _window: window,
                 audio,
                 audio_menu: std::cell::Cell::new(false),
+                wifi,
+                wifi_menu,
             },
         ))
     }
@@ -921,6 +949,226 @@ mod windows {
                 }
             })?;
         Ok(())
+    }
+
+    /// What the Wi-Fi source's thread is handed: the menu's requests and
+    /// the WLAN service's notices.
+    #[derive(Debug)]
+    pub(super) enum WifiWork {
+        Request(super::WifiRequest),
+        Notice(lyr_sources::network::windows::wlan::Notice),
+    }
+
+    /// A join under way, waiting for the WLAN service's word on it.
+    struct Pending {
+        /// The interface's GUID text.
+        device: String,
+        ssid: Vec<u8>,
+        /// The network's name, for a failure's text.
+        name: String,
+        profile: String,
+        /// Joined with a profile saved before, not one made for it.
+        saved: bool,
+        security: lyr_core::wifi_menu::Security,
+    }
+
+    /// Hands what the Wi-Fi menu shows to the main loop now and after every
+    /// change, waking the bar only while the menu is open, and carries out
+    /// what the menu asks, on a thread of its own. A machine without the
+    /// WLAN service logs so, and the menu opens Settings instead.
+    ///
+    /// # Errors
+    ///
+    /// When the thread cannot start.
+    pub(super) fn wifi(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+        menu: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> std::io::Result<mpsc::Sender<WifiWork>> {
+        use lyr_sources::network::windows::wlan::{Client, Notice, since_boot};
+        let (work, incoming) = mpsc::channel();
+        let notices = work.clone();
+        std::thread::Builder::new()
+            .name("lyr wi-fi".to_owned())
+            .spawn(move || {
+                let Some(mut client) = Client::open() else {
+                    tracing::info!("wi-fi: the WLAN service is not running");
+                    return;
+                };
+                if let Err(error) = client.watch(move |notice| {
+                    // The thread has gone when this fails: nothing to tell.
+                    let _gone = notices.send(WifiWork::Notice(notice));
+                }) {
+                    tracing::warn!("wi-fi: changes will not show: {error}");
+                }
+                let deliver = |update: Update, wake: bool| {
+                    if sender.send(update).is_err() {
+                        return false;
+                    }
+                    if let Some(waker) = waker.as_ref().filter(|_| wake) {
+                        waker.wake();
+                    }
+                    true
+                };
+                let mut last_scan = None;
+                let mut pending: Option<Pending> = None;
+                if !deliver(Update::Wifi(client.read(last_scan)), true) {
+                    return;
+                }
+                while let Ok(first) = incoming.recv() {
+                    for item in std::iter::once(first).chain(incoming.try_iter()) {
+                        let joined = match item {
+                            WifiWork::Notice(Notice::Scanned) => {
+                                last_scan = Some(since_boot());
+                                None
+                            }
+                            WifiWork::Notice(Notice::Changed) => None,
+                            WifiWork::Notice(Notice::Joined(ssid)) => pending
+                                .take_if(|join| join.ssid == ssid)
+                                .map(|_| crate::wifi_menu::Joined::Up),
+                            WifiWork::Notice(Notice::Failed(ssid, reason)) => pending
+                                .take_if(|join| join.ssid == ssid)
+                                .map(|join| failed(&client, &join, reason)),
+                            WifiWork::Request(request) => act(&client, request, &mut pending),
+                        };
+                        if let Some(joined) = joined
+                            && !deliver(Update::WifiJoined(joined), true)
+                        {
+                            return;
+                        }
+                    }
+                    let open = menu.load(std::sync::atomic::Ordering::Relaxed);
+                    if !deliver(Update::Wifi(client.read(last_scan)), open) {
+                        return;
+                    }
+                }
+            })?;
+        Ok(work)
+    }
+
+    /// Carries out `request`; a join that cannot start ends at once, with
+    /// why.
+    fn act(
+        client: &lyr_sources::network::windows::wlan::Client,
+        request: super::WifiRequest,
+        pending: &mut Option<Pending>,
+    ) -> Option<crate::wifi_menu::Joined> {
+        use lyr_sources::network::windows::wlan::guid;
+
+        use super::WifiRequest;
+        let done = match request {
+            WifiRequest::Radio(on) => client
+                .device()
+                .ok_or_else(no_interface)
+                .and_then(|device| client.set_radio(&device, on)),
+            WifiRequest::Scan(device) => guid(&device)
+                .ok_or_else(no_interface)
+                .and_then(|device| client.scan(&device)),
+            WifiRequest::Disconnect(device) => guid(&device)
+                .ok_or_else(no_interface)
+                .and_then(|device| client.disconnect(&device)),
+            WifiRequest::Forget(profiles) => {
+                client.device().ok_or_else(no_interface).and_then(|device| {
+                    profiles
+                        .iter()
+                        .try_for_each(|profile| client.forget(&device, profile))
+                })
+            }
+            WifiRequest::Join(request) => {
+                let ssid = request.ssid.clone();
+                return match join(client, request) {
+                    Ok(join) => {
+                        *pending = Some(join);
+                        None
+                    }
+                    Err(error) => Some(crate::wifi_menu::Joined::Failed(format!(
+                        "Joining {ssid} failed: {error}"
+                    ))),
+                };
+            }
+        };
+        if let Err(error) = done {
+            tracing::warn!("wi-fi: {error}");
+        }
+        None
+    }
+
+    fn no_interface() -> std::io::Error {
+        std::io::Error::other("there is no Wi-Fi interface")
+    }
+
+    /// Starts the join `request` asks for: writes the profile a new network
+    /// or a new password needs, then connects with it.
+    fn join(
+        client: &lyr_sources::network::windows::wlan::Client,
+        request: super::JoinRequest,
+    ) -> std::io::Result<Pending> {
+        use lyr_sources::network::Join;
+        use lyr_sources::network::win32::wifi::{point, profile_xml, ssid_of};
+        use lyr_sources::network::windows::wlan::guid;
+        let text = request.device.clone();
+        let device = guid(&text).ok_or_else(no_interface)?;
+        let (profile, at, password, saved) = match request.join {
+            Join::Saved { profile, point } => (profile, point, request.new_password, true),
+            Join::New {
+                ssid,
+                password,
+                point,
+                ..
+            } => (ssid, point, password, false),
+        };
+        if password.is_some() || !saved {
+            let entry = client
+                .entries(&device)
+                .into_iter()
+                .find(|entry| point(&entry.ssid) == at)
+                .ok_or_else(|| std::io::Error::other("the network is out of range"))?;
+            let xml = profile_xml(&profile, &entry, password.as_deref()).ok_or_else(|| {
+                std::io::Error::other(
+                    request
+                        .security
+                        .refusal()
+                        .unwrap_or("its security cannot be written as a profile"),
+                )
+            })?;
+            client.set_profile(&device, &xml)?;
+        }
+        client.connect(&device, &profile)?;
+        Ok(Pending {
+            device: text,
+            ssid: ssid_of(&at).unwrap_or_default(),
+            name: request.ssid,
+            profile,
+            saved,
+            security: request.security,
+        })
+    }
+
+    /// How the failed `join` ends, for `reason`: a wrong password for a
+    /// saved profile offers a new one, and a profile made for the join is
+    /// deleted when it cannot have worked.
+    fn failed(
+        client: &lyr_sources::network::windows::wlan::Client,
+        join: &Pending,
+        reason: u32,
+    ) -> crate::wifi_menu::Joined {
+        use lyr_core::wifi_menu::Recovery;
+        use lyr_sources::network::win32::wifi::recovery;
+        use lyr_sources::network::windows::wlan::{guid, reason_text};
+        let text = format!("Joining {} failed: {}", join.name, reason_text(reason));
+        match recovery(join.saved, join.security, reason) {
+            Recovery::NewPassword => crate::wifi_menu::Joined::NewPassword,
+            Recovery::Delete => {
+                let forgotten = guid(&join.device)
+                    .ok_or_else(no_interface)
+                    .and_then(|device| client.forget(&device, &join.profile));
+                if let Err(error) = forgotten {
+                    tracing::warn!("wi-fi: the profile made for {}: {error}", join.name);
+                }
+                crate::wifi_menu::Joined::Failed(text)
+            }
+            Recovery::Keep => crate::wifi_menu::Joined::Failed(text),
+        }
     }
 
     /// Hands the network to the main loop now and after every change, read on

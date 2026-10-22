@@ -219,7 +219,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         }
         // The source follows the streams while the menu is open.
         app.commands.audio_menu(app.audio_menu.is_some());
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", windows))]
         app.commands.wifi_menu(app.wifi_menu.is_some());
         app.draw(shell.as_mut())?;
     }
@@ -287,6 +287,10 @@ impl App {
 
     /// Applies a source's update.
     fn update(&mut self, update: Update, now: Instant) {
+        #[cfg(windows)]
+        if let Update::WifiJoined(joined) = &update {
+            self.wifi_joined(joined.clone());
+        }
         #[cfg(target_os = "linux")]
         {
             use lyr_sources::notifications::linux::Change;
