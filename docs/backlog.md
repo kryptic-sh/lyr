@@ -213,24 +213,24 @@ implementation follows meanwhile.
   (`libpulse-binding`, `pipewire-rs`, libpulse itself): on Linux the PulseAudio
   or PipeWire wire protocol implemented natively in the crate ("needs to be
   native in the crate", the owner); on Windows and macOS, the OS APIs through
-  the `windows` and `objc2` crates. Requested from office-crcbl the same day,
-  with lyr's sources (`pactl.rs`, `windows.rs` and `win32.rs`, `macos.rs` and
-  `coreaudio.rs`, `level.rs`) as the requirements and free to take, and how
-  lyr's bar keeps idle: device changes apart from stream churn. Until it lands,
-  lyr stays on `pactl`, which works on this laptop's PipeWire. What the `pactl`
-  source taught, worth carrying into the seam: PipeWire's stream-restore
-  remembers a stream's mute and device per application, so a test that mutes or
-  moves a probe stream changes what that application starts with next; pactl
-  17.0 refuses a `--` before a negative step; the ports were tested on
-  `pactl`-shaped JSON only, since every device here has one port.
+  the `windows` and `objc2` crates. The owner approved crcbl's design the same
+  day: a `crcbl-mixer` crate with two Linux backends, both in-house Rust,
+  PipeWire's own protocol when its socket exists (node `Props` for volume and
+  mute, device `Route` and `Profile` params for ports, profiles and device
+  volume, the `default` metadata for defaults, `target.object` to move streams)
+  and otherwise PulseAudio's native protocol; WASAPI on Windows, with
+  `IPolicyConfig` to set the default device; CoreAudio on macOS. Requested from
+  office-crcbl the same day, with lyr's sources (`pactl.rs`, `windows.rs` and
+  `win32.rs`, `macos.rs` and `coreaudio.rs`, `level.rs`) as the requirements and
+  free to take, and how lyr's bar keeps idle: device changes apart from stream
+  churn. Until it lands, lyr stays on `pactl`, which works on this laptop's
+  PipeWire. What the `pactl` source taught, worth carrying into the seam:
+  PipeWire's stream-restore remembers a stream's mute and device per
+  application, so a test that mutes or moves a probe stream changes what that
+  application starts with next; pactl 17.0 refuses a `--` before a negative
+  step; the ports were tested on `pactl`-shaped JSON only, since every device
+  here has one port.
 
-- **crcbl: export its keysym names.** lyr's menus act on the key's symbol, not
-  on `key_code`, which crcbl derives from the scancode and so ignores xkb remaps
-  and virtual keyboards (`wtype`'s Down arrived as `key_code: Escape`). lyr
-  spells the six X11 keysyms it needs itself (`apps/lyr/src/keys.rs`). crcbl
-  named them as constants on `crcbl_core::input::Keysym` on its main
-  (2026-10-20, unreleased); on the release that carries them, `keys.rs` matches
-  `Keysym::ESCAPE` and the rest and drops its own numbers.
 - **crcbl: Linux and Vulkan parity for 0.6 – 0.8.** Also at the owner's request
   (2026-10-20): every crcbl feature developed on the Windows machine to be
   implemented and tested on Wayland, X11 and Vulkan. The per-feature table is on
