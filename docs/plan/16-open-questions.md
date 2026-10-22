@@ -47,10 +47,9 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
 8. **Compositors** (draft Q4). Answered 2026-10-20: Hyprland, sway and niri on
    Linux, each one backend in `lyr-wm` ([06](06-workspaces.md#linux--sway)).
    Other compositors leave the workspace module out.
-9. **Windows workspaces.** Default: native virtual desktops through the
-   undocumented COM interfaces, with a per-build table. The alternative is
-   targeting komorebi or GlazeWM, if one of them gets used
-   ([06](06-workspaces.md#windows--virtual-desktops)).
+9. **Windows workspaces.** Answered by the owner (2026-10-22): left out on
+   Windows. komorebi's or GlazeWM's IPC is the way back in if one of them gets
+   used ([06](06-workspaces.md#windows--virtual-desktops)).
 10. **macOS workspaces.** Default: AeroSpace only. Without it, the module is
     left out ([06](06-workspaces.md#macos--spaces)).
 11. **macOS bar placement.** Default: in the menu-bar strip, with the menu bar
@@ -58,9 +57,9 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
     ([03](03-surfaces-and-input.md#macos--status-panel)).
 12. **Windows taskbar.** Default: lyr stacks with it and never hides it. The
     tray stays there ([03](03-surfaces-and-input.md#windows--appbar)).
-13. **Power profile setting on Windows.** Default: use the undocumented
-    `PowerSetActiveOverlayScheme`. The alternative is read-only, like macOS
-    ([07](07-modules.md#power-profile)).
+13. **Power profile setting on Windows.** Answered by the owner (2026-10-22): a
+    click opens Settings' Power page, rather than the undocumented
+    `PowerSetActiveOverlayScheme` ([07](07-modules.md#power-profile)).
 14. **Linux network daemon.** Answered by the dotfiles: `.menu-wifi` drives
     `nmcli`, so it is NetworkManager, which the Wi-Fi menu needs too. The 30 s
     nl80211 read stays as the signal fallback on machines without it

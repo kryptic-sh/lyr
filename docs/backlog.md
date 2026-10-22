@@ -90,39 +90,6 @@ implementation follows meanwhile.
 - **The dotfiles' standalone tools** (M8). **Q:** When the dotfiles switch to
   lyr, do `wiremix` and `bluetui` stay installed, and do the `krypt menu` names
   stay as wrappers?
-- **Windows Bluetooth and Wi-Fi menu: build them on a machine that cannot show
-  them?** (M9.) **Q:** The development machine's Bluetooth adapter is in a PnP
-  error state and WinRT's `Radio::GetRadiosAsync` lists no radios at all
-  (checked 2026-10-20), Wi-Fi included: it is on Ethernet. So a Windows
-  Bluetooth source (`Windows.Devices.Radios` for on/off/disabled, a
-  `DeviceWatcher` on `BluetoothDevice` and `BluetoothLEDevice`'s connected
-  selectors for the devices) could only be seen hiding the module, and the
-  native Wi-Fi menu (Native Wifi's `WlanScan`, `WlanGetAvailableNetworkList` and
-  `WlanConnect`, plan 10) only seen finding no interface; the network module's
-  own Wi-Fi reading (`WlanQueryInterface`) is built and equally unseen. Build
-  them checked only that far, wait for a machine or dongle with working radios,
-  or leave them out on Windows? Until then a click opens `ms-settings:bluetooth`
-  or `ms-settings:network`.
-- **Windows workspaces: native virtual desktops on an Insider build?** (M9.)
-  **Q:** Plan 06's default is the undocumented `IVirtualDesktopManagerInternal`
-  with a per-build IID table, refusing an unknown build. The development machine
-  runs build 26300, which public IID tables (VirtualDesktopAccessor's and
-  others') may not cover yet, and a wrong IID calls through the wrong vtable
-  rather than failing cleanly, so it cannot be guessed. Options: build the table
-  for the released builds (24H2, 26100) and leave the module out on this
-  machine; target komorebi or GlazeWM's IPC instead (stable, but only if one of
-  them gets used); or leave workspaces out on Windows.
-- **Windows power profile: switch it through an undocumented export?** (M9.)
-  **Q:** Plan 16's question 13 defaults to `PowerSetActiveOverlayScheme`, which
-  neither `windows-sys` nor `windows` binds: it would be an `extern` on
-  `powrprof.dll` with the overlay GUIDs written out from outside sources, and
-  plan 11 has each undocumented API refuse a build missing from its table. The
-  development machine runs Insider build 26300, which such a table would not
-  hold, so the switch would refuse here and could not be seen working (reading
-  the mode back through `PowerGetEffectiveOverlayScheme` would be the check).
-  Build it with a table for the released builds, or keep the module read-only on
-  Windows, as on macOS? Until then a click logs that `cycle_profile` is not
-  implemented.
 - **`lyr import-waybar`: carry `style.css` into `[theme]`?** (Post-MVP.) **Q:**
   The importer carries `config.jsonc` only. Mapping `style.css` means parsing
   CSS and choosing which of waybar's selectors (`#battery`, `window#waybar`,
@@ -805,38 +772,41 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   and later) when registered and at each change, mapped onto
   power-profiles-daemon's three names with Windows' own mode name as the
   tooltip's driver (`power_profile::win32`); run on Windows (2026-10-20), its
-  tooltip read "Profile: balanced / Driver: Balanced". Switching it, which the
-  clicks do on Linux, is undocumented on Windows (plan 16's question 13) and not
-  built: a click there logs that `cycle_profile` is not implemented. Volume and
-  mic too (`lyr_sources::audio::windows`, through `windows`, which plan 02 lists
-  and which was already in the build through `crcbl-dx12`, with `windows-core`
-  for its `implement` macro): the default output and input (`eConsole`), each
-  one's scalar volume and mute from `IAudioEndpointVolume`, friendly name as the
-  tooltip's description, and the output's form factor as waybar's port kind for
-  the icon (`audio::win32`); changes from `IMMNotificationClient` and
-  `IAudioEndpointVolumeCallback` wake a COM thread of lyr's own, which also
-  carries out `toggle_mute`, `volume_up` and `volume_down` (by `scroll_step`,
-  held to 100 %, since Windows' endpoint volume has no boost). Run on Windows
-  (2026-10-20): the bar showed the output at 40 % and the input at 100 %. A
-  wheel step over the volume module was run (2026-10-20): it took the output
-  from 40 % to 35 %, and was set back through the audio menu. The step went down
-  for an injected forward (+120) wheel event because this machine has Windows'
-  reversed mouse scrolling on (`ReverseMouseWheelDirection` = 1 under
-  `HKCU\Control Panel\Mouse`), which Windows applies before any program sees the
-  event; lyr follows it as every other program does, so it is not a bug. The
-  mute click was run on the mic (2026-10-20): a click on the module muted the
-  default input and a second unmuted it, read back between clicks through
-  `Audio::source` from another process (this machine draws the icons as missing
-  glyphs, so the bar could not show it). The output's mute takes the same path
-  and was not clicked, since it cuts what is heard. A Bluetooth endpoint is told
-  apart by its device's bus enumerator (`PKEY_Device_EnumeratorName` among
-  `BTHENUM`, `BTHHFENUM`, `BTHLEDEVICE`; `audio::win32::bluetooth`, tested and
-  mutation-checked). Read on this machine, the USB headset's property store
-  names `USB`, which shows the key gives the device's bus rather than the
-  endpoint's own `SWD`; no Bluetooth endpoint has been seen. The notifications
-  module is plan 09's Windows bell: always the `none` icon
-  (`lyr_core::bell::stateless`), since Windows offers no API for its
-  notifications or do-not-disturb, with both clicks bound in
+  tooltip read "Profile: balanced / Driver: Balanced". Switching it has no
+  public API on Windows, so its clicks (`cycle_profile` and
+  `cycle_profile_back`) open Settings' Power page (`ms-settings:powersleep`, the
+  owner's choice, 2026-10-22, over the undocumented
+  `PowerSetActiveOverlayScheme`); run on Windows (2026-10-22), a click on the
+  module opened Settings on System > Power, read through UI Automation. Volume
+  and mic too (`lyr_sources::audio::windows`, through `windows`, which plan 02
+  lists and which was already in the build through `crcbl-dx12`, with
+  `windows-core` for its `implement` macro): the default output and input
+  (`eConsole`), each one's scalar volume and mute from `IAudioEndpointVolume`,
+  friendly name as the tooltip's description, and the output's form factor as
+  waybar's port kind for the icon (`audio::win32`); changes from
+  `IMMNotificationClient` and `IAudioEndpointVolumeCallback` wake a COM thread
+  of lyr's own, which also carries out `toggle_mute`, `volume_up` and
+  `volume_down` (by `scroll_step`, held to 100 %, since Windows' endpoint volume
+  has no boost). Run on Windows (2026-10-20): the bar showed the output at 40 %
+  and the input at 100 %. A wheel step over the volume module was run
+  (2026-10-20): it took the output from 40 % to 35 %, and was set back through
+  the audio menu. The step went down for an injected forward (+120) wheel event
+  because this machine has Windows' reversed mouse scrolling on
+  (`ReverseMouseWheelDirection` = 1 under `HKCU\Control Panel\Mouse`), which
+  Windows applies before any program sees the event; lyr follows it as every
+  other program does, so it is not a bug. The mute click was run on the mic
+  (2026-10-20): a click on the module muted the default input and a second
+  unmuted it, read back between clicks through `Audio::source` from another
+  process (this machine draws the icons as missing glyphs, so the bar could not
+  show it). The output's mute takes the same path and was not clicked, since it
+  cuts what is heard. A Bluetooth endpoint is told apart by its device's bus
+  enumerator (`PKEY_Device_EnumeratorName` among `BTHENUM`, `BTHHFENUM`,
+  `BTHLEDEVICE`; `audio::win32::bluetooth`, tested and mutation-checked). Read
+  on this machine, the USB headset's property store names `USB`, which shows the
+  key gives the device's bus rather than the endpoint's own `SWD`; no Bluetooth
+  endpoint has been seen. The notifications module is plan 09's Windows bell:
+  always the `none` icon (`lyr_core::bell::stateless`), since Windows offers no
+  API for its notifications or do-not-disturb, with both clicks bound in
   `[platform.windows.notifications.on]` to `start "" ms-actioncenter:`; run on
   Windows (2026-10-20), a click on it opened the notification centre. The Wi-Fi
   and Bluetooth menus open Windows' Settings pages in their place
@@ -877,9 +847,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   this machine's two microphones with the default in the active colour. Not
   built: plan 10's 150 % (with a Linux source), wiremix's card configuration
   tab, and routing a stream to another device (no public API on Windows). Not
-  built: the other Windows sources (Bluetooth, workspaces, both waiting on the
-  owner's questions above) and the native menus plan 10 names; macOS's
-  `x-apple.systempreferences:` fallbacks are built (the macOS entry).
+  built: the Bluetooth source (`Windows.Devices.Radios` for on, off and
+  disabled, a `DeviceWatcher` on `BluetoothDevice` and `BluetoothLEDevice`'s
+  connected selectors for the devices) and the native Wi-Fi menu (Native Wifi's
+  `WlanScan`, `WlanGetAvailableNetworkList` and `WlanConnect`, plan 10). The
+  owner chose (2026-10-22) to build both although this machine cannot show them
+  working: its Bluetooth adapter is in a PnP error state, WinRT's
+  `Radio::GetRadiosAsync` lists no radios (checked 2026-10-20), and it is on
+  Ethernet, so each can only be seen finding nothing here. Until they are built
+  a click opens the Settings page. Workspaces are left out on Windows (declined
+  below); macOS's `x-apple.systempreferences:` fallbacks are built (the macOS
+  entry).
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace
@@ -888,24 +866,25 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   power profile, `open_power_menu` opens the power menu, `toggle_dnd` flips
   do-not-disturb as `lyr dnd` does (the bell's right click; not run end to end,
   since Windows draws no bell and WSL has no compositor), and every other
-  built-in is handled; `cycle_profile` on Windows and macOS says it is not
-  implemented, waiting on a question above. Touchpad scrolling makes one step
-  per 50 device pixels (`PIXELS_PER_STEP`, lyr's own choice; crcbl leaves it to
-  the application). Scrolling away from the user steps to the previous
-  workspace. Run on Windows with injected input (`SetCursorPos` and
-  `mouse_event`, not a physical mouse; Windows sources entry): a click on the
-  mic toggled its mute, a wheel step on the volume stepped it, and a click on
-  the bell opened the notification centre. Hover is built: the workspace button
-  under the pointer takes the active colour, as waybar's style colours both
-  (`apps/lyr/src/modules.rs`), and moving onto another button redraws the bar.
-  Tooltips are built (`apps/lyr/src/tooltips.rs`): timed as GTK 3 does
-  (`lyr_core::tooltip`), a passthrough popup below the module (above it on a
-  bottom bar) drawn by `lyr_core::draw::tooltip`, for every module that has one;
-  tested on crcbl's headless shell and mutation-checked. Seen on Windows: the
-  clock's `UTC+08:00` and the power button's "Power Button" tooltips opened
-  below them. **Known issue on Windows:** the tooltip stays up after the pointer
-  leaves the bar, until something else wakes the bar (a clock tick, a control
-  request). Traced on crcbl 0.8.1 (2026-10-22, scripted `SetCursorPos`,
+  built-in is handled; `cycle_profile` opens Settings' Power page on Windows,
+  and on macOS says it is not implemented, waiting on a question above. Touchpad
+  scrolling makes one step per 50 device pixels (`PIXELS_PER_STEP`, lyr's own
+  choice; crcbl leaves it to the application). Scrolling away from the user
+  steps to the previous workspace. Run on Windows with injected input
+  (`SetCursorPos` and `mouse_event`, not a physical mouse; Windows sources
+  entry): a click on the mic toggled its mute, a wheel step on the volume
+  stepped it, and a click on the bell opened the notification centre. Hover is
+  built: the workspace button under the pointer takes the active colour, as
+  waybar's style colours both (`apps/lyr/src/modules.rs`), and moving onto
+  another button redraws the bar. Tooltips are built
+  (`apps/lyr/src/tooltips.rs`): timed as GTK 3 does (`lyr_core::tooltip`), a
+  passthrough popup below the module (above it on a bottom bar) drawn by
+  `lyr_core::draw::tooltip`, for every module that has one; tested on crcbl's
+  headless shell and mutation-checked. Seen on Windows: the clock's `UTC+08:00`
+  and the power button's "Power Button" tooltips opened below them. **Known
+  issue on Windows:** the tooltip stays up after the pointer leaves the bar,
+  until something else wakes the bar (a clock tick, a control request). Traced
+  on crcbl 0.8.1 (2026-10-22, scripted `SetCursorPos`,
   `RUST_LOG=crcbl_shell=trace` and a temporary probe of the events the bar
   receives): crcbl reported the bar's `WM_MOUSELEAVE` 8 ms after the warp, the
   tooltip window never took a pointer move, but the leave reached lyr only 2.3 s
@@ -1277,9 +1256,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   names from the locale (the calendar locale question above), Hyprland's click
   on the bare desktop while it is open closes it (nested, `wlrctl`, 2026-10-21;
   "How Hyprland treats a panel's keyboard and pointer").
-- **Undocumented Windows APIs:** virtual desktops
-  (`IVirtualDesktopManagerInternal`) and setting the power mode
-  (`PowerSetActiveOverlayScheme`) can break with any Windows build.
 - **macOS cannot reserve screen space.** The bar overlaps windows unless the
   menu bar is set to auto-hide.
 - **No tray and no notification state on Windows or macOS.** Neither platform
@@ -1287,6 +1263,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   [plan/09](plan/09-notifications.md)).
 
 ## Ideas considered and declined
+
+- **Windows workspaces through virtual desktops**
+  (`IVirtualDesktopManagerInternal`, plan 06): declined by the owner on
+  2026-10-22, so the workspaces module is left out on Windows. The interface is
+  undocumented, its IIDs change with Windows builds, and a wrong IID calls
+  through the wrong vtable rather than failing; the development machine's
+  Insider build 26300 is in no public IID table. Reopen with komorebi's or
+  GlazeWM's IPC if one of them is used.
+- **Switching the Windows power mode through `PowerSetActiveOverlayScheme`**:
+  declined by the owner on 2026-10-22 for opening Settings' Power page. The
+  export is undocumented and bound by neither `windows-sys` nor `windows`, and a
+  per-build table would refuse on this machine's Insider build, so it could not
+  be seen working.
 
 - **wiremix's peak meters in the audio menu:** they need audio capture on every
   node shown, which a bar menu has no use for (plan 10). Declined by lyr's
@@ -1340,8 +1329,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `defaults.toml`, the differences being waybar's `on-click` commands, which
   lyr's built-ins replace. Not built: `style.css` to `[theme]`, which would mean
   mapping waybar's selectors onto lyr's theme keys.
-- **komorebi or GlazeWM on Windows**: unbuilt, as the Windows workspaces
-  question above says.
+- **komorebi or GlazeWM on Windows**: unbuilt; Windows workspaces are left out
+  (declined above), and a tiling window manager's IPC is the way back in if the
+  owner uses one.
 
 ## Not yet verified
 

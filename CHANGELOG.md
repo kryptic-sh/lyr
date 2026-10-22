@@ -53,7 +53,7 @@ and this project adheres to
   volume module's Bluetooth format.
 - On Windows the power-profile module shows Windows' power mode (Best power
   efficiency, Balanced, Best performance and the rest), updated when it changes;
-  switching it from the bar is not built there yet.
+  a click opens Settings' Power page, where Windows switches it.
 - On Windows the network module shows the interface with the default route, its
   address and, on Wi-Fi, the network's name and signal, updated as they change;
   with no link and every Wi-Fi radio switched off, it shows Wi-Fi as off rather
