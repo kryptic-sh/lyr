@@ -451,14 +451,23 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   presents nothing (`Window::shown`) and every D-Bus watcher hands on only a
   value that changed (`lyr_sources::bus::publish`); before, UPower's identical
   30 s re-sends and every Wi-Fi or BlueZ change the bar does not show each
-  presented a frame. Wake-ups do not meet it yet: 5 in an idle minute, down from
-  13 once a Wi-Fi change (NetworkManager's background scans move it every few
-  seconds) stopped waking the bar while the menu is closed
+  presented a frame. Wake-ups do not meet it yet, though they are down from 13 a
+  minute once a Wi-Fi change (NetworkManager's background scans move it every
+  few seconds) stopped waking the bar while the menu is closed
   (`Commands::wifi_menu`; the change waits in the channel for the next wake-up,
   which drains it before handling its own events, so a click opening the menu
-  still sees it). The rest are UPower's power reading, which only the battery's
-  tooltip shows, and the clock. `lyr_wm::Compositor` picks it, or sway or niri,
-  at start. Hyprland main's changes for the next release are in
+  still sees it). Logged wake by wake on the owner's laptop (crcbl 0.8.1,
+  2026-10-22): each clock minute costs three, the tick, an empty one about 14 ms
+  later, and the compositor's `FrameReady` answering the present (crcbl's frame
+  gate), so an idle minute is 3; UPower's 30 s re-sends change only `UpdateTime`
+  and `Voltage` there, which the bar does not show, and wake nothing. The rest
+  come from the desktop's apps while they are busy: a tray item's updates
+  (Spotify's and Discord's, a dozen in a minute at times) and the audio menu's
+  stream list (a notification sound playing) each wake the bar although it draws
+  neither while the menu is closed. Open: what the empty wake-up after the tick
+  is, and whether the tray and the stream list could wait, as the Wi-Fi state
+  does, when nothing shown changed. `lyr_wm::Compositor` picks it, or sway or
+  niri, at start. Hyprland main's changes for the next release are in
   [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Render, rest of M1.** `lyr-render` has the GPU-free half: the bar font found
   with crcbl-font and given the system's fallback faces (`fonts::load`), text
