@@ -200,8 +200,9 @@ implementation follows meanwhile.
   panels clicked through `wlrctl`, the notification daemon on a private bus, the
   tray with a test item, every Linux source against the real services, the bar
   inside niri 26.04 and sway 1.12, and the owner runs it on the live desktop.
-  Still only the owner can run: the window title against real windows on the
-  live session, the frame gate on a monitor hypridle turns off, a battery
+  The window title followed real windows there too, on all three compositors,
+  and the frame gate held with each one's outputs turned off. Still only the
+  owner can run: the frame gate on a real monitor hypridle turns off, a battery
   charging or discharging, a successful Wi-Fi join and disconnect; and on a Mac
   with a battery, Wi-Fi and AeroSpace, the macOS sources, the Settings
   fallbacks, and whether IOBluetooth's notifications arrive on crcbl's AppKit
