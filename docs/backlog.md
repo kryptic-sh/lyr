@@ -343,26 +343,32 @@ implementation follows meanwhile.
   does not count as one (M5 measures Hyprland). S3: the Wayland
   `reposition_popup` path needs xdg_wm_base 3 and has not run anywhere.
   `ui.scrollbar` is vertical only.
-- **crcbl's frame gate: adopted, not yet seen on an output that is off.** A FIFO
-  present to an output the compositor has turned off (hypridle DPMS) could block
-  lyr's loop, by crcbl's reading of its own source (2026-10-19). crcbl 0.7.0's
-  `Presenter` gate is in: `lyr_render::surface::Surface::draw` asks the shell
-  for the next frame before each present, `Surface::observe` reads the answers,
-  and every pumped event reaches every surface (`App::observe` in
-  `apps/lyr/src/bar.rs`); a surface whose answer has not come presents nothing
-  and stays dirty, and the loop's wait counts only what can present now
-  (`ready()` on each window, menu and panel), so it sleeps rather than spins.
-  `Surface`'s test on crcbl's headless shell and null backend shows a present
-  asking, the next draw skipped, and the pump's answer opening it again,
-  mutation-checked. On Windows the bar ran 106 s with `--stats` (2026-10-20): 3
-  presents (the first and one per minute tick) over 7 wake-ups. On a nested
-  Hyprland 0.56.2 (2026-10-20) with its output turned off
+- **crcbl's frame gate: adopted, seen on outputs turned off by the compositor.**
+  A FIFO present to an output the compositor has turned off (hypridle DPMS)
+  could block lyr's loop, by crcbl's reading of its own source (2026-10-19).
+  crcbl 0.7.0's `Presenter` gate is in: `lyr_render::surface::Surface::draw`
+  asks the shell for the next frame before each present, `Surface::observe`
+  reads the answers, and every pumped event reaches every surface
+  (`App::observe` in `apps/lyr/src/bar.rs`); a surface whose answer has not come
+  presents nothing and stays dirty, and the loop's wait counts only what can
+  present now (`ready()` on each window, menu and panel), so it sleeps rather
+  than spins. `Surface`'s test on crcbl's headless shell and null backend shows
+  a present asking, the next draw skipped, and the pump's answer opening it
+  again, mutation-checked. On Windows the bar ran 106 s with `--stats`
+  (2026-10-20): 3 presents (the first and one per minute tick) over 7 wake-ups.
+  On a nested Hyprland 0.56.2 (2026-10-20) with its output turned off
   (`hl.dsp.dpms({ action = "off" })`) for 80 s: the control socket answered
   every request at once, so the loop never blocked; over the 97 s around it the
   bar woke 16 times (three were those requests) and presented 3 frames, so it
-  did not spin either; turned back on, the bar showed the current minute. Not
-  seen: the owner's real outputs under hypridle, and DPMS on a compositor other
-  than Hyprland.
+  did not spin either; turned back on, the bar showed the current minute. The
+  same on sway 1.12 and niri 26.04, nested in a nested Hyprland (2026-10-22),
+  each with its outputs turned off for about 75 s
+  (`swaymsg 'output * power off'`, `niri msg action power-off-monitors`): lyr
+  answered `lyr reload` every 18 s throughout, in 7 – 11 ms on niri, and stayed
+  quiet (13 wake-ups and 3 presents over 77 s on sway, 18 and 6 on niri, the
+  reloads among them); niri, woken by the pointer, showed the current minute.
+  Turning the nested sway's output back on hung that sway, which is the
+  nesting's, not lyr's. Not seen: the owner's real outputs under hypridle.
 - **Two presenters crash NVIDIA's Wayland driver on teardown: fixed on a branch,
   waiting on a crcbl release.** office-crcbl found (2026-10-22) that on the
   NVIDIA MX550 (driver 615.78) under Wayland, a process with two `Presenter`s
