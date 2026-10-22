@@ -51,14 +51,14 @@ implementation follows meanwhile.
   the menu forwards its panel's keys to the open dropdown; and crcbl's grab
   closes a popup on a key whose `key_code` is Escape whatever its keysym, so
   `wtype`'s first key (keycode 1) closes it; real keyboards are not affected.
-  crcbl fixed it on its main (2026-10-20, unreleased: a grab closes on the
-  Escape keysym, so `caps:escape` closes it too); on that release, run the
-  dropdown under `wtype` without spending keycode 1 first. Worth knowing:
-  PipeWire's stream-restore remembers a stream's mute and device per
-  application, so a test that mutes or moves a probe stream changes what that
-  application next starts with; the probe's were put back. Keep `pactl`, or take
-  `libpulse-binding` (plan 07's default: one connection, no processes) or native
-  PipeWire with WirePlumber metadata?
+  crcbl fixed it (a grab closes on the Escape keysym, so `caps:escape` closes it
+  too), and on crcbl 0.8.1 a `wtype -k Down` on keycode 1 moved the power menu's
+  outline and left it open (nested, 2026-10-22). Worth knowing: PipeWire's
+  stream-restore remembers a stream's mute and device per application, so a test
+  that mutes or moves a probe stream changes what that application next starts
+  with; the probe's were put back. Keep `pactl`, or take `libpulse-binding`
+  (plan 07's default: one connection, no processes) or native PipeWire with
+  WirePlumber metadata?
 - **Network without NetworkManager: build the rtnetlink fallback?** (M4.) **Q:**
   The network module reads NetworkManager over zbus, which the dotfiles use.
   Should lyr also support machines without it, through a new rtnetlink crate
@@ -194,15 +194,18 @@ implementation follows meanwhile.
   crcbl uses `objc2`, `objc2-core-foundation` and `objc2-foundation`). Keep
   them, or name the ones the row did not mean, and those sources come out until
   a decision?
-- **Running lyr on the real thing: when, and on what?** (M1, M10.) **Q:**
-  Everything compositor-, radio- or Mac-specific is tested against fakes, a
-  headless sway in CI and CI's macOS runner, which has no battery, Wi-Fi or
-  AeroSpace. The checks only you can run: lyr on your Hyprland (plan 15's M1
-  check: the Lua dispatch, the window title, the notification daemon, the tray,
-  the frame gate on a monitor hypridle turns off); on a Mac with a battery,
-  Wi-Fi and AeroSpace (the macOS sources, the Settings fallbacks, whether
-  IOBluetooth's notifications arrive on crcbl's AppKit run loop); and on niri if
-  you use it. Which can you run, and should lyr hold any milestone for them?
+- **Running lyr on the real thing: when, and on what?** (M1, M10.) **Q:** On the
+  owner's Arch laptop most of it has now run, nested in Hyprland 0.56 (the
+  entries below say what each showed): the bar, the Lua dispatch, the menus and
+  panels clicked through `wlrctl`, the notification daemon on a private bus, the
+  tray with a test item, every Linux source against the real services, the bar
+  inside niri 26.04 and sway 1.12, and the owner runs it on the live desktop.
+  Still only the owner can run: the window title against real windows on the
+  live session, the frame gate on a monitor hypridle turns off, a battery
+  charging or discharging, a successful Wi-Fi join and disconnect; and on a Mac
+  with a battery, Wi-Fi and AeroSpace, the macOS sources, the Settings
+  fallbacks, and whether IOBluetooth's notifications arrive on crcbl's AppKit
+  run loop. Which can you run, and should lyr hold any milestone for them?
 - **macOS Wi-Fi and Bluetooth menus: build them natively without a Mac to try
   them?** (M10.) **Q:** Plan 10 wants native menus wherever there is a public
   API: CoreWLAN can scan and join (the scan's names need Location permission),
