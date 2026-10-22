@@ -1306,8 +1306,27 @@ mod linux {
                 }
             }
         };
-        tokio::join!(audio.watch(&states), forward, act);
+        let watch = async {
+            // A sound server that goes away is most often restarting: the
+            // modules hide until it is back.
+            while audio.watch(&states).await.is_err() {
+                tracing::warn!("audio: the sound server went away; reconnecting");
+                let mut delay = AUDIO_RETRY_FIRST;
+                while let Err(error) = audio.reconnect().await {
+                    tracing::debug!("audio: not back yet: {error}");
+                    tokio::time::sleep(delay).await;
+                    delay = (delay * 2).min(AUDIO_RETRY_LONGEST);
+                }
+                tracing::info!("audio: following the sound server again");
+            }
+        };
+        tokio::join!(watch, forward, act);
     }
+
+    /// The first wait before connecting to a sound server that went away
+    /// again, doubled after each try up to [`AUDIO_RETRY_LONGEST`].
+    const AUDIO_RETRY_FIRST: std::time::Duration = std::time::Duration::from_millis(100);
+    const AUDIO_RETRY_LONGEST: std::time::Duration = std::time::Duration::from_secs(5);
 
     async fn battery(sender: mpsc::Sender<Update>, waker: Option<ShellWaker>) {
         let upower = match UPower::system().await {

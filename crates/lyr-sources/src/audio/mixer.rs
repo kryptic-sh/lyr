@@ -4,7 +4,8 @@
 //! client library. Readings follow waybar 0.15.0's `AudioBackend`
 //! (`src/util/audio_backend.cpp`) for the default sink and source.
 
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use crcbl_mixer::{Action, Device, Direction, Interest, Mixer, MixerError, MixerState, StreamId};
 use lyr_core::audio::{Sink, Source};
@@ -165,14 +166,16 @@ fn ports(device: &Device) -> Option<Setting> {
 
 /// The system mixer, and a note of each change it reports.
 pub struct Audio {
-    mixer: Mixer,
+    /// Replaced by [`reconnect`](Self::reconnect) once the server has gone.
+    mixer: Mutex<Mixer>,
     changed: Arc<Notify>,
+    /// Whether streams are followed, kept for the mixer a reconnect opens.
+    streams: AtomicBool,
 }
 
 impl Audio {
-    /// Connects to the sound server and reads it, on a thread of its own:
-    /// the mixer waits there for the server's whole first picture. It
-    /// follows devices only until [`follow_streams`](Self::follow_streams).
+    /// Connects to the sound server and reads it. It follows devices only
+    /// until [`follow_streams`](Self::follow_streams).
     ///
     /// # Errors
     ///
@@ -180,34 +183,60 @@ impl Audio {
     /// be read.
     pub async fn open() -> Result<Self, MixerError> {
         let changed = Arc::new(Notify::new());
-        let (opened, mixer) = oneshot::channel();
-        let waker = Arc::clone(&changed);
-        std::thread::spawn(move || {
-            // Nobody waits any more when the receiver is gone.
-            let _ = opened.send(Mixer::open(move || waker.notify_one()));
-        });
-        let mixer = mixer
-            .await
-            .map_err(|_| MixerError::Protocol("the mixer's thread ended".to_owned()))??;
-        mixer.set_interest(Interest::Devices);
-        Ok(Self { mixer, changed })
+        let mixer = connect(&changed, Interest::Devices).await?;
+        Ok(Self {
+            mixer: Mutex::new(mixer),
+            changed,
+            streams: AtomicBool::new(false),
+        })
+    }
+
+    /// Whether the sound server is still there: once it has gone, as it does
+    /// when it restarts, the mixer holds its last state and refuses
+    /// changes until [`reconnect`](Self::reconnect).
+    #[must_use]
+    pub fn is_connected(&self) -> bool {
+        self.mixer().is_connected()
+    }
+
+    /// Connects to the sound server again, once, in place of the one that
+    /// went away.
+    ///
+    /// # Errors
+    ///
+    /// As [`open`](Self::open): the server may not be back yet.
+    pub async fn reconnect(&self) -> Result<(), MixerError> {
+        let mixer = connect(&self.changed, self.interest()).await?;
+        *self.mixer() = mixer;
+        Ok(())
     }
 
     /// The modules' reading and the menu's nodes now.
     #[must_use]
     pub fn read(&self) -> (Reading, Nodes) {
-        let state = self.mixer.state();
+        let state = self.mixer().state();
         (reading(&state), nodes(&state))
     }
 
     /// Sends what [`read`](Self::read) reads to `states` now and after every
     /// change the mixer reports, until every receiver is dropped.
-    pub async fn watch(&self, states: &watch::Sender<(Reading, Nodes)>) {
+    ///
+    /// # Errors
+    ///
+    /// [`MixerError::Disconnected`] when the sound server goes away; `states`
+    /// then holds no reading and no nodes, and [`reconnect`](Self::reconnect)
+    /// follows it again once it is back.
+    pub async fn watch(&self, states: &watch::Sender<(Reading, Nodes)>) -> Result<(), MixerError> {
         states.send_replace(self.read());
         loop {
             self.changed.notified().await;
+            if !self.is_connected() {
+                // What it last read is no longer true, and changes are refused.
+                states.send_replace(Default::default());
+                return Err(MixerError::Disconnected);
+            }
             if !publish(states, self.read()) {
-                break;
+                return Ok(());
             }
         }
     }
@@ -216,17 +245,30 @@ impl Audio {
     /// for the menu opening, whose streams were not followed while it was
     /// closed.
     pub fn refresh(&self, states: &watch::Sender<(Reading, Nodes)>) {
-        publish(states, self.read());
+        if self.is_connected() {
+            publish(states, self.read());
+        }
     }
 
     /// Whether a stream's change is a change [`watch`](Self::watch) sends:
     /// only the open menu shows streams.
     pub fn follow_streams(&self, follow: bool) {
-        self.mixer.set_interest(if follow {
+        self.streams.store(follow, Ordering::Relaxed);
+        self.mixer().set_interest(self.interest());
+    }
+
+    fn interest(&self) -> Interest {
+        if self.streams.load(Ordering::Relaxed) {
             Interest::DevicesAndStreams
         } else {
             Interest::Devices
-        });
+        }
+    }
+
+    fn mixer(&self) -> MutexGuard<'_, Mixer> {
+        // A panic while it was held left nothing half-changed: the guard only
+        // ever reads or swaps whole mixers.
+        self.mixer.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
     /// Mutes or unmutes `target`.
@@ -264,7 +306,7 @@ impl Audio {
     /// As [`toggle_mute`](Self::toggle_mute).
     pub fn move_stream(&self, flow: Flow, id: u32, name: &str) -> Result<(), MixerError> {
         let device = self.device(flow, name)?;
-        self.mixer.apply(
+        self.mixer().apply(
             crcbl_mixer::Target::Stream(StreamId(id)),
             &Action::MoveTo(device),
         )
@@ -281,14 +323,14 @@ impl Audio {
         match kind {
             Kind::Profile => {
                 let card = self
-                    .mixer
+                    .mixer()
                     .state()
                     .cards
                     .iter()
                     .find(|card| card.name == id)
                     .ok_or(MixerError::NoSuchTarget)?
                     .id;
-                self.mixer.apply(
+                self.mixer().apply(
                     crcbl_mixer::Target::Card(card),
                     &Action::SetProfile(option.to_owned()),
                 )
@@ -322,13 +364,13 @@ impl Audio {
             Target::Device(flow, name) => crcbl_mixer::Target::Device(self.device(*flow, name)?),
             Target::Stream(_, id) => crcbl_mixer::Target::Stream(StreamId(*id)),
         };
-        self.mixer.apply(target, action)
+        self.mixer().apply(target, action)
     }
 
     /// The id of the device `name` of `flow`.
     fn device(&self, flow: Flow, name: &str) -> Result<crcbl_mixer::DeviceId, MixerError> {
         let direction = flow.into();
-        self.mixer
+        self.mixer()
             .state()
             .devices
             .iter()
@@ -336,6 +378,23 @@ impl Audio {
             .map(|device| device.id)
             .ok_or(MixerError::NoSuchTarget)
     }
+}
+
+/// Opens a mixer following `interest`, waking `changed` on each change, on a
+/// thread of its own: the mixer waits there for the server's whole first
+/// picture.
+async fn connect(changed: &Arc<Notify>, interest: Interest) -> Result<Mixer, MixerError> {
+    let (opened, mixer) = oneshot::channel();
+    let waker = Arc::clone(changed);
+    std::thread::spawn(move || {
+        // Nobody waits any more when the receiver is gone.
+        let _ = opened.send(Mixer::open(move || waker.notify_one()));
+    });
+    let mixer = mixer
+        .await
+        .map_err(|_| MixerError::Protocol("the mixer's thread ended".to_owned()))??;
+    mixer.set_interest(interest);
+    Ok(mixer)
 }
 
 #[cfg(test)]

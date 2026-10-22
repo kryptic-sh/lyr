@@ -164,7 +164,7 @@ async fn the_mixer_steps_the_default_sink_both_ways() {
     };
     let (before, lowered, raised, down, up) = tokio::select! {
         steps = steps => steps,
-        () = audio.watch(&states) => unreachable!("the watch ends only when the test drops it"),
+        ended = audio.watch(&states) => panic!("the watch ended under the test: {ended:?}"),
     };
     eprintln!("{before}% -> {lowered}% -> {raised}%");
     down.expect("a step down");

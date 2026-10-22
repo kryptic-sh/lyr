@@ -221,16 +221,17 @@ implementation follows meanwhile.
   and otherwise PulseAudio's native protocol; WASAPI on Windows, with
   `IPolicyConfig` to set the default device; CoreAudio on macOS.
 
-  **Where it stands (2026-10-22).** crcbl main has the model and the PipeWire
-  backend (`crcbl-mixer`, unreleased). lyr's branch `crcbl-mixer` puts the Linux
-  volume, mic and audio menu on it (`lyr_sources::audio::mixer`, `pactl` gone),
-  through a git dependency on a crcbl main commit and `deny.toml`'s `allow-git`,
-  both branch-only. What remains before it merges: a crcbl release carrying
-  `crcbl-mixer` (move the dependency to it and drop `allow-git`), and the
-  PulseAudio backend, without which a Linux system with no PipeWire has no audio
-  modules (`Audio::open` gives up with "no sound server"); then Windows and
-  macOS move from `lyr_sources::audio::windows` and `macos` onto it as crcbl
-  builds them.
+  **Where it stands (2026-10-22).** crcbl main has the model, the PipeWire
+  backend and the PulseAudio one (`crcbl-mixer`, unreleased). lyr's branch
+  `crcbl-mixer` puts the Linux volume, mic and audio menu on it
+  (`lyr_sources::audio::mixer`, `pactl` gone), through a git dependency on a
+  crcbl main commit and `deny.toml`'s `allow-git`, both branch-only. It merges
+  once a crcbl release carries `crcbl-mixer` (the owner's go, which office-crcbl
+  has asked for): move the dependency to it and drop `allow-git`. Then Windows
+  and macOS move from `lyr_sources::audio::windows` and `macos` onto it as crcbl
+  builds them. When the sound server goes away the modules hide and lyr
+  reconnects, retrying on a doubling wait (`AUDIO_RETRY_FIRST` to
+  `AUDIO_RETRY_LONGEST` in `apps/lyr/src/sources.rs`).
 
   Verified on this laptop (PipeWire 1.6.9) against `pactl`: every device's
   volume, mute, default and active port (after crcbl's fix for HDMI2/3 and the
@@ -242,8 +243,14 @@ implementation follows meanwhile.
   down to 45 % and back, a click muting and unmuting, and the menu's Output
   devices and Configuration tabs. Not verified: MakeDefault on an output
   (Spotify was playing on the headset), SetPort between two real ports (every
-  device here has one), a Bluetooth sink, and what the mixer does when PipeWire
-  restarts under it (lyr opens it once and does not reopen). Changed from the
+  device here has one), a Bluetooth sink, the PulseAudio backend against a real
+  PulseAudio daemon (only through pipewire-pulse, forced with
+  `CRCBL_MIXER_BACKEND=pulse`: both live tests in `system_services.rs` pass on
+  each backend), and a restart of the session's own PipeWire. The reconnect was
+  run against a private `pipewire` daemon (no session manager, so no devices)
+  that lyr followed through `PIPEWIRE_REMOTE`: killed and restarted twice, lyr
+  logged it gone at once and back within the backoff each time, and with the
+  disconnect check in `Audio::watch` removed it never noticed. Changed from the
   `pactl` source: a step stops at 150 % (`level::MAX_PERCENT`) where `pactl` had
   no ceiling; card profiles list in the server's order, not by priority, which
   the mixer does not report; Bluetooth is the mixer's flag, not the monitor's
