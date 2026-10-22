@@ -360,6 +360,23 @@ implementation follows meanwhile.
   did not spin either; turned back on, the bar showed the current minute. Not
   seen: the owner's real outputs under hypridle, and DPMS on a compositor other
   than Hyprland.
+- **Two presenters crash NVIDIA's Wayland driver on teardown: needs the owner's
+  call.** office-crcbl found (2026-10-22) that on the NVIDIA MX550 (driver
+  615.78) under Wayland, a process with two `Presenter`s segfaults in
+  `libnvidia-eglcore` when the second's swapchain is torn down; Intel and
+  lavapipe are fine, and so is one presenter. lyr opens a presenter per surface
+  (each bar, tooltip, panel and toast), so it hits this: on the owner's laptop
+  with `CRCBL_ADAPTER=discrete`, lyr with a bar on each of two outputs in a
+  nested Hyprland died with SIGSEGV (a call through a null pointer) when one
+  output was removed. It does not happen by default here, where the bars draw on
+  the Intel GPU, but would on any machine whose display is on an NVIDIA GPU, at
+  a monitor unplug or a config change that drops a bar. The options, in crcbl's
+  `docs/backlog.md` ("Two presenters crash NVIDIA's Wayland WSI on teardown"):
+  one `VkInstance` shared by every presenter of a process, which is crcbl's
+  change and lyr's to adopt, and/or a report to NVIDIA. Not checked: whether
+  closing a tooltip or panel, also a second presenter, crashes the same way (the
+  run's tooltip did not open).
+
 - **crcbl's `set_panel`: adopted.** crcbl 0.7.0's `Shell::set_panel` resizes a
   panel in place, and lyr uses it where it used to recreate one: the toast stack
   as toasts come and go (`toasts::panel_desc`), the Bluetooth, Wi-Fi and audio
