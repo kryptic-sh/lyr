@@ -1,4 +1,4 @@
-use super::{Click, ITEM_PATH, Item, Registry, Status, click, item_address, scroll};
+use super::{Click, ITEM_PATH, Item, Registry, Status, click, faces, item_address, scroll};
 use crate::pointer::Press;
 
 #[test]
@@ -30,6 +30,32 @@ fn an_item_stands_in_with_its_first_letter() {
         "no letter in the title"
     );
     assert_eq!(item("", "").letter(), "?");
+}
+
+#[test]
+fn the_faces_are_the_shown_items_letters_and_statuses() {
+    let item = |title: &str, status| Item {
+        title: title.to_owned(),
+        status,
+        ..Item::default()
+    };
+    let items = [
+        item("spotify", Status::Active),
+        item("hidden", Status::Passive),
+        item("discord", Status::NeedsAttention),
+    ];
+    assert_eq!(
+        faces(&items),
+        [
+            ("S".to_owned(), Status::Active),
+            ("D".to_owned(), Status::NeedsAttention)
+        ]
+    );
+    // A new tooltip or icon leaves them alone.
+    let mut quiet = items.clone();
+    quiet[0].tooltip = "now playing".to_owned();
+    quiet[0].icon_name = "spotify-playing".to_owned();
+    assert_eq!(faces(&quiet), faces(&items));
 }
 
 #[test]

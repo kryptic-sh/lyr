@@ -467,10 +467,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   it changed and the rows only while the menu is open, as the Wi-Fi state does
   (a silent `pacat` stream: two wake-ups before, none after; with the menu open,
   the rows still came at once). A tray item's updates (Spotify's and Discord's,
-  a dozen in a minute at times) still wake it. Open: what the empty wake-up
-  after the tick is, and whether a tray update could wait when the item's letter
-  and status did not change. `lyr_wm::Compositor` picks it, or sway or niri, at
-  start. Hyprland main's changes for the next release are in
+  a dozen in a minute at times) woke it too; one now wakes the bar only when
+  what it draws of the items changed (`lyr_core::tray::faces`, each shown item's
+  letter and status), and waits for the next wake-up otherwise (a test item
+  flipping its icon every second: 13 wake-ups in 12 s before, none after its
+  first showing). A tooltip that changes under a pointer held still shows the
+  new text at that next wake-up. Open: what the empty wake-up after the tick is.
+  `lyr_wm::Compositor` picks it, or sway or niri, at start. Hyprland main's
+  changes for the next release are in
   [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Render, rest of M1.** `lyr-render` has the GPU-free half: the bar font found
   with crcbl-font and given the system's fallback faces (`fonts::load`), text

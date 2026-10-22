@@ -1438,6 +1438,7 @@ mod linux {
         let (listings, mut changed) = watch::channel(Listing::default());
         let forward = async {
             let mut reported = Vec::new();
+            let mut drawn = None;
             while changed.changed().await.is_ok() {
                 let listing = changed.borrow_and_update().clone();
                 // Each item that cannot be read is said once, not on every
@@ -1448,7 +1449,13 @@ mod linux {
                     }
                 }
                 reported = listing.unreadable;
-                if !deliver(&sender, waker.as_ref(), Update::Tray(listing.items)) {
+                // A change the bar does not draw (a tooltip, an icon) waits
+                // for the next wake-up; apps such as Spotify and Discord
+                // send a dozen a minute while busy.
+                let faces = lyr_core::tray::faces(&listing.items);
+                let waker = waker.as_ref().filter(|_| drawn.as_ref() != Some(&faces));
+                drawn = Some(faces);
+                if !deliver(&sender, waker, Update::Tray(listing.items)) {
                     break;
                 }
             }

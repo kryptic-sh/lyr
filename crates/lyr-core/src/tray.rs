@@ -81,6 +81,18 @@ impl Item {
     }
 }
 
+/// What the bar draws of `items`: each shown item's letter and status, in
+/// order. A change to anything else, a tooltip or an icon lyr does not draw
+/// yet, leaves it as it was.
+#[must_use]
+pub fn faces(items: &[Item]) -> Vec<(String, Status)> {
+    items
+        .iter()
+        .filter(|item| item.shown())
+        .map(|item| (item.letter(), item.status))
+        .collect()
+}
+
 /// What a click asks of an item.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Click {

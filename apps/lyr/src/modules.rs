@@ -278,11 +278,11 @@ fn content(
         }
         Module::Tray => {
             // A letter stands in for each icon until lyr draws images.
-            let buttons: Vec<draw::Button> = data
-                .tray_shown()
-                .map(|item| draw::Button {
-                    text: item.letter(),
-                    colour: if item.status == lyr_core::tray::Status::NeedsAttention {
+            let buttons: Vec<draw::Button> = lyr_core::tray::faces(&data.tray)
+                .into_iter()
+                .map(|(text, status)| draw::Button {
+                    text,
+                    colour: if status == lyr_core::tray::Status::NeedsAttention {
                         theme.workspace_urgent.unwrap_or(theme.foreground)
                     } else {
                         theme.foreground
