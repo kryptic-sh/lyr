@@ -370,12 +370,18 @@ implementation follows meanwhile.
   nested Hyprland died with SIGSEGV (a call through a null pointer) when one
   output was removed. It does not happen by default here, where the bars draw on
   the Intel GPU, but would on any machine whose display is on an NVIDIA GPU, at
-  a monitor unplug or a config change that drops a bar. The options, in crcbl's
-  `docs/backlog.md` ("Two presenters crash NVIDIA's Wayland WSI on teardown"):
-  one `VkInstance` shared by every presenter of a process, which is crcbl's
-  change and lyr's to adopt, and/or a report to NVIDIA. Not checked: whether
-  closing a tooltip or panel, also a second presenter, crashes the same way (the
-  run's tooltip did not open).
+  a monitor unplug or a config change that drops a bar. crcbl's answer is one
+  device shared by a process's presenters (`crcbl_app::present::SharedGpu`, on
+  crcbl main since 2026-10-22, not in a release yet). lyr's side is on the
+  branch `crcbl-shared-gpu`: `Surface::open` opens every surface after the first
+  on the first's device, one the shared device cannot present to getting its
+  own, with crcbl patched to that main commit by git rev. Run on the laptop with
+  the bars on the MX550: the unplug that crashed it, five more rounds, a tooltip
+  and the clock panel, then a clean quit; the Intel default draws and survives
+  the unplug too; the workspace's tests and cross-target clippy pass. **To
+  finish:** once a crcbl release carries `SharedGpu`, move the pins to it, drop
+  the branch's `[patch]`, and merge. A report to NVIDIA is still open, the
+  owner's call.
 
 - **crcbl's `set_panel`: adopted.** crcbl 0.7.0's `Shell::set_panel` resizes a
   panel in place, and lyr uses it where it used to recreate one: the toast stack
