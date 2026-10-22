@@ -34,10 +34,10 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
    API exists and opens Settings where not
    ([10](10-popups-and-menus.md#windows-and-macos)); whether `wiremix` and
    `bluetui` stay installed as standalone tools is the dotfiles' call.
-5. **Linux audio API** (draft Q8). Default: the PulseAudio protocol through
-   `pipewire-pulse` with `libpulse-binding`, which is a new dependency. The
-   alternative is native PipeWire with WirePlumber metadata
-   ([07](07-modules.md#audio-sources)).
+5. **Linux audio API** (draft Q8). **Decided by the owner (2026-10-22):** none
+   of the Linux-only options. crcbl gains an audio-control seam for Linux,
+   Windows and macOS, and lyr's audio moves onto it
+   ([07](07-modules.md#audio-sources)); until then lyr stays on `pactl`.
 6. **Theme format** (draft Q10). Default: a `[theme]` TOML table. The
    alternative is crcbl-ui's CSS stylesheet, which would let `style.css` values
    be carried more directly. Icons stay Nerd Font glyphs.

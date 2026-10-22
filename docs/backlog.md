@@ -11,54 +11,6 @@ costs. The provisional decisions in
 [plan/16-open-questions.md](plan/16-open-questions.md) are the defaults the
 implementation follows meanwhile.
 
-- **Audio: `pactl`, `libpulse-binding`, or native PipeWire?** (M7 audio menu.)
-  **Q:** The volume and mic modules are built on `pactl`
-  (`lyr_sources::audio::pactl`): the PulseAudio protocol as pipewire-pulse
-  serves it, through its command-line client, so no new crate; `pactl subscribe`
-  pushes the changes and each re-read is three `pactl --format=json` runs. The
-  audio menu is built on it too: the playing and recording streams (sink inputs
-  and source outputs, named by their application) and every device but monitors,
-  each with mute, steps, a slider and Default (`set-default-sink`/`-source`),
-  the streams followed only while the menu is open. Seen in a nested Hyprland
-  (2026-10-20): it listed this machine's five sinks with the default marked, and
-  a silent `pacat` stream on Playback, which a keyboard Enter on its Mute muted
-  (read back with `pactl`). Its sliders run to 150 % on Linux
-  (`audio_menu::MAX_PERCENT`, wiremix's scale; 100 % on Windows and macOS, where
-  the endpoints stop). A stream's row names the device it plays on or records
-  from as a button, which opens the dropdown below to move it
-  (`move-sink-input`, `move-source-output`); seen in a nested Hyprland
-  (2026-10-20), a keyboard Enter moved a silent `pacat` stream from the headset
-  to HDMI 3, read back with `pactl`. Windows has no public API for it, so its
-  streams carry no device and draw no button. The Configuration tab lists the
-  sound cards with their active profile as a button, which opens the dropdown of
-  their available profiles, best first by PulseAudio's priority
-  (`set-card-profile`); seen in a nested Hyprland (2026-10-20), a keyboard Enter
-  moved the Intel card (none of whose sinks was in use) to its next profile,
-  which was then set back with `pactl`. A device with more than one usable port
-  is a row of that tab too, its port chosen the same way (`set-sink-port`,
-  `set-source-port`; ports reported "not available" left out unless active);
-  each row is an `audio_menu::Setting` of its `Kind`. The ports are tested on
-  `pactl`-shaped JSON only: every device on the owner's machine has one port, so
-  no real port has been switched. The tab shows only where a source lists
-  settings (`Nodes::settings`, `None` on Windows and macOS). A stream's device
-  and a configuration row's choice open a dropdown of every option over the
-  button, the chosen one selected, as wiremix's do (`AudioMenu`'s `Choice`, a
-  `ListPopup` parented to the menu's panel); choosing one acts on it, Escape or
-  a click outside closes only the dropdown. Seen in a nested Hyprland
-  (2026-10-20): opened by keyboard over the layer panel, it moved a silent
-  `pacat` stream to HDMI 3 (read back with `pactl`). Two things that run found:
-  Hyprland keeps a layer panel's exclusive keyboard under its grabbing popup, so
-  the menu forwards its panel's keys to the open dropdown; and crcbl's grab
-  closes a popup on a key whose `key_code` is Escape whatever its keysym, so
-  `wtype`'s first key (keycode 1) closes it; real keyboards are not affected.
-  crcbl fixed it (a grab closes on the Escape keysym, so `caps:escape` closes it
-  too), and on crcbl 0.8.1 a `wtype -k Down` on keycode 1 moved the power menu's
-  outline and left it open (nested, 2026-10-22). Worth knowing: PipeWire's
-  stream-restore remembers a stream's mute and device per application, so a test
-  that mutes or moves a probe stream changes what that application next starts
-  with; the probe's were put back. Keep `pactl`, or take `libpulse-binding`
-  (plan 07's default: one connection, no processes) or native PipeWire with
-  WirePlumber metadata?
 - **Network without NetworkManager: build the rtnetlink fallback?** (M4.) **Q:**
   The network module reads NetworkManager over zbus, which the dotfiles use.
   Should lyr also support machines without it, through a new rtnetlink crate
@@ -248,6 +200,24 @@ implementation follows meanwhile.
   as the owner's call. When it lands: move lyr's daemon and `notify_session`
   onto it, and the Windows bell from `ms-actioncenter:` to real state where the
   seam can read it.
+- **crcbl: an audio-control seam, and lyr's audio on it.** The owner decided
+  (2026-10-22), answering whether lyr's audio should stay on `pactl` or move to
+  `libpulse-binding` or native PipeWire: neither. crcbl gains a proper audio
+  seam any crcbl app can use on Linux, Windows and macOS to control the system's
+  mixer (volume, mute, devices, streams, defaults, card profiles and ports, with
+  change notification and no polling), and lyr's volume, mic and audio menu move
+  onto it, dropping `lyr_sources::audio`'s per-platform code. Requested from
+  office-crcbl the same day, with lyr's sources (`pactl.rs`, `windows.rs` and
+  `win32.rs`, `macos.rs` and `coreaudio.rs`, `level.rs`) as the requirements and
+  free to take, and how lyr's bar keeps idle: device changes apart from stream
+  churn. Until it lands, lyr stays on `pactl`, which works on this laptop's
+  PipeWire. What the `pactl` source taught, worth carrying into the seam:
+  PipeWire's stream-restore remembers a stream's mute and device per
+  application, so a test that mutes or moves a probe stream changes what that
+  application starts with next; pactl 17.0 refuses a `--` before a negative
+  step; the ports were tested on `pactl`-shaped JSON only, since every device
+  here has one port.
+
 - **crcbl: export its keysym names.** lyr's menus act on the key's symbol, not
   on `key_code`, which crcbl derives from the scancode and so ignores xkb remaps
   and virtual keyboards (`wtype`'s Down arrived as `key_code: Escape`). lyr
