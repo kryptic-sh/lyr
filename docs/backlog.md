@@ -478,7 +478,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   letter and status), and waits for the next wake-up otherwise (a test item
   flipping its icon every second: 13 wake-ups in 12 s before, none after its
   first showing). A tooltip that changes under a pointer held still shows the
-  new text at that next wake-up. Open: what the empty wake-up after the tick is.
+  new text at that next wake-up. The empty wake-up after the tick is Mesa's:
+  traced with `WAYLAND_DEBUG` (2026-10-22), the present's commit is answered
+  within about 9 ms by `wp_presentation_feedback` and the buffer's release on
+  Mesa's own queues and by the frame callback on crcbl's, all on the one
+  connection, and any data on the socket ends crcbl's `poll`, so the bar wakes
+  once for Mesa's traffic and once for its `FrameReady`. It comes with each
+  present on a shared connection, and nothing in lyr drives it.
   `lyr_wm::Compositor` picks it, or sway or niri, at start. Hyprland main's
   changes for the next release are in
   [plan/06](plan/06-workspaces.md#linux--hyprland).
