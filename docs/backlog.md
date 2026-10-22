@@ -889,15 +889,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   implemented, waiting on a question above. Touchpad scrolling makes one step
   per 50 device pixels (`PIXELS_PER_STEP`, lyr's own choice; crcbl leaves it to
   the application). Scrolling away from the user steps to the previous
-  workspace. Not tried with a real click: the tests cover the resolution and the
-  step arithmetic, and the Windows run had no pointer input. Hover is built: the
-  workspace button under the pointer takes the active colour, as waybar's style
-  colours both (`apps/lyr/src/modules.rs`), and moving onto another button
-  redraws the bar. Tooltips are built (`apps/lyr/src/tooltips.rs`): timed as GTK
-  3 does (`lyr_core::tooltip`), a passthrough popup below the module (above it
-  on a bottom bar) drawn by `lyr_core::draw::tooltip`, for every module that has
-  one; tested on crcbl's headless shell and mutation-checked. Seen on Windows:
-  the clock's `UTC+08:00` and the power button's "Power Button" tooltips opened
+  workspace. Run on Windows with injected input (`SetCursorPos` and
+  `mouse_event`, not a physical mouse; Windows sources entry): a click on the
+  mic toggled its mute, a wheel step on the volume stepped it, and a click on
+  the bell opened the notification centre. Hover is built: the workspace button
+  under the pointer takes the active colour, as waybar's style colours both
+  (`apps/lyr/src/modules.rs`), and moving onto another button redraws the bar.
+  Tooltips are built (`apps/lyr/src/tooltips.rs`): timed as GTK 3 does
+  (`lyr_core::tooltip`), a passthrough popup below the module (above it on a
+  bottom bar) drawn by `lyr_core::draw::tooltip`, for every module that has one;
+  tested on crcbl's headless shell and mutation-checked. Seen on Windows: the
+  clock's `UTC+08:00` and the power button's "Power Button" tooltips opened
   below them. **Known issue on Windows:** the tooltip stays up after the pointer
   leaves the bar, until something else wakes the bar (a clock tick, a control
   request). Traced on crcbl 0.8.1 (2026-10-22, scripted `SetCursorPos`,
@@ -1047,20 +1049,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   taking the keyboard (Escape and losing focus close it), each click sent to
   BlueZ, and drawn again as BlueZ changes (resized in place when its size
   changes). Tested on crcbl's headless shell and mutation-checked; never run
-  against a real BlueZ, and on Windows `lyr panel bluetooth` answers that there
-  is no adapter. The arrow keys move an outline through its buttons and switches
-  in the order drawn, and Enter acts on the outlined one. The pairing agent
-  (`bluetooth::linux::agent`) is built and registered at start as
-  `DisplayYesNo`; its question shows at the top of the menu, which opens if it
-  is closed. A passkey confirmation or an authorization is asked with Yes and
-  No, and a PIN (BlueZ asks for one of a device that pairs the legacy way,
-  whatever the capability: `pin_code_request_callback` in its `src/adapter.c`,
-  read on master) is typed into a field with OK and Cancel, through crcbl's text
-  input as `TextPurpose::Pin`: at most `PIN_LENGTH` characters, Backspace, Enter
-  sends it, and nothing typed sends nothing. The PIN is drawn as typed, not
-  masked, as GNOME's and Windows' pairing dialogs show it. A No is `Rejected`,
-  an unanswered question `Canceled`, and a typed passkey always `Rejected`,
-  since lyr claims no keyboard. The agent is tested against BlueZ's side on a
+  against a real BlueZ. On Windows `lyr panel bluetooth` opens Settings'
+  Bluetooth & devices page instead (Windows sources entry). The arrow keys move
+  an outline through its buttons and switches in the order drawn, and Enter acts
+  on the outlined one. The pairing agent (`bluetooth::linux::agent`) is built
+  and registered at start as `DisplayYesNo`; its question shows at the top of
+  the menu, which opens if it is closed. A passkey confirmation or an
+  authorization is asked with Yes and No, and a PIN (BlueZ asks for one of a
+  device that pairs the legacy way, whatever the capability:
+  `pin_code_request_callback` in its `src/adapter.c`, read on master) is typed
+  into a field with OK and Cancel, through crcbl's text input as
+  `TextPurpose::Pin`: at most `PIN_LENGTH` characters, Backspace, Enter sends
+  it, and nothing typed sends nothing. The PIN is drawn as typed, not masked, as
+  GNOME's and Windows' pairing dialogs show it. A No is `Rejected`, an
+  unanswered question `Canceled`, and a typed passkey always `Rejected`, since
+  lyr claims no keyboard. The agent is tested against BlueZ's side on a
   peer-to-peer connection, the menu on crcbl's headless shell, both
   mutation-checked. A question BlueZ gives up on (the agent's `Cancel`) leaves
   the menu. Each question's answer is kept by id (`agent::Questions`), tested
