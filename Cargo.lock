@@ -353,7 +353,7 @@ dependencies = [
 [[package]]
 name = "crcbl-mixer"
 version = "0.8.1"
-source = "git+https://github.com/kryptic-sh/crcbl?rev=8744e4b7#8744e4b76eefec7f481e98f86cb27d561e5f99d9"
+source = "git+https://github.com/kryptic-sh/crcbl?rev=5f275419#5f275419e1d1bdf3459863a04e8fab88277fe5e6"
 
 [[package]]
 name = "crcbl-mtl"
