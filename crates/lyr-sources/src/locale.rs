@@ -4,8 +4,9 @@
 /// The locale's first day of the week, as days after Monday (0 for Monday,
 /// 6 for Sunday); `None` when it cannot be read. Read from Windows'
 /// `LOCALE_IFIRSTDAYOFWEEK`, macOS' current `NSCalendar`, and elsewhere
-/// glibc's `LC_TIME` through its `locale` utility ([`from_glibc`]); a
-/// system without that utility (musl, the BSDs) answers `None`.
+/// from the region of the POSIX locale the environment names
+/// ([`from_posix`]), through CLDR's week data, in-process and the same on
+/// glibc, musl and the BSDs.
 #[must_use]
 pub fn first_weekday() -> Option<u8> {
     #[cfg(windows)]
@@ -13,47 +14,54 @@ pub fn first_weekday() -> Option<u8> {
     #[cfg(target_os = "macos")]
     return from_apple(objc2_foundation::NSCalendar::currentCalendar().firstWeekday());
     #[cfg(not(any(windows, target_os = "macos")))]
-    return glibc();
+    return from_posix(&posix_time_locale()?);
 }
 
-/// `locale -k LC_TIME`'s output, as days after Monday: the weekday of the
-/// `week-1stday` date, moved on by `first_weekday` - 1 days. These are the
-/// two values waybar 0.15.0 reads through `nl_langinfo`
-/// (`_NL_TIME_WEEK_1STDAY` and `_NL_TIME_FIRST_WEEKDAY`, in
-/// `Clock::first_day_of_week`), the way `cal` does.
-#[must_use]
-pub fn from_glibc(output: &str) -> Option<u8> {
-    use chrono::{Datelike, NaiveDate};
-
-    let value = |key: &str| {
-        output
-            .lines()
-            .find_map(|line| line.strip_prefix(key)?.strip_prefix('='))
-            .map(str::trim)
-    };
-    // Always eight digits from glibc; chrono's `%Y` would take fewer.
-    let start = value("week-1stday")
-        .filter(|date| date.len() == 8 && date.bytes().all(|byte| byte.is_ascii_digit()))?;
-    let start = NaiveDate::parse_from_str(start, "%Y%m%d").ok()?;
-    let first: u32 = value("first_weekday")?.parse().ok()?;
-    if !(1..=7).contains(&first) {
-        return None;
-    }
-    let day = (start.weekday().num_days_from_monday() + first - 1) % 7;
-    u8::try_from(day).ok()
-}
-
-/// [`from_glibc`] for the user's `LC_TIME`, by running `locale`, which reads
-/// it from the environment as glibc's `setlocale` does.
+/// The locale `LC_TIME` follows, by POSIX's order: `LC_ALL`, else
+/// `LC_TIME`, else `LANG`, the first of them set and not empty.
 #[cfg(not(any(windows, target_os = "macos")))]
-fn glibc() -> Option<u8> {
-    let output = std::process::Command::new("locale")
-        .args(["-k", "LC_TIME"])
-        .stderr(std::process::Stdio::null())
-        .output()
-        .ok()
-        .filter(|output| output.status.success())?;
-    from_glibc(&String::from_utf8_lossy(&output.stdout))
+fn posix_time_locale() -> Option<String> {
+    ["LC_ALL", "LC_TIME", "LANG"]
+        .into_iter()
+        .find_map(|name| std::env::var(name).ok().filter(|value| !value.is_empty()))
+}
+
+/// The first day of the week, as days after Monday, for a POSIX locale name
+/// such as `en_US.UTF-8` or `de_DE@euro`: [`from_region`] of its territory,
+/// or `None` for a name with none, such as `C` or `POSIX`.
+#[must_use]
+pub fn from_posix(locale: &str) -> Option<u8> {
+    let name = locale.split(['.', '@']).next()?;
+    let (_, region) = name.split_once('_')?;
+    (!region.is_empty()).then(|| from_region(region))
+}
+
+/// The first day of the week, as days after Monday, in the territory
+/// `region` (`US`, `DE`, `419`), as CLDR 47's week data has it
+/// (`common/supplemental/supplementalData.xml`, `weekData`'s `firstDay`):
+/// Monday for every territory it does not list otherwise, as its `001`
+/// says.
+#[must_use]
+pub fn from_region(region: &str) -> u8 {
+    const FRIDAY: &[&str] = &["MV"];
+    const SATURDAY: &[&str] = &[
+        "AF", "BH", "DJ", "DZ", "EG", "IQ", "IR", "JO", "KW", "LY", "OM", "QA", "SD", "SY",
+    ];
+    const SUNDAY: &[&str] = &[
+        "AG", "AS", "BD", "BR", "BS", "BT", "BW", "BZ", "CA", "CO", "DM", "DO", "ET", "GT", "GU",
+        "HK", "HN", "ID", "IL", "IN", "JM", "JP", "KE", "KH", "KR", "LA", "MH", "MM", "MO", "MT",
+        "MX", "MZ", "NI", "NP", "PA", "PE", "PH", "PK", "PR", "PT", "PY", "SA", "SG", "SV", "TH",
+        "TT", "TW", "UM", "US", "VE", "VI", "WS", "YE", "ZA", "ZW",
+    ];
+    if FRIDAY.contains(&region) {
+        4
+    } else if SATURDAY.contains(&region) {
+        5
+    } else if SUNDAY.contains(&region) {
+        6
+    } else {
+        0
+    }
 }
 
 /// `LOCALE_IFIRSTDAYOFWEEK`'s value, "0" for Monday through "6" for Sunday,
@@ -96,7 +104,7 @@ fn windows() -> Option<u8> {
 
 #[cfg(test)]
 mod tests {
-    use super::{first_weekday, from_apple, from_glibc, from_windows};
+    use super::{first_weekday, from_apple, from_posix, from_region, from_windows};
 
     #[test]
     fn windows_counts_from_monday() {
@@ -107,27 +115,35 @@ mod tests {
     }
 
     #[test]
-    fn glibc_moves_on_from_its_week_start() {
-        let output = |start: &str, first: &str| {
-            format!("abday=\"Sun;Mon\"\nweek-ndays=7\nweek-1stday={start}\nfirst_weekday={first}\n")
-        };
-        // 1997-11-30 is a Sunday, glibc's usual `week-1stday`.
+    fn a_posix_locale_counts_by_its_region() {
+        assert_eq!(from_posix("en_US.UTF-8"), Some(6), "Sunday");
+        assert_eq!(from_posix("de_DE@euro"), Some(0), "Monday");
         assert_eq!(
-            from_glibc(&output("19971130", "1")),
+            from_posix("sd_IN@devanagari"),
             Some(6),
-            "en_US: Sunday"
+            "the modifier is not the region"
         );
-        assert_eq!(
-            from_glibc(&output("19971130", "2")),
-            Some(0),
-            "de_DE: Monday"
-        );
-        assert_eq!(from_glibc(&output("19971130", "7")), Some(5), "Saturday");
-        // 1997-12-01 is a Monday.
-        assert_eq!(from_glibc(&output("19971201", "1")), Some(0));
-        assert_eq!(from_glibc(&output("19971130", "8")), None);
-        assert_eq!(from_glibc(&output("1997113", "1")), None, "not a date");
-        assert_eq!(from_glibc("first_weekday=1\n"), None, "no week start");
+        assert_eq!(from_posix("ar_EG.UTF-8"), Some(5), "Saturday");
+        assert_eq!(from_posix("dv_MV"), Some(4), "Friday");
+        assert_eq!(from_posix("en_GB"), Some(0), "not the GB variant");
+        assert_eq!(from_posix("es_419.UTF-8"), Some(0), "the world's Monday");
+        assert_eq!(from_posix("C.UTF-8"), None, "no region");
+        assert_eq!(from_posix("POSIX"), None);
+        assert_eq!(from_posix("en_"), None);
+    }
+
+    #[test]
+    fn regions_follow_cldr() {
+        assert_eq!(from_region("MV"), 4);
+        for region in ["AF", "SY", "IR"] {
+            assert_eq!(from_region(region), 5, "{region}");
+        }
+        for region in ["AG", "US", "ZW", "PT", "SA", "YE"] {
+            assert_eq!(from_region(region), 6, "{region}");
+        }
+        for region in ["AE", "FR", "XK", "us", ""] {
+            assert_eq!(from_region(region), 0, "{region}");
+        }
     }
 
     #[test]
@@ -142,6 +158,13 @@ mod tests {
     #[test]
     fn this_machine_s_locale_answers_where_it_can_be_read() {
         let day = first_weekday();
+        // A POSIX locale with no region, such as a CI runner's `C.UTF-8`,
+        // has no first weekday to read.
+        #[cfg(not(any(windows, target_os = "macos")))]
+        if super::posix_time_locale().is_none_or(|locale| !locale.contains('_')) {
+            assert_eq!(day, None);
+            return;
+        }
         assert!(day.is_some_and(|day| day <= 6), "{day:?}");
     }
 }

@@ -18,15 +18,18 @@ implementation follows meanwhile.
   leave the module out there?
 - **Calendar locale: day and month names, and an override?** (M5.) **Q:** The
   first weekday follows the locale everywhere now, in `lyr_sources::locale`:
-  Windows' `LOCALE_IFIRSTDAYOFWEEK`, macOS' `NSCalendar`, and on Linux glibc's
-  `week-1stday` and `first_weekday` read from `locale -k LC_TIME` (the values
-  waybar reads through `nl_langinfo`, without taking `libc`; a system without
-  glibc's `locale` keeps Monday). Day and month names are still English. The
-  same `locale -k LC_TIME` output carries them (`abday`, `mon`), so Linux could
-  localize them the same way; Windows and macOS would need `GetLocaleInfoEx` and
-  `NSDateFormatter`. Localize them, and add a `clock.first_weekday` key to
-  override the locale? The owner's machine is `en_US`, where neither shows a
-  difference.
+  Windows' `LOCALE_IFIRSTDAYOFWEEK`, macOS' `NSCalendar`, and elsewhere the
+  region of the POSIX locale (`LC_ALL`, `LC_TIME`, `LANG`) looked up in CLDR
+  47's `weekData` `firstDay`, transcribed into `from_region` and checked against
+  CLDR's XML: in-process and the same on glibc, musl and the BSDs (the owner's
+  rule, 2026-10-22: no external program; glibc's own `week-1stday` exists only
+  on glibc). A locale glibc has been customised away from CLDR is not followed,
+  and a locale with no region (`C`, `POSIX`) falls back to the panel's Monday.
+  Day and month names are still English; localizing them without a program means
+  CLDR's names (`icu4x`, a new dependency, or a transcription) on Linux,
+  `GetLocaleInfoEx` on Windows and `NSDateFormatter` on macOS. Localize them,
+  and add a `clock.first_weekday` key to override the locale? The owner's
+  machine is `en_US`, where neither shows a difference.
 - **Week numbers: waybar's or ISO?** (M5.) **Q:** The calendar numbers weeks as
   waybar does for a Monday start (`%W`), since the dotfiles do not set
   `iso8601`. ISO weeks (`%V`) are a one-line change. Keep `%W`?
