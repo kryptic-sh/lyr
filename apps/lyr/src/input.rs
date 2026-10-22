@@ -182,9 +182,14 @@ pub fn act(
                 _ => commands.step_volume(which, -step),
             }
         }
-        // Linux carries out every built-in; Windows and macOS cannot switch
-        // the power profile yet.
-        #[cfg(not(target_os = "linux"))]
+        // Windows switches its power mode in Settings, having no public API
+        // for it.
+        #[cfg(windows)]
+        Action::Builtin(Builtin::CycleProfile | Builtin::CycleProfileBack) => {
+            crate::settings::open(crate::settings::Page::Power);
+        }
+        // macOS cannot switch the power profile yet.
+        #[cfg(target_os = "macos")]
         Action::Builtin(builtin) => {
             tracing::warn!("`{}` is not implemented yet", builtin.name());
         }

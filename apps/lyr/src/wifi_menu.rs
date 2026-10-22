@@ -109,8 +109,9 @@ pub enum Outcome {
     Redraw,
 }
 
-/// How a join the menu started ended. Only Linux has a source that joins.
-#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+/// How a join the menu started ended. Linux and Windows have a source that
+/// joins.
+#[cfg_attr(target_os = "macos", allow(dead_code))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Joined {
     Up,
@@ -264,7 +265,7 @@ impl WifiMenu {
     }
 
     /// Shows how the join it started ended.
-    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    #[cfg_attr(target_os = "macos", allow(dead_code))]
     pub fn joined(&mut self, joined: Joined) {
         let network = match self.showing.take() {
             Some(Showing::Joining(ssid)) => self.networks.iter().find(|n| n.ssid == ssid).cloned(),

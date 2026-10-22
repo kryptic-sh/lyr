@@ -27,10 +27,10 @@ supported (left out of that platform's defaults).
 
 | Module         | Linux                        | Windows                              | macOS                             |
 | -------------- | ---------------------------- | ------------------------------------ | --------------------------------- |
-| Workspaces     | ✓ Hyprland, sway, niri       | ◐ virtual desktops, undocumented COM | ◐ AeroSpace only                  |
+| Workspaces     | ✓ Hyprland, sway, niri       | ✗ left out (undocumented COM)        | ◐ AeroSpace only                  |
 | Power button   | ✓ logind                     | ✓ Win32                              | ◐ no hibernate                    |
 | Battery        | ✓ UPower                     | ✓ power notifications                | ✓ IOKit power sources             |
-| Power profile  | ✓ power-profiles-daemon      | ◐ setting the mode is undocumented   | ◐ read-only (Low Power Mode)      |
+| Power profile  | ✓ power-profiles-daemon      | ◐ set in Settings, opened on click   | ◐ read-only (Low Power Mode)      |
 | Network        | ✓ rtnetlink + NetworkManager | ✓ IP Helper + WLAN API               | ◐ SSID needs Location permission  |
 | Bluetooth      | ✓ BlueZ, with device battery | ◐ no device battery                  | ◐ no device battery               |
 | Tray           | ✓ StatusNotifierItem         | ✗ owned by Explorer                  | ✗ owned by the menu bar           |
@@ -38,7 +38,7 @@ supported (left out of that platform's defaults).
 | Clock          | ✓                            | ✓                                    | ✓                                 |
 | Window title   | ✓ Hyprland, sway, niri       | ✓ foreground window (WinEvent hooks) | ◐ AeroSpace only                  |
 | Notifications  | ✓ lyr is the daemon          | ◐ opens Action Center, no state      | ✗ no API                          |
-| Wi-Fi menu     | ✓ NetworkManager             | ◐ Native Wifi                        | ◐ Settings pane; CoreWLAN unbuilt |
+| Wi-Fi menu     | ✓ NetworkManager             | ◐ Native Wifi, not run on Wi-Fi yet  | ◐ Settings pane; CoreWLAN unbuilt |
 | Bluetooth menu | ✓ BlueZ                      | ◐ pairing only, no connect           | ◐ Settings pane; native unbuilt   |
 | Audio menu     | ✓ PulseAudio protocol        | ◐ default device opens Settings      | ◐ no per-app volume               |
 
@@ -55,9 +55,9 @@ and are checked in M9 and M10.
   with a `clippy.toml` `disallowed-methods` entry for
   `std::process::Command::new`. lyr adopts the same lint once it has a wrapper
   to point at (M4, with the first `exec` action).
-- **Undocumented Windows APIs** (virtual desktops, setting the power mode) are
-  isolated in one module each. Each checks the Windows build first and fails
-  with a logged error naming that build when it is not in the known table.
+- **Undocumented Windows APIs:** none. Virtual desktops and setting the power
+  mode were the two, and the owner left both out ([16](16-open-questions.md)
+  questions 9 and 13).
 - **macOS permissions:** Location Services (WiFi SSID) is optional, and lyr
   degrades without it. lyr needs no Accessibility permission.
 - **Linux without Hyprland, sway or niri:** the bar runs, and the workspace and

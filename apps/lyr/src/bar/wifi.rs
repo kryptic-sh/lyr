@@ -33,8 +33,8 @@ impl App {
             return Ok(Ok(()));
         }
         let Some(wifi) = self.data.wifi.as_ref().filter(|wifi| wifi.device.is_some()) else {
-            // Windows and macOS have no Wi-Fi menu yet: their Settings page
-            // stands in.
+            // macOS has no Wi-Fi menu yet, and Windows none without a
+            // wireless interface: their Settings page stands in.
             #[cfg(any(windows, target_os = "macos"))]
             {
                 crate::settings::open(crate::settings::Page::Network);
@@ -89,8 +89,9 @@ impl App {
     }
 
     /// Shows how a join ended in the menu; with the menu closed, a failure
-    /// is a notice.
-    #[cfg(target_os = "linux")]
+    /// is a notice on Linux, and logged on Windows, which has no daemon of
+    /// lyr's to show one.
+    #[cfg(any(target_os = "linux", windows))]
     pub(super) fn wifi_joined(&mut self, joined: crate::wifi_menu::Joined) {
         match &mut self.wifi_menu {
             Some(menu) => menu.joined(joined),
@@ -98,6 +99,7 @@ impl App {
                 if let crate::wifi_menu::Joined::Failed(why) = joined {
                     tracing::warn!("wi-fi: {why}");
                     // It names the network, which is anyone's text.
+                    #[cfg(target_os = "linux")]
                     self.commands
                         .notify("Wi-Fi".to_owned(), lyr_core::markup::escape(&why));
                 }
@@ -135,7 +137,7 @@ impl App {
     }
 
     /// Asks the Wi-Fi device for a scan.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     fn wifi_scan(&self) {
         if let Some(device) = self.data.wifi.as_ref().and_then(|wifi| wifi.device.clone()) {
             self.commands
@@ -144,7 +146,7 @@ impl App {
     }
 
     /// Carries out what the Wi-Fi menu asked.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     fn wifi_act(&self, outcome: Outcome) {
         use lyr_sources::network::Join;
 
@@ -210,23 +212,25 @@ impl App {
         self.commands.wifi(request);
     }
 
-    /// Windows and macOS: the menu has no device to open on yet.
-    #[cfg(not(target_os = "linux"))]
+    /// macOS: the menu has no device to open on yet.
+    #[cfg(target_os = "macos")]
     fn wifi_scan(&self) {}
 
-    /// Windows and macOS: the menu has no device to open on yet.
-    #[cfg(not(target_os = "linux"))]
+    /// macOS: the menu has no device to open on yet.
+    #[cfg(target_os = "macos")]
     fn wifi_act(&self, _outcome: Outcome) {}
 }
 
 /// How long the machine has been up, on the clock NetworkManager's
-/// `LastScan` uses; `None` where it cannot be read, which treats the last
-/// scan as stale.
+/// `LastScan` uses (the tick count Windows' source keeps its scans on);
+/// `None` where it cannot be read, which treats the last scan as stale.
 fn since_boot() -> Option<Duration> {
+    #[cfg(windows)]
+    return Some(lyr_sources::network::windows::wlan::since_boot());
     #[cfg(target_os = "linux")]
     return lyr_sources::network::linux::wifi::since_boot()
         .inspect_err(|error| tracing::warn!("wi-fi: the time since boot: {error}"))
         .ok();
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     None
 }

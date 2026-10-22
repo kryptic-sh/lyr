@@ -55,11 +55,18 @@ and this project adheres to
   volume module's Bluetooth format.
 - On Windows the power-profile module shows Windows' power mode (Best power
   efficiency, Balanced, Best performance and the rest), updated when it changes;
-  switching it from the bar is not built there yet.
+  a click opens Settings' Power page, where Windows switches it.
 - On Windows the network module shows the interface with the default route, its
   address and, on Wi-Fi, the network's name and signal, updated as they change;
   with no link and every Wi-Fi radio switched off, it shows Wi-Fi as off rather
   than disconnected.
+- On Windows the Wi-Fi menu is native: it lists the networks Native Wifi sees,
+  scans, switches the radio, joins (writing a profile for a new network, or a
+  new password for a saved one), leaves and forgets networks. A machine without
+  a wireless interface or the WLAN service opens Settings instead.
+- On Windows the bluetooth module shows the adapter's state and the device that
+  connected last, from WinRT, updated as the radio switches and devices connect,
+  disconnect, pair or unpair.
 - On Windows the battery module shows the battery, from Windows' power status,
   updated when the power source or the charge changes.
 - On macOS the battery module shows the internal battery, from IOKit's power
