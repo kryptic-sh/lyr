@@ -788,7 +788,7 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   lyr's own. The mapping (`network::win32`) is tested everywhere and
   mutation-checked, the calls on this machine; run in the bar on Windows
   (2026-10-20), its tooltip read `Ethernet 192.168.68.54/22`. Wi-Fi has not been
-  seen, this machine being wired, The radio's state is read
+  seen, this machine being wired. The radio's state is read
   (`WlanEnumInterfaces`, then `WlanQueryInterface`'s
   `wlan_intf_opcode_radio_state`; off when every phy of every interface has its
   software or hardware switch off, `network::win32::radio_off`, tested and
@@ -839,24 +839,25 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   and Bluetooth menus open Windows' Settings pages in their place
   (`apps/lyr/src/settings.rs`, `ms-settings:network` and `:bluetooth` through
   `cmd /C start`), from their bindings and from `lyr panel`; run on Windows
-  (2026-10-20), `lyr panel bluetooth` brought up a Settings window, though which
-  page it showed was not seen (it opened behind the terminal). The audio menu is
-  native on Windows (`lyr_core::audio_menu`, `apps/lyr/src/audio_menu.rs`,
-  `lyr_sources::audio::windows::menu`): tabs for playback and recording streams
-  (WASAPI's audio sessions on every active endpoint, named by the session, else
-  its program's file name, `audio::win32::session_name`; every endpoint has a
-  system-sounds session, so those off the default endpoint are left out, and
-  another stream there names its endpoint, `stream_row`) and output and input
-  devices, each row with mute, a step down and up by the module's `scroll_step`,
-  and on a device that is not the default a Default button, which opens
-  `ms-settings:sound` since Windows has no public API for setting it. The source
-  re-reads the rows on each endpoint change and once a second while the menu is
-  open, since session changes have no callbacks wired. Run on Windows
-  (2026-10-20): `lyr panel audio` opened it listing this machine's four output
-  devices, the default in the active colour; a menu panel now stays inside its
-  output (`menu_panel::Place`, from the clicked bar's width; `lyr panel` with no
-  bar showing the module opens at the left edge), and the audio menu opened
-  ending 16 px from the screen's right edge, its Playback tab clicked for real
+  (2026-10-22), `lyr panel bluetooth` opened Settings on Bluetooth & devices and
+  `lyr panel wifi` on Network & internet, read from the Settings window through
+  UI Automation. The audio menu is native on Windows (`lyr_core::audio_menu`,
+  `apps/lyr/src/audio_menu.rs`, `lyr_sources::audio::windows::menu`): tabs for
+  playback and recording streams (WASAPI's audio sessions on every active
+  endpoint, named by the session, else its program's file name,
+  `audio::win32::session_name`; every endpoint has a system-sounds session, so
+  those off the default endpoint are left out, and another stream there names
+  its endpoint, `stream_row`) and output and input devices, each row with mute,
+  a step down and up by the module's `scroll_step`, and on a device that is not
+  the default a Default button, which opens `ms-settings:sound` since Windows
+  has no public API for setting it. The source re-reads the rows on each
+  endpoint change and once a second while the menu is open, since session
+  changes have no callbacks wired. Run on Windows (2026-10-20):
+  `lyr panel audio` opened it listing this machine's four output devices, the
+  default in the active colour; a menu panel now stays inside its output
+  (`menu_panel::Place`, from the clicked bar's width; `lyr panel` with no bar
+  showing the module opens at the left edge), and the audio menu opened ending
+  16 px from the screen's right edge, its Playback tab clicked for real
   redrawing it there. Each control's lookup was tested by a 0 % step on every
   device and stream; on the real machine (2026-10-20) a click on the steam
   stream's step down showed 95 % and its step up 100 % again, so a click reaches
@@ -907,14 +908,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   The cause is crcbl-shell's Win32 `wait`: it drains the message queue first,
   and a message that drain dispatches (the leave, posted just after the warp's
   raw input already woke and pumped the loop) records an event that `wait` then
-  sleeps on. Reported to crcbl with the trace and a suggested fix (return at
-  once when the drain recorded an event); retest when a crcbl release carries
-  it. crcbl's traces reach lyr's log only since lyr bridges `log` into its
-  subscriber (`tracing-subscriber`'s `tracing-log`); before that every crcbl
-  record was dropped, on every platform. A tooltip follows its module when the
-  module moves (repositioned where the window system can, opened again
-  elsewhere). A tooltip of several lines (a format with line breaks) is drawn a
-  row per line.
+  sleeps on. Reported to crcbl with the trace; crcbl confirmed it and fixes it
+  on its branch `win32-wait-recorded` (`Win32Shell::wait` returns
+  `Wake::Recorded` when its drain recorded an event, with a desktop test of
+  exactly this leave), for its next release. On that release: run the
+  hover-then-warp check again, with no wake-up step. crcbl's traces reach lyr's
+  log only since lyr bridges `log` into its subscriber (`tracing-subscriber`'s
+  `tracing-log`); before that every crcbl record was dropped, on every platform.
+  A tooltip follows its module when the module moves (repositioned where the
+  window system can, opened again elsewhere). A tooltip of several lines (a
+  format with line breaks) is drawn a row per line.
 - **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second
