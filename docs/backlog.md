@@ -18,15 +18,18 @@ implementation follows meanwhile.
   leave the module out there?
 - **Calendar locale: day and month names, and an override?** (M5.) **Q:** The
   first weekday follows the locale everywhere now, in `lyr_sources::locale`:
-  Windows' `LOCALE_IFIRSTDAYOFWEEK`, macOS' `NSCalendar`, and on Linux glibc's
-  `week-1stday` and `first_weekday` read from `locale -k LC_TIME` (the values
-  waybar reads through `nl_langinfo`, without taking `libc`; a system without
-  glibc's `locale` keeps Monday). Day and month names are still English. The
-  same `locale -k LC_TIME` output carries them (`abday`, `mon`), so Linux could
-  localize them the same way; Windows and macOS would need `GetLocaleInfoEx` and
-  `NSDateFormatter`. Localize them, and add a `clock.first_weekday` key to
-  override the locale? The owner's machine is `en_US`, where neither shows a
-  difference.
+  Windows' `LOCALE_IFIRSTDAYOFWEEK`, macOS' `NSCalendar`, and elsewhere the
+  region of the POSIX locale (`LC_ALL`, `LC_TIME`, `LANG`) looked up in CLDR
+  47's `weekData` `firstDay`, transcribed into `from_region` and checked against
+  CLDR's XML: in-process and the same on glibc, musl and the BSDs (the owner's
+  rule, 2026-10-22: no external program; glibc's own `week-1stday` exists only
+  on glibc). A locale glibc has been customised away from CLDR is not followed,
+  and a locale with no region (`C`, `POSIX`) falls back to the panel's Monday.
+  Day and month names are still English; localizing them without a program means
+  CLDR's names (`icu4x`, a new dependency, or a transcription) on Linux,
+  `GetLocaleInfoEx` on Windows and `NSDateFormatter` on macOS. Localize them,
+  and add a `clock.first_weekday` key to override the locale? The owner's
+  machine is `en_US`, where neither shows a difference.
 - **Week numbers: waybar's or ISO?** (M5.) **Q:** The calendar numbers weeks as
   waybar does for a Monday start (`%W`), since the dotfiles do not set
   `iso8601`. ISO weeks (`%V`) are a one-line change. Keep `%W`?
@@ -258,8 +261,8 @@ implementation follows meanwhile.
   device per application, so a test that mutes or moves a probe stream changes
   what that application starts with next; switching a card's profile and back
   within milliseconds left this laptop's Intel nodes renamed with a `.2` suffix
-  (`…HDMI1__sink.2`), which neither later switches nor the "off" profile undo,
-  so a live test waits for the old nodes to go.
+  (`…HDMI1__sink.2`), which neither later switches nor the "off" profile undo
+  (restarting WirePlumber did), so a live test waits for the old nodes to go.
 
 - **crcbl: Linux and Vulkan parity for 0.6 – 0.8.** Also at the owner's request
   (2026-10-20): every crcbl feature developed on the Windows machine to be
@@ -271,13 +274,13 @@ implementation follows meanwhile.
   panel at 1.5 scale. lyr's own runs showed `set_panel` and the frame gate
   working, the latter with an output turned off. Still open in crcbl:
   pointer-leave between an app's own windows on Wayland and X11, X11's
-  `display_adapter`, and the scripted resize and read-back as CI jobs. On crcbl
-  0.8.0, lyr's `Surface::resize` drain can go.
+  `display_adapter`, and the scripted resize and read-back as CI jobs.
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
-  `=0.7.0` (published 2026-10-20, with `set_panel`, frame pacing and
-  `font::breaks`; crcbl's `rust-version` is 1.98, and lyr's follows). The bump
-  needed no change in lyr; the bar ran on it on Windows. crcbl 0.4.0
+  `=0.8.1` (moved there 2026-10-21; 0.8.0's `Presenter` drains before a
+  reconfigure, so lyr no longer does; 0.7.0 brought `set_panel`, frame pacing
+  and `font::breaks`; crcbl's `rust-version` is 1.98, and lyr's follows). The
+  bump needed no change in lyr; the bar ran on it on Windows. crcbl 0.4.0
   (2026-10-18) brought `crcbl-app`, the window-plus-device crate lyr asked for
   so that it links no engine, audio (cpal, ALSA) or physics; 0.5.0's only
   breaking change is in crcbl-phys. M1 adds `crcbl-app`, `crcbl-hal`, `crcbl-ui`
@@ -409,15 +412,11 @@ implementation follows meanwhile.
   reshaped bars keep theirs with the new anchor and layer. Run on Windows
   (2026-10-20): a reload from a 30 px top bar to a 50 px bottom one moved it in
   place, seen in a screenshot. That run found that D3D12 refuses `ResizeBuffers`
-  while frames in flight use the back buffers, and crcbl-app's
-  `Presenter::resize` does not wait, so the bar exited; `Surface::resize` now
-  drains first. Reported to crcbl, which agreed (crcbl-dx12 waits for the queue,
-  but the command buffers the `Presenter` still holds keep the back buffers
-  referenced) and makes every `Presenter` reconfigure drain first: on crcbl's
-  main (4490f05d, CI green), shipping in 0.8.0. On 0.8.0: drop the drain from
-  `Surface::resize` (keeping it is harmless) and run the reload reshape on
-  Windows again without it, which is the D3D12 check crcbl has no CI leg for,
-  and tell crcbl what it shows.
+  while frames in flight use the back buffers; crcbl 0.8.0's `Presenter` drains
+  before every reconfigure, and lyr's own drain in `Surface::resize` is gone.
+  Run again on Windows without it (2026-10-22, crcbl 0.8.1): reloads from a 30
+  px top bar to a 50 px bottom one and back moved the bar each time, seen in
+  screenshots, and lyr exited cleanly on `lyr quit`.
 - **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
   the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
   S8 – S27. pikr's session tracks the move in pikr's own backlog and
@@ -813,7 +812,7 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   lyr's own. The mapping (`network::win32`) is tested everywhere and
   mutation-checked, the calls on this machine; run in the bar on Windows
   (2026-10-20), its tooltip read `Ethernet 192.168.68.54/22`. Wi-Fi has not been
-  seen, this machine being wired, The radio's state is read
+  seen, this machine being wired. The radio's state is read
   (`WlanEnumInterfaces`, then `WlanQueryInterface`'s
   `wlan_intf_opcode_radio_state`; off when every phy of every interface has its
   software or hardware switch off, `network::win32::radio_off`, tested and
@@ -864,24 +863,25 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   and Bluetooth menus open Windows' Settings pages in their place
   (`apps/lyr/src/settings.rs`, `ms-settings:network` and `:bluetooth` through
   `cmd /C start`), from their bindings and from `lyr panel`; run on Windows
-  (2026-10-20), `lyr panel bluetooth` brought up a Settings window, though which
-  page it showed was not seen (it opened behind the terminal). The audio menu is
-  native on Windows (`lyr_core::audio_menu`, `apps/lyr/src/audio_menu.rs`,
-  `lyr_sources::audio::windows::menu`): tabs for playback and recording streams
-  (WASAPI's audio sessions on every active endpoint, named by the session, else
-  its program's file name, `audio::win32::session_name`; every endpoint has a
-  system-sounds session, so those off the default endpoint are left out, and
-  another stream there names its endpoint, `stream_row`) and output and input
-  devices, each row with mute, a step down and up by the module's `scroll_step`,
-  and on a device that is not the default a Default button, which opens
-  `ms-settings:sound` since Windows has no public API for setting it. The source
-  re-reads the rows on each endpoint change and once a second while the menu is
-  open, since session changes have no callbacks wired. Run on Windows
-  (2026-10-20): `lyr panel audio` opened it listing this machine's four output
-  devices, the default in the active colour; a menu panel now stays inside its
-  output (`menu_panel::Place`, from the clicked bar's width; `lyr panel` with no
-  bar showing the module opens at the left edge), and the audio menu opened
-  ending 16 px from the screen's right edge, its Playback tab clicked for real
+  (2026-10-22), `lyr panel bluetooth` opened Settings on Bluetooth & devices and
+  `lyr panel wifi` on Network & internet, read from the Settings window through
+  UI Automation. The audio menu is native on Windows (`lyr_core::audio_menu`,
+  `apps/lyr/src/audio_menu.rs`, `lyr_sources::audio::windows::menu`): tabs for
+  playback and recording streams (WASAPI's audio sessions on every active
+  endpoint, named by the session, else its program's file name,
+  `audio::win32::session_name`; every endpoint has a system-sounds session, so
+  those off the default endpoint are left out, and another stream there names
+  its endpoint, `stream_row`) and output and input devices, each row with mute,
+  a step down and up by the module's `scroll_step`, and on a device that is not
+  the default a Default button, which opens `ms-settings:sound` since Windows
+  has no public API for setting it. The source re-reads the rows on each
+  endpoint change and once a second while the menu is open, since session
+  changes have no callbacks wired. Run on Windows (2026-10-20):
+  `lyr panel audio` opened it listing this machine's four output devices, the
+  default in the active colour; a menu panel now stays inside its output
+  (`menu_panel::Place`, from the clicked bar's width; `lyr panel` with no bar
+  showing the module opens at the left edge), and the audio menu opened ending
+  16 px from the screen's right edge, its Playback tab clicked for real
   redrawing it there. Each control's lookup was tested by a 0 % step on every
   device and stream; on the real machine (2026-10-20) a click on the steam
   stream's step down showed 95 % and its step up 100 % again, so a click reaches
@@ -913,36 +913,37 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   implemented, waiting on a question above. Touchpad scrolling makes one step
   per 50 device pixels (`PIXELS_PER_STEP`, lyr's own choice; crcbl leaves it to
   the application). Scrolling away from the user steps to the previous
-  workspace. Not tried with a real click: the tests cover the resolution and the
-  step arithmetic, and the Windows run had no pointer input. Hover is built: the
-  workspace button under the pointer takes the active colour, as waybar's style
-  colours both (`apps/lyr/src/modules.rs`), and moving onto another button
-  redraws the bar. Tooltips are built (`apps/lyr/src/tooltips.rs`): timed as GTK
-  3 does (`lyr_core::tooltip`), a passthrough popup below the module (above it
-  on a bottom bar) drawn by `lyr_core::draw::tooltip`, for every module that has
-  one; tested on crcbl's headless shell and mutation-checked. Seen on Windows:
-  the clock's `UTC+08:00` and the power button's "Power Button" tooltips opened
-  below them. **Known issue on Windows:** once the popup is open, the bar gets
-  no pointer-leave from crcbl 0.5.0's Win32 backend, so the tooltip stays up
-  after the pointer leaves the bar (with no popup, the leave arrives). Seen with
-  a scripted `SetCursorPos`, not a physical mouse; reported to crcbl on
-  2026-10-19, which found the cause (`TME_LEAVE` armed only on the first move
-  after a leave, so nothing re-arms it once the popup cancels it). Its test with
-  an ordinary parent window did not reproduce the bug; trying a panel parent, as
-  lyr's bar is, is next in crcbl's backlog, so the fix has no release yet. Seen
-  again on crcbl 0.7.0 (2026-10-20, scripted cursor, screenshots before and
-  after) and reported again. crcbl found a defect that could cause it (a pointer
-  arriving in another of the app's windows moved the leave tracking without
-  reporting a leave of the old one) and fixes it in 0.8.0, but its e2e of lyr's
-  geometry passed on CI even without the fix, so the cause is not proven; the
-  differences left are that lyr's windows draw through a swapchain, the pointer
-  rests through the hover delay, and another process moves it. On 0.8.0: run the
-  same hover-then-warp check again, and if the tooltip still stays up, send
-  crcbl the `crcbl_shell` trace log around the warp, saying whether the bar got
-  a `WM_MOUSELEAVE` at all and whether the tooltip window ever got a
-  `WM_MOUSEMOVE`. A tooltip follows its module when the module moves
-  (repositioned where the window system can, opened again elsewhere). A tooltip
-  of several lines (a format with line breaks) is drawn a row per line.
+  workspace. Run on Windows with injected input (`SetCursorPos` and
+  `mouse_event`, not a physical mouse; Windows sources entry): a click on the
+  mic toggled its mute, a wheel step on the volume stepped it, and a click on
+  the bell opened the notification centre. Hover is built: the workspace button
+  under the pointer takes the active colour, as waybar's style colours both
+  (`apps/lyr/src/modules.rs`), and moving onto another button redraws the bar.
+  Tooltips are built (`apps/lyr/src/tooltips.rs`): timed as GTK 3 does
+  (`lyr_core::tooltip`), a passthrough popup below the module (above it on a
+  bottom bar) drawn by `lyr_core::draw::tooltip`, for every module that has one;
+  tested on crcbl's headless shell and mutation-checked. Seen on Windows: the
+  clock's `UTC+08:00` and the power button's "Power Button" tooltips opened
+  below them. **Known issue on Windows:** the tooltip stays up after the pointer
+  leaves the bar, until something else wakes the bar (a clock tick, a control
+  request). Traced on crcbl 0.8.1 (2026-10-22, scripted `SetCursorPos`,
+  `RUST_LOG=crcbl_shell=trace` and a temporary probe of the events the bar
+  receives): crcbl reported the bar's `WM_MOUSELEAVE` 8 ms after the warp, the
+  tooltip window never took a pointer move, but the leave reached lyr only 2.3 s
+  later, when `lyr event workspace` woke the loop, and the tooltip then closed.
+  The cause is crcbl-shell's Win32 `wait`: it drains the message queue first,
+  and a message that drain dispatches (the leave, posted just after the warp's
+  raw input already woke and pumped the loop) records an event that `wait` then
+  sleeps on. Reported to crcbl with the trace; crcbl confirmed it and fixes it
+  on its branch `win32-wait-recorded` (`Win32Shell::wait` returns
+  `Wake::Recorded` when its drain recorded an event, with a desktop test of
+  exactly this leave), for its next release. On that release: run the
+  hover-then-warp check again, with no wake-up step. crcbl's traces reach lyr's
+  log only since lyr bridges `log` into its subscriber (`tracing-subscriber`'s
+  `tracing-log`); before that every crcbl record was dropped, on every platform.
+  A tooltip follows its module when the module moves (repositioned where the
+  window system can, opened again elsewhere). A tooltip of several lines (a
+  format with line breaks) is drawn a row per line.
 - **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second
@@ -1072,20 +1073,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   taking the keyboard (Escape and losing focus close it), each click sent to
   BlueZ, and drawn again as BlueZ changes (resized in place when its size
   changes). Tested on crcbl's headless shell and mutation-checked; never run
-  against a real BlueZ, and on Windows `lyr panel bluetooth` answers that there
-  is no adapter. The arrow keys move an outline through its buttons and switches
-  in the order drawn, and Enter acts on the outlined one. The pairing agent
-  (`bluetooth::linux::agent`) is built and registered at start as
-  `DisplayYesNo`; its question shows at the top of the menu, which opens if it
-  is closed. A passkey confirmation or an authorization is asked with Yes and
-  No, and a PIN (BlueZ asks for one of a device that pairs the legacy way,
-  whatever the capability: `pin_code_request_callback` in its `src/adapter.c`,
-  read on master) is typed into a field with OK and Cancel, through crcbl's text
-  input as `TextPurpose::Pin`: at most `PIN_LENGTH` characters, Backspace, Enter
-  sends it, and nothing typed sends nothing. The PIN is drawn as typed, not
-  masked, as GNOME's and Windows' pairing dialogs show it. A No is `Rejected`,
-  an unanswered question `Canceled`, and a typed passkey always `Rejected`,
-  since lyr claims no keyboard. The agent is tested against BlueZ's side on a
+  against a real BlueZ. On Windows `lyr panel bluetooth` opens Settings'
+  Bluetooth & devices page instead (Windows sources entry). The arrow keys move
+  an outline through its buttons and switches in the order drawn, and Enter acts
+  on the outlined one. The pairing agent (`bluetooth::linux::agent`) is built
+  and registered at start as `DisplayYesNo`; its question shows at the top of
+  the menu, which opens if it is closed. A passkey confirmation or an
+  authorization is asked with Yes and No, and a PIN (BlueZ asks for one of a
+  device that pairs the legacy way, whatever the capability:
+  `pin_code_request_callback` in its `src/adapter.c`, read on master) is typed
+  into a field with OK and Cancel, through crcbl's text input as
+  `TextPurpose::Pin`: at most `PIN_LENGTH` characters, Backspace, Enter sends
+  it, and nothing typed sends nothing. The PIN is drawn as typed, not masked, as
+  GNOME's and Windows' pairing dialogs show it. A No is `Rejected`, an
+  unanswered question `Canceled`, and a typed passkey always `Rejected`, since
+  lyr claims no keyboard. The agent is tested against BlueZ's side on a
   peer-to-peer connection, the menu on crcbl's headless shell, both
   mutation-checked. A question BlueZ gives up on (the agent's `Cancel`) leaves
   the menu. Each question's answer is kept by id (`agent::Questions`), tested
