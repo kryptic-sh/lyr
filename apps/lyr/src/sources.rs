@@ -39,9 +39,8 @@ pub enum Update {
     /// How a join the Wi-Fi menu asked for ended.
     #[cfg(target_os = "linux")]
     WifiJoined(crate::wifi_menu::Joined),
-    /// BlueZ's (IOBluetooth's on macOS): the module's reading and the menu's
-    /// adapter and devices.
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    /// BlueZ's (IOBluetooth's on macOS, WinRT's on Windows): the module's
+    /// reading and the menu's adapter and devices.
     Bluetooth(lyr_sources::bluetooth::Snapshot),
     /// The pairing agent asks, about the device at this path, under this
     /// id.
@@ -517,6 +516,7 @@ pub fn start(
         let power_profile = windows::power_profile(sender.clone(), waker.clone());
         let window = windows::window(sender.clone(), waker.clone());
         let audio = windows::audio(sender.clone(), waker.clone())?;
+        windows::bluetooth(sender.clone(), waker.clone())?;
         let battery = windows::battery(sender, waker);
         Ok((
             receiver,
@@ -872,6 +872,56 @@ mod windows {
     use lyr_sources::battery::windows::{Watch, status};
 
     use super::{MENU_REFRESH, Update};
+
+    /// Hands the adapter and paired devices to the main loop now and after
+    /// every change, on a thread in COM's multithreaded apartment that also
+    /// keeps the watch, and ends with the bar. A machine whose Bluetooth
+    /// cannot be read logs why, and the module stays out.
+    ///
+    /// # Errors
+    ///
+    /// When the thread cannot start.
+    pub(super) fn bluetooth(
+        sender: mpsc::Sender<Update>,
+        waker: Option<ShellWaker>,
+    ) -> std::io::Result<()> {
+        use lyr_sources::bluetooth::Tracker;
+        use lyr_sources::bluetooth::windows::{Watch, init, snapshot};
+        std::thread::Builder::new()
+            .name("lyr bluetooth".to_owned())
+            .spawn(move || {
+                if let Err(error) = init() {
+                    tracing::warn!("bluetooth: {error}");
+                    return;
+                }
+                let (changes, changed) = mpsc::channel::<()>();
+                let _watch = Watch::new(move || {
+                    // The reading loop has gone when this fails: nothing to
+                    // tell.
+                    let _gone = changes.send(());
+                })
+                .inspect_err(|error| tracing::warn!("bluetooth: changes will not show: {error}"))
+                .ok();
+                let mut tracker = Tracker::default();
+                // Once now, then once for each run of changes.
+                loop {
+                    if sender
+                        .send(Update::Bluetooth(snapshot(&mut tracker)))
+                        .is_err()
+                    {
+                        break;
+                    }
+                    if let Some(waker) = &waker {
+                        waker.wake();
+                    }
+                    if changed.recv().is_err() {
+                        break;
+                    }
+                    while changed.try_recv().is_ok() {}
+                }
+            })?;
+        Ok(())
+    }
 
     /// Hands the network to the main loop now and after every change, read on
     /// a thread of its own, since a WLAN callback must not call into the WLAN

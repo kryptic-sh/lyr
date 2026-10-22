@@ -846,18 +846,27 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   for 75 %. A right click on the mic module opened it on Input devices, listing
   this machine's two microphones with the default in the active colour. Not
   built: plan 10's 150 % (with a Linux source), wiremix's card configuration
-  tab, and routing a stream to another device (no public API on Windows). Not
-  built: the Bluetooth source (`Windows.Devices.Radios` for on, off and
-  disabled, a `DeviceWatcher` on `BluetoothDevice` and `BluetoothLEDevice`'s
-  connected selectors for the devices) and the native Wi-Fi menu (Native Wifi's
-  `WlanScan`, `WlanGetAvailableNetworkList` and `WlanConnect`, plan 10). The
-  owner chose (2026-10-22) to build both although this machine cannot show them
-  working: its Bluetooth adapter is in a PnP error state, WinRT's
-  `Radio::GetRadiosAsync` lists no radios (checked 2026-10-20), and it is on
-  Ethernet, so each can only be seen finding nothing here. Until they are built
-  a click opens the Settings page. Workspaces are left out on Windows (declined
-  below); macOS's `x-apple.systempreferences:` fallbacks are built (the macOS
-  entry).
+  tab, and routing a stream to another device (no public API on Windows). The
+  Bluetooth source is built (`lyr_sources::bluetooth::windows`, 2026-10-22):
+  WinRT's default adapter and its radio's state (`Windows.Devices.Radios`;
+  disabled reads as BlueZ's `off-blocked`), and the paired devices, classic and
+  LE, as association endpoints with `System.Devices.Aep.IsConnected` and
+  `DeviceAddress`, a device paired over both joined by its address
+  (`bluetooth::win32`, tested and mutation-checked on every platform). A
+  `DeviceWatcher` on the adapters and on each kind of paired device, and the
+  radio's `StateChanged`, call for a fresh read, on a thread in COM's
+  multithreaded apartment. The owner chose (2026-10-22) to build it, and the
+  native Wi-Fi menu, although this machine cannot show them working: its
+  Bluetooth adapter is in a PnP error state and WinRT lists no radios (checked
+  2026-10-20), and it is on Ethernet. Run here, the source finds no adapter, so
+  the module stays hidden, and its watchers start; nothing has shown a real
+  adapter or device. Not seen: a radio switched on after start-up when no
+  adapter was there at start (its `StateChanged` is not followed then). Not
+  built: the native Wi-Fi menu (Native Wifi's `WlanScan`,
+  `WlanGetAvailableNetworkList` and `WlanConnect`, plan 10) and a native
+  Bluetooth menu; their clicks open the Settings pages. Workspaces are left out
+  on Windows (declined below); macOS's `x-apple.systempreferences:` fallbacks
+  are built (the macOS entry).
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace
