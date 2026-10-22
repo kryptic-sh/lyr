@@ -897,27 +897,24 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   on a bottom bar) drawn by `lyr_core::draw::tooltip`, for every module that has
   one; tested on crcbl's headless shell and mutation-checked. Seen on Windows:
   the clock's `UTC+08:00` and the power button's "Power Button" tooltips opened
-  below them. **Known issue on Windows:** once the popup is open, the bar gets
-  no pointer-leave from crcbl 0.5.0's Win32 backend, so the tooltip stays up
-  after the pointer leaves the bar (with no popup, the leave arrives). Seen with
-  a scripted `SetCursorPos`, not a physical mouse; reported to crcbl on
-  2026-10-19, which found the cause (`TME_LEAVE` armed only on the first move
-  after a leave, so nothing re-arms it once the popup cancels it). Its test with
-  an ordinary parent window did not reproduce the bug; trying a panel parent, as
-  lyr's bar is, is next in crcbl's backlog, so the fix has no release yet. Seen
-  again on crcbl 0.7.0 (2026-10-20, scripted cursor, screenshots before and
-  after) and reported again. crcbl found a defect that could cause it (a pointer
-  arriving in another of the app's windows moved the leave tracking without
-  reporting a leave of the old one) and fixes it in 0.8.0, but its e2e of lyr's
-  geometry passed on CI even without the fix, so the cause is not proven; the
-  differences left are that lyr's windows draw through a swapchain, the pointer
-  rests through the hover delay, and another process moves it. On 0.8.0: run the
-  same hover-then-warp check again, and if the tooltip still stays up, send
-  crcbl the `crcbl_shell` trace log around the warp, saying whether the bar got
-  a `WM_MOUSELEAVE` at all and whether the tooltip window ever got a
-  `WM_MOUSEMOVE`. A tooltip follows its module when the module moves
-  (repositioned where the window system can, opened again elsewhere). A tooltip
-  of several lines (a format with line breaks) is drawn a row per line.
+  below them. **Known issue on Windows:** the tooltip stays up after the pointer
+  leaves the bar, until something else wakes the bar (a clock tick, a control
+  request). Traced on crcbl 0.8.1 (2026-10-22, scripted `SetCursorPos`,
+  `RUST_LOG=crcbl_shell=trace` and a temporary probe of the events the bar
+  receives): crcbl reported the bar's `WM_MOUSELEAVE` 8 ms after the warp, the
+  tooltip window never took a pointer move, but the leave reached lyr only 2.3 s
+  later, when `lyr event workspace` woke the loop, and the tooltip then closed.
+  The cause is crcbl-shell's Win32 `wait`: it drains the message queue first,
+  and a message that drain dispatches (the leave, posted just after the warp's
+  raw input already woke and pumped the loop) records an event that `wait` then
+  sleeps on. Reported to crcbl with the trace and a suggested fix (return at
+  once when the drain recorded an event); retest when a crcbl release carries
+  it. crcbl's traces reach lyr's log only since lyr bridges `log` into its
+  subscriber (`tracing-subscriber`'s `tracing-log`); before that every crcbl
+  record was dropped, on every platform. A tooltip follows its module when the
+  module moves (repositioned where the window system can, opened again
+  elsewhere). A tooltip of several lines (a format with line breaks) is drawn a
+  row per line.
 - **Control socket, rest.** Built: the socket (`apps/lyr/src/control.rs`,
   `interprocess`), the reply line, single-instance detection and `lyr quit`,
   tested on Windows and Linux (WSL), and run end to end on Windows (a second
