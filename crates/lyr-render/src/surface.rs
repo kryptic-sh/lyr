@@ -1,9 +1,11 @@
 //! Presenting a draw list on one window: crcbl-app's presenter and
 //! crcbl-frame's UI pass, as `crates/crcbl-app/examples/ui_window.rs` does.
 
+use std::sync::{Mutex, PoisonError};
+
 use crcbl_app::adapter::PowerPreference;
 use crcbl_app::backend::GpuBackend;
-use crcbl_app::present::{FrameOutcome, PresentError, Presenter, PresenterDesc};
+use crcbl_app::present::{FrameOutcome, PresentError, Presenter, PresenterDesc, SharedGpu};
 use crcbl_frame::{
     GraphError, ImportedImage, InitialClaim, RenderGraph, TransientPool, UiRenderer,
 };
@@ -39,6 +41,14 @@ const fn preferred_backend() -> Option<GpuBackend> {
         None
     }
 }
+
+/// The device every surface after the first opens on, with the backend the
+/// first was asked for. With a device each, closing one window's tore down
+/// state another's still used on NVIDIA's Wayland driver, and lyr died with
+/// a segfault when a monitor went (crcbl's backlog, "Two presenters crash
+/// NVIDIA's Wayland WSI on teardown"). Held for the life of the process, as
+/// the bar is.
+static SHARED: Mutex<Option<(SharedGpu, Option<GpuBackend>)>> = Mutex::new(None);
 
 /// One window's device, swapchain and UI pass.
 pub struct Surface {
@@ -92,14 +102,34 @@ impl Surface {
             power_preference: PowerPreference::LowPower,
             ..PresenterDesc::default()
         };
-        let (presenter, asked) = match Presenter::open(shell, window, size, &desc(preferred)) {
-            Ok(presenter) => (presenter, preferred),
-            // The preferred backend refused: let crcbl walk its own order.
-            Err(_) if preferred.is_some() => {
-                (Presenter::open(shell, window, size, &desc(None))?, None)
+        let mut shared = SHARED.lock().unwrap_or_else(PoisonError::into_inner);
+        let on_shared = shared.as_ref().and_then(|(gpu, asked)| {
+            // One the shared device cannot present to, a display wired to
+            // another GPU, gets a device of its own below.
+            gpu.open(shell, window, size, &desc(*asked))
+                .ok()
+                .map(|presenter| (presenter, *asked))
+        });
+        let (presenter, asked) = match on_shared {
+            Some(opened) => opened,
+            None => {
+                let (presenter, asked) =
+                    match Presenter::open(shell, window, size, &desc(preferred)) {
+                        Ok(presenter) => (presenter, preferred),
+                        // The preferred backend refused: let crcbl walk its
+                        // own order.
+                        Err(_) if preferred.is_some() => {
+                            (Presenter::open(shell, window, size, &desc(None))?, None)
+                        }
+                        Err(error) => return Err(error.into()),
+                    };
+                if shared.is_none() {
+                    *shared = Some((presenter.shared(), asked));
+                }
+                (presenter, asked)
             }
-            Err(error) => return Err(error.into()),
         };
+        drop(shared);
         let ui = UiRenderer::with_ring(
             presenter.device(),
             presenter.queue(),
