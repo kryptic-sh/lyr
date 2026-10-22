@@ -209,19 +209,20 @@ implementation follows meanwhile.
   onto it, dropping `lyr_sources::audio`'s per-platform code. Its implementation
   is to be mostly in-house or pure-Rust crates (the owner, the same day), so
   that a user needs no other program installed to use it: no shelling out to
-  `pactl`, and no wrappers around C client libraries such as `libpulse-binding`
-  or `pipewire-rs`; on Linux, the PulseAudio or PipeWire protocol spoken from
-  Rust; on Windows and macOS, the OS APIs through the `windows` and `objc2`
-  crates. Requested from office-crcbl the same day, with lyr's sources
-  (`pactl.rs`, `windows.rs` and `win32.rs`, `macos.rs` and `coreaudio.rs`,
-  `level.rs`) as the requirements and free to take, and how lyr's bar keeps
-  idle: device changes apart from stream churn. Until it lands, lyr stays on
-  `pactl`, which works on this laptop's PipeWire. What the `pactl` source
-  taught, worth carrying into the seam: PipeWire's stream-restore remembers a
-  stream's mute and device per application, so a test that mutes or moves a
-  probe stream changes what that application starts with next; pactl 17.0
-  refuses a `--` before a negative step; the ports were tested on `pactl`-shaped
-  JSON only, since every device here has one port.
+  `pactl`, and no C client library, linked or loaded with `dlopen`
+  (`libpulse-binding`, `pipewire-rs`, libpulse itself): on Linux the PulseAudio
+  or PipeWire wire protocol implemented natively in the crate ("needs to be
+  native in the crate", the owner); on Windows and macOS, the OS APIs through
+  the `windows` and `objc2` crates. Requested from office-crcbl the same day,
+  with lyr's sources (`pactl.rs`, `windows.rs` and `win32.rs`, `macos.rs` and
+  `coreaudio.rs`, `level.rs`) as the requirements and free to take, and how
+  lyr's bar keeps idle: device changes apart from stream churn. Until it lands,
+  lyr stays on `pactl`, which works on this laptop's PipeWire. What the `pactl`
+  source taught, worth carrying into the seam: PipeWire's stream-restore
+  remembers a stream's mute and device per application, so a test that mutes or
+  moves a probe stream changes what that application starts with next; pactl
+  17.0 refuses a `--` before a negative step; the ports were tested on
+  `pactl`-shaped JSON only, since every device here has one port.
 
 - **crcbl: export its keysym names.** lyr's menus act on the key's symbol, not
   on `key_code`, which crcbl derives from the scancode and so ignores xkb remaps
