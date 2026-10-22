@@ -241,13 +241,13 @@ implementation follows meanwhile.
   panel at 1.5 scale. lyr's own runs showed `set_panel` and the frame gate
   working, the latter with an output turned off. Still open in crcbl:
   pointer-leave between an app's own windows on Wayland and X11, X11's
-  `display_adapter`, and the scripted resize and read-back as CI jobs. On crcbl
-  0.8.0, lyr's `Surface::resize` drain can go.
+  `display_adapter`, and the scripted resize and read-back as CI jobs.
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
-  `=0.7.0` (published 2026-10-20, with `set_panel`, frame pacing and
-  `font::breaks`; crcbl's `rust-version` is 1.98, and lyr's follows). The bump
-  needed no change in lyr; the bar ran on it on Windows. crcbl 0.4.0
+  `=0.8.1` (moved there 2026-10-21; 0.8.0's `Presenter` drains before a
+  reconfigure, so lyr no longer does; 0.7.0 brought `set_panel`, frame pacing
+  and `font::breaks`; crcbl's `rust-version` is 1.98, and lyr's follows). The
+  bump needed no change in lyr; the bar ran on it on Windows. crcbl 0.4.0
   (2026-10-18) brought `crcbl-app`, the window-plus-device crate lyr asked for
   so that it links no engine, audio (cpal, ALSA) or physics; 0.5.0's only
   breaking change is in crcbl-phys. M1 adds `crcbl-app`, `crcbl-hal`, `crcbl-ui`
@@ -379,15 +379,11 @@ implementation follows meanwhile.
   reshaped bars keep theirs with the new anchor and layer. Run on Windows
   (2026-10-20): a reload from a 30 px top bar to a 50 px bottom one moved it in
   place, seen in a screenshot. That run found that D3D12 refuses `ResizeBuffers`
-  while frames in flight use the back buffers, and crcbl-app's
-  `Presenter::resize` does not wait, so the bar exited; `Surface::resize` now
-  drains first. Reported to crcbl, which agreed (crcbl-dx12 waits for the queue,
-  but the command buffers the `Presenter` still holds keep the back buffers
-  referenced) and makes every `Presenter` reconfigure drain first: on crcbl's
-  main (4490f05d, CI green), shipping in 0.8.0. On 0.8.0: drop the drain from
-  `Surface::resize` (keeping it is harmless) and run the reload reshape on
-  Windows again without it, which is the D3D12 check crcbl has no CI leg for,
-  and tell crcbl what it shows.
+  while frames in flight use the back buffers; crcbl 0.8.0's `Presenter` drains
+  before every reconfigure, and lyr's own drain in `Surface::resize` is gone.
+  Run again on Windows without it (2026-10-22, crcbl 0.8.1): reloads from a 30
+  px top bar to a 50 px bottom one and back moved the bar each time, seen in
+  screenshots, and lyr exited cleanly on `lyr quit`.
 - **pikr moves to crcbl** (the owner's decision, 2026-10-15), dropping floem,
   the floem and winit forks, iced and the SCTK fallback. pikr needs S1, S6 and
   S8 – S27. pikr's session tracks the move in pikr's own backlog and
