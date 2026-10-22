@@ -219,17 +219,40 @@ implementation follows meanwhile.
   mute, device `Route` and `Profile` params for ports, profiles and device
   volume, the `default` metadata for defaults, `target.object` to move streams)
   and otherwise PulseAudio's native protocol; WASAPI on Windows, with
-  `IPolicyConfig` to set the default device; CoreAudio on macOS. Requested from
-  office-crcbl the same day, with lyr's sources (`pactl.rs`, `windows.rs` and
-  `win32.rs`, `macos.rs` and `coreaudio.rs`, `level.rs`) as the requirements and
-  free to take, and how lyr's bar keeps idle: device changes apart from stream
-  churn. Until it lands, lyr stays on `pactl`, which works on this laptop's
-  PipeWire. What the `pactl` source taught, worth carrying into the seam:
-  PipeWire's stream-restore remembers a stream's mute and device per
-  application, so a test that mutes or moves a probe stream changes what that
-  application starts with next; pactl 17.0 refuses a `--` before a negative
-  step; the ports were tested on `pactl`-shaped JSON only, since every device
-  here has one port.
+  `IPolicyConfig` to set the default device; CoreAudio on macOS.
+
+  **Where it stands (2026-10-22).** crcbl main has the model and the PipeWire
+  backend (`crcbl-mixer`, unreleased). lyr's branch `crcbl-mixer` puts the Linux
+  volume, mic and audio menu on it (`lyr_sources::audio::mixer`, `pactl` gone),
+  through a git dependency on a crcbl main commit and `deny.toml`'s `allow-git`,
+  both branch-only. What remains before it merges: a crcbl release carrying
+  `crcbl-mixer` (move the dependency to it and drop `allow-git`), and the
+  PulseAudio backend, without which a Linux system with no PipeWire has no audio
+  modules (`Audio::open` gives up with "no sound server"); then Windows and
+  macOS move from `lyr_sources::audio::windows` and `macos` onto it as crcbl
+  builds them.
+
+  Verified on this laptop (PipeWire 1.6.9) against `pactl`: every device's
+  volume, mute, default and active port (after crcbl's fix for HDMI2/3 and the
+  Intel Headset source, which first had none); MoveTo, MakeDefault on the input,
+  SetProfile on the Intel card, and the error paths, through a scratch probe; a
+  stream starting woke the probe 0 times with `Interest::Devices` and 3 times
+  with streams (after crcbl coalesced them; it was 1 and 20); in a nested
+  Hyprland, the branch's bar at the headset's 50 % and the mic's 29 %, a scroll
+  down to 45 % and back, a click muting and unmuting, and the menu's Output
+  devices and Configuration tabs. Not verified: MakeDefault on an output
+  (Spotify was playing on the headset), SetPort between two real ports (every
+  device here has one), a Bluetooth sink, and what the mixer does when PipeWire
+  restarts under it (lyr opens it once and does not reopen). Changed from the
+  `pactl` source: a step stops at 150 % (`level::MAX_PERCENT`) where `pactl` had
+  no ceiling; card profiles list in the server's order, not by priority, which
+  the mixer does not report; Bluetooth is the mixer's flag, not the monitor's
+  name. Lessons carried: PipeWire's stream-restore remembers a stream's mute and
+  device per application, so a test that mutes or moves a probe stream changes
+  what that application starts with next; switching a card's profile and back
+  within milliseconds left this laptop's Intel nodes renamed with a `.2` suffix
+  (`…HDMI1__sink.2`), which neither later switches nor the "off" profile undo,
+  so a live test waits for the old nodes to go.
 
 - **crcbl: Linux and Vulkan parity for 0.6 – 0.8.** Also at the owner's request
   (2026-10-20): every crcbl feature developed on the Windows machine to be
@@ -655,13 +678,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `crates/lyr-sources/tests/system_services.rs`, ignored unless asked for (CI
   has none of them): UPower (its battery checked against the kernel's
   `/sys/class/power_supply/BAT0/capacity`, mutation-checked),
-  power-profiles-daemon, NetworkManager, BlueZ, timedate1 and `pactl`. All
-  passed on the owner's Dell Latitude 3440 (Arch, 2026-10-21): BAT0 full at 100
-  % on mains (UPower reports a 153-day time to empty there, which the reading
-  shows as unknown), the `performance` profile, the wired connection, the
-  adapter, Asia/Manila, and the headset as the default sink. A switch of power
-  profile through `PowerProfiles::set` ran there too, to power-saver and back,
-  read back from the daemon (mutation-checked). Not exercised: a battery
+  power-profiles-daemon, NetworkManager, BlueZ, timedate1 and the sound server.
+  All passed on the owner's Dell Latitude 3440 (Arch, 2026-10-21): BAT0 full at
+  100 % on mains (UPower reports a 153-day time to empty there, which the
+  reading shows as unknown), the `performance` profile, the wired connection,
+  the adapter, Asia/Manila, and the headset as the default sink. A switch of
+  power profile through `PowerProfiles::set` ran there too, to power-saver and
+  back, read back from the daemon (mutation-checked). Not exercised: a battery
   charging or discharging, since the laptop stayed on mains. The power-profile
   source is built the same way
   (`lyr_sources::power_profile::linux::PowerProfiles`): the daemon found under
@@ -673,19 +696,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   added or removed, the rfkill block from the adapter's `PowerState`, and the
   device shown the last to connect, as waybar does
   (`lyr_sources::bluetooth::Tracker`); tested against a fake BlueZ. The volume
-  and mic sources are built over `pactl` (`lyr_sources::audio::pactl`), after
-  waybar 0.15.0's `AudioBackend`: the default sink and source, the channels'
-  mean rounded, the active port and form factor for the icon, Bluetooth told by
-  the monitor's name, re-read on `pactl subscribe`'s sink, source and server
-  events only (drained through `bus::Follow`, so a burst is one re-read); a
-  click mutes and a wheel step moves the volume by `pactl`'s relative `±N%`,
-  with no ceiling at 100 % (plan 07, as the dotfiles' bindings had it). The
-  parsing is tested on JSON from the owner's machine and mutation-checked; the
-  subprocess side is not. Run in a nested Hyprland (2026-10-20): the bar showed
-  the headset at 50 % and the mic at 29 %, as waybar did, and the mic's change
-  to 40 % and back within a second. A click and a scroll have not been made (no
-  pointer injection here). The network source is built over NetworkManager
-  (`lyr_sources::network::linux::NetworkManager`): the device of
+  and mic sources are built over crcbl's mixer (`lyr_sources::audio::mixer`),
+  after waybar 0.15.0's `AudioBackend` for what the modules show; see "crcbl: an
+  audio-control seam" for what was verified. The network source is built over
+  NetworkManager (`lyr_sources::network::linux::NetworkManager`): the device of
   `PrimaryConnection` (the default route, as waybar picks it), else of
   `ActivatingConnection`, its IPv4 address, prefix and gateway, and on Wi-Fi the
   access point's SSID and strength, with the radio blocked when

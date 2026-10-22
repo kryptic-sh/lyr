@@ -37,11 +37,11 @@ and this project adheres to
   device's Default button opens Sound settings. A right click on the volume or
   mic module, or `lyr panel audio`, opens it.
 - On Linux the volume and mic modules show the default output and input through
-  PulseAudio's `pactl` (PipeWire serves it through pipewire-pulse), updated as
-  they change; a click mutes and a scroll steps the volume with no ceiling at
-  100 %, as the dotfiles' `pactl … +5%` bindings did.
+  crcbl's mixer (`crcbl-mixer`), which speaks PipeWire's own protocol, so
+  nothing beside the sound server needs installing; they update as they change,
+  a click mutes and a scroll steps the volume, up to 150 %.
 - On Linux the audio menu lists the playing and recording streams and the output
-  and input devices through `pactl`, each with mute, a slider to 150 %
+  and input devices through crcbl's mixer, each with mute, a slider to 150 %
   (wiremix's scale) and steps, a device's Default button makes it the default, a
   stream's device button opens a dropdown of the devices to move it to, and a
   Configuration tab chooses a sound card's profile and a device's port from

@@ -351,6 +351,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "crcbl-mixer"
+version = "0.8.1"
+source = "git+https://github.com/kryptic-sh/crcbl?rev=09e98f86#09e98f860cc8d31c198b1fdd12a0cc4f431f96b4"
+
+[[package]]
 name = "crcbl-mtl"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -951,6 +956,7 @@ version = "0.1.0"
 dependencies = [
  "block2",
  "chrono",
+ "crcbl-mixer",
  "futures-util",
  "lyr-core",
  "objc2",
@@ -961,8 +967,6 @@ dependencies = [
  "objc2-io-bluetooth",
  "objc2-io-kit",
  "objc2-system-configuration",
- "serde",
- "serde_json",
  "thiserror",
  "tokio",
  "windows",

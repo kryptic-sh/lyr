@@ -155,9 +155,9 @@ See [08-tray.md](08-tray.md).
   first while muted. A muted Bluetooth sink with no `format_bluetooth_muted`
   falls back to `format_muted`. The view is `lyr_core::audio::volume`.
 - Click toggles output mute. Scroll up raises and scroll down lowers the volume
-  by **5 %**, with no ceiling at 100 %, as `pactl set-sink-volume ... +5%` has
-  none. Right-click opens the audio menu on its output devices
-  ([10](10-popups-and-menus.md#audio-menu)), where waybar ran
+  by **5 %**, past 100 % up to crcbl-mixer's `level::MAX_PERCENT`, where
+  `pavucontrol`'s slider ends. Right-click opens the audio menu on its output
+  devices ([10](10-popups-and-menus.md#audio-menu)), where waybar ran
   `krypt menu audio`.
 - Tooltip: the default sink's description, which is waybar's default when no
   `tooltip-format` is set.
@@ -185,15 +185,14 @@ muted, and unmuting output restores that state.
 
 ### Audio sources
 
-- Linux: the **PulseAudio protocol**, which PipeWire serves through
-  `pipewire-pulse`. It pushes sink, source and server changes through its
-  subscribe API, and follows `@DEFAULT_SINK@` / `@DEFAULT_SOURCE@`. The modules
-  speak it through `pactl` (`pactl subscribe` for changes, `--format=json`
-  reads), which needs no client library. The owner decided (2026-10-22) that
-  audio control belongs in crcbl as one seam for Linux, Windows and macOS, which
-  lyr's volume, mic and audio menu move onto when it lands; the `pactl` source
-  stays until then (backlog, "crcbl: an audio-control seam"). See
-  [16](16-open-questions.md).
+- Linux: crcbl's mixer (`crcbl-mixer`), which speaks PipeWire's own protocol
+  over its socket, written in Rust in crcbl, so no tool and no C client library
+  is needed. The owner decided (2026-10-22) that audio control belongs in crcbl
+  as one seam for Linux, Windows and macOS; lyr's Linux volume, mic and audio
+  menu are on it (`lyr_sources::audio::mixer`), and the mixer calls back on each
+  change, devices only while the menu is closed. Its PulseAudio fallback,
+  Windows and macOS are still being built (backlog, "crcbl: an audio-control
+  seam"). See [16](16-open-questions.md).
 - Windows: WASAPI `IAudioEndpointVolume` with an `IAudioEndpointVolumeCallback`
   for changes, and `IMMNotificationClient` for default-device changes.
 - macOS: CoreAudio `AudioObjectAddPropertyListener` on the default output and

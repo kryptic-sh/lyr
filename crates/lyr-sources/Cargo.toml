@@ -18,11 +18,10 @@ lyr-core.workspace = true
 workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
+crcbl-mixer = { git = "https://github.com/kryptic-sh/crcbl", rev = "09e98f86", version = "0.8.1" }
 futures-util = { version = "0.3.34", default-features = false, features = ["alloc"] }
-serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.154"
 thiserror = "2.0.21"
-tokio = { version = "1.53.3", features = ["io-util", "process", "sync"] }
+tokio = { version = "1.53.3", features = ["sync"] }
 zbus = { version = "6.0.0", default-features = false, features = ["tokio", "proxy", "service"] }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]

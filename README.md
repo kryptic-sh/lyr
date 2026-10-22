@@ -35,10 +35,10 @@ CI's Mac:
 - One transparent bar along the top of every output, with the power button, the
   clock and, on Linux, the battery (UPower), power profile
   (power-profiles-daemon), network (NetworkManager), Bluetooth (BlueZ), volume
-  and mic (PulseAudio's `pactl`, which PipeWire serves through pipewire-pulse),
-  the tray (a letter per icon until lyr draws images), the notification bell and
-  the Hyprland, sway or niri workspaces. Windows and macOS have their own
-  battery, network, power-profile, volume and mic sources.
+  and mic (PipeWire, through crcbl's mixer), the tray (a letter per icon until
+  lyr draws images), the notification bell and the Hyprland, sway or niri
+  workspaces. Windows and macOS have their own battery, network, power-profile,
+  volume and mic sources.
 - Tooltips, the power menu, and the clock panel's calendar.
 - On Linux, the notification daemon with toasts, when no other daemon (such as
   swaync) holds the name, and below the calendar the notification centre and the

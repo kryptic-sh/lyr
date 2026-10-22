@@ -173,7 +173,7 @@ pub fn act(
             };
             #[cfg(target_os = "linux")]
             let which = {
-                use lyr_sources::audio::pactl::{Flow, Target};
+                use lyr_sources::audio::mixer::{Flow, Target};
                 Target::Default(if input { Flow::Input } else { Flow::Output })
             };
             match builtin {
