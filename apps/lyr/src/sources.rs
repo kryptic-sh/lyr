@@ -1254,11 +1254,23 @@ mod linux {
         let (states, mut changed) = watch::channel(((None, None), Nodes::default()));
         let menu = AtomicBool::new(false);
         let forward = async {
+            let mut shown = None;
             while changed.changed().await.is_ok() {
-                let ((sink, source), nodes) = changed.borrow_and_update().clone();
-                if !deliver(&sender, waker.as_ref(), Update::Audio(sink, source))
-                    || !deliver(&sender, waker.as_ref(), Update::AudioNodes(nodes))
-                {
+                let (reading, nodes) = changed.borrow_and_update().clone();
+                // The modules show the reading, so a new one wakes the bar.
+                if shown.as_ref() != Some(&reading) {
+                    shown = Some(reading.clone());
+                    let (sink, source) = reading;
+                    if !deliver(&sender, waker.as_ref(), Update::Audio(sink, source)) {
+                        break;
+                    }
+                }
+                // Only the menu shows the rows, and a stream starting or
+                // ending changes them: closed, they wait for the next
+                // wake-up, which drains them before the click that opens
+                // the menu.
+                let waker = waker.as_ref().filter(|_| menu.load(Ordering::Relaxed));
+                if !deliver(&sender, waker, Update::AudioNodes(nodes)) {
                     break;
                 }
             }

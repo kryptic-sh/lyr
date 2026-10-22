@@ -461,13 +461,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   later, and the compositor's `FrameReady` answering the present (crcbl's frame
   gate), so an idle minute is 3; UPower's 30 s re-sends change only `UpdateTime`
   and `Voltage` there, which the bar does not show, and wake nothing. The rest
-  come from the desktop's apps while they are busy: a tray item's updates
-  (Spotify's and Discord's, a dozen in a minute at times) and the audio menu's
-  stream list (a notification sound playing) each wake the bar although it draws
-  neither while the menu is closed. Open: what the empty wake-up after the tick
-  is, and whether the tray and the stream list could wait, as the Wi-Fi state
-  does, when nothing shown changed. `lyr_wm::Compositor` picks it, or sway or
-  niri, at start. Hyprland main's changes for the next release are in
+  come from the desktop's apps while they are busy. A stream starting or ending
+  (a notification sound) changed the audio menu's rows and re-sent an unchanged
+  volume reading, two wake-ups a stream; the reading now wakes the bar only when
+  it changed and the rows only while the menu is open, as the Wi-Fi state does
+  (a silent `pacat` stream: two wake-ups before, none after; with the menu open,
+  the rows still came at once). A tray item's updates (Spotify's and Discord's,
+  a dozen in a minute at times) still wake it. Open: what the empty wake-up
+  after the tick is, and whether a tray update could wait when the item's letter
+  and status did not change. `lyr_wm::Compositor` picks it, or sway or niri, at
+  start. Hyprland main's changes for the next release are in
   [plan/06](plan/06-workspaces.md#linux--hyprland).
 - **Render, rest of M1.** `lyr-render` has the GPU-free half: the bar font found
   with crcbl-font and given the system's fallback faces (`fonts::load`), text
