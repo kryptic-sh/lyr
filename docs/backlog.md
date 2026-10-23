@@ -900,9 +900,22 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   wireless interface, so the source logs that the service is not running and the
   menu's click opens Settings; the read-and-watch test returns early here for
   the same reason. Not seen either: whether `WlanSetInterface`'s software radio
-  switch needs elevation. Not built: a native Bluetooth menu; its click opens
-  Settings. Workspaces are left out on Windows (declined below); macOS's
-  `x-apple.systempreferences:` fallbacks are built (the macOS entry).
+  switch needs elevation. The Bluetooth menu is native on Windows too
+  (2026-10-23), with what Windows lets a program do
+  (`lyr_core::bluetooth_menu::Abilities::WINDOWS`, the owner's choice): Power
+  (`Radio::RequestAccessAsync`, then `SetStateAsync`), Scan (a `DeviceWatcher`
+  on each kind of unpaired device while it is on, `bluetooth::windows::Scan`),
+  Pair (`DeviceInformationCustomPairing`, its confirm-only, show-PIN, type-PIN
+  and PIN-match requests asked as the menu's pairing questions on a thread of
+  its own, refused after `PAIRING_ANSWER` unanswered) and Forget (`UnpairAsync`
+  on each of the device's endpoints); a paired device's Settings button opens
+  Settings, where Windows connects it, since connecting has no public API. A
+  request for an adapter other than the one last read is refused. The
+  pairing-kind mapping, the endpoint ids and the drawn buttons are tested and
+  mutation-checked; none of it has run against an adapter, this machine's being
+  broken, so here the click still opens Settings. Workspaces are left out on
+  Windows (declined below); macOS's `x-apple.systempreferences:` fallbacks are
+  built (the macOS entry).
 - **Pointer input.** Built: a click or a wheel step on a bar is hit-tested
   against its last frame's regions (`apps/lyr/src/input.rs`) and resolved to an
   action by the module's bindings (`lyr_core::pointer::action`): a workspace
@@ -1076,21 +1089,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   taking the keyboard (Escape and losing focus close it), each click sent to
   BlueZ, and drawn again as BlueZ changes (resized in place when its size
   changes). Tested on crcbl's headless shell and mutation-checked; never run
-  against a real BlueZ. On Windows `lyr panel bluetooth` opens Settings'
-  Bluetooth & devices page instead (Windows sources entry). The arrow keys move
-  an outline through its buttons and switches in the order drawn, and Enter acts
-  on the outlined one. The pairing agent (`bluetooth::linux::agent`) is built
-  and registered at start as `DisplayYesNo`; its question shows at the top of
-  the menu, which opens if it is closed. A passkey confirmation or an
-  authorization is asked with Yes and No, and a PIN (BlueZ asks for one of a
-  device that pairs the legacy way, whatever the capability:
-  `pin_code_request_callback` in its `src/adapter.c`, read on master) is typed
-  into a field with OK and Cancel, through crcbl's text input as
-  `TextPurpose::Pin`: at most `PIN_LENGTH` characters, Backspace, Enter sends
-  it, and nothing typed sends nothing. The PIN is drawn as typed, not masked, as
-  GNOME's and Windows' pairing dialogs show it. A No is `Rejected`, an
-  unanswered question `Canceled`, and a typed passkey always `Rejected`, since
-  lyr claims no keyboard. The agent is tested against BlueZ's side on a
+  against a real BlueZ. On Windows the menu draws what Windows allows, and opens
+  Settings' Bluetooth & devices page on a machine with no adapter (Windows
+  sources entry). The arrow keys move an outline through its buttons and
+  switches in the order drawn, and Enter acts on the outlined one. The pairing
+  agent (`bluetooth::linux::agent`) is built and registered at start as
+  `DisplayYesNo`; its question shows at the top of the menu, which opens if it
+  is closed. A passkey confirmation or an authorization is asked with Yes and
+  No, and a PIN (BlueZ asks for one of a device that pairs the legacy way,
+  whatever the capability: `pin_code_request_callback` in its `src/adapter.c`,
+  read on master) is typed into a field with OK and Cancel, through crcbl's text
+  input as `TextPurpose::Pin`: at most `PIN_LENGTH` characters, Backspace, Enter
+  sends it, and nothing typed sends nothing. The PIN is drawn as typed, not
+  masked, as GNOME's and Windows' pairing dialogs show it. A No is `Rejected`,
+  an unanswered question `Canceled`, and a typed passkey always `Rejected`,
+  since lyr claims no keyboard. The agent is tested against BlueZ's side on a
   peer-to-peer connection, the menu on crcbl's headless shell, both
   mutation-checked. A question BlueZ gives up on (the agent's `Cancel`) leaves
   the menu. Each question's answer is kept by id (`agent::Questions`), tested

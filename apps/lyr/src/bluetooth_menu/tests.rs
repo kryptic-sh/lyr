@@ -24,6 +24,7 @@ fn adapter() -> Adapter {
         pairable: false,
         discovering: false,
         power_state: None,
+        abilities: lyr_core::bluetooth_menu::Abilities::BLUEZ,
     }
 }
 

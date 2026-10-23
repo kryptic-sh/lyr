@@ -42,12 +42,12 @@ pub enum Update {
     /// BlueZ's (IOBluetooth's on macOS, WinRT's on Windows): the module's
     /// reading and the menu's adapter and devices.
     Bluetooth(lyr_sources::bluetooth::Snapshot),
-    /// The pairing agent asks, about the device at this path, under this
-    /// id.
-    #[cfg(target_os = "linux")]
+    /// The pairing agent asks (a pairing on Windows), about the device at
+    /// this path, under this id.
+    #[cfg(any(target_os = "linux", windows))]
     BluetoothAsk(u64, String, lyr_core::bluetooth_menu::Question),
     /// The pairing agent's question is no longer asked.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     BluetoothCancel,
     /// The compositor's workspaces (AeroSpace's on macOS).
     #[cfg(any(target_os = "linux", target_os = "macos"))]
@@ -104,8 +104,9 @@ pub enum TrayRequest {
     },
 }
 
-/// What the Bluetooth menu asks of BlueZ, by object path.
-#[cfg(target_os = "linux")]
+/// What the Bluetooth menu asks of BlueZ, by object path, or of WinRT on
+/// Windows, by the paths its source gives.
+#[cfg(any(target_os = "linux", windows))]
 #[derive(Debug)]
 pub enum BluetoothRequest {
     Switch(String, lyr_core::bluetooth_menu::Switch, bool),
@@ -113,7 +114,8 @@ pub enum BluetoothRequest {
     Device(String, lyr_core::bluetooth_menu::DeviceAction),
     /// The adapter's path, then the device's.
     Forget(String, String),
-    /// The device's path, then its new name.
+    /// The device's path, then its new name. Only BlueZ renames.
+    #[cfg(target_os = "linux")]
     Rename(String, String),
     /// The answer to the pairing agent's question with this id.
     Answer(u64, lyr_core::bluetooth_menu::Reply),
@@ -210,6 +212,8 @@ pub struct Commands {
     audio: std::sync::mpsc::Sender<windows::AudioRequest>,
     #[cfg(windows)]
     wifi: std::sync::mpsc::Sender<windows::WifiWork>,
+    #[cfg(windows)]
+    bluetooth: std::sync::mpsc::Sender<windows::BluetoothWork>,
     /// Windows: whether the Wi-Fi menu is open, as on Linux.
     #[cfg(windows)]
     wifi_menu: std::sync::Arc<std::sync::atomic::AtomicBool>,
@@ -353,6 +357,13 @@ impl Commands {
 
 #[cfg(windows)]
 impl Commands {
+    /// Asks WinRT what the Bluetooth menu wants.
+    pub fn bluetooth(&self, request: BluetoothRequest) {
+        let _stopped = self
+            .bluetooth
+            .send(windows::BluetoothWork::Request(request));
+    }
+
     /// Asks Native Wifi what the Wi-Fi menu wants.
     pub fn wifi(&self, request: WifiRequest) {
         let _stopped = self.wifi.send(windows::WifiWork::Request(request));
@@ -536,7 +547,7 @@ pub fn start(
         let power_profile = windows::power_profile(sender.clone(), waker.clone());
         let window = windows::window(sender.clone(), waker.clone());
         let audio = windows::audio(sender.clone(), waker.clone())?;
-        windows::bluetooth(sender.clone(), waker.clone())?;
+        let bluetooth = windows::bluetooth(sender.clone(), waker.clone())?;
         let wifi_menu = std::sync::Arc::default();
         let wifi = windows::wifi(
             sender.clone(),
@@ -555,6 +566,7 @@ pub fn start(
                 audio_menu: std::cell::Cell::new(false),
                 wifi,
                 wifi_menu,
+                bluetooth,
             },
         ))
     }
@@ -901,10 +913,31 @@ mod windows {
 
     use super::{MENU_REFRESH, Update};
 
-    /// Hands the adapter and paired devices to the main loop now and after
-    /// every change, on a thread in COM's multithreaded apartment that also
-    /// keeps the watch, and ends with the bar. A machine whose Bluetooth
-    /// cannot be read logs why, and the module stays out.
+    /// What the Bluetooth source's thread is handed: a change to read, or
+    /// what the menu asks.
+    #[derive(Debug)]
+    pub(super) enum BluetoothWork {
+        Changed,
+        Request(super::BluetoothRequest),
+    }
+
+    /// How long a pairing's question waits for an answer before the
+    /// pairing is refused.
+    const PAIRING_ANSWER: std::time::Duration = std::time::Duration::from_secs(60);
+
+    /// The pairing questions waiting for an answer, by id.
+    type Asked = std::sync::Arc<
+        std::sync::Mutex<
+            std::collections::HashMap<u64, mpsc::Sender<lyr_core::bluetooth_menu::Reply>>,
+        >,
+    >;
+
+    /// Hands the adapter and devices to the main loop now and after every
+    /// change, and carries out what the Bluetooth menu asks, on a thread in
+    /// COM's multithreaded apartment that also keeps the watch, and ends
+    /// with the bar. A pairing runs on a thread of its own, its questions
+    /// asked in the menu. A machine whose Bluetooth cannot be read logs
+    /// why, and the module stays out.
     ///
     /// # Errors
     ///
@@ -912,9 +945,11 @@ mod windows {
     pub(super) fn bluetooth(
         sender: mpsc::Sender<Update>,
         waker: Option<ShellWaker>,
-    ) -> std::io::Result<()> {
+    ) -> std::io::Result<mpsc::Sender<BluetoothWork>> {
         use lyr_sources::bluetooth::Tracker;
-        use lyr_sources::bluetooth::windows::{Watch, init, snapshot};
+        use lyr_sources::bluetooth::windows::{Scan, Watch, init, snapshot};
+        let (work, incoming) = mpsc::channel();
+        let changes = work.clone();
         std::thread::Builder::new()
             .name("lyr bluetooth".to_owned())
             .spawn(move || {
@@ -922,31 +957,190 @@ mod windows {
                     tracing::warn!("bluetooth: {error}");
                     return;
                 }
-                let (changes, changed) = mpsc::channel::<()>();
-                let _watch = Watch::new(move || {
-                    // The reading loop has gone when this fails: nothing to
-                    // tell.
-                    let _gone = changes.send(());
-                })
-                .inspect_err(|error| tracing::warn!("bluetooth: changes will not show: {error}"))
-                .ok();
+                let changed = {
+                    let changes = changes.clone();
+                    move || {
+                        // The thread has gone when this fails: nothing to
+                        // tell.
+                        let _gone = changes.send(BluetoothWork::Changed);
+                    }
+                };
+                let _watch = Watch::new(changed.clone())
+                    .inspect_err(|error| {
+                        tracing::warn!("bluetooth: changes will not show: {error}");
+                    })
+                    .ok();
                 let mut tracker = Tracker::default();
-                // Once now, then once for each run of changes.
+                let mut scan: Option<Scan> = None;
+                let asked: Asked = std::sync::Arc::default();
+                let mut next_id = 0_u64;
+                // Once now, then once for each run of work.
                 loop {
-                    if sender
-                        .send(Update::Bluetooth(snapshot(&mut tracker)))
-                        .is_err()
-                    {
+                    let (read, endpoints) = snapshot(&mut tracker, scan.as_ref());
+                    let adapter = read.adapter.as_ref().map(|adapter| adapter.path.clone());
+                    if sender.send(Update::Bluetooth(read)).is_err() {
                         break;
                     }
                     if let Some(waker) = &waker {
                         waker.wake();
                     }
-                    if changed.recv().is_err() {
+                    let Ok(first) = incoming.recv() else {
                         break;
+                    };
+                    for item in std::iter::once(first).chain(incoming.try_iter()) {
+                        let BluetoothWork::Request(request) = item else {
+                            continue;
+                        };
+                        bluetooth_act(
+                            request,
+                            adapter.as_deref(),
+                            &endpoints,
+                            &mut scan,
+                            &changed,
+                            Pairing {
+                                sender: &sender,
+                                waker: waker.as_ref(),
+                                asked: &asked,
+                                next_id: &mut next_id,
+                                changes: &changes,
+                            },
+                        );
                     }
-                    while changed.try_recv().is_ok() {}
                 }
+            })?;
+        Ok(work)
+    }
+
+    /// What a pairing needs from the worker: where to ask, the questions
+    /// waiting, and where to say it ended.
+    struct Pairing<'a> {
+        sender: &'a mpsc::Sender<Update>,
+        waker: Option<&'a ShellWaker>,
+        asked: &'a Asked,
+        next_id: &'a mut u64,
+        changes: &'a mpsc::Sender<BluetoothWork>,
+    }
+
+    /// Carries out what the Bluetooth menu asked of the adapter at
+    /// `adapter`, the one last read; a request for another, one that has
+    /// gone since the menu was drawn, is refused. Only what Windows'
+    /// abilities draw reaches here.
+    fn bluetooth_act(
+        request: super::BluetoothRequest,
+        adapter: Option<&str>,
+        endpoints: &[lyr_sources::bluetooth::win32::Endpoint],
+        scan: &mut Option<lyr_sources::bluetooth::windows::Scan>,
+        changed: &(impl Fn() + Clone + Send + Sync + 'static),
+        pairing: Pairing<'_>,
+    ) {
+        use lyr_core::bluetooth_menu::{DeviceAction, Switch};
+        use lyr_sources::bluetooth::win32::ids;
+        use lyr_sources::bluetooth::windows::{Scan, set_power, unpair};
+
+        use super::BluetoothRequest;
+        let current = |path: &str| {
+            if adapter == Some(path) {
+                Ok(())
+            } else {
+                Err(std::io::Error::other(format!(
+                    "the adapter {path} has gone"
+                )))
+            }
+        };
+        let done = match request {
+            BluetoothRequest::Switch(path, Switch::Powered, on) => {
+                current(&path).and_then(|()| set_power(on))
+            }
+            BluetoothRequest::Scan(path, true) => current(&path).and_then(|()| {
+                Scan::start(changed.clone()).map(|started| {
+                    *scan = Some(started);
+                })
+            }),
+            BluetoothRequest::Scan(_, false) => {
+                *scan = None;
+                Ok(())
+            }
+            BluetoothRequest::Device(device, DeviceAction::Pair) => {
+                match ids(endpoints, &device).into_iter().next() {
+                    Some(id) => start_pairing(id, device, pairing),
+                    None => Err(std::io::Error::other("the device has gone")),
+                }
+            }
+            BluetoothRequest::Forget(path, device) => current(&path)
+                .and_then(|()| ids(endpoints, &device).iter().try_for_each(|id| unpair(id))),
+            BluetoothRequest::Answer(id, reply) => {
+                let waiting = pairing
+                    .asked
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .remove(&id);
+                if let Some(waiting) = waiting {
+                    // The pairing gave up waiting when this fails.
+                    let _late = waiting.send(reply);
+                }
+                Ok(())
+            }
+            // Switches and device actions Windows' abilities do not draw.
+            BluetoothRequest::Switch(..) | BluetoothRequest::Device(..) => Ok(()),
+        };
+        if let Err(error) = done {
+            tracing::warn!("bluetooth: {error}");
+        }
+    }
+
+    /// Pairs the endpoint `id` of the device at `device` on a thread of its
+    /// own, asking in the menu what the pairing needs; the worker reads
+    /// again when it ends.
+    fn start_pairing(id: String, device: String, pairing: Pairing<'_>) -> std::io::Result<()> {
+        use lyr_sources::bluetooth::windows::{init, pair};
+        let (sender, waker, asked) = (
+            pairing.sender.clone(),
+            pairing.waker.cloned(),
+            std::sync::Arc::clone(pairing.asked),
+        );
+        let changes = pairing.changes.clone();
+        // Ids for this pairing's questions: one is enough for any pairing
+        // Windows runs, and the next pairing starts past them.
+        *pairing.next_id += 1;
+        let question_id = *pairing.next_id;
+        std::thread::Builder::new()
+            .name("lyr pairing".to_owned())
+            .spawn(move || {
+                let deliver = move |update: Update| {
+                    // The bar has gone when this fails: nothing to ask.
+                    let _gone = sender.send(update);
+                    if let Some(waker) = &waker {
+                        waker.wake();
+                    }
+                };
+                let ask = {
+                    let (deliver, asked) = (deliver.clone(), std::sync::Arc::clone(&asked));
+                    move |question| {
+                        let (reply, answer) = mpsc::channel();
+                        asked
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
+                            .insert(question_id, reply);
+                        deliver(Update::BluetoothAsk(question_id, device.clone(), question));
+                        let answered = answer.recv_timeout(PAIRING_ANSWER).ok();
+                        asked
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner)
+                            .remove(&question_id);
+                        if answered.is_none() {
+                            deliver(Update::BluetoothCancel);
+                        }
+                        answered
+                    }
+                };
+                let paired = init().and_then(|()| pair(&id, ask));
+                if let Err(error) = paired {
+                    tracing::warn!("bluetooth: pairing: {error}");
+                }
+                // The question goes with the pairing, answered or not.
+                deliver(Update::BluetoothCancel);
+                // The worker has gone when this fails: nothing to read.
+                let _gone = changes.send(BluetoothWork::Changed);
             })?;
         Ok(())
     }

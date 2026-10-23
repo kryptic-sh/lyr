@@ -25,22 +25,22 @@ All of it is provided by crcbl-shell once requirements S1 – S7 land
 ✓ = supported, ◐ = partly (the reason is in the module's section), ✗ = not
 supported (left out of that platform's defaults).
 
-| Module         | Linux                        | Windows                              | macOS                             |
-| -------------- | ---------------------------- | ------------------------------------ | --------------------------------- |
-| Workspaces     | ✓ Hyprland, sway, niri       | ✗ left out (undocumented COM)        | ◐ AeroSpace only                  |
-| Power button   | ✓ logind                     | ✓ Win32                              | ◐ no hibernate                    |
-| Battery        | ✓ UPower                     | ✓ power notifications                | ✓ IOKit power sources             |
-| Power profile  | ✓ power-profiles-daemon      | ◐ set in Settings, opened on click   | ◐ read-only (Low Power Mode)      |
-| Network        | ✓ rtnetlink + NetworkManager | ✓ IP Helper + WLAN API               | ◐ SSID needs Location permission  |
-| Bluetooth      | ✓ BlueZ, with device battery | ◐ no device battery                  | ◐ no device battery               |
-| Tray           | ✓ StatusNotifierItem         | ✗ owned by Explorer                  | ✗ owned by the menu bar           |
-| Volume / mic   | ✓ PulseAudio protocol        | ✓ WASAPI                             | ✓ CoreAudio                       |
-| Clock          | ✓                            | ✓                                    | ✓                                 |
-| Window title   | ✓ Hyprland, sway, niri       | ✓ foreground window (WinEvent hooks) | ◐ AeroSpace only                  |
-| Notifications  | ✓ lyr is the daemon          | ◐ opens Action Center, no state      | ✗ no API                          |
-| Wi-Fi menu     | ✓ NetworkManager             | ◐ Native Wifi, not run on Wi-Fi yet  | ◐ Settings pane; CoreWLAN unbuilt |
-| Bluetooth menu | ✓ BlueZ                      | ◐ pairing only, no connect           | ◐ Settings pane; native unbuilt   |
-| Audio menu     | ✓ PulseAudio protocol        | ◐ default device opens Settings      | ◐ no per-app volume               |
+| Module         | Linux                        | Windows                                  | macOS                             |
+| -------------- | ---------------------------- | ---------------------------------------- | --------------------------------- |
+| Workspaces     | ✓ Hyprland, sway, niri       | ✗ left out (undocumented COM)            | ◐ AeroSpace only                  |
+| Power button   | ✓ logind                     | ✓ Win32                                  | ◐ no hibernate                    |
+| Battery        | ✓ UPower                     | ✓ power notifications                    | ✓ IOKit power sources             |
+| Power profile  | ✓ power-profiles-daemon      | ◐ set in Settings, opened on click       | ◐ read-only (Low Power Mode)      |
+| Network        | ✓ rtnetlink + NetworkManager | ✓ IP Helper + WLAN API                   | ◐ SSID needs Location permission  |
+| Bluetooth      | ✓ BlueZ, with device battery | ◐ no device battery                      | ◐ no device battery               |
+| Tray           | ✓ StatusNotifierItem         | ✗ owned by Explorer                      | ✗ owned by the menu bar           |
+| Volume / mic   | ✓ PulseAudio protocol        | ✓ WASAPI                                 | ✓ CoreAudio                       |
+| Clock          | ✓                            | ✓                                        | ✓                                 |
+| Window title   | ✓ Hyprland, sway, niri       | ✓ foreground window (WinEvent hooks)     | ◐ AeroSpace only                  |
+| Notifications  | ✓ lyr is the daemon          | ◐ opens Action Center, no state          | ✗ no API                          |
+| Wi-Fi menu     | ✓ NetworkManager             | ◐ Native Wifi, not run on Wi-Fi yet      | ◐ Settings pane; CoreWLAN unbuilt |
+| Bluetooth menu | ✓ BlueZ                      | ◐ power, scan, pair; connect in Settings | ◐ Settings pane; native unbuilt   |
+| Audio menu     | ✓ PulseAudio protocol        | ◐ default device opens Settings          | ◐ no per-app volume               |
 
 Details for each row are in [06](06-workspaces.md) –
 [10](10-popups-and-menus.md). The Windows and macOS menu rows are from memory

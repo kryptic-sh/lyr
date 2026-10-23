@@ -97,17 +97,16 @@ impl Data {
             // The Wi-Fi menu takes it.
             #[cfg(any(target_os = "linux", windows))]
             Update::WifiJoined(_) => {}
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", windows))]
             Update::BluetoothAsk(id, device, question) => {
                 self.bluetooth_ask = Some((id, device, question));
             }
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", windows))]
             Update::BluetoothCancel => self.bluetooth_ask = None,
             Update::Bluetooth(snapshot) => {
                 self.bluetooth = snapshot.reading;
-                // The menu's actions are BlueZ's: Windows and macOS show the
-                // module only.
-                #[cfg(target_os = "linux")]
+                // macOS shows the module only.
+                #[cfg(any(target_os = "linux", windows))]
                 {
                     self.bluetooth_adapter = snapshot.adapter;
                     self.bluetooth_devices = snapshot.devices;
