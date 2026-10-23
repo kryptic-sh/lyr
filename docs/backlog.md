@@ -214,10 +214,10 @@ implementation follows meanwhile.
   `display_adapter`, and the scripted resize and read-back as CI jobs.
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
-  `=0.8.1` (moved there 2026-10-21; 0.8.0's `Presenter` drains before a
-  reconfigure, so lyr no longer does; 0.7.0 brought `set_panel`, frame pacing
-  and `font::breaks`; crcbl's `rust-version` is 1.98, and lyr's follows). The
-  bump needed no change in lyr; the bar ran on it on Windows. crcbl 0.4.0
+  `=0.9.0` (moved there 2026-10-23 for `SharedGpu`; the bump needed no change in
+  lyr's code; 0.8.0's `Presenter` drains before a reconfigure, so lyr no longer
+  does; 0.7.0 brought `set_panel`, frame pacing and `font::breaks`; crcbl's
+  `rust-version` is 1.98, and lyr's follows). 0.8.1 ran on Windows. crcbl 0.4.0
   (2026-10-18) brought `crcbl-app`, the window-plus-device crate lyr asked for
   so that it links no engine, audio (cpal, ALSA) or physics; 0.5.0's only
   breaking change is in crcbl-phys. M1 adds `crcbl-app`, `crcbl-hal`, `crcbl-ui`
@@ -316,28 +316,20 @@ implementation follows meanwhile.
   reloads among them); niri, woken by the pointer, showed the current minute.
   Turning the nested sway's output back on hung that sway, which is the
   nesting's, not lyr's. Not seen: the owner's real outputs under hypridle.
-- **Two presenters crash NVIDIA's Wayland driver on teardown: fixed on a branch,
-  waiting on a crcbl release.** office-crcbl found (2026-10-22) that on the
-  NVIDIA MX550 (driver 615.78) under Wayland, a process with two `Presenter`s
-  segfaults in `libnvidia-eglcore` when the second's swapchain is torn down;
-  Intel and lavapipe are fine, and so is one presenter. lyr opens a presenter
-  per surface (each bar, tooltip, panel and toast), so it hits this: on the
-  owner's laptop with `CRCBL_ADAPTER=discrete`, lyr with a bar on each of two
-  outputs in a nested Hyprland died with SIGSEGV (a call through a null pointer)
-  when one output was removed. It does not happen by default here, where the
-  bars draw on the Intel GPU, but would on any machine whose display is on an
-  NVIDIA GPU, at a monitor unplug or a config change that drops a bar. crcbl's
-  answer is one device shared by a process's presenters
-  (`crcbl_app::present::SharedGpu`, on crcbl main since 2026-10-22, not in a
-  release yet). lyr's side is on the branch `crcbl-shared-gpu`: `Surface::open`
-  opens every surface after the first on the first's device, one the shared
-  device cannot present to getting its own, with crcbl patched to that main
-  commit by git rev. Run on the laptop with the bars on the MX550: the unplug
-  that crashed it, five more rounds, a tooltip and the clock panel, then a clean
-  quit; the Intel default draws and survives the unplug too; the workspace's
-  tests and cross-target clippy pass. **To finish:** once a crcbl release
-  carries `SharedGpu`, move the pins to it, drop the branch's `[patch]`, and
-  merge. A report to NVIDIA is still open, the owner's call.
+- **Two presenters crash NVIDIA's Wayland driver on teardown: reported to
+  NVIDIA?** office-crcbl found (2026-10-22) that on the NVIDIA MX550 (driver
+  615.78) under Wayland, a process with two `Presenter`s segfaults in
+  `libnvidia-eglcore` when the second's swapchain is torn down; Intel and
+  lavapipe are fine, and so is one presenter. lyr hit it at a monitor unplug
+  with its bars on the MX550. lyr now opens every surface after the first on the
+  first's device (crcbl 0.9.0's `crcbl_app::present::SharedGpu`, in
+  `lyr_render::surface`), one the shared device cannot present to getting its
+  own. Run on the laptop with the bars on the MX550 on crcbl 0.9.0 (2026-10-23,
+  two outputs in a nested Hyprland, `CRCBL_ADAPTER=discrete`): six rounds of
+  removing and re-adding an output, both bars back each time, then a clean
+  `lyr quit`. Earlier, on the crcbl main commit: a tooltip and the clock panel,
+  and the Intel default surviving the unplug. A report to NVIDIA is still open,
+  the owner's call.
 
 - **crcbl's `set_panel`: adopted.** crcbl 0.7.0's `Shell::set_panel` resizes a
   panel in place, and lyr uses it where it used to recreate one: the toast stack
