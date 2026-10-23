@@ -1,17 +1,25 @@
-//! The volume and mic modules' and the audio menu's source on Linux, through
-//! crcbl's mixer (`crcbl-mixer`), which speaks the sound server's own protocol
-//! over its socket: nothing to install beside the server, no `pactl` and no C
-//! client library. Readings follow waybar 0.15.0's `AudioBackend`
-//! (`src/util/audio_backend.cpp`) for the default sink and source.
+//! The volume and mic modules' and the audio menu's source on Linux and
+//! Windows, through crcbl's mixer (`crcbl-mixer`): on Linux it speaks the sound
+//! server's own protocol over its socket, nothing to install beside the server,
+//! no `pactl` and no C client library; on Windows it reads WASAPI. Readings
+//! follow waybar 0.15.0's `AudioBackend` (`src/util/audio_backend.cpp`) for
+//! the default sink and source. `Audio` follows the mixer on Linux's async
+//! sources; Windows' thread holds a [`Mixer`] itself and calls the same
+//! controls.
 
+#[cfg(target_os = "linux")]
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(target_os = "linux")]
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
-use crcbl_mixer::{Action, Device, Direction, Interest, Mixer, MixerError, MixerState, StreamId};
+use crcbl_mixer::{Action, Device, Direction, MixerState, StreamId};
+pub use crcbl_mixer::{Interest, Mixer, MixerError};
 use lyr_core::audio::{Sink, Source};
 use lyr_core::audio_menu::{Kind, Node, Nodes, Setting};
+#[cfg(target_os = "linux")]
 use tokio::sync::{Notify, oneshot, watch};
 
+#[cfg(target_os = "linux")]
 use crate::bus::publish;
 
 /// The default sink and source, as the volume and mic modules show them.
@@ -70,10 +78,56 @@ pub fn reading(state: &MixerState) -> Reading {
     (sink, source)
 }
 
+/// What a platform's mixer does beyond volumes, mutes and defaults, which
+/// decides what the audio menu draws.
+#[derive(Clone, Copy, Debug)]
+struct Platform {
+    /// Whether a stream can be moved to another device: the menu then shows
+    /// the device a stream plays to as a button that moves it, and otherwise
+    /// in the stream's name.
+    moves_streams: bool,
+    /// Whether it reports cards and ports, which the configuration tab
+    /// lists.
+    configures: bool,
+}
+
+/// PipeWire and PulseAudio do all of it.
+#[cfg(any(target_os = "linux", test))]
+const LINUX: Platform = Platform {
+    moves_streams: true,
+    configures: true,
+};
+
+/// WASAPI reports no cards and no ports, and has no public API to move a
+/// stream.
+#[cfg(any(windows, test))]
+const WINDOWS: Platform = Platform {
+    moves_streams: false,
+    configures: false,
+};
+
+#[cfg(target_os = "linux")]
+const HERE: Platform = LINUX;
+#[cfg(windows)]
+const HERE: Platform = WINDOWS;
+
+/// The name crcbl's mixer gives Windows' own sounds' session
+/// (`crcbl_mixer`'s `windows::session`).
+const SYSTEM_SOUNDS: &str = "System sounds";
+
 /// What the audio menu lists from `state`: devices by name, streams by id,
-/// and the configuration tab's cards and the devices with ports to choose.
+/// and the configuration tab's cards and the devices with ports to choose,
+/// as this platform's mixer can act on them.
 #[must_use]
 pub fn nodes(state: &MixerState) -> Nodes {
+    nodes_on(state, HERE)
+}
+
+/// [`nodes`] as `platform` draws them. Where streams cannot move, a stream
+/// on a device other than its flow's default is named with that device, and
+/// Windows' own sounds there, which every endpoint has and which play on the
+/// default, are left out.
+fn nodes_on(state: &MixerState, platform: Platform) -> Nodes {
     let devices = |direction| {
         state
             .devices
@@ -94,21 +148,31 @@ pub fn nodes(state: &MixerState) -> Nodes {
             .streams
             .iter()
             .filter(|stream| stream.direction == direction)
-            .map(|stream| Node {
-                id: stream.id.0.to_string(),
+            .filter_map(|stream| {
                 // Its application, else what it plays, else its number.
-                name: [Some(&stream.application), stream.title.as_ref()]
+                let name = [Some(&stream.application), stream.title.as_ref()]
                     .into_iter()
                     .flatten()
                     .find(|name| !name.is_empty())
-                    .map_or_else(|| format!("Stream {}", stream.id.0), String::clone),
-                volume: stream.volume,
-                muted: stream.muted,
-                default: false,
-                device: stream
-                    .device
-                    .and_then(|id| state.device(id))
-                    .map(|device| device.name.clone()),
+                    .map_or_else(|| format!("Stream {}", stream.id.0), String::clone);
+                let device = stream.device.and_then(|id| state.device(id));
+                let (name, device) = if platform.moves_streams {
+                    (name, device.map(|device| device.name.clone()))
+                } else {
+                    match device.filter(|device| !device.default) {
+                        None => (name, None),
+                        Some(_) if stream.application == SYSTEM_SOUNDS => return None,
+                        Some(device) => (format!("{name} ({})", device.description), None),
+                    }
+                };
+                Some(Node {
+                    id: stream.id.0.to_string(),
+                    name,
+                    volume: stream.volume,
+                    muted: stream.muted,
+                    default: false,
+                    device,
+                })
             })
             .collect()
     };
@@ -133,11 +197,11 @@ pub fn nodes(state: &MixerState) -> Nodes {
         recording: streams(Direction::Input),
         outputs: devices(Direction::Output),
         inputs: devices(Direction::Input),
-        settings: Some(
+        settings: platform.configures.then(|| {
             profiles
                 .chain(state.devices.iter().filter_map(ports))
-                .collect(),
-        ),
+                .collect()
+        }),
     }
 }
 
@@ -165,6 +229,7 @@ fn ports(device: &Device) -> Option<Setting> {
 }
 
 /// The system mixer, and a note of each change it reports.
+#[cfg(target_os = "linux")]
 pub struct Audio {
     /// Replaced by [`reconnect`](Self::reconnect) once the server has gone.
     mixer: Mutex<Mixer>,
@@ -173,6 +238,7 @@ pub struct Audio {
     streams: AtomicBool,
 }
 
+#[cfg(target_os = "linux")]
 impl Audio {
     /// Connects to the sound server and reads it. It follows devices only
     /// until [`follow_streams`](Self::follow_streams).
@@ -271,118 +337,176 @@ impl Audio {
         self.mixer.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Mutes or unmutes `target`.
+    /// Mutes or unmutes `target`; see [`toggle_mute`].
     ///
     /// # Errors
     ///
-    /// When the target is gone or the server could not be told.
+    /// As [`toggle_mute`].
     pub fn toggle_mute(&self, target: &Target) -> Result<(), MixerError> {
-        self.apply(target, &Action::ToggleMute)
+        toggle_mute(&self.mixer(), target)
     }
 
-    /// Moves `target`'s volume by `delta` percent, held to the mixer's
-    /// range.
+    /// Moves `target`'s volume by `delta` percent; see [`step`].
     ///
     /// # Errors
     ///
-    /// As [`toggle_mute`](Self::toggle_mute).
+    /// As [`toggle_mute`].
     pub fn step(&self, target: &Target, delta: i32) -> Result<(), MixerError> {
-        self.apply(target, &Action::Step(delta))
+        step(&self.mixer(), target, delta)
     }
 
-    /// Sets `target`'s volume to `percent`.
+    /// Sets `target`'s volume to `percent`; see [`set`].
     ///
     /// # Errors
     ///
-    /// As [`toggle_mute`](Self::toggle_mute).
+    /// As [`toggle_mute`].
     pub fn set(&self, target: &Target, percent: u32) -> Result<(), MixerError> {
-        self.apply(target, &Action::SetVolume(percent))
+        set(&self.mixer(), target, percent)
     }
 
-    /// Moves the stream `id` of `flow` to the device `name`.
+    /// Moves the stream `id` of `flow` to the device `name`; see
+    /// [`move_stream`].
     ///
     /// # Errors
     ///
-    /// As [`toggle_mute`](Self::toggle_mute).
+    /// As [`toggle_mute`].
     pub fn move_stream(&self, flow: Flow, id: u32, name: &str) -> Result<(), MixerError> {
-        let device = self.device(flow, name)?;
-        self.mixer().apply(
-            crcbl_mixer::Target::Stream(StreamId(id)),
-            &Action::MoveTo(device),
-        )
+        move_stream(&self.mixer(), flow, id, name)
     }
 
-    /// Chooses `option` for the card or device `id`: its profile or its
-    /// port, as `kind` says.
+    /// Chooses `option` for the card or device `id`; see [`choose`].
     ///
     /// # Errors
     ///
-    /// As [`toggle_mute`](Self::toggle_mute), and when `option` is not one
-    /// it has.
+    /// As [`choose`].
     pub fn choose(&self, kind: Kind, id: &str, option: &str) -> Result<(), MixerError> {
-        match kind {
-            Kind::Profile => {
-                let card = self
-                    .mixer()
-                    .state()
-                    .cards
-                    .iter()
-                    .find(|card| card.name == id)
-                    .ok_or(MixerError::NoSuchTarget)?
-                    .id;
-                self.mixer().apply(
-                    crcbl_mixer::Target::Card(card),
-                    &Action::SetProfile(option.to_owned()),
-                )
-            }
-            Kind::OutputPort | Kind::InputPort => {
-                let flow = if kind == Kind::OutputPort {
-                    Flow::Output
-                } else {
-                    Flow::Input
-                };
-                self.apply(
-                    &Target::Device(flow, id.to_owned()),
-                    &Action::SetPort(option.to_owned()),
-                )
-            }
+        choose(&self.mixer(), kind, id, option)
+    }
+
+    /// Makes the device `name` of `flow` the default; see [`make_default`].
+    ///
+    /// # Errors
+    ///
+    /// As [`toggle_mute`].
+    pub fn make_default(&self, flow: Flow, name: &str) -> Result<(), MixerError> {
+        make_default(&self.mixer(), flow, name)
+    }
+}
+
+/// Mutes or unmutes `target` in `mixer`.
+///
+/// # Errors
+///
+/// When the target is gone or the server could not be told.
+pub fn toggle_mute(mixer: &Mixer, target: &Target) -> Result<(), MixerError> {
+    apply(mixer, target, &Action::ToggleMute)
+}
+
+/// Moves `target`'s volume by `delta` percent, held to the mixer's range.
+///
+/// # Errors
+///
+/// As [`toggle_mute`].
+pub fn step(mixer: &Mixer, target: &Target, delta: i32) -> Result<(), MixerError> {
+    apply(mixer, target, &Action::Step(delta))
+}
+
+/// Sets `target`'s volume to `percent`.
+///
+/// # Errors
+///
+/// As [`toggle_mute`].
+pub fn set(mixer: &Mixer, target: &Target, percent: u32) -> Result<(), MixerError> {
+    apply(mixer, target, &Action::SetVolume(percent))
+}
+
+/// Moves the stream `id` of `flow` to the device `name`.
+///
+/// # Errors
+///
+/// As [`toggle_mute`], and on Windows, which cannot move a stream.
+pub fn move_stream(mixer: &Mixer, flow: Flow, id: u32, name: &str) -> Result<(), MixerError> {
+    let device = device(mixer, flow, name)?;
+    mixer.apply(
+        crcbl_mixer::Target::Stream(StreamId(id)),
+        &Action::MoveTo(device),
+    )
+}
+
+/// Chooses `option` for the card or device `id`: its profile or its port,
+/// as `kind` says.
+///
+/// # Errors
+///
+/// As [`toggle_mute`], and when `option` is not one it has.
+pub fn choose(mixer: &Mixer, kind: Kind, id: &str, option: &str) -> Result<(), MixerError> {
+    match kind {
+        Kind::Profile => {
+            let card = mixer
+                .state()
+                .cards
+                .iter()
+                .find(|card| card.name == id)
+                .ok_or(MixerError::NoSuchTarget)?
+                .id;
+            mixer.apply(
+                crcbl_mixer::Target::Card(card),
+                &Action::SetProfile(option.to_owned()),
+            )
+        }
+        Kind::OutputPort | Kind::InputPort => {
+            let flow = if kind == Kind::OutputPort {
+                Flow::Output
+            } else {
+                Flow::Input
+            };
+            apply(
+                mixer,
+                &Target::Device(flow, id.to_owned()),
+                &Action::SetPort(option.to_owned()),
+            )
         }
     }
+}
 
-    /// Makes the device `name` of `flow` the default.
-    ///
-    /// # Errors
-    ///
-    /// As [`toggle_mute`](Self::toggle_mute).
-    pub fn make_default(&self, flow: Flow, name: &str) -> Result<(), MixerError> {
-        self.apply(&Target::Device(flow, name.to_owned()), &Action::MakeDefault)
-    }
+/// Makes the device `name` of `flow` the default.
+///
+/// # Errors
+///
+/// As [`toggle_mute`].
+pub fn make_default(mixer: &Mixer, flow: Flow, name: &str) -> Result<(), MixerError> {
+    apply(
+        mixer,
+        &Target::Device(flow, name.to_owned()),
+        &Action::MakeDefault,
+    )
+}
 
-    fn apply(&self, target: &Target, action: &Action) -> Result<(), MixerError> {
-        let target = match target {
-            Target::Default(flow) => crcbl_mixer::Target::Default((*flow).into()),
-            Target::Device(flow, name) => crcbl_mixer::Target::Device(self.device(*flow, name)?),
-            Target::Stream(_, id) => crcbl_mixer::Target::Stream(StreamId(*id)),
-        };
-        self.mixer().apply(target, action)
-    }
+fn apply(mixer: &Mixer, target: &Target, action: &Action) -> Result<(), MixerError> {
+    let target = match target {
+        Target::Default(flow) => crcbl_mixer::Target::Default((*flow).into()),
+        Target::Device(flow, name) => crcbl_mixer::Target::Device(device(mixer, *flow, name)?),
+        Target::Stream(_, id) => crcbl_mixer::Target::Stream(StreamId(*id)),
+    };
+    mixer.apply(target, action)
+}
 
-    /// The id of the device `name` of `flow`.
-    fn device(&self, flow: Flow, name: &str) -> Result<crcbl_mixer::DeviceId, MixerError> {
-        let direction = flow.into();
-        self.mixer()
-            .state()
-            .devices
-            .iter()
-            .find(|device| device.direction == direction && device.name == name)
-            .map(|device| device.id)
-            .ok_or(MixerError::NoSuchTarget)
-    }
+/// The id of the device `name` of `flow` in `mixer`.
+fn device(mixer: &Mixer, flow: Flow, name: &str) -> Result<crcbl_mixer::DeviceId, MixerError> {
+    let direction = flow.into();
+    mixer
+        .state()
+        .devices
+        .iter()
+        .find(|device| device.direction == direction && device.name == name)
+        .map(|device| device.id)
+        .ok_or(MixerError::NoSuchTarget)
 }
 
 /// Opens a mixer following `interest`, waking `changed` on each change, on a
 /// thread of its own: the mixer waits there for the server's whole first
 /// picture.
+#[cfg(target_os = "linux")]
 async fn connect(changed: &Arc<Notify>, interest: Interest) -> Result<Mixer, MixerError> {
     let (opened, mixer) = oneshot::channel();
     let waker = Arc::clone(changed);

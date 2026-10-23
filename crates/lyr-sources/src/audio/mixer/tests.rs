@@ -1,9 +1,9 @@
 use crcbl_mixer::{
     Card, CardId, Choice, Device, DeviceId, Direction, MixerState, Stream, StreamId,
 };
-use lyr_core::audio_menu::Kind;
+use lyr_core::audio_menu::{Kind, Nodes};
 
-use super::{nodes, reading};
+use super::{LINUX, WINDOWS, nodes_on, reading};
 
 const HEADSET: &str = "alsa_output.usb-SteelSeries_Arctis_Nova_7-00.analog-stereo";
 const SPEAKER: &str =
@@ -33,6 +33,11 @@ fn device(id: u32, direction: Direction, name: &str, description: &str) -> Devic
         bluetooth: false,
         card: None,
     }
+}
+
+/// What the menu lists on Linux, which these tests mostly check.
+fn nodes(state: &MixerState) -> Nodes {
+    nodes_on(state, LINUX)
 }
 
 /// The owner's machine as crcbl-mixer read it (2026-10-22), cut to the
@@ -254,4 +259,104 @@ fn a_device_with_ports_to_choose_is_a_setting() {
     let mut single = machine();
     single.cards.clear();
     assert_eq!(nodes(&single).settings, Some(Vec::new()));
+}
+
+/// A stream as Windows' mixer reports one: its application, on a device.
+fn session(id: u32, application: &str, device: u32) -> Stream {
+    Stream {
+        id: StreamId(id),
+        direction: Direction::Output,
+        application: application.to_owned(),
+        title: None,
+        volume: 100,
+        muted: false,
+        device: Some(DeviceId(device)),
+    }
+}
+
+#[test]
+fn windows_names_a_stream_s_other_device_and_moves_nothing() {
+    let mut state = machine();
+    // The headset (61) is the default output, the speaker (69) not.
+    state.streams = vec![
+        session(1, "Spotify", 61),
+        session(2, "firefox", 69),
+        session(3, "System sounds", 61),
+        session(4, "System sounds", 69),
+    ];
+    let listed = nodes_on(&state, WINDOWS);
+    let rows: Vec<_> = listed
+        .playback
+        .iter()
+        .map(|node| (node.id.as_str(), node.name.as_str()))
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            ("1", "Spotify"),
+            ("2", "firefox (Raptor Lake-P/U/H cAVS Speaker)"),
+            ("3", "System sounds"),
+        ],
+        "the other device named, and its system sounds left out"
+    );
+    assert!(
+        listed.playback.iter().all(|node| node.device.is_none()),
+        "no stream can be moved, so none shows a device to move it to"
+    );
+    assert_eq!(listed.settings, None, "Windows has nothing to configure");
+    // The same state on Linux: every stream, plainly named, with its device.
+    let linux = nodes(&state);
+    assert_eq!(linux.playback.len(), 4);
+    assert_eq!(linux.playback[1].name, "firefox");
+    assert_eq!(linux.playback[1].device.as_deref(), Some(SPEAKER));
+    assert!(linux.settings.is_some());
+}
+
+/// This machine's audio through crcbl's mixer, as the Windows source reads
+/// it: the default output is the sink, and stepping each device and stream
+/// by 0 %, which changes nothing, finds it by the id the menu gives it.
+#[cfg(windows)]
+#[test]
+fn this_machine_s_audio_reads_and_each_row_finds_its_control() {
+    use super::{Flow, Mixer, Target, nodes, step};
+
+    let mixer = Mixer::open(|| {}).expect("WASAPI answers");
+    let state = mixer.state();
+    let (sink, _) = reading(&state);
+    let listed = nodes(&state);
+    assert_eq!(listed.settings, None, "Windows has nothing to configure");
+    let defaults: Vec<_> = listed.outputs.iter().filter(|node| node.default).collect();
+    assert_eq!(
+        defaults.iter().map(|node| &node.id).collect::<Vec<_>>(),
+        sink.iter().map(|sink| &sink.name).collect::<Vec<_>>(),
+        "the one default output is the sink"
+    );
+    let rows: Vec<_> = listed
+        .outputs
+        .iter()
+        .map(|node| (Target::Device(Flow::Output, node.id.clone()), node))
+        .chain(
+            listed
+                .inputs
+                .iter()
+                .map(|node| (Target::Device(Flow::Input, node.id.clone()), node)),
+        )
+        .chain(listed.playback.iter().map(|node| {
+            let id = node.id.parse().expect("a stream's number");
+            (Target::Stream(Flow::Output, id), node)
+        }))
+        .collect();
+    for (target, node) in &rows {
+        step(&mixer, target, 0).unwrap_or_else(|error| panic!("{target:?}: {error}"));
+        assert!(node.volume <= 100, "{target:?}: Windows has no boost");
+    }
+    assert!(
+        step(
+            &mixer,
+            &Target::Device(Flow::Output, "no such device".to_owned()),
+            0
+        )
+        .is_err(),
+        "a device the mixer does not have"
+    );
 }

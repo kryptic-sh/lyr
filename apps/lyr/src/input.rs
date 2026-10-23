@@ -161,17 +161,12 @@ pub fn act(
                 config.volume.scroll_step
             };
             let step = i32::try_from(step).unwrap_or(i32::MAX);
-            #[cfg(windows)]
-            let which = {
-                use lyr_sources::audio::windows::{Flow, Which};
-                Which::Default(if input { Flow::Input } else { Flow::Output })
-            };
             #[cfg(target_os = "macos")]
             let which = {
                 use lyr_sources::audio::macos::{Flow, Which};
                 Which::Default(if input { Flow::Input } else { Flow::Output })
             };
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", windows))]
             let which = {
                 use lyr_sources::audio::mixer::{Flow, Target};
                 Target::Default(if input { Flow::Input } else { Flow::Output })

@@ -95,44 +95,10 @@ impl App {
         }
     }
 
-    /// Carries out a click in the audio menu: a stream or device is muted,
-    /// set, or stepped by the volume or mic module's `scroll_step`, as its
-    /// flow is;
-    /// "make default" opens the Sound Settings page, since Windows has no
-    /// public API for it. What changed comes back from the source.
-    #[cfg(windows)]
-    fn audio_act(&self, tab: Tab, id: String, action: Action) {
-        use lyr_core::audio_menu::Step;
-        use lyr_sources::audio::windows::{Flow, Which};
-        let which = match tab {
-            Tab::Playback => Which::Stream(Flow::Output, id),
-            Tab::Recording => Which::Stream(Flow::Input, id),
-            Tab::Output | Tab::Input => Which::Device(id),
-            // Windows lists nothing to configure, so the menu never shows
-            // that tab.
-            Tab::Configuration => return,
-        };
-        let step = if matches!(tab, Tab::Recording | Tab::Input) {
-            self.config.mic.scroll_step
-        } else {
-            self.config.volume.scroll_step
-        };
-        let step = i32::try_from(step).unwrap_or(i32::MAX);
-        match action {
-            Action::Mute => self.commands.toggle_mute(which),
-            Action::Step(Step::Up) => self.commands.step_volume(which, step),
-            Action::Step(Step::Down) => self.commands.step_volume(which, -step),
-            Action::Set(percent) => self.commands.set_volume(which, percent),
-            Action::Default => crate::settings::open(crate::settings::Page::Sound),
-            // Its streams carry no device and it lists nothing to configure,
-            // so the menu draws neither button.
-            Action::Route(_) | Action::Setting(_) => {}
-        }
-    }
-
-    /// macOS: carries out a click in the audio menu on a device, as on
-    /// Windows; "make default" sets the default through CoreAudio. macOS
-    /// lists no streams, so their tabs never ask.
+    /// macOS: carries out a click in the audio menu on a device: a device is
+    /// muted, set, or stepped by the volume or mic module's `scroll_step`, as
+    /// its flow is, and "make default" sets the default through CoreAudio.
+    /// macOS lists no streams, so their tabs never ask.
     #[cfg(target_os = "macos")]
     fn audio_act(&self, tab: Tab, id: String, action: Action) {
         use lyr_core::audio_menu::Step;
@@ -167,11 +133,12 @@ impl App {
         }
     }
 
-    /// Linux: carries out a click in the audio menu on a stream or device,
-    /// by its id or name, through crcbl's mixer; steps go by the volume or mic
-    /// module's `scroll_step`, as its flow is. What changed comes back from
-    /// the source.
-    #[cfg(target_os = "linux")]
+    /// Linux and Windows: carries out a click in the audio menu on a stream or
+    /// device, by its id or name, through crcbl's mixer; steps go by the
+    /// volume or mic module's `scroll_step`, as its flow is. What changed
+    /// comes back from the source. Windows lists nothing to configure and no
+    /// stream's device, so it draws neither a setting nor a route.
+    #[cfg(any(target_os = "linux", windows))]
     fn audio_act(&self, tab: Tab, id: String, action: Action) {
         use lyr_core::audio_menu::Step;
         use lyr_sources::audio::mixer::{Flow, Target};

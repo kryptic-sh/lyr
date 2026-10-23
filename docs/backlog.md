@@ -191,14 +191,14 @@ implementation follows meanwhile.
   and otherwise PulseAudio's native protocol; WASAPI on Windows, with
   `IPolicyConfig` to set the default device; CoreAudio on macOS.
 
-  **Where it stands (2026-10-23).** Linux is on it: the volume, mic and audio
-  menu use `crcbl-mixer` 0.9.0 (`lyr_sources::audio::mixer`), and `pactl` is
-  gone. crcbl 0.9.0 also has the Windows backend over WASAPI, not used by lyr
-  yet: moving `lyr_sources::audio::windows` onto it is the next step, for a
-  session on the Windows machine; macOS follows when crcbl builds CoreAudio.
-  When the sound server goes away the modules hide and lyr reconnects, retrying
-  on a doubling wait (`AUDIO_RETRY_FIRST` to `AUDIO_RETRY_LONGEST` in
-  `apps/lyr/src/sources.rs`).
+  **Where it stands (2026-10-23).** Linux and Windows are on it: the volume, mic
+  and audio menu use `crcbl-mixer` 0.9.0 (`lyr_sources::audio::mixer`), so
+  `pactl` and lyr's own WASAPI code (`lyr_sources::audio::windows`) are gone;
+  Windows moved on 2026-10-23 (Windows sources entry). macOS follows when crcbl
+  builds CoreAudio. When the sound server goes away the modules hide and lyr
+  reconnects, retrying on a doubling wait (`AUDIO_RETRY_FIRST` to
+  `AUDIO_RETRY_LONGEST`, `audio_retry_after`, in `apps/lyr/src/sources.rs`), on
+  Windows' thread as on Linux's task.
 
   Verified on this laptop (PipeWire 1.6.9) against `pactl`: every device's
   volume, mute, default and active port (after crcbl's fix for HDMI2/3 and the
@@ -788,35 +788,35 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   owner's choice, 2026-10-22, over the undocumented
   `PowerSetActiveOverlayScheme`); run on Windows (2026-10-22), a click on the
   module opened Settings on System > Power, read through UI Automation. Volume
-  and mic too (`lyr_sources::audio::windows`, through `windows`, which plan 02
-  lists and which was already in the build through `crcbl-dx12`, with
-  `windows-core` for its `implement` macro): the default output and input
-  (`eConsole`), each one's scalar volume and mute from `IAudioEndpointVolume`,
-  friendly name as the tooltip's description, and the output's form factor as
-  waybar's port kind for the icon (`audio::win32`); changes from
-  `IMMNotificationClient` and `IAudioEndpointVolumeCallback` wake a COM thread
-  of lyr's own, which also carries out `toggle_mute`, `volume_up` and
-  `volume_down` (by `scroll_step`, held to 100 %, since Windows' endpoint volume
-  has no boost). Run on Windows (2026-10-20): the bar showed the output at 40 %
-  and the input at 100 %. A wheel step over the volume module was run
-  (2026-10-20): it took the output from 40 % to 35 %, and was set back through
-  the audio menu. The step went down for an injected forward (+120) wheel event
-  because this machine has Windows' reversed mouse scrolling on
-  (`ReverseMouseWheelDirection` = 1 under `HKCU\Control Panel\Mouse`), which
-  Windows applies before any program sees the event; lyr follows it as every
-  other program does, so it is not a bug. The mute click was run on the mic
-  (2026-10-20): a click on the module muted the default input and a second
-  unmuted it, read back between clicks through `Audio::source` from another
-  process (this machine draws the icons as missing glyphs, so the bar could not
-  show it). The output's mute takes the same path and was not clicked, since it
-  cuts what is heard. A Bluetooth endpoint is told apart by its device's bus
-  enumerator (`PKEY_Device_EnumeratorName` among `BTHENUM`, `BTHHFENUM`,
-  `BTHLEDEVICE`; `audio::win32::bluetooth`, tested and mutation-checked). Read
-  on this machine, the USB headset's property store names `USB`, which shows the
-  key gives the device's bus rather than the endpoint's own `SWD`; no Bluetooth
-  endpoint has been seen. The notifications module is plan 09's Windows bell:
-  always the `none` icon (`lyr_core::bell::stateless`), since Windows offers no
-  API for its notifications or do-not-disturb, with both clicks bound in
+  and mic too, through crcbl's mixer since 2026-10-23 (`crcbl-mixer`'s WASAPI
+  backend, read by `lyr_sources::audio::mixer` as on Linux; lyr's own WASAPI
+  code before it is gone): the default output and input (`eConsole`), each one's
+  scalar volume and mute, friendly name as the tooltip's description, and form
+  factor as the icon's port kind. The mixer's thread follows every endpoint and
+  session through WASAPI's callbacks; lyr's `windows::audio` thread reads its
+  state on each change, and carries out `toggle_mute`, `volume_up` and
+  `volume_down` (by `scroll_step`, held to 100 %, since Windows has no boost)
+  through the controls Linux uses (`mixer::toggle_mute` and the rest). The audio
+  service going away hides the modules until it is back, retried as on Linux;
+  not tried here, since stopping it cuts what is heard. Run on Windows
+  (2026-10-23): the bar showed the output at 40 % and the input at 100 %; a
+  click on the volume module muted the default output and a second unmuted it,
+  read back between clicks through crcbl's mixer from another process (this
+  machine draws the icons as missing glyphs, so the bar could not show it); a
+  forward (+120) wheel event took the output to 35 % and a backward one back to
+  40 %. The step went down for a forward event because this machine has Windows'
+  reversed mouse scrolling on (`ReverseMouseWheelDirection` = 1 under
+  `HKCU\Control Panel\Mouse`), which Windows applies before any program sees the
+  event; lyr follows it as every other program does, so it is not a bug. A
+  Bluetooth endpoint is told apart by its device's bus enumerator
+  (`PKEY_Device_EnumeratorName` among `BTHENUM`, `BTHHFENUM`, `BTHLEDEVICE`,
+  crcbl's `bluetooth`); on this machine the USB headset's names `USB`, the
+  device's bus rather than the endpoint's own `SWD`, and no Bluetooth endpoint
+  has been seen. A handset's form factor reads as `handset`, which none of
+  waybar's port kinds match, as on Linux; lyr's own code read it as `phone`. The
+  notifications module is plan 09's Windows bell: always the `none` icon
+  (`lyr_core::bell::stateless`), since Windows offers no API for its
+  notifications or do-not-disturb, with both clicks bound in
   `[platform.windows.notifications.on]` to `start "" ms-actioncenter:`; run on
   Windows (2026-10-20), a click on it opened the notification centre. The Wi-Fi
   and Bluetooth menus open Windows' Settings pages in their place
@@ -825,28 +825,35 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (2026-10-22), `lyr panel bluetooth` opened Settings on Bluetooth & devices and
   `lyr panel wifi` on Network & internet, read from the Settings window through
   UI Automation. The audio menu is native on Windows (`lyr_core::audio_menu`,
-  `apps/lyr/src/audio_menu.rs`, `lyr_sources::audio::windows::menu`): tabs for
-  playback and recording streams (WASAPI's audio sessions on every active
-  endpoint, named by the session, else its program's file name,
-  `audio::win32::session_name`; every endpoint has a system-sounds session, so
-  those off the default endpoint are left out, and another stream there names
-  its endpoint, `stream_row`) and output and input devices, each row with mute,
-  a step down and up by the module's `scroll_step`, and on a device that is not
-  the default a Default button, which opens `ms-settings:sound` since Windows
-  has no public API for setting it. The source re-reads the rows on each
-  endpoint change and once a second while the menu is open, since session
-  changes have no callbacks wired. Run on Windows (2026-10-20):
-  `lyr panel audio` opened it listing this machine's four output devices, the
-  default in the active colour; a menu panel now stays inside its output
-  (`menu_panel::Place`, from the clicked bar's width; `lyr panel` with no bar
-  showing the module opens at the left edge), and the audio menu opened ending
-  16 px from the screen's right edge, its Playback tab clicked for real
-  redrawing it there. Each control's lookup was tested by a 0 % step on every
-  device and stream; on the real machine (2026-10-20) a click on the steam
-  stream's step down showed 95 % and its step up 100 % again, so a click reaches
-  the source and the change comes back to the menu; Mute and a device's steps
-  have not been clicked, since they change what is heard. Each row also has a
-  slider (`audio_menu::Target::Level`): a click sets the volume where it lands
+  `apps/lyr/src/audio_menu.rs`, its rows from `mixer::nodes`): tabs for playback
+  and recording streams (WASAPI's audio sessions on every active endpoint, named
+  by the session, else its program's file name, as crcbl names them; every
+  endpoint has a system-sounds session, so those off the default endpoint are
+  left out, and another stream there names its endpoint, `mixer::nodes_on` with
+  `WINDOWS`, tested and mutation-checked on every platform) and output and input
+  devices, each row with mute, a step down and up by the module's `scroll_step`,
+  and on a device that is not the default a Default button, which makes it the
+  default through crcbl's `IPolicyConfig` (undocumented; before crcbl's mixer it
+  opened `ms-settings:sound`). A session's changes come through crcbl's
+  callbacks, followed only while the menu is open; the once-a-second re-read is
+  gone. Run on Windows (2026-10-23): `lyr panel audio` opened it on this
+  machine's four output devices, the default in the active colour and no
+  Configuration tab, and its Playback tab listed five streams, one of them
+  System sounds, with no device buttons. The Default button has not been
+  clicked, since it moves what is heard to another device; crcbl's own
+  `wasapi_live` test sets a default. Each row's lookup is tested by a 0 % step
+  on every device and stream
+  (`this_machine_s_audio_reads_and_each_row_finds_its_control`, run on this
+  machine). From the runs of 2026-10-20, which tried the menu rather than its
+  source: a menu panel stays inside its output (`menu_panel::Place`, from the
+  clicked bar's width; `lyr panel` with no bar showing the module opens at the
+  left edge), and the audio menu opened ending 16 px from the screen's right
+  edge, its Playback tab clicked for real redrawing it there. On the real
+  machine (2026-10-20) a click on the steam stream's step down showed 95 % and
+  its step up 100 % again, so a click reaches the source and the change comes
+  back to the menu; Mute and a device's steps have not been clicked, since they
+  change what is heard. Each row also has a slider
+  (`audio_menu::Target::Level`): a click sets the volume where it lands
   (`level_at`, from `MenuPanel::picked_across`), up to `MAX_PERCENT`, 100 % for
   Windows; Enter on it does nothing, having no place. Clicked on the real
   machine (2026-10-20): a quarter of the way along steam's slider set 25 %, and

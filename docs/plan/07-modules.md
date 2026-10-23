@@ -189,14 +189,14 @@ muted, and unmuting output restores that state.
 - Linux: crcbl's mixer (`crcbl-mixer`), which speaks PipeWire's own protocol
   over its socket, written in Rust in crcbl, so no tool and no C client library
   is needed. The owner decided (2026-10-22) that audio control belongs in crcbl
-  as one seam for Linux, Windows and macOS; lyr's Linux volume, mic and audio
-  menu are on it (`lyr_sources::audio::mixer`), and the mixer calls back on each
-  change, devices only while the menu is closed. Without PipeWire it speaks
-  PulseAudio's native protocol instead. When the server goes away the modules
-  hide until lyr reconnects. Windows and macOS are still being built (backlog,
+  as one seam for Linux, Windows and macOS; lyr's Linux and Windows volume, mic
+  and audio menu are on it (`lyr_sources::audio::mixer`), and the mixer calls
+  back on each change, devices only while the menu is closed. Without PipeWire
+  it speaks PulseAudio's native protocol instead. When the server goes away the
+  modules hide until lyr reconnects. macOS is still being built (backlog,
   "crcbl: an audio-control seam"). See [16](16-open-questions.md).
-- Windows: WASAPI `IAudioEndpointVolume` with an `IAudioEndpointVolumeCallback`
-  for changes, and `IMMNotificationClient` for default-device changes.
+- Windows: crcbl's mixer over WASAPI, which follows `IAudioEndpointVolume`'s
+  callbacks for changes and `IMMNotificationClient` for default-device changes.
 - macOS: CoreAudio `AudioObjectAddPropertyListener` on the default output and
   input devices' volume and mute, plus the default-device properties.
 

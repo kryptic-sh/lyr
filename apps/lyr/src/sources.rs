@@ -121,8 +121,8 @@ pub enum BluetoothRequest {
     Answer(u64, lyr_core::bluetooth_menu::Reply),
 }
 
-/// What the bar asks of the sound server on Linux.
-#[cfg(target_os = "linux")]
+/// What the bar asks of crcbl's mixer.
+#[cfg(any(target_os = "linux", windows))]
 #[derive(Debug)]
 pub enum AudioRequest {
     ToggleMute(lyr_sources::audio::mixer::Target),
@@ -209,7 +209,7 @@ pub struct Commands {
     #[cfg(windows)]
     _window: Option<lyr_sources::window::windows::Watch>,
     #[cfg(windows)]
-    audio: std::sync::mpsc::Sender<windows::AudioRequest>,
+    audio: std::sync::mpsc::Sender<windows::AudioWork>,
     #[cfg(windows)]
     wifi: std::sync::mpsc::Sender<windows::WifiWork>,
     #[cfg(windows)]
@@ -293,45 +293,6 @@ impl Commands {
             .store(open, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// Mutes or unmutes `target`.
-    pub fn toggle_mute(&self, target: lyr_sources::audio::mixer::Target) {
-        let _stopped = self.audio.send(AudioRequest::ToggleMute(target));
-    }
-
-    /// Moves the volume of `target` by `delta` percent.
-    pub fn step_volume(&self, target: lyr_sources::audio::mixer::Target, delta: i32) {
-        let _stopped = self.audio.send(AudioRequest::Step(target, delta));
-    }
-
-    /// Sets the volume of `target` to `percent`.
-    pub fn set_volume(&self, target: lyr_sources::audio::mixer::Target, percent: u32) {
-        let _stopped = self.audio.send(AudioRequest::Set(target, percent));
-    }
-
-    /// Chooses `option` for the card or device `id`: its profile or its
-    /// port, as `kind` says.
-    pub fn choose(&self, kind: lyr_core::audio_menu::Kind, id: String, option: String) {
-        let _stopped = self.audio.send(AudioRequest::Setting(kind, id, option));
-    }
-
-    /// Moves the stream `index` of `flow` to the device `name`.
-    pub fn move_stream(&self, flow: lyr_sources::audio::mixer::Flow, index: u32, name: String) {
-        let _stopped = self.audio.send(AudioRequest::Move(flow, index, name));
-    }
-
-    /// Makes the device `name` the default for `flow`.
-    pub fn set_default(&self, flow: lyr_sources::audio::mixer::Flow, name: String) {
-        let _stopped = self.audio.send(AudioRequest::Default(flow, name));
-    }
-
-    /// Tells the audio source whether the menu is open, when that changed:
-    /// the streams' changes count only while it is.
-    pub fn audio_menu(&self, open: bool) {
-        if self.audio_menu.replace(open) != open {
-            let _stopped = self.audio.send(AudioRequest::Menu(open));
-        }
-    }
-
     /// Presses `control` on the media player at `bus_name`.
     pub fn media(&self, bus_name: String, control: lyr_core::media::Control) {
         let _stopped = self.media.send((bus_name, control));
@@ -352,6 +313,56 @@ impl Commands {
         let _stopped = self
             .notifications
             .send(NotificationRequest::Invoke(id, key));
+    }
+}
+
+#[cfg(any(target_os = "linux", windows))]
+impl Commands {
+    /// Mutes or unmutes `target`.
+    pub fn toggle_mute(&self, target: lyr_sources::audio::mixer::Target) {
+        self.audio_request(AudioRequest::ToggleMute(target));
+    }
+
+    /// Moves the volume of `target` by `delta` percent.
+    pub fn step_volume(&self, target: lyr_sources::audio::mixer::Target, delta: i32) {
+        self.audio_request(AudioRequest::Step(target, delta));
+    }
+
+    /// Sets the volume of `target` to `percent`.
+    pub fn set_volume(&self, target: lyr_sources::audio::mixer::Target, percent: u32) {
+        self.audio_request(AudioRequest::Set(target, percent));
+    }
+
+    /// Chooses `option` for the card or device `id`: its profile or its
+    /// port, as `kind` says.
+    pub fn choose(&self, kind: lyr_core::audio_menu::Kind, id: String, option: String) {
+        self.audio_request(AudioRequest::Setting(kind, id, option));
+    }
+
+    /// Moves the stream `index` of `flow` to the device `name`.
+    pub fn move_stream(&self, flow: lyr_sources::audio::mixer::Flow, index: u32, name: String) {
+        self.audio_request(AudioRequest::Move(flow, index, name));
+    }
+
+    /// Makes the device `name` the default for `flow`.
+    pub fn set_default(&self, flow: lyr_sources::audio::mixer::Flow, name: String) {
+        self.audio_request(AudioRequest::Default(flow, name));
+    }
+
+    /// Tells the audio source whether the menu is open, when that changed:
+    /// the streams' changes count only while it is.
+    pub fn audio_menu(&self, open: bool) {
+        if self.audio_menu.replace(open) != open {
+            self.audio_request(AudioRequest::Menu(open));
+        }
+    }
+
+    /// Hands `request` to the audio source; one that has stopped drops it.
+    fn audio_request(&self, request: AudioRequest) {
+        #[cfg(target_os = "linux")]
+        let _stopped = self.audio.send(request);
+        #[cfg(windows)]
+        let _stopped = self.audio.send(windows::AudioWork::Request(request));
     }
 }
 
@@ -395,33 +406,6 @@ impl Commands {
             });
         if let Err(error) = spawned {
             tracing::warn!("power menu: {}: no thread: {error}", entry.label());
-        }
-    }
-
-    /// Windows: mutes or unmutes what `which` names.
-    #[cfg(windows)]
-    pub fn toggle_mute(&self, which: lyr_sources::audio::windows::Which) {
-        let _stopped = self.audio.send(windows::AudioRequest::ToggleMute(which));
-    }
-
-    /// Windows: moves the volume of what `which` names by `delta` percent.
-    #[cfg(windows)]
-    pub fn step_volume(&self, which: lyr_sources::audio::windows::Which, delta: i32) {
-        let _stopped = self.audio.send(windows::AudioRequest::Step(which, delta));
-    }
-
-    /// Windows: sets the volume of what `which` names to `percent`.
-    #[cfg(windows)]
-    pub fn set_volume(&self, which: lyr_sources::audio::windows::Which, percent: u32) {
-        let _stopped = self.audio.send(windows::AudioRequest::Set(which, percent));
-    }
-
-    /// Windows: tells the audio source whether the menu is open, when that
-    /// changed.
-    #[cfg(windows)]
-    pub fn audio_menu(&self, open: bool) {
-        if self.audio_menu.replace(open) != open {
-            let _stopped = self.audio.send(windows::AudioRequest::Menu(open));
         }
     }
 
@@ -595,9 +579,30 @@ pub fn start(
 
 /// How often the open audio menu's streams and devices are read again: a
 /// stream starting or a volume other than the defaults' changing has no
-/// callback wired on Windows or macOS.
-#[cfg(any(windows, target_os = "macos"))]
+/// callback wired on macOS.
+#[cfg(target_os = "macos")]
 const MENU_REFRESH: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// The first wait before connecting to a sound server that went away
+/// again, doubled after each try up to [`AUDIO_RETRY_LONGEST`].
+#[cfg(any(target_os = "linux", windows))]
+const AUDIO_RETRY_FIRST: std::time::Duration = std::time::Duration::from_millis(100);
+#[cfg(any(target_os = "linux", windows))]
+const AUDIO_RETRY_LONGEST: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// The wait before the next try to reach a sound server that went away,
+/// after a try that followed a wait of `delay`.
+#[cfg(any(target_os = "linux", windows))]
+fn audio_retry_after(delay: std::time::Duration) -> std::time::Duration {
+    (delay * 2).min(AUDIO_RETRY_LONGEST)
+}
+
+/// What the log says when the sound server goes away, and when it is
+/// followed again.
+#[cfg(any(target_os = "linux", windows))]
+const AUDIO_GONE: &str = "audio: the sound server went away; reconnecting";
+#[cfg(any(target_os = "linux", windows))]
+const AUDIO_BACK: &str = "audio: following the sound server again";
 
 /// The sources macOS has so far: the battery, the default audio devices,
 /// Low Power Mode, the network, Bluetooth and AeroSpace's workspaces.
@@ -903,7 +908,8 @@ mod macos {
 }
 
 /// The sources Windows has so far: the battery, the network, the power
-/// profile and the audio endpoints.
+/// profile, the audio devices and streams, Wi-Fi, Bluetooth and the
+/// foreground window.
 #[cfg(windows)]
 mod windows {
     use std::sync::mpsc;
@@ -911,7 +917,7 @@ mod windows {
     use crcbl_shell::ShellWaker;
     use lyr_sources::battery::windows::{Watch, status};
 
-    use super::{MENU_REFRESH, Update};
+    use super::{AUDIO_BACK, AUDIO_GONE, AUDIO_RETRY_FIRST, Update, audio_retry_after};
 
     /// What the Bluetooth source's thread is handed: a change to read, or
     /// what the menu asks.
@@ -1407,23 +1413,21 @@ mod windows {
         .ok())
     }
 
-    /// What the bar asks of the audio source.
+    /// What the audio source's thread is handed: a change crcbl's mixer
+    /// reported, or what the bar asks.
     #[derive(Debug)]
-    pub(super) enum AudioRequest {
-        /// Something changed: read again.
+    pub(super) enum AudioWork {
         Changed,
-        /// The audio menu opened or closed.
-        Menu(bool),
-        ToggleMute(lyr_sources::audio::windows::Which),
-        Step(lyr_sources::audio::windows::Which, i32),
-        Set(lyr_sources::audio::windows::Which, u32),
+        Request(super::AudioRequest),
     }
 
     /// Hands the default output and input, and what the audio menu lists, to
-    /// the main loop now and after every change that alters them, and carries
-    /// out what the bar asks of them, on a thread in COM's multithreaded
-    /// apartment. A machine whose audio cannot be read logs why, and the
-    /// modules stay out.
+    /// the main loop now and after every change crcbl's mixer reports, and
+    /// carries out what the bar asks of them, on a thread of its own. Only
+    /// the open menu shows streams, so their changes are followed only
+    /// while it is. An audio service that goes away, as it does when it
+    /// restarts, hides the modules until it is back. A machine whose audio
+    /// cannot be read logs why, and the modules stay out.
     ///
     /// # Errors
     ///
@@ -1431,119 +1435,162 @@ mod windows {
     pub(super) fn audio(
         sender: mpsc::Sender<Update>,
         waker: Option<ShellWaker>,
-    ) -> std::io::Result<mpsc::Sender<AudioRequest>> {
-        use lyr_sources::audio::windows::{Audio, Watch, init};
-        let (requests, incoming) = mpsc::channel();
-        let changes = requests.clone();
+    ) -> std::io::Result<mpsc::Sender<AudioWork>> {
+        use lyr_sources::audio::mixer::{Mixer, nodes, reading};
+        let (work, incoming) = mpsc::channel();
+        let changes = work.clone();
         std::thread::Builder::new()
             .name("lyr audio".to_owned())
             .spawn(move || {
-                let audio = match init().and_then(|()| Audio::new()) {
-                    Ok(audio) => audio,
+                let open = |menu: bool| {
+                    let changes = changes.clone();
+                    let mixer = Mixer::open(move || {
+                        // The thread has gone when this fails: nothing to
+                        // tell.
+                        let _gone = changes.send(AudioWork::Changed);
+                    })?;
+                    mixer.set_interest(interest(menu));
+                    Ok::<_, lyr_sources::audio::mixer::MixerError>(mixer)
+                };
+                let mut mixer = match open(false) {
+                    Ok(mixer) => mixer,
                     Err(error) => {
-                        tracing::warn!("audio: {error}");
+                        tracing::warn!("audio: the sound server is not reachable: {error}");
                         return;
                     }
                 };
-                let watch = Watch::new(&audio, move || {
-                    // The thread has gone when this fails: nothing to tell.
-                    let _gone = changes.send(AudioRequest::Changed);
-                });
-                let mut watch = match watch {
-                    Ok(watch) => Some(watch),
-                    Err(error) => {
-                        tracing::warn!("audio: changes will not show: {error}");
-                        None
-                    }
-                };
-                // The endpoints the callbacks are on, to move them when a
-                // default changes.
-                let mut followed = None;
                 let mut menu = false;
-                // What was last handed over, so only a change wakes the loop.
-                let mut sent = None;
-                let mut sent_nodes = None;
+                // What was last shown, so only a new reading wakes the bar.
+                let mut shown = None;
                 loop {
-                    let sink = audio
-                        .sink()
-                        .inspect_err(|error| tracing::warn!("audio: the output: {error}"))
-                        .ok()
-                        .flatten();
-                    let source = audio
-                        .source()
-                        .inspect_err(|error| tracing::warn!("audio: the input: {error}"))
-                        .ok()
-                        .flatten();
-                    let endpoints = sink
-                        .as_ref()
-                        .map(|sink| (sink.name.clone(), sink.source_name.clone()));
-                    if endpoints != followed
-                        && let Some(watch) = &mut watch
-                        && let Err(error) = watch.follow(&audio)
-                    {
-                        tracing::warn!("audio: following the new endpoint: {error}");
-                    }
-                    followed = endpoints;
-                    let mut changed = false;
-                    let readings = Some((sink, source));
-                    if readings != sent {
-                        sent = readings;
-                        if let Some((sink, source)) = sent.clone()
-                            && sender.send(Update::Audio(sink, source)).is_err()
+                    if !mixer.is_connected() {
+                        // What it last read is no longer true.
+                        shown = Some(Default::default());
+                        if !deliver(&sender, waker.as_ref(), Update::Audio(None, None))
+                            || !deliver(&sender, None, Update::AudioNodes(Default::default()))
                         {
                             break;
                         }
-                        changed = true;
-                    }
-                    let nodes = audio
-                        .nodes()
-                        .inspect_err(|error| tracing::warn!("audio: the menu's rows: {error}"))
-                        .ok();
-                    if nodes.is_some() && nodes != sent_nodes {
-                        sent_nodes = nodes;
-                        if let Some(nodes) = sent_nodes.clone()
-                            && sender.send(Update::AudioNodes(nodes)).is_err()
-                        {
-                            break;
-                        }
-                        changed = true;
-                    }
-                    if changed && let Some(waker) = &waker {
-                        waker.wake();
-                    }
-                    // A request changes the volume, which comes back as a
-                    // change; a run of changes reads once. While the menu is
-                    // open, a quiet second reads again too.
-                    let request = if menu {
-                        match incoming.recv_timeout(MENU_REFRESH) {
-                            Ok(request) => request,
-                            Err(mpsc::RecvTimeoutError::Timeout) => AudioRequest::Changed,
-                            Err(mpsc::RecvTimeoutError::Disconnected) => break,
-                        }
-                    } else {
-                        let Ok(request) = incoming.recv() else {
+                        tracing::warn!("{AUDIO_GONE}");
+                        let Some(back) = reopen(&incoming, || open(menu)) else {
                             break;
                         };
-                        request
+                        mixer = back;
+                        tracing::info!("{AUDIO_BACK}");
+                    }
+                    let state = mixer.state();
+                    let read = reading(&state);
+                    if shown.as_ref() != Some(&read) {
+                        shown = Some(read.clone());
+                        let (sink, source) = read;
+                        if !deliver(&sender, waker.as_ref(), Update::Audio(sink, source)) {
+                            break;
+                        }
+                    }
+                    // Only the menu shows the rows: closed, they wait for the
+                    // next wake-up, which drains them before the click that
+                    // opens the menu.
+                    let rows = waker.as_ref().filter(|_| menu);
+                    if !deliver(&sender, rows, Update::AudioNodes(nodes(&state))) {
+                        break;
+                    }
+                    // What a request changes comes back as a change; a run of
+                    // them reads once.
+                    let Ok(first) = incoming.recv() else {
+                        break;
                     };
-                    for request in std::iter::once(request).chain(incoming.try_iter()) {
-                        let done = match request {
-                            AudioRequest::Changed => Ok(()),
-                            AudioRequest::Menu(open) => {
-                                menu = open;
-                                Ok(())
-                            }
-                            AudioRequest::ToggleMute(which) => audio.toggle_mute(&which),
-                            AudioRequest::Step(which, delta) => audio.step(&which, delta),
-                            AudioRequest::Set(which, percent) => audio.set(&which, percent),
-                        };
-                        if let Err(error) = done {
+                    for item in std::iter::once(first).chain(incoming.try_iter()) {
+                        if let AudioWork::Request(request) = item
+                            && let Err(error) = audio_act(&mixer, request, &mut menu)
+                        {
                             tracing::warn!("audio: {error}");
                         }
                     }
                 }
             })?;
-        Ok(requests)
+        Ok(work)
+    }
+
+    /// Which of the mixer's changes count: streams' only while the menu is
+    /// open.
+    fn interest(menu: bool) -> lyr_sources::audio::mixer::Interest {
+        use lyr_sources::audio::mixer::Interest;
+        if menu {
+            Interest::DevicesAndStreams
+        } else {
+            Interest::Devices
+        }
+    }
+
+    /// Hands `update` to the main loop, and wakes it when `waker` is given.
+    /// `false` once the main loop has gone.
+    fn deliver(sender: &mpsc::Sender<Update>, waker: Option<&ShellWaker>, update: Update) -> bool {
+        let delivered = sender.send(update).is_ok();
+        if let Some(waker) = waker {
+            waker.wake();
+        }
+        delivered
+    }
+
+    /// Tries `open` until the audio service is back, waiting longer after
+    /// each failure as Linux does; what the bar asks meanwhile is refused.
+    /// `None` once the bar has gone.
+    fn reopen(
+        incoming: &mpsc::Receiver<AudioWork>,
+        open: impl Fn()
+            -> Result<lyr_sources::audio::mixer::Mixer, lyr_sources::audio::mixer::MixerError>,
+    ) -> Option<lyr_sources::audio::mixer::Mixer> {
+        let mut delay = AUDIO_RETRY_FIRST;
+        loop {
+            match open() {
+                Ok(mixer) => return Some(mixer),
+                Err(error) => tracing::debug!("audio: not back yet: {error}"),
+            }
+            let until = std::time::Instant::now() + delay;
+            loop {
+                let left = until.saturating_duration_since(std::time::Instant::now());
+                if left.is_zero() {
+                    break;
+                }
+                match incoming.recv_timeout(left) {
+                    Ok(AudioWork::Request(_)) => tracing::warn!(
+                        "audio: {}",
+                        lyr_sources::audio::mixer::MixerError::Disconnected
+                    ),
+                    // A late word from the mixer that went.
+                    Ok(AudioWork::Changed) | Err(mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(mpsc::RecvTimeoutError::Disconnected) => return None,
+                }
+            }
+            delay = audio_retry_after(delay);
+        }
+    }
+
+    /// Carries out what the bar asked of `mixer`. Windows draws no route and
+    /// no setting, which its mixer refuses anyway.
+    fn audio_act(
+        mixer: &lyr_sources::audio::mixer::Mixer,
+        request: super::AudioRequest,
+        menu: &mut bool,
+    ) -> Result<(), lyr_sources::audio::mixer::MixerError> {
+        use lyr_sources::audio::mixer::{
+            choose, make_default, move_stream, set, step, toggle_mute,
+        };
+
+        use super::AudioRequest;
+        match request {
+            AudioRequest::ToggleMute(target) => toggle_mute(mixer, &target),
+            AudioRequest::Step(target, delta) => step(mixer, &target, delta),
+            AudioRequest::Set(target, percent) => set(mixer, &target, percent),
+            AudioRequest::Default(flow, name) => make_default(mixer, flow, &name),
+            AudioRequest::Setting(kind, id, option) => choose(mixer, kind, &id, &option),
+            AudioRequest::Move(flow, index, name) => move_stream(mixer, flow, index, &name),
+            AudioRequest::Menu(open) => {
+                *menu = open;
+                mixer.set_interest(interest(open));
+                Ok(())
+            }
+        }
     }
 
     /// Hands the foreground window to the main loop now and at each change,
@@ -1651,8 +1698,8 @@ mod linux {
     use lyr_sources::notifications::linux::{Daemon, serve_session};
 
     use super::{
-        AudioRequest, BluetoothRequest, JoinRequest, NotificationRequest, TrayRequest, Update,
-        WifiRequest,
+        AUDIO_BACK, AUDIO_GONE, AUDIO_RETRY_FIRST, AudioRequest, BluetoothRequest, JoinRequest,
+        NotificationRequest, TrayRequest, Update, WifiRequest, audio_retry_after,
     };
     use crate::wifi_menu::Joined;
 
@@ -1802,23 +1849,18 @@ mod linux {
             // A sound server that goes away is most often restarting: the
             // modules hide until it is back.
             while audio.watch(&states).await.is_err() {
-                tracing::warn!("audio: the sound server went away; reconnecting");
+                tracing::warn!("{AUDIO_GONE}");
                 let mut delay = AUDIO_RETRY_FIRST;
                 while let Err(error) = audio.reconnect().await {
                     tracing::debug!("audio: not back yet: {error}");
                     tokio::time::sleep(delay).await;
-                    delay = (delay * 2).min(AUDIO_RETRY_LONGEST);
+                    delay = audio_retry_after(delay);
                 }
-                tracing::info!("audio: following the sound server again");
+                tracing::info!("{AUDIO_BACK}");
             }
         };
         tokio::join!(watch, forward, act);
     }
-
-    /// The first wait before connecting to a sound server that went away
-    /// again, doubled after each try up to [`AUDIO_RETRY_LONGEST`].
-    const AUDIO_RETRY_FIRST: std::time::Duration = std::time::Duration::from_millis(100);
-    const AUDIO_RETRY_LONGEST: std::time::Duration = std::time::Duration::from_secs(5);
 
     async fn battery(sender: mpsc::Sender<Update>, waker: Option<ShellWaker>) {
         let upower = match UPower::system().await {
@@ -2349,5 +2391,30 @@ mod linux {
             }
         };
         tokio::join!(forward, act);
+    }
+}
+
+#[cfg(all(test, any(target_os = "linux", windows)))]
+mod tests {
+    use std::time::Duration;
+
+    use super::{AUDIO_RETRY_FIRST, AUDIO_RETRY_LONGEST, audio_retry_after};
+
+    #[test]
+    fn the_audio_retry_doubles_up_to_its_longest() {
+        let mut delay = AUDIO_RETRY_FIRST;
+        let mut waits = vec![delay];
+        while delay < AUDIO_RETRY_LONGEST {
+            delay = audio_retry_after(delay);
+            waits.push(delay);
+        }
+        assert_eq!(waits[1], AUDIO_RETRY_FIRST * 2);
+        assert_eq!(waits.last(), Some(&AUDIO_RETRY_LONGEST));
+        assert_eq!(audio_retry_after(AUDIO_RETRY_LONGEST), AUDIO_RETRY_LONGEST);
+        assert_eq!(
+            audio_retry_after(Duration::from_secs(4)),
+            AUDIO_RETRY_LONGEST,
+            "held to the longest"
+        );
     }
 }

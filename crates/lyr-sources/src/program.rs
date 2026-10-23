@@ -1,6 +1,6 @@
-//! Naming the program a process runs, which the audio menu's streams and the
-//! window module's class are shown by: [`name`] on every platform's tests,
-//! [`windows::path`] reading a process's on Windows.
+//! Naming the program a process runs, which the window module's class is
+//! shown by: [`name`] on every platform's tests, [`windows::path`] reading a
+//! process's on Windows.
 
 #[cfg(windows)]
 pub mod windows;

@@ -279,12 +279,12 @@ PulseAudio protocol, which PipeWire serves through `pipewire-pulse`.
 
 The native menus are planned for Windows and macOS too, wherever the platform
 has a public API, and fall back to opening the matching Settings page where it
-does not (`ms-settings:network`, `ms-settings:bluetooth`, `ms-settings:sound`;
-on macOS the `x-apple.systempreferences:` URLs). The APIs below are from memory
-and are checked when M9 and M10 start ([16](16-open-questions.md)):
+does not (`ms-settings:network`, `ms-settings:bluetooth`; on macOS the
+`x-apple.systempreferences:` URLs). The APIs below are from memory and are
+checked when M9 and M10 start ([16](16-open-questions.md)):
 
-| Menu      | Windows                                                                                                                           | macOS                                                                      |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Wi-Fi     | Native Wifi (`WlanScan`, `WlanGetAvailableNetworkList`, `WlanConnect`)                                                            | CoreWLAN; SSIDs need Location Services                                     |
-| Bluetooth | WinRT `Windows.Devices.Enumeration` pairing; connecting a paired device has no public API                                         | `IOBluetooth`                                                              |
-| Audio     | WASAPI devices and per-app sessions (`IAudioSessionManager2`); setting the default device has no public API, so it opens Settings | CoreAudio devices and the default device; per-app volume has no public API |
+| Menu      | Windows                                                                                                                                                  | macOS                                                                      |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Wi-Fi     | Native Wifi (`WlanScan`, `WlanGetAvailableNetworkList`, `WlanConnect`)                                                                                   | CoreWLAN; SSIDs need Location Services                                     |
+| Bluetooth | WinRT `Windows.Devices.Enumeration` pairing; connecting a paired device has no public API                                                                | `IOBluetooth`                                                              |
+| Audio     | WASAPI devices and per-app sessions (`IAudioSessionManager2`), through crcbl's mixer; the default device is set through the undocumented `IPolicyConfig` | CoreAudio devices and the default device; per-app volume has no public API |

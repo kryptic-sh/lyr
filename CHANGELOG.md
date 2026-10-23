@@ -40,8 +40,10 @@ and this project adheres to
   without a wireless interface.
 - On Windows the audio menu lists the playing and recording programs and the
   output and input devices, each with mute, a volume slider and steps; a
-  device's Default button opens Sound settings. A right click on the volume or
-  mic module, or `lyr panel audio`, opens it.
+  device's Default button makes it the default. A right click on the volume or
+  mic module, or `lyr panel audio`, opens it. Windows' volume, mic and audio
+  menu read through crcbl's mixer (`crcbl-mixer`), as Linux's do, and hide while
+  the audio service is away, coming back when it restarts.
 - On Linux the volume and mic modules show the default output and input through
   crcbl's mixer (`crcbl-mixer`), which speaks PipeWire's own protocol, or
   PulseAudio's where PipeWire is not running, so nothing beside the sound server
