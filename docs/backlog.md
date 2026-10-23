@@ -880,7 +880,7 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   menu's click opens Settings; the read-and-watch test returns early here for
   the same reason. Not seen either: whether `WlanSetInterface`'s software radio
   switch needs elevation. The Bluetooth menu is native on Windows too
-  (2026-10-22), with what Windows lets a program do
+  (2026-10-23), with what Windows lets a program do
   (`lyr_core::bluetooth_menu::Abilities::WINDOWS`, the owner's choice): Power
   (`Radio::RequestAccessAsync`, then `SetStateAsync`), Scan (a `DeviceWatcher`
   on each kind of unpaired device while it is on, `bluetooth::windows::Scan`),
