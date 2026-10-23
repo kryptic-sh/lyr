@@ -6,7 +6,7 @@
 //! WinRT's adapter, radio and paired devices, shaped by [`win32`].
 
 use lyr_core::bluetooth::{Device as Shown, Reading, State};
-pub use lyr_core::bluetooth_menu::{Adapter, Device, DeviceAction, Switch};
+pub use lyr_core::bluetooth_menu::{Abilities, Adapter, Device, DeviceAction, Switch};
 
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -78,7 +78,7 @@ impl Tracker {
 mod tests {
     use lyr_core::bluetooth::State;
 
-    use super::{Adapter, Device, Tracker};
+    use super::{Abilities, Adapter, Device, Tracker};
 
     fn adapter(powered: bool) -> Adapter {
         Adapter {
@@ -88,6 +88,7 @@ mod tests {
             pairable: false,
             discovering: false,
             power_state: None,
+            abilities: Abilities::BLUEZ,
         }
     }
 
@@ -130,6 +131,7 @@ mod tests {
             pairable: false,
             discovering: false,
             power_state: Some("off-blocked".to_owned()),
+            abilities: Abilities::BLUEZ,
         };
         assert_eq!(state(blocked, &[]), Some(State::Disabled));
     }

@@ -2,7 +2,7 @@
 //! ([`Adapter`], [`Device`]) so [`super::Tracker`] gives the reading on every
 //! platform's tests; [`super::windows`] reads it through WinRT.
 
-use super::{Adapter, Device};
+use super::{Abilities, Adapter, Device};
 
 /// `Windows.Devices.Radios.RadioState`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -28,6 +28,7 @@ pub fn adapter(address: u64, radio: Option<Radio>) -> Adapter {
         pairable: false,
         discovering: false,
         power_state: (radio == Some(Radio::Disabled)).then(|| "off-blocked".to_owned()),
+        abilities: Abilities::WINDOWS,
     }
 }
 
@@ -87,7 +88,7 @@ pub fn devices(endpoints: &[Endpoint]) -> Vec<Device> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Endpoint, Radio, adapter, devices, format_address};
+    use super::{Abilities, Endpoint, Radio, adapter, devices, format_address};
 
     #[test]
     fn an_address_is_six_bytes_most_significant_first() {
@@ -106,6 +107,7 @@ mod tests {
         assert!(on.powered);
         assert_eq!(on.power_state, None);
         assert_eq!(on.path, "00:00:00:00:00:01");
+        assert_eq!(on.abilities, Abilities::WINDOWS);
         let off = adapter(1, Some(Radio::Off));
         assert!(!off.powered);
         assert_eq!(off.power_state, None);

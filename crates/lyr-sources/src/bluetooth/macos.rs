@@ -27,7 +27,7 @@ use objc2_io_bluetooth::{
     IOBluetoothHostControllerPoweredOnNotification, IOBluetoothUserNotification,
 };
 
-use super::{Adapter, Device, Snapshot, Tracker};
+use super::{Abilities, Adapter, Device, Snapshot, Tracker};
 
 /// The adapter's path, which nothing else names on macOS.
 const DEFAULT_ADAPTER: &str = "default";
@@ -52,6 +52,8 @@ fn adapter() -> Option<Adapter> {
         pairable: false,
         discovering: false,
         power_state: None,
+        // macOS shows the module only; the menu is not drawn.
+        abilities: Abilities::BLUEZ,
     })
 }
 

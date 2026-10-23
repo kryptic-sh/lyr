@@ -369,7 +369,8 @@ impl App {
                 };
                 BluetoothRequest::Device(device.path.clone(), action)
             }
-            Target::Rename(_) => return,
+            // BlueZ's menu draws no Settings button.
+            Target::Rename(_) | Target::Settings => return,
             Target::Forget(index) => {
                 let Some(device) = devices.get(index) else {
                     return;
