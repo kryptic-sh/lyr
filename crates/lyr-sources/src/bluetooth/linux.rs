@@ -18,7 +18,7 @@ use zbus::{Connection, MatchRule, MessageStream, ObjectPath, OwnedVariant};
 
 use crate::bus::Follow;
 
-use super::{Adapter, Device, DeviceAction, Snapshot, Switch, Tracker};
+use super::{Abilities, Adapter, Device, DeviceAction, Snapshot, Switch, Tracker};
 
 /// BlueZ's service name.
 const SERVICE: &str = "org.bluez";
@@ -272,6 +272,7 @@ fn parse(objects: &ManagedObjects) -> (Option<Adapter>, Vec<Device>) {
                 pairable: flag(ADAPTER, "Pairable").unwrap_or(false),
                 discovering: flag(ADAPTER, "Discovering").unwrap_or(false),
                 power_state: text(ADAPTER, "PowerState"),
+                abilities: Abilities::BLUEZ,
             });
         }
         if property(DEVICE, "Address").is_some() {

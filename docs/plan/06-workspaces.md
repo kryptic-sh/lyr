@@ -148,11 +148,12 @@ the **undocumented** `IVirtualDesktopManagerInternal` /
 Windows builds (every tool that switches desktops, such as
 VirtualDesktopAccessor, ships a per-build IID table).
 
-Provisional default ([16](16-open-questions.md)): implement it with a per-build
-IID table, refuse to load on an unknown build with a logged error naming that
-build, and leave the module out rather than guess. Tiling window managers
-(komorebi, GlazeWM) have stable IPC and are a better target if the owner uses
-one. The dotfiles have no config for either.
+Decided ([16](16-open-questions.md) question 9, the owner, 2026-10-22): the
+workspaces module is left out on Windows. A per-build IID table could not be
+checked on the development machine's Insider build, and a wrong IID fails by
+calling through the wrong vtable. Tiling window managers (komorebi, GlazeWM)
+have stable IPC and are the way back in if the owner uses one. The dotfiles have
+no config for either.
 
 ## macOS — Spaces
 

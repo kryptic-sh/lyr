@@ -30,8 +30,11 @@ and this project adheres to
   well as at spaces, and at every kind of line break.
 - On Windows the notifications module shows a bell, and either click opens
   Windows' notification centre.
-- On Windows the Wi-Fi and Bluetooth menus open the matching Settings page, from
-  their bindings and from `lyr panel`.
+- On Windows the Bluetooth menu switches the radio, scans, pairs (asking for a
+  confirmation or PIN in the menu) and forgets devices; a paired device's
+  Settings button opens Settings, where Windows connects it. Without an adapter
+  the menu opens Settings' Bluetooth page, and the Wi-Fi menu its network page
+  without a wireless interface.
 - On Windows the audio menu lists the playing and recording programs and the
   output and input devices, each with mute, a volume slider and steps; a
   device's Default button opens Sound settings. A right click on the volume or
@@ -53,11 +56,18 @@ and this project adheres to
   volume module's Bluetooth format.
 - On Windows the power-profile module shows Windows' power mode (Best power
   efficiency, Balanced, Best performance and the rest), updated when it changes;
-  switching it from the bar is not built there yet.
+  a click opens Settings' Power page, where Windows switches it.
 - On Windows the network module shows the interface with the default route, its
   address and, on Wi-Fi, the network's name and signal, updated as they change;
   with no link and every Wi-Fi radio switched off, it shows Wi-Fi as off rather
   than disconnected.
+- On Windows the Wi-Fi menu is native: it lists the networks Native Wifi sees,
+  scans, switches the radio, joins (writing a profile for a new network, or a
+  new password for a saved one), leaves and forgets networks. A machine without
+  a wireless interface or the WLAN service opens Settings instead.
+- On Windows the bluetooth module shows the adapter's state and the device that
+  connected last, from WinRT, updated as the radio switches and devices connect,
+  disconnect, pair or unpair.
 - On Windows the battery module shows the battery, from Windows' power status,
   updated when the power source or the charge changes.
 - On macOS the battery module shows the internal battery, from IOKit's power

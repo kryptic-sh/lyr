@@ -15,6 +15,10 @@ pub enum Page {
     /// default device has no public API; macOS sets it through CoreAudio.
     #[cfg(any(windows, test))]
     Sound,
+    /// The power-profile module's clicks on Windows, where switching the
+    /// power mode has no public API (`docs/backlog.md`).
+    #[cfg(any(windows, test))]
+    Power,
 }
 
 impl Page {
@@ -25,6 +29,8 @@ impl Page {
             Self::Bluetooth => "ms-settings:bluetooth",
             #[cfg(any(windows, test))]
             Self::Sound => "ms-settings:sound",
+            #[cfg(any(windows, test))]
+            Self::Power => "ms-settings:powersleep",
         }
     }
 
@@ -38,6 +44,8 @@ impl Page {
             Self::Bluetooth => "x-apple.systempreferences:com.apple.BluetoothSettings",
             #[cfg(any(windows, test))]
             Self::Sound => "x-apple.systempreferences:com.apple.Sound-Settings.extension",
+            #[cfg(any(windows, test))]
+            Self::Power => "x-apple.systempreferences:com.apple.Battery-Settings.extension",
         }
     }
 
@@ -86,6 +94,10 @@ mod tests {
         assert_eq!(
             command(Page::Sound).as_deref(),
             Some(r#"start "" ms-settings:sound"#)
+        );
+        assert_eq!(
+            command(Page::Power).as_deref(),
+            Some(r#"start "" ms-settings:powersleep"#)
         );
     }
 

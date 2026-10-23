@@ -6,6 +6,8 @@ use std::net::Ipv4Addr;
 
 use lyr_core::network::Link;
 
+pub mod wifi;
+
 /// An adapter's facts from `GetAdaptersAddresses`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Adapter {

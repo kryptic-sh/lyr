@@ -947,6 +947,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "windows",
+ "windows-collections",
  "windows-core",
  "windows-sys",
  "zbus",

@@ -23,6 +23,47 @@ pub struct Adapter {
     /// `PowerState`, which BlueZ marks experimental and may not send;
     /// `off-blocked` is an rfkill block.
     pub power_state: Option<String>,
+    /// What the platform's Bluetooth stack lets the menu do with it.
+    pub abilities: Abilities,
+}
+
+/// What a platform's Bluetooth stack lets the menu do: the switches and
+/// device buttons it draws.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Abilities {
+    /// The Discoverable and Pairable switches.
+    pub visibility: bool,
+    /// Connecting and disconnecting a paired device.
+    pub connect: bool,
+    pub trust: bool,
+    pub rename: bool,
+    /// Forgetting a device a scan found, before it pairs.
+    pub forget_unpaired: bool,
+    /// A paired device's Settings button, where the platform connects it.
+    pub settings: bool,
+}
+
+impl Abilities {
+    /// BlueZ does everything the menu asks.
+    pub const BLUEZ: Self = Self {
+        visibility: true,
+        connect: true,
+        trust: true,
+        rename: true,
+        forget_unpaired: true,
+        settings: false,
+    };
+
+    /// Windows lets a program switch the radio, scan, pair and unpair;
+    /// connecting a paired device is Settings' (`docs/plan/10-popups-and-menus.md`).
+    pub const WINDOWS: Self = Self {
+        visibility: false,
+        connect: false,
+        trust: false,
+        rename: false,
+        forget_unpaired: false,
+        settings: true,
+    };
 }
 
 /// A device's properties the module uses (`org.bluez.Device1`, and
@@ -157,6 +198,8 @@ pub enum Target {
     Rename(usize),
     /// A device's Forget button.
     Forget(usize),
+    /// A paired device's Settings button, where the platform connects it.
+    Settings,
 }
 
 /// The devices in the order the menu lists them: paired first, then those a
@@ -174,6 +217,7 @@ enum Button {
     Action(DeviceAction),
     Rename,
     Forget,
+    Settings,
 }
 
 impl Button {
@@ -183,31 +227,42 @@ impl Button {
             Self::Action(action) => Target::Device(index, action),
             Self::Rename => Target::Rename(index),
             Self::Forget => Target::Forget(index),
+            Self::Settings => Target::Settings,
         }
     }
 }
 
-/// A device's buttons, left to right: connect or disconnect, pair while it
-/// is not paired, trust or untrust, Rename once it is paired, as bluetui
-/// does, then Forget.
-fn buttons(device: &Device) -> Vec<(&'static str, Button)> {
-    let mut buttons = vec![if device.connected {
-        ("Disconnect", Button::Action(DeviceAction::Disconnect))
-    } else {
-        ("Connect", Button::Action(DeviceAction::Connect))
-    }];
+/// A device's buttons, left to right, those `abilities` allow: connect or
+/// disconnect, pair while it is not paired, trust or untrust, Rename once
+/// it is paired, as bluetui does, Settings once it is paired, then Forget.
+fn buttons(device: &Device, abilities: Abilities) -> Vec<(&'static str, Button)> {
+    let mut buttons = Vec::new();
+    if abilities.connect {
+        buttons.push(if device.connected {
+            ("Disconnect", Button::Action(DeviceAction::Disconnect))
+        } else {
+            ("Connect", Button::Action(DeviceAction::Connect))
+        });
+    }
     if !device.paired {
         buttons.push(("Pair", Button::Action(DeviceAction::Pair)));
     }
-    buttons.push(if device.trusted {
-        ("Untrust", Button::Action(DeviceAction::Untrust))
-    } else {
-        ("Trust", Button::Action(DeviceAction::Trust))
-    });
-    if device.paired {
+    if abilities.trust {
+        buttons.push(if device.trusted {
+            ("Untrust", Button::Action(DeviceAction::Untrust))
+        } else {
+            ("Trust", Button::Action(DeviceAction::Trust))
+        });
+    }
+    if device.paired && abilities.rename {
         buttons.push(("Rename", Button::Rename));
     }
-    buttons.push(("Forget", Button::Forget));
+    if device.paired && abilities.settings {
+        buttons.push(("Settings", Button::Settings));
+    }
+    if device.paired || abilities.forget_unpaired {
+        buttons.push(("Forget", Button::Forget));
+    }
     buttons
 }
 
@@ -226,20 +281,21 @@ pub fn draw(
 ) -> (DrawList, Size, Regions<Target>) {
     let across = menu::BUTTON_PADDING.0;
     let row = menu::row(line_height);
-    let switches = [
-        ("Power", Target::Switch(Switch::Powered), adapter.powered),
-        (
+    let abilities = adapter.abilities;
+    let mut switches = vec![("Power", Target::Switch(Switch::Powered), adapter.powered)];
+    if abilities.visibility {
+        switches.push((
             "Discoverable",
             Target::Switch(Switch::Discoverable),
             adapter.discoverable,
-        ),
-        (
+        ));
+        switches.push((
             "Pairable",
             Target::Switch(Switch::Pairable),
             adapter.pairable,
-        ),
-        ("Scan", Target::Scan, adapter.discovering),
-    ];
+        ));
+    }
+    switches.push(("Scan", Target::Scan, adapter.discovering));
     let ordered = order(devices);
     let name = |device: &Device| match device.battery {
         Some(battery) => format!("{} {battery}%", device.alias),
@@ -254,7 +310,7 @@ pub fn draw(
     let buttons_width = ordered
         .iter()
         .map(|device| {
-            buttons(device)
+            buttons(device, abilities)
                 .iter()
                 .map(|(label, _)| button_width(label) + GAP)
                 .sum::<f32>()
@@ -335,7 +391,7 @@ pub fn draw(
         };
         items.push(text(name(device), PADDING, y, colour));
         let mut x = PADDING + label_width + GAP;
-        for (label, button) in buttons(device) {
+        for (label, button) in buttons(device, abilities) {
             let rect = Rect {
                 x,
                 y,

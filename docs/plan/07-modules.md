@@ -78,9 +78,10 @@ itself; that is not an error.
   `performance` / `balanced` / `power-saver`.
 - Windows: the power-mode slider.
   `PowerRegisterForEffectivePowerModeNotifications` is documented and read-only.
-  **Setting** the mode needs the undocumented `PowerSetActiveOverlayScheme`.
-  Provisional default: read through the documented call and set through the
-  undocumented one, and say so in the tooltip if setting fails.
+  **Setting** the mode has only the undocumented `PowerSetActiveOverlayScheme`,
+  so lyr does not set it: a click opens Settings' Power page
+  (`ms-settings:powersleep`), where Windows does (the owner's choice,
+  [16](16-open-questions.md) question 13).
 - macOS: Low Power Mode. It is readable (`NSProcessInfo.isLowPowerModeEnabled`
   and its change notification), but setting it needs `pmset` as root. Read-only
   on macOS. A click shows a tooltip saying so.

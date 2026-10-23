@@ -1,7 +1,8 @@
 use lyr_config::{Platform, Theme, from_sources};
 
 use super::{
-    Adapter, Ask, Device, DeviceAction, GAP, Header, PADDING, Question, Switch, Target, draw, order,
+    Abilities, Adapter, Ask, Device, DeviceAction, GAP, Header, PADDING, Question, Switch, Target,
+    draw, order,
 };
 use crate::draw::Item;
 
@@ -28,6 +29,7 @@ fn adapter() -> Adapter {
         pairable: true,
         discovering: false,
         power_state: None,
+        abilities: Abilities::BLUEZ,
     }
 }
 
@@ -102,6 +104,51 @@ fn each_device_has_the_buttons_its_state_calls_for() {
     assert_eq!(
         regions.hit(x, second + 1.0),
         Some(&Target::Device(1, DeviceAction::Connect))
+    );
+}
+
+#[test]
+fn windows_draws_only_what_it_can_do() {
+    let theme = theme();
+    let windows = Adapter {
+        abilities: Abilities::WINDOWS,
+        ..adapter()
+    };
+    let devices = [
+        device("Buds", true, true, true),
+        device("Phone", false, false, false),
+    ];
+    let (list, _, regions) = draw(&windows, &devices, None, None, &measure, LINE, &theme);
+    // Power and Scan only, then the devices after a gap.
+    let first = PADDING + 2.0 * (ROW + GAP) + GAP;
+    let second = first + ROW + GAP;
+    let names = ["Buds", "Phone"];
+    assert_eq!(
+        buttons_at(&list.items, first + 2.0, &names),
+        ["Settings", "Forget"],
+        "a paired device connects in Settings"
+    );
+    assert_eq!(
+        buttons_at(&list.items, second + 2.0, &names),
+        ["Pair"],
+        "a found device can only pair"
+    );
+    let labels: Vec<&str> = list
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            crate::draw::Item::Text { text, .. } => Some(text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert!(labels.contains(&"Power") && labels.contains(&"Scan"));
+    assert!(!labels.contains(&"Discoverable") && !labels.contains(&"Pairable"));
+    // Buttons start after the widest name ("Phone", 50 px).
+    let x = PADDING + 50.0 + GAP + 1.0;
+    assert_eq!(regions.hit(x, first + 1.0), Some(&Target::Settings));
+    assert_eq!(
+        regions.hit(x, second + 1.0),
+        Some(&Target::Device(1, DeviceAction::Pair))
     );
 }
 
