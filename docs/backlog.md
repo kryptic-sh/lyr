@@ -844,25 +844,25 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   sets it at every move until the button is let go (`MenuPanel::with_drags`),
   dragged on the real machine from a quarter to three quarters of steam's slider
   for 75 %. A right click on the mic module opened it on Input devices, listing
-  this machine's two microphones with the default in the active colour. Not
-  built: plan 10's 150 % (with a Linux source), wiremix's card configuration
-  tab, and routing a stream to another device (no public API on Windows). The
-  Bluetooth source is built (`lyr_sources::bluetooth::windows`, 2026-10-22):
-  WinRT's default adapter and its radio's state (`Windows.Devices.Radios`;
-  disabled reads as BlueZ's `off-blocked`), and the paired devices, classic and
-  LE, as association endpoints with `System.Devices.Aep.IsConnected` and
-  `DeviceAddress`, a device paired over both joined by its address
-  (`bluetooth::win32`, tested and mutation-checked on every platform). A
-  `DeviceWatcher` on the adapters and on each kind of paired device, and the
-  radio's `StateChanged`, call for a fresh read, on a thread in COM's
-  multithreaded apartment. The owner chose (2026-10-22) to build it, and the
-  native Wi-Fi menu, although this machine cannot show them working: its
-  Bluetooth adapter is in a PnP error state and WinRT lists no radios (checked
-  2026-10-20), and it is on Ethernet. Run here, the source finds no adapter, so
-  the module stays hidden, and its watchers start; nothing has shown a real
-  adapter or device. Not seen: a radio switched on after start-up when no
-  adapter was there at start (its `StateChanged` is not followed then). The
-  Wi-Fi menu is native on Windows too (2026-10-22):
+  this machine's two microphones with the default in the active colour. Not on
+  Windows, which Linux's menu has: 150 % (Windows' endpoint volume stops at 100
+  %), the cards tab (the source lists no cards, so it never shows), and moving a
+  stream to another device (no public API). The Bluetooth source is built
+  (`lyr_sources::bluetooth::windows`, 2026-10-22): WinRT's default adapter and
+  its radio's state (`Windows.Devices.Radios`; disabled reads as BlueZ's
+  `off-blocked`), and the paired devices, classic and LE, as association
+  endpoints with `System.Devices.Aep.IsConnected` and `DeviceAddress`, a device
+  paired over both joined by its address (`bluetooth::win32`, tested and
+  mutation-checked on every platform). A `DeviceWatcher` on the adapters and on
+  each kind of paired device, and the radio's `StateChanged`, call for a fresh
+  read, on a thread in COM's multithreaded apartment. The owner chose
+  (2026-10-22) to build it, and the native Wi-Fi menu, although this machine
+  cannot show them working: its Bluetooth adapter is in a PnP error state and
+  WinRT lists no radios (checked 2026-10-20), and it is on Ethernet. Run here,
+  the source finds no adapter, so the module stays hidden, and its watchers
+  start; nothing has shown a real adapter or device. Not seen: a radio switched
+  on after start-up when no adapter was there at start (its `StateChanged` is
+  not followed then). The Wi-Fi menu is native on Windows too (2026-10-22):
   `lyr_sources::network::windows::wlan` reads the first wireless interface, its
   radio and `WlanGetAvailableNetworkList`'s networks (one entry per SSID, so an
   SSID in hex stands for its access point's path), and scans, switches the
@@ -1089,16 +1089,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   with the agent on the peer-to-peer connection; the loop in
   `apps/lyr/src/sources.rs` that joins it to the bar is untested glue. Not done:
   the PIN field has never had a real input method behind it; favourites (below);
-  and the Windows and macOS menus. Rename is built: a paired device's Rename
-  button puts a field for its name at the top of the menu (text input `Normal`,
-  the end of a long name in sight), OK or Enter sets `Device1.Alias` (empty
-  gives back the device's own name), and Cancel or Escape drops it; the agent's
-  question takes the top over from it. Tested on the headless shell and against
-  a recording device on a peer-to-peer connection, mutation-checked; not run
-  against a real BlueZ. The menu's reading and its scan are: the
-  `system_services` test reads the owner's laptop's adapter and starts and stops
-  a scan, seen in the adapter's `Discovering` (2026-10-21, mutation-checked).
-  Pairing, connecting and renaming need a device, and it has none paired.
+  and the macOS menu (Windows' is built, with what Windows allows; Windows
+  sources entry). Rename is built: a paired device's Rename button puts a field
+  for its name at the top of the menu (text input `Normal`, the end of a long
+  name in sight), OK or Enter sets `Device1.Alias` (empty gives back the
+  device's own name), and Cancel or Escape drops it; the agent's question takes
+  the top over from it. Tested on the headless shell and against a recording
+  device on a peer-to-peer connection, mutation-checked; not run against a real
+  BlueZ. The menu's reading and its scan are: the `system_services` test reads
+  the owner's laptop's adapter and starts and stops a scan, seen in the
+  adapter's `Discovering` (2026-10-21, mutation-checked). Pairing, connecting
+  and renaming need a device, and it has none paired.
 - **Wi-Fi menu, M7.** Built: the menu's model and drawing
   (`lyr_core::wifi_menu`): an access point's security from its `Flags`,
   `WpaFlags` and `RsnFlags` (`Security::of`; WEP and 802.1X refused with a
