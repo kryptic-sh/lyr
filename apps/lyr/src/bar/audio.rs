@@ -168,13 +168,13 @@ impl App {
     }
 
     /// Linux: carries out a click in the audio menu on a stream or device,
-    /// by its index or name, through `pactl`; steps go by the volume or mic
+    /// by its id or name, through crcbl's mixer; steps go by the volume or mic
     /// module's `scroll_step`, as its flow is. What changed comes back from
     /// the source.
     #[cfg(target_os = "linux")]
     fn audio_act(&self, tab: Tab, id: String, action: Action) {
         use lyr_core::audio_menu::Step;
-        use lyr_sources::audio::pactl::{Flow, Target};
+        use lyr_sources::audio::mixer::{Flow, Target};
         let flow = match tab {
             Tab::Playback | Tab::Output => Flow::Output,
             Tab::Recording | Tab::Input => Flow::Input,

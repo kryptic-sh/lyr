@@ -125,15 +125,15 @@ pub enum BluetoothRequest {
 #[cfg(target_os = "linux")]
 #[derive(Debug)]
 pub enum AudioRequest {
-    ToggleMute(lyr_sources::audio::pactl::Target),
+    ToggleMute(lyr_sources::audio::mixer::Target),
     /// By this many percent.
-    Step(lyr_sources::audio::pactl::Target, i32),
+    Step(lyr_sources::audio::mixer::Target, i32),
     /// To this percent.
-    Set(lyr_sources::audio::pactl::Target, u32),
+    Set(lyr_sources::audio::mixer::Target, u32),
     /// Make the device with this name the flow's default.
-    Default(lyr_sources::audio::pactl::Flow, String),
+    Default(lyr_sources::audio::mixer::Flow, String),
     /// Move the stream with this index to the device with this name.
-    Move(lyr_sources::audio::pactl::Flow, u32, String),
+    Move(lyr_sources::audio::mixer::Flow, u32, String),
     /// Choose an option for a card or device: its profile or its port, as
     /// the kind says, by the card's or device's name and the option's.
     Setting(lyr_core::audio_menu::Kind, String, String),
@@ -294,17 +294,17 @@ impl Commands {
     }
 
     /// Mutes or unmutes `target`.
-    pub fn toggle_mute(&self, target: lyr_sources::audio::pactl::Target) {
+    pub fn toggle_mute(&self, target: lyr_sources::audio::mixer::Target) {
         let _stopped = self.audio.send(AudioRequest::ToggleMute(target));
     }
 
     /// Moves the volume of `target` by `delta` percent.
-    pub fn step_volume(&self, target: lyr_sources::audio::pactl::Target, delta: i32) {
+    pub fn step_volume(&self, target: lyr_sources::audio::mixer::Target, delta: i32) {
         let _stopped = self.audio.send(AudioRequest::Step(target, delta));
     }
 
     /// Sets the volume of `target` to `percent`.
-    pub fn set_volume(&self, target: lyr_sources::audio::pactl::Target, percent: u32) {
+    pub fn set_volume(&self, target: lyr_sources::audio::mixer::Target, percent: u32) {
         let _stopped = self.audio.send(AudioRequest::Set(target, percent));
     }
 
@@ -315,12 +315,12 @@ impl Commands {
     }
 
     /// Moves the stream `index` of `flow` to the device `name`.
-    pub fn move_stream(&self, flow: lyr_sources::audio::pactl::Flow, index: u32, name: String) {
+    pub fn move_stream(&self, flow: lyr_sources::audio::mixer::Flow, index: u32, name: String) {
         let _stopped = self.audio.send(AudioRequest::Move(flow, index, name));
     }
 
     /// Makes the device `name` the default for `flow`.
-    pub fn set_default(&self, flow: lyr_sources::audio::pactl::Flow, name: String) {
+    pub fn set_default(&self, flow: lyr_sources::audio::mixer::Flow, name: String) {
         let _stopped = self.audio.send(AudioRequest::Default(flow, name));
     }
 
@@ -1732,7 +1732,7 @@ mod linux {
     }
 
     /// The default output and input and what the audio menu lists, through
-    /// `pactl`, and what the volume and mic modules and the menu ask.
+    /// crcbl's mixer, and what the volume and mic modules and the menu ask.
     async fn audio(
         sender: mpsc::Sender<Update>,
         mut requests: UnboundedReceiver<AudioRequest>,
@@ -1741,8 +1741,15 @@ mod linux {
         use std::sync::atomic::{AtomicBool, Ordering};
 
         use lyr_core::audio_menu::Nodes;
-        use lyr_sources::audio::pactl;
+        use lyr_sources::audio::mixer::Audio;
 
+        let audio = match Audio::open().await {
+            Ok(audio) => audio,
+            Err(error) => {
+                tracing::warn!("audio: the sound server is not reachable: {error}");
+                return;
+            }
+        };
         let (states, mut changed) = watch::channel(((None, None), Nodes::default()));
         let menu = AtomicBool::new(false);
         let forward = async {
@@ -1769,24 +1776,21 @@ mod linux {
         };
         let act = async {
             while let Some(request) = requests.recv().await {
+                // What changes comes back through the watch.
                 let done = match request {
-                    AudioRequest::ToggleMute(target) => pactl::toggle_mute(&target).await,
-                    AudioRequest::Step(target, delta) => pactl::step(&target, delta).await,
-                    AudioRequest::Set(target, percent) => pactl::set(&target, percent).await,
-                    AudioRequest::Default(flow, name) => pactl::make_default(flow, &name).await,
-                    AudioRequest::Setting(kind, id, option) => {
-                        pactl::choose(kind, &id, &option).await
-                    }
-                    AudioRequest::Move(flow, index, name) => {
-                        pactl::move_stream(flow, index, &name).await
-                    }
+                    AudioRequest::ToggleMute(target) => audio.toggle_mute(&target),
+                    AudioRequest::Step(target, delta) => audio.step(&target, delta),
+                    AudioRequest::Set(target, percent) => audio.set(&target, percent),
+                    AudioRequest::Default(flow, name) => audio.make_default(flow, &name),
+                    AudioRequest::Setting(kind, id, option) => audio.choose(kind, &id, &option),
+                    AudioRequest::Move(flow, index, name) => audio.move_stream(flow, index, &name),
                     AudioRequest::Menu(open) => {
                         menu.store(open, Ordering::Relaxed);
+                        audio.follow_streams(open);
                         if open {
-                            pactl::refresh(&states).await
-                        } else {
-                            Ok(())
+                            audio.refresh(&states);
                         }
+                        Ok(())
                     }
                 };
                 if let Err(error) = done {
@@ -1794,11 +1798,27 @@ mod linux {
                 }
             }
         };
-        let (watched, (), ()) = tokio::join!(pactl::watch(&states, &menu), forward, act);
-        if let Err(error) = watched {
-            tracing::warn!("audio: pactl stopped following the sound server: {error}");
-        }
+        let watch = async {
+            // A sound server that goes away is most often restarting: the
+            // modules hide until it is back.
+            while audio.watch(&states).await.is_err() {
+                tracing::warn!("audio: the sound server went away; reconnecting");
+                let mut delay = AUDIO_RETRY_FIRST;
+                while let Err(error) = audio.reconnect().await {
+                    tracing::debug!("audio: not back yet: {error}");
+                    tokio::time::sleep(delay).await;
+                    delay = (delay * 2).min(AUDIO_RETRY_LONGEST);
+                }
+                tracing::info!("audio: following the sound server again");
+            }
+        };
+        tokio::join!(watch, forward, act);
     }
+
+    /// The first wait before connecting to a sound server that went away
+    /// again, doubled after each try up to [`AUDIO_RETRY_LONGEST`].
+    const AUDIO_RETRY_FIRST: std::time::Duration = std::time::Duration::from_millis(100);
+    const AUDIO_RETRY_LONGEST: std::time::Duration = std::time::Duration::from_secs(5);
 
     async fn battery(sender: mpsc::Sender<Update>, waker: Option<ShellWaker>) {
         let upower = match UPower::system().await {

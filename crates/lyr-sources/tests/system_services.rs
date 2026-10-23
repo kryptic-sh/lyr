@@ -118,11 +118,12 @@ async fn timedate1_reads_the_zone() {
 }
 
 #[tokio::test]
-#[ignore = "reads this machine's sound server through pactl; run with --ignored"]
-async fn pactl_reads_the_defaults_and_the_menu() {
-    let ((sink, source), nodes) = lyr_sources::audio::pactl::read()
+#[ignore = "reads this machine's sound server; run with --ignored"]
+async fn the_mixer_reads_the_defaults_and_the_menu() {
+    let audio = lyr_sources::audio::mixer::Audio::open()
         .await
-        .expect("pactl reads");
+        .expect("the mixer opens");
+    let ((sink, source), nodes) = audio.read();
     eprintln!("sink: {sink:?}\nsource: {source:?}\nmenu: {nodes:?}");
     assert!(sink.is_some(), "a default sink");
     assert!(
@@ -133,26 +134,38 @@ async fn pactl_reads_the_defaults_and_the_menu() {
 
 #[tokio::test]
 #[ignore = "steps this machine's default sink down and back; run with --ignored"]
-async fn pactl_steps_the_default_sink_both_ways() {
-    use lyr_sources::audio::pactl::{Flow, Target, read, set, step};
+async fn the_mixer_steps_the_default_sink_both_ways() {
+    use lyr_sources::audio::mixer::{Audio, Flow, Target};
 
-    let volume = || async {
-        read()
-            .await
-            .expect("pactl reads")
-            .0
-            .0
-            .expect("a default sink")
-            .volume
-    };
+    let audio = Audio::open().await.expect("the mixer opens");
+    let (states, mut changed) = tokio::sync::watch::channel(Default::default());
+    let volume = || audio.read().0.0.expect("a default sink").volume;
     let sink = Target::Default(Flow::Output);
-    let before = volume().await;
-    let down = step(&sink, -5).await;
-    let lowered = volume().await;
-    let up = step(&sink, 5).await;
-    let raised = volume().await;
-    // Back where it was, whatever the steps did.
-    set(&sink, before).await.expect("restored");
+    let steps = async {
+        // A change is the server's, so it shows once the watch hears it.
+        let mut settle = async || {
+            tokio::time::timeout(std::time::Duration::from_secs(2), changed.changed())
+                .await
+                .ok();
+            changed.borrow_and_update();
+        };
+        settle().await;
+        let before = volume();
+        let down = audio.step(&sink, -5);
+        settle().await;
+        let lowered = volume();
+        let up = audio.step(&sink, 5);
+        settle().await;
+        let raised = volume();
+        // Back where it was, whatever the steps did.
+        audio.set(&sink, before).expect("restored");
+        settle().await;
+        (before, lowered, raised, down, up)
+    };
+    let (before, lowered, raised, down, up) = tokio::select! {
+        steps = steps => steps,
+        ended = audio.watch(&states) => panic!("the watch ended under the test: {ended:?}"),
+    };
     eprintln!("{before}% -> {lowered}% -> {raised}%");
     down.expect("a step down");
     up.expect("a step up");
@@ -161,6 +174,7 @@ async fn pactl_steps_the_default_sink_both_ways() {
         "{before}% stepped down to {lowered}%"
     );
     assert!(raised > lowered, "{lowered}% stepped up to {raised}%");
+    assert_eq!(volume(), before, "restored");
 }
 
 #[tokio::test]

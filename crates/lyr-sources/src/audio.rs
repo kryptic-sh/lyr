@@ -4,14 +4,15 @@
 //! Windows' audio endpoints report into the views' sink and source, and
 //! [`coreaudio`] what CoreAudio's devices report, all on every platform's
 //! tests; [`windows`] reads them through WASAPI, `macos` through CoreAudio,
-//! and `pactl` on Linux through PulseAudio's `pactl`.
+//! and `mixer` on Linux through crcbl's mixer, which speaks the sound
+//! server's own protocol.
 
 pub mod coreaudio;
 pub mod level;
 #[cfg(target_os = "macos")]
 pub mod macos;
 #[cfg(target_os = "linux")]
-pub mod pactl;
+pub mod mixer;
 pub mod win32;
 #[cfg(windows)]
 pub mod windows;

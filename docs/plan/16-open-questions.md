@@ -37,7 +37,7 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
 5. **Linux audio API** (draft Q8). **Decided by the owner (2026-10-22):** none
    of the Linux-only options. crcbl gains an audio-control seam for Linux,
    Windows and macOS, and lyr's audio moves onto it
-   ([07](07-modules.md#audio-sources)); until then lyr stays on `pactl`.
+   ([07](07-modules.md#audio-sources)); lyr's Linux audio is on it.
 6. **Theme format** (draft Q10). Default: a `[theme]` TOML table. The
    alternative is crcbl-ui's CSS stylesheet, which would let `style.css` values
    be carried more directly. Icons stay Nerd Font glyphs.
