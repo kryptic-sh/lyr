@@ -332,7 +332,7 @@ fn the_panel_s_keys_go_to_its_dropdown() {
     setup.refresh();
     setup.click(Tab::Playback, Target::Route(0));
     let panel = setup.menu.panel.window();
-    // As Hyprland delivers them: to the panel, under the dropdown's grab.
+    // Keys that reach the panel under the dropdown's grab, not the dropdown.
     setup
         .shell
         .key_press(panel, KeyCode::ArrowDown)

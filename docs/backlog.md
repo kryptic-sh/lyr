@@ -244,10 +244,10 @@ implementation follows meanwhile.
   `display_adapter`, and the scripted resize and read-back as CI jobs.
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
-  `=0.8.1` (moved there 2026-10-21; 0.8.0's `Presenter` drains before a
-  reconfigure, so lyr no longer does; 0.7.0 brought `set_panel`, frame pacing
-  and `font::breaks`; crcbl's `rust-version` is 1.98, and lyr's follows). The
-  bump needed no change in lyr; the bar ran on it on Windows. crcbl 0.4.0
+  `=0.9.0` (moved there 2026-10-23 for `SharedGpu`; the bump needed no change in
+  lyr's code; 0.8.0's `Presenter` drains before a reconfigure, so lyr no longer
+  does; 0.7.0 brought `set_panel`, frame pacing and `font::breaks`; crcbl's
+  `rust-version` is 1.98, and lyr's follows). 0.8.1 ran on Windows. crcbl 0.4.0
   (2026-10-18) brought `crcbl-app`, the window-plus-device crate lyr asked for
   so that it links no engine, audio (cpal, ALSA) or physics; 0.5.0's only
   breaking change is in crcbl-phys. M1 adds `crcbl-app`, `crcbl-hal`, `crcbl-ui`
@@ -346,28 +346,20 @@ implementation follows meanwhile.
   reloads among them); niri, woken by the pointer, showed the current minute.
   Turning the nested sway's output back on hung that sway, which is the
   nesting's, not lyr's. Not seen: the owner's real outputs under hypridle.
-- **Two presenters crash NVIDIA's Wayland driver on teardown: fixed on a branch,
-  waiting on a crcbl release.** office-crcbl found (2026-10-22) that on the
-  NVIDIA MX550 (driver 615.78) under Wayland, a process with two `Presenter`s
-  segfaults in `libnvidia-eglcore` when the second's swapchain is torn down;
-  Intel and lavapipe are fine, and so is one presenter. lyr opens a presenter
-  per surface (each bar, tooltip, panel and toast), so it hits this: on the
-  owner's laptop with `CRCBL_ADAPTER=discrete`, lyr with a bar on each of two
-  outputs in a nested Hyprland died with SIGSEGV (a call through a null pointer)
-  when one output was removed. It does not happen by default here, where the
-  bars draw on the Intel GPU, but would on any machine whose display is on an
-  NVIDIA GPU, at a monitor unplug or a config change that drops a bar. crcbl's
-  answer is one device shared by a process's presenters
-  (`crcbl_app::present::SharedGpu`, on crcbl main since 2026-10-22, not in a
-  release yet). lyr's side is on the branch `crcbl-shared-gpu`: `Surface::open`
-  opens every surface after the first on the first's device, one the shared
-  device cannot present to getting its own, with crcbl patched to that main
-  commit by git rev. Run on the laptop with the bars on the MX550: the unplug
-  that crashed it, five more rounds, a tooltip and the clock panel, then a clean
-  quit; the Intel default draws and survives the unplug too; the workspace's
-  tests and cross-target clippy pass. **To finish:** once a crcbl release
-  carries `SharedGpu`, move the pins to it, drop the branch's `[patch]`, and
-  merge. A report to NVIDIA is still open, the owner's call.
+- **Two presenters crash NVIDIA's Wayland driver on teardown: reported to
+  NVIDIA?** office-crcbl found (2026-10-22) that on the NVIDIA MX550 (driver
+  615.78) under Wayland, a process with two `Presenter`s segfaults in
+  `libnvidia-eglcore` when the second's swapchain is torn down; Intel and
+  lavapipe are fine, and so is one presenter. lyr hit it at a monitor unplug
+  with its bars on the MX550. lyr now opens every surface after the first on the
+  first's device (crcbl 0.9.0's `crcbl_app::present::SharedGpu`, in
+  `lyr_render::surface`), one the shared device cannot present to getting its
+  own. Run on the laptop with the bars on the MX550 on crcbl 0.9.0 (2026-10-23,
+  two outputs in a nested Hyprland, `CRCBL_ADAPTER=discrete`): six rounds of
+  removing and re-adding an output, both bars back each time, then a clean
+  `lyr quit`. Earlier, on the crcbl main commit: a tooltip and the clock panel,
+  and the Intel default surviving the unplug. A report to NVIDIA is still open,
+  the owner's call.
 
 - **crcbl's `set_panel`: adopted.** crcbl 0.7.0's `Shell::set_panel` resizes a
   panel in place, and lyr uses it where it used to recreate one: the toast stack
@@ -865,25 +857,25 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   sets it at every move until the button is let go (`MenuPanel::with_drags`),
   dragged on the real machine from a quarter to three quarters of steam's slider
   for 75 %. A right click on the mic module opened it on Input devices, listing
-  this machine's two microphones with the default in the active colour. Not
-  built: plan 10's 150 % (with a Linux source), wiremix's card configuration
-  tab, and routing a stream to another device (no public API on Windows). The
-  Bluetooth source is built (`lyr_sources::bluetooth::windows`, 2026-10-22):
-  WinRT's default adapter and its radio's state (`Windows.Devices.Radios`;
-  disabled reads as BlueZ's `off-blocked`), and the paired devices, classic and
-  LE, as association endpoints with `System.Devices.Aep.IsConnected` and
-  `DeviceAddress`, a device paired over both joined by its address
-  (`bluetooth::win32`, tested and mutation-checked on every platform). A
-  `DeviceWatcher` on the adapters and on each kind of paired device, and the
-  radio's `StateChanged`, call for a fresh read, on a thread in COM's
-  multithreaded apartment. The owner chose (2026-10-22) to build it, and the
-  native Wi-Fi menu, although this machine cannot show them working: its
-  Bluetooth adapter is in a PnP error state and WinRT lists no radios (checked
-  2026-10-20), and it is on Ethernet. Run here, the source finds no adapter, so
-  the module stays hidden, and its watchers start; nothing has shown a real
-  adapter or device. Not seen: a radio switched on after start-up when no
-  adapter was there at start (its `StateChanged` is not followed then). The
-  Wi-Fi menu is native on Windows too (2026-10-22):
+  this machine's two microphones with the default in the active colour. Not on
+  Windows, which Linux's menu has: 150 % (Windows' endpoint volume stops at 100
+  %), the cards tab (the source lists no cards, so it never shows), and moving a
+  stream to another device (no public API). The Bluetooth source is built
+  (`lyr_sources::bluetooth::windows`, 2026-10-22): WinRT's default adapter and
+  its radio's state (`Windows.Devices.Radios`; disabled reads as BlueZ's
+  `off-blocked`), and the paired devices, classic and LE, as association
+  endpoints with `System.Devices.Aep.IsConnected` and `DeviceAddress`, a device
+  paired over both joined by its address (`bluetooth::win32`, tested and
+  mutation-checked on every platform). A `DeviceWatcher` on the adapters and on
+  each kind of paired device, and the radio's `StateChanged`, call for a fresh
+  read, on a thread in COM's multithreaded apartment. The owner chose
+  (2026-10-22) to build it, and the native Wi-Fi menu, although this machine
+  cannot show them working: its Bluetooth adapter is in a PnP error state and
+  WinRT lists no radios (checked 2026-10-20), and it is on Ethernet. Run here,
+  the source finds no adapter, so the module stays hidden, and its watchers
+  start; nothing has shown a real adapter or device. Not seen: a radio switched
+  on after start-up when no adapter was there at start (its `StateChanged` is
+  not followed then). The Wi-Fi menu is native on Windows too (2026-10-22):
   `lyr_sources::network::windows::wlan` reads the first wireless interface, its
   radio and `WlanGetAvailableNetworkList`'s networks (one entry per SSID, so an
   SSID in hex stands for its access point's path), and scans, switches the
@@ -1110,16 +1102,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   with the agent on the peer-to-peer connection; the loop in
   `apps/lyr/src/sources.rs` that joins it to the bar is untested glue. Not done:
   the PIN field has never had a real input method behind it; favourites (below);
-  and the Windows and macOS menus. Rename is built: a paired device's Rename
-  button puts a field for its name at the top of the menu (text input `Normal`,
-  the end of a long name in sight), OK or Enter sets `Device1.Alias` (empty
-  gives back the device's own name), and Cancel or Escape drops it; the agent's
-  question takes the top over from it. Tested on the headless shell and against
-  a recording device on a peer-to-peer connection, mutation-checked; not run
-  against a real BlueZ. The menu's reading and its scan are: the
-  `system_services` test reads the owner's laptop's adapter and starts and stops
-  a scan, seen in the adapter's `Discovering` (2026-10-21, mutation-checked).
-  Pairing, connecting and renaming need a device, and it has none paired.
+  and the macOS menu (Windows' is built, with what Windows allows; Windows
+  sources entry). Rename is built: a paired device's Rename button puts a field
+  for its name at the top of the menu (text input `Normal`, the end of a long
+  name in sight), OK or Enter sets `Device1.Alias` (empty gives back the
+  device's own name), and Cancel or Escape drops it; the agent's question takes
+  the top over from it. Tested on the headless shell and against a recording
+  device on a peer-to-peer connection, mutation-checked; not run against a real
+  BlueZ. The menu's reading and its scan are: the `system_services` test reads
+  the owner's laptop's adapter and starts and stops a scan, seen in the
+  adapter's `Discovering` (2026-10-21, mutation-checked). Pairing, connecting
+  and renaming need a device, and it has none paired.
 - **Wi-Fi menu, M7.** Built: the menu's model and drawing
   (`lyr_core::wifi_menu`): an access point's security from its `Flags`,
   `WpaFlags` and `RsnFlags` (`Security::of`; WEP and 802.1X refused with a
@@ -1261,7 +1254,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   now dropped (`keys::settled_focus`), and hovering keeps it open there. sway
   hands a click outside to what is under it, not to the panel, so on sway a
   click in a window or on the desktop does not close a panel; Escape and the
-  module's own click do. Not tried on niri.
+  module's own click do. Not tried on niri. A grabbing dropdown opened from a
+  panel (the audio menu's profile list) takes the keyboard from it on Hyprland
+  0.56.2: in a nested run with `WAYLAND_DEBUG=1` (2026-10-23) the panel got
+  `leave` and the popup `enter` right after `xdg_popup.grab`, and `wtype` keys
+  moved the dropdown's selection. The audio menu hands the panel's keys to the
+  dropdown anyway, in case a compositor leaves them there.
+- **A panel that shrinks can show one stretched frame (seen once, not chased).**
+  In the same run, switching the audio menu from Output devices to Configuration
+  narrowed the panel, and a screenshot right after the click showed the new,
+  narrower panel holding the old content squeezed to fit; a second screenshot
+  two seconds later was right. That looks like the compositor scaling the old
+  buffer to the new size until lyr's next frame lands. Not timed, and not tried
+  on sway or niri.
 
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,

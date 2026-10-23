@@ -152,9 +152,10 @@ impl AudioMenu {
         look: &Look<'_>,
     ) -> anyhow::Result<Outcome> {
         if let Some(choice) = &mut self.choice {
-            // A layer panel that takes the keyboard can keep it under its
-            // popup's grab (Hyprland does), so the panel's keys are the
-            // dropdown's while it is open, and Escape closes only it.
+            // The dropdown's grab should move the keyboard to it (Hyprland
+            // 0.56.2 does, seen 2026-10-23), but keys still arriving at the
+            // panel are the dropdown's while it is open, and Escape closes
+            // only it.
             let keys = matches!(event, ShellEvent::Key { .. });
             if keys && keys::pressed(event) == Some(Key::Escape) {
                 if let Some(choice) = self.choice.take() {
