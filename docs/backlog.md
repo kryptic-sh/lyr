@@ -191,17 +191,14 @@ implementation follows meanwhile.
   and otherwise PulseAudio's native protocol; WASAPI on Windows, with
   `IPolicyConfig` to set the default device; CoreAudio on macOS.
 
-  **Where it stands (2026-10-22).** crcbl main has the model, the PipeWire
-  backend and the PulseAudio one (`crcbl-mixer`, unreleased). lyr's branch
-  `crcbl-mixer` puts the Linux volume, mic and audio menu on it
-  (`lyr_sources::audio::mixer`, `pactl` gone), through a git dependency on a
-  crcbl main commit and `deny.toml`'s `allow-git`, both branch-only. It merges
-  once a crcbl release carries `crcbl-mixer` (the owner's go, which office-crcbl
-  has asked for): move the dependency to it and drop `allow-git`. Then Windows
-  and macOS move from `lyr_sources::audio::windows` and `macos` onto it as crcbl
-  builds them. When the sound server goes away the modules hide and lyr
-  reconnects, retrying on a doubling wait (`AUDIO_RETRY_FIRST` to
-  `AUDIO_RETRY_LONGEST` in `apps/lyr/src/sources.rs`).
+  **Where it stands (2026-10-23).** Linux is on it: the volume, mic and audio
+  menu use `crcbl-mixer` 0.9.0 (`lyr_sources::audio::mixer`), and `pactl` is
+  gone. crcbl 0.9.0 also has the Windows backend over WASAPI, not used by lyr
+  yet: moving `lyr_sources::audio::windows` onto it is the next step, for a
+  session on the Windows machine; macOS follows when crcbl builds CoreAudio.
+  When the sound server goes away the modules hide and lyr reconnects, retrying
+  on a doubling wait (`AUDIO_RETRY_FIRST` to `AUDIO_RETRY_LONGEST` in
+  `apps/lyr/src/sources.rs`).
 
   Verified on this laptop (PipeWire 1.6.9) against `pactl`: every device's
   volume, mute, default and active port (after crcbl's fix for HDMI2/3 and the
