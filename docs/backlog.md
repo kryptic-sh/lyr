@@ -1241,7 +1241,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   now dropped (`keys::settled_focus`), and hovering keeps it open there. sway
   hands a click outside to what is under it, not to the panel, so on sway a
   click in a window or on the desktop does not close a panel; Escape and the
-  module's own click do. Not tried on niri.
+  module's own click do. Not tried on niri. A grabbing dropdown opened from a
+  panel (the audio menu's profile list) takes the keyboard from it on Hyprland
+  0.56.2: in a nested run with `WAYLAND_DEBUG=1` (2026-10-23) the panel got
+  `leave` and the popup `enter` right after `xdg_popup.grab`, and `wtype` keys
+  moved the dropdown's selection. The audio menu hands the panel's keys to the
+  dropdown anyway, in case a compositor leaves them there.
+- **A panel that shrinks can show one stretched frame (seen once, not chased).**
+  In the same run, switching the audio menu from Output devices to Configuration
+  narrowed the panel, and a screenshot right after the click showed the new,
+  narrower panel holding the old content squeezed to fit; a second screenshot
+  two seconds later was right. That looks like the compositor scaling the old
+  buffer to the new size until lyr's next frame lands. Not timed, and not tried
+  on sway or niri.
 
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,
