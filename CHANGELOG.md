@@ -22,6 +22,9 @@ and this project adheres to
 - Each bar, menu, panel and toast presents only when the window system asks for
   its next frame (crcbl 0.7.0's frame gate), so an output the compositor has
   turned off cannot block the bar.
+- Every bar, menu, panel and toast draws on one GPU device (crcbl 0.9.0's
+  `SharedGpu`) instead of a device each, so removing a monitor no longer crashes
+  NVIDIA's Wayland driver.
 - The toast stack, the menus and, on a reload that changes `[bar]`, the bars
   change size and place in place (crcbl 0.7.0's `set_panel`) instead of closing
   and reopening their windows.

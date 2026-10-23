@@ -35,14 +35,3 @@ lyr-sources = { path = "crates/lyr-sources", version = "0.1.0" }
 lto = "thin"
 codegen-units = 1
 strip = true
-
-[patch.crates-io]
-# crcbl main's shared device (`SharedGpu`), until a crcbl release has it.
-crcbl-shell = { git = "https://github.com/kryptic-sh/crcbl", rev = "4ded3c3d86942b3d9f16c088f5ceb443a14380ef" }
-crcbl-ui = { git = "https://github.com/kryptic-sh/crcbl", rev = "4ded3c3d86942b3d9f16c088f5ceb443a14380ef" }
-crcbl-app = { git = "https://github.com/kryptic-sh/crcbl", rev = "4ded3c3d86942b3d9f16c088f5ceb443a14380ef" }
-crcbl-font = { git = "https://github.com/kryptic-sh/crcbl", rev = "4ded3c3d86942b3d9f16c088f5ceb443a14380ef" }
-crcbl-frame = { git = "https://github.com/kryptic-sh/crcbl", rev = "4ded3c3d86942b3d9f16c088f5ceb443a14380ef" }
-crcbl-hal = { git = "https://github.com/kryptic-sh/crcbl", rev = "4ded3c3d86942b3d9f16c088f5ceb443a14380ef" }
-crcbl-core = { git = "https://github.com/kryptic-sh/crcbl", rev = "4ded3c3d86942b3d9f16c088f5ceb443a14380ef" }
-crcbl-vk = { git = "https://github.com/kryptic-sh/crcbl", rev = "4ded3c3d86942b3d9f16c088f5ceb443a14380ef" }

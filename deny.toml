@@ -34,6 +34,3 @@ highlight = "all"
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-# This branch only: crcbl patched to a main commit until a release has
-# SharedGpu (Cargo.toml's [patch]); both go when it merges.
-allow-git = ["https://github.com/kryptic-sh/crcbl"]
