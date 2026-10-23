@@ -343,7 +343,7 @@ impl App {
     }
 
     /// Carries out a click in the Bluetooth menu.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     fn bluetooth_act(&mut self, target: lyr_core::bluetooth_menu::Target) {
         use lyr_core::bluetooth_menu::{Switch, Target, order};
 
@@ -369,8 +369,14 @@ impl App {
                 };
                 BluetoothRequest::Device(device.path.clone(), action)
             }
-            // BlueZ's menu draws no Settings button.
-            Target::Rename(_) | Target::Settings => return,
+            Target::Rename(_) => return,
+            // Where Windows connects a paired device; BlueZ's menu draws no
+            // Settings button.
+            Target::Settings => {
+                #[cfg(windows)]
+                crate::settings::open(crate::settings::Page::Bluetooth);
+                return;
+            }
             Target::Forget(index) => {
                 let Some(device) = devices.get(index) else {
                     return;
@@ -382,7 +388,7 @@ impl App {
     }
 
     /// Answers the pairing agent's question.
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     fn bluetooth_answer(&mut self, reply: lyr_core::bluetooth_menu::Reply) {
         if let Some((id, _, _)) = self.data.bluetooth_ask.take() {
             self.commands
@@ -398,16 +404,17 @@ impl App {
             .bluetooth(crate::sources::BluetoothRequest::Rename(device, name));
     }
 
-    /// Windows and macOS: the menu has no adapter to open on yet.
-    #[cfg(not(target_os = "linux"))]
+    /// macOS: the menu has no adapter to open on.
+    #[cfg(target_os = "macos")]
     fn bluetooth_act(&mut self, _target: lyr_core::bluetooth_menu::Target) {}
 
-    /// Windows and macOS: there is no device to rename.
+    /// Windows and macOS: there is no device to rename (Windows draws no
+    /// Rename button).
     #[cfg(not(target_os = "linux"))]
     fn bluetooth_rename(&self, _device: String, _name: String) {}
 
-    /// Windows and macOS: there is no pairing agent to answer.
-    #[cfg(not(target_os = "linux"))]
+    /// macOS: there is no pairing agent to answer.
+    #[cfg(target_os = "macos")]
     fn bluetooth_answer(&mut self, _reply: lyr_core::bluetooth_menu::Reply) {}
 
     /// Applies `event`, which is for the clock panel's window.

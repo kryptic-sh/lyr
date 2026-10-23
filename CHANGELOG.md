@@ -30,8 +30,11 @@ and this project adheres to
   well as at spaces, and at every kind of line break.
 - On Windows the notifications module shows a bell, and either click opens
   Windows' notification centre.
-- On Windows the Wi-Fi and Bluetooth menus open the matching Settings page, from
-  their bindings and from `lyr panel`.
+- On Windows the Bluetooth menu switches the radio, scans, pairs (asking for a
+  confirmation or PIN in the menu) and forgets devices; a paired device's
+  Settings button opens Settings, where Windows connects it. Without an adapter
+  the menu opens Settings' Bluetooth page, and the Wi-Fi menu its network page
+  without a wireless interface.
 - On Windows the audio menu lists the playing and recording programs and the
   output and input devices, each with mute, a volume slider and steps; a
   device's Default button opens Sound settings. A right click on the volume or
