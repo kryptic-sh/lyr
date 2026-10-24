@@ -3,30 +3,36 @@
 
 use crcbl_ui::DrawList;
 use crcbl_ui::draw_list::{Border, CornerRadii};
+use crcbl_ui::image::AtlasImage;
 use glam::Vec2;
-use lyr_core::draw::{DrawList as Bar, Item};
+use lyr_core::draw::{DrawList as Bar, Item, Picture};
 
 use crate::colour::linear;
 use crate::text::Text;
 
+/// Where a picture sits on the window's image atlas at a size in device
+/// pixels, or `None` when it cannot be placed there.
+pub type Place<'a> = dyn FnMut(&Picture, u32, u32) -> Option<AtlasImage> + 'a;
+
 /// `bar` as crcbl-ui draw commands for a window at `scale` window pixels
-/// per logical pixel, its text drawn in `text`. A group is one of
-/// crcbl-ui's opacity groups, faded as one layer as CSS `opacity` fades it.
+/// per logical pixel, its text drawn in `text` and its pictures placed by
+/// `place` at the device pixels they cover. A group is one of crcbl-ui's
+/// opacity groups, faded as one layer as CSS `opacity` fades it.
 ///
 /// Everything is recorded at `scale` (`DrawList::set_scale`): positions,
 /// sizes, text and clips alike, so a clip still holds its text on an output
 /// at 1.5.
 #[must_use]
-pub fn translate(bar: &Bar, text: &Text, scale: f32) -> DrawList {
+pub fn translate(bar: &Bar, text: &Text, scale: f32, place: &mut Place<'_>) -> DrawList {
     let mut list = DrawList::new();
     list.set_scale(scale);
     for item in &bar.items {
-        push(&mut list, item, text);
+        push(&mut list, item, text, scale, place);
     }
     list
 }
 
-fn push(list: &mut DrawList, item: &Item, text: &Text) {
+fn push(list: &mut DrawList, item: &Item, text: &Text, scale: f32, place: &mut Place<'_>) {
     match item {
         Item::Box {
             rect,
@@ -58,10 +64,23 @@ fn push(list: &mut DrawList, item: &Item, text: &Text) {
             text.draw(list, *rect, string, *style, linear(*colour));
             list.pop_clip().expect("the clip pushed just above");
         }
+        Item::Image { rect, picture } => {
+            // Resized to the device pixels it covers, so the GPU draws it
+            // texel for pixel rather than filtering a larger picture down.
+            let device = |length: f32| (length * scale).round() as u32;
+            if let Some(image) = place(picture, device(rect.width), device(rect.height)) {
+                list.image(
+                    Vec2::new(rect.x, rect.y),
+                    Vec2::new(rect.x + rect.width, rect.y + rect.height),
+                    &image,
+                    [1.0; 4],
+                );
+            }
+        }
         Item::Group { opacity, items } => {
             list.push_opacity(*opacity);
             for item in items {
-                push(list, item, text);
+                push(list, item, text, scale, place);
             }
             list.pop_opacity().expect("the group pushed just above");
         }
@@ -71,7 +90,7 @@ fn push(list: &mut DrawList, item: &Item, text: &Text) {
                 Vec2::new(rect.x + rect.width, rect.y + rect.height),
             );
             for item in items {
-                push(list, item, text);
+                push(list, item, text, scale, place);
             }
             list.pop_clip().expect("the clip pushed just above");
         }
@@ -110,7 +129,12 @@ mod tests {
                 border: Some((2.0, colour("#000000"))),
             }],
         };
-        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0), 1.0);
+        let list = translate(
+            &bar,
+            &Text::new(Font::sans().clone(), 16.0),
+            1.0,
+            &mut |_, _, _| None,
+        );
         let [
             DrawCommand::RoundedRect {
                 min,
@@ -162,7 +186,12 @@ mod tests {
                 },
             ],
         };
-        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0), 1.0);
+        let list = translate(
+            &bar,
+            &Text::new(Font::sans().clone(), 16.0),
+            1.0,
+            &mut |_, _, _| None,
+        );
         let count = list.commands().len();
         let groups: Vec<(std::ops::Range<usize>, f32)> = list
             .opacity_groups()
@@ -202,7 +231,12 @@ mod tests {
                 },
             ],
         };
-        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0), 1.0);
+        let list = translate(
+            &bar,
+            &Text::new(Font::sans().clone(), 16.0),
+            1.0,
+            &mut |_, _, _| None,
+        );
         let (glyphs, boxes): (Vec<_>, Vec<_>) = list
             .commands()
             .iter()
@@ -233,7 +267,7 @@ mod tests {
         };
         let text = Text::new(Font::sans().clone(), 16.0);
         let at = |scale| {
-            let list = translate(&bar, &text, scale);
+            let list = translate(&bar, &text, scale, &mut |_, _, _| None);
             list.commands()
                 .iter()
                 .zip(list.clips())
@@ -274,7 +308,12 @@ mod tests {
                 }],
             }],
         };
-        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0), 1.0);
+        let list = translate(
+            &bar,
+            &Text::new(Font::sans().clone(), 16.0),
+            1.0,
+            &mut |_, _, _| None,
+        );
         let [clip] = list.clips() else {
             panic!("one command");
         };
@@ -299,7 +338,12 @@ mod tests {
         let bar = Bar {
             items: vec![item(TextStyle::PLAIN), item(bold)],
         };
-        let list = translate(&bar, &Text::new(Font::sans().clone(), 16.0), 1.0);
+        let list = translate(
+            &bar,
+            &Text::new(Font::sans().clone(), 16.0),
+            1.0,
+            &mut |_, _, _| None,
+        );
         let fonts: Vec<_> = list
             .commands()
             .iter()
@@ -310,5 +354,59 @@ mod tests {
             .collect();
         assert_eq!(fonts.len(), 2);
         assert!(!fonts[0].bold && fonts[1].bold, "{fonts:?}");
+    }
+
+    #[test]
+    fn a_picture_is_asked_for_at_the_device_pixels_it_covers() {
+        use crcbl_ui::image::ImageAtlas;
+        use lyr_core::draw::Picture;
+
+        let picture = Picture::new(1, 1, vec![255; 4]).expect("a picture");
+        let bar = Bar {
+            items: vec![Item::Image {
+                rect: Rect {
+                    x: 2.0,
+                    y: 4.0,
+                    width: 18.0,
+                    height: 9.0,
+                },
+                picture: picture.clone(),
+            }],
+        };
+        let mut atlas = ImageAtlas::new();
+        let mut asked = Vec::new();
+        let list = translate(
+            &bar,
+            &Text::new(Font::sans().clone(), 16.0),
+            1.5,
+            &mut |drawn, width, height| {
+                asked.push((drawn.clone(), width, height));
+                atlas
+                    .register(width, height, &vec![255; (width * height * 4) as usize])
+                    .ok()
+            },
+        );
+        assert_eq!(asked, [(picture, 27, 14)], "18 x 9 at 1.5, rounded");
+        let [DrawCommand::Image { min, max, .. }] = list.commands() else {
+            panic!("one image: {:?}", list.commands());
+        };
+        assert_eq!((min.x, min.y, max.x, max.y), (3.0, 6.0, 30.0, 19.5));
+    }
+
+    #[test]
+    fn a_picture_that_cannot_be_placed_draws_nothing() {
+        let bar = Bar {
+            items: vec![Item::Image {
+                rect: RECT,
+                picture: lyr_core::draw::Picture::new(1, 1, vec![0; 4]).expect("a picture"),
+            }],
+        };
+        let list = translate(
+            &bar,
+            &Text::new(Font::sans().clone(), 16.0),
+            1.0,
+            &mut |_, _, _| None,
+        );
+        assert!(list.commands().is_empty());
     }
 }

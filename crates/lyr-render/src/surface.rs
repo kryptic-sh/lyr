@@ -14,6 +14,11 @@ use crcbl_shell::{Shell, ShellError, ShellEvent, WindowId};
 use crcbl_ui::DrawList;
 use crcbl_ui::image::ImageAtlas;
 use crcbl_ui::text::FontAtlas;
+use lyr_core::draw::DrawList as Bar;
+
+use crate::pictures::Pictures;
+use crate::text::Text;
+use crate::translate::translate;
 
 /// What the cleared window is before the bar draws: fully transparent, so
 /// whatever the bar leaves undrawn shows the desktop.
@@ -58,6 +63,8 @@ pub struct Surface {
     /// The built-in bitmap font the UI pass wants; lyr's own text is glyph
     /// runs in its parsed font, so nothing draws from it.
     atlas: FontAtlas,
+    /// The pictures this window's lists draw, on its UI pass's image atlas.
+    pictures: Pictures,
     /// Device pixels per logical pixel.
     scale: f32,
     /// The backend asked for and accepted, or `None` when crcbl's own order
@@ -142,6 +149,7 @@ impl Surface {
             ui,
             pool: TransientPool::new(),
             atlas: FontAtlas::built_in(),
+            pictures: Pictures::default(),
             scale,
             asked,
         })
@@ -180,6 +188,27 @@ impl Surface {
         self.scale = scale;
         self.presenter.resize(size)?;
         Ok(())
+    }
+
+    /// Draws `bar`, lyr's list, as the window's next frame, its text in `text`
+    /// and its pictures on this window's atlas: [`Surface::draw`] after
+    /// [`translate`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Surface::draw`].
+    pub fn draw_bar(
+        &mut self,
+        shell: &mut dyn Shell,
+        bar: &Bar,
+        text: &Text,
+    ) -> Result<bool, Error> {
+        let (ui, pictures) = (&mut self.ui, &mut self.pictures);
+        let list = translate(bar, text, self.scale, &mut |picture, width, height| {
+            pictures.image(ui.images_mut(), picture, width, height)
+        });
+        self.pictures.sweep(self.ui.images_mut());
+        self.draw(shell, &list)
     }
 
     /// Draws `list`, in logical pixels, as the window's next frame, asking

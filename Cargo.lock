@@ -939,6 +939,7 @@ dependencies = [
  "crcbl-font",
  "crcbl-frame",
  "crcbl-hal",
+ "crcbl-image",
  "crcbl-shell",
  "crcbl-ui",
  "glam",
@@ -960,6 +961,7 @@ name = "lyr-sources"
 version = "0.1.0"
 dependencies = [
  "block2",
+ "crcbl-image",
  "crcbl-mixer",
  "futures-util",
  "lyr-core",
@@ -971,6 +973,7 @@ dependencies = [
  "objc2-io-bluetooth",
  "objc2-io-kit",
  "objc2-system-configuration",
+ "tempfile",
  "thiserror",
  "tokio",
  "windows",

@@ -5,6 +5,7 @@
 
 pub mod menu;
 
+use crate::draw::Picture;
 use crate::pointer::Press;
 
 /// Where an item lives when it registers with only its bus name.
@@ -33,6 +34,28 @@ impl Status {
     }
 }
 
+/// One of an item's `IconPixmap` sizes: `width` × `height` pixels of ARGB32
+/// in network byte order, as the specification lays them out.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Pixmap {
+    pub width: i32,
+    pub height: i32,
+    pub data: Vec<u8>,
+}
+
+/// Where an item's icon may come from, in the order to try them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IconSource<'a> {
+    /// A name in the icon theme, or a file's path.
+    Name(&'a str),
+    /// Pixels the item sent, in each size it sent.
+    Pixmaps(&'a [Pixmap]),
+}
+
+/// The icon a tray item draws when none of its own can be found, as waybar
+/// draws it.
+pub const MISSING_ICON: &str = "image-missing";
+
 /// One StatusNotifierItem's properties the tray uses.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Item {
@@ -43,7 +66,9 @@ pub struct Item {
     pub title: String,
     pub status: Status,
     pub icon_name: String,
+    pub icon_pixmap: Vec<Pixmap>,
     pub attention_icon_name: String,
+    pub attention_icon_pixmap: Vec<Pixmap>,
     pub icon_theme_path: String,
     /// The `ToolTip`'s title.
     pub tooltip: String,
@@ -51,6 +76,9 @@ pub struct Item {
     pub menu: Option<String>,
     /// A left click opens its menu rather than activating it.
     pub item_is_menu: bool,
+    /// Its icon as found from [`Item::icon_sources`], once the host has
+    /// looked; `None` draws [`Item::letter`].
+    pub picture: Option<Picture>,
 }
 
 impl Item {
@@ -70,7 +98,32 @@ impl Item {
             .map(String::as_str)
     }
 
-    /// What stands in for its icon until lyr draws images: the first letter
+    /// Where its icon may come from, in waybar's order (`Item::getIconPixbuf`,
+    /// master, read 2026-10-25): while it needs attention, its attention
+    /// icon's name and then pixels; then its icon's name and then pixels.
+    /// Empty names and pixmap lists are left out. waybar's attention movie
+    /// and overlay icon are not read.
+    #[must_use]
+    pub fn icon_sources(&self) -> Vec<IconSource<'_>> {
+        let attention = (self.status == Status::NeedsAttention).then_some([
+            IconSource::Name(&self.attention_icon_name),
+            IconSource::Pixmaps(&self.attention_icon_pixmap),
+        ]);
+        attention
+            .into_iter()
+            .flatten()
+            .chain([
+                IconSource::Name(&self.icon_name),
+                IconSource::Pixmaps(&self.icon_pixmap),
+            ])
+            .filter(|source| match source {
+                IconSource::Name(name) => !name.is_empty(),
+                IconSource::Pixmaps(pixmaps) => !pixmaps.is_empty(),
+            })
+            .collect()
+    }
+
+    /// What stands in for its icon when it has no picture: the first letter
     /// of its title, else of its id, upper-cased.
     #[must_use]
     pub fn letter(&self) -> String {
@@ -81,15 +134,27 @@ impl Item {
     }
 }
 
-/// What the bar draws of `items`: each shown item's letter and status, in
-/// order. A change to anything else, a tooltip or an icon lyr does not draw
-/// yet, leaves it as it was.
+/// What the bar draws of one item.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Face {
+    pub letter: String,
+    pub status: Status,
+    pub picture: Option<Picture>,
+}
+
+/// What the bar draws of `items`: each shown item's face, in order. A
+/// change to anything else, such as a tooltip or an icon's raw pixels that
+/// came to the same picture, leaves it as it was.
 #[must_use]
-pub fn faces(items: &[Item]) -> Vec<(String, Status)> {
+pub fn faces(items: &[Item]) -> Vec<Face> {
     items
         .iter()
         .filter(|item| item.shown())
-        .map(|item| (item.letter(), item.status))
+        .map(|item| Face {
+            letter: item.letter(),
+            status: item.status,
+            picture: item.picture.clone(),
+        })
         .collect()
 }
 

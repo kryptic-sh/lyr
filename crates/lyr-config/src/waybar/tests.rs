@@ -39,7 +39,7 @@ const CONFIG: &str = r#"{
         "tooltip": true,
     },
     "hyprland/workspaces": { "all-outputs": false, "format": "<{}>" },
-    "tray": { "icon-size": 18, "spacing": 10 },
+    "tray": { "icon-size": 24, "spacing": 6 },
     "pulseaudio": { "format": "{volume}%", "scroll-step": 2 },
     "pulseaudio#microphone": {
         "format": "{format_source}",
@@ -86,6 +86,7 @@ fn the_dotfiles_shape_converts_and_loads() {
     assert_eq!((config.battery.warning, config.battery.critical), (25, 5));
     assert!(!config.workspaces.all_outputs);
     assert_eq!(config.workspaces.format, format("<{name}>"));
+    assert_eq!((config.tray.icon_size, config.tray.spacing), (24, 6));
     assert_eq!(config.volume.scroll_step, 2);
     assert_eq!(config.mic.format, format("M {volume}%"));
     assert_eq!(config.mic.format_muted, format("m {volume}%"));
@@ -109,7 +110,6 @@ fn what_lyr_cannot_carry_is_listed() {
     let skipped = imported.skipped.join("\n");
     for expected in [
         "`cpu` has no lyr module",
-        "tray.icon-size",
         "clock.tooltip-format",
         "custom/notification.exec",
         "custom/notification.tooltip",
@@ -128,11 +128,12 @@ fn what_lyr_cannot_carry_is_listed() {
         "waybar's own bar keys are listed"
     );
     assert!(imported.toml.starts_with("# Converted from waybar"));
-    assert!(imported.toml.contains("#   tray.icon-size"));
-    assert!(
-        !skipped.contains("tray.spacing"),
-        "lyr's tray takes waybar's spacing"
-    );
+    for carried in ["tray.spacing", "tray.icon-size"] {
+        assert!(
+            !skipped.contains(carried),
+            "lyr's tray takes waybar's {carried}"
+        );
+    }
 }
 
 #[test]

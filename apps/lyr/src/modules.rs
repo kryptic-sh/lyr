@@ -274,16 +274,19 @@ fn content(
             Some(label(shown.text, theme.mic))
         }
         Module::Tray => {
-            // A letter stands in for each icon until lyr draws images.
+            // Each item's icon, or its letter when none was found.
             let buttons: Vec<draw::Button> = lyr_core::tray::faces(&data.tray)
                 .into_iter()
-                .map(|(text, status)| draw::Button {
-                    text,
-                    colour: if status == lyr_core::tray::Status::NeedsAttention {
+                .map(|face| draw::Button {
+                    text: face.letter,
+                    colour: if face.status == lyr_core::tray::Status::NeedsAttention {
                         theme.workspace_urgent.unwrap_or(theme.foreground)
                     } else {
                         theme.foreground
                     },
+                    picture: face
+                        .picture
+                        .map(|picture| picture.sized(config.tray.icon_size as f32)),
                 })
                 .collect();
             (!buttons.is_empty()).then_some(Content::Buttons {
@@ -325,6 +328,7 @@ fn content(
                     } else {
                         theme.foreground
                     },
+                    picture: None,
                 })
                 .collect();
             Some(Content::Buttons { buttons, gap: 0.0 })

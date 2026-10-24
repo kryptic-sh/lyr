@@ -1,6 +1,6 @@
 use lyr_config::{Colour, Platform, Theme, from_sources};
 
-use super::{Bar, Button, Content, DrawList, Item, Module, Target, TextStyle, build};
+use super::{Bar, Button, Content, DrawList, Item, Module, Picture, Target, TextStyle, build};
 use crate::hit::Rect;
 
 /// Every character is 10 px wide.
@@ -140,14 +140,17 @@ fn buttons_keep_their_gap_apart_and_the_gap_is_the_modules() {
                     Button {
                         text: "a".to_owned(),
                         colour: theme().foreground,
+                        picture: None,
                     },
                     Button {
                         text: "b".to_owned(),
                         colour: theme().foreground,
+                        picture: None,
                     },
                     Button {
                         text: "c".to_owned(),
                         colour: theme().foreground,
+                        picture: None,
                     },
                 ],
                 gap,
@@ -186,10 +189,12 @@ fn a_click_on_a_workspace_button_names_the_button() {
                 Button {
                     text: "1".to_owned(),
                     colour: active,
+                    picture: None,
                 },
                 Button {
                     text: "2".to_owned(),
                     colour: theme().foreground,
+                    picture: None,
                 },
             ],
             gap: 0.0,
@@ -382,4 +387,54 @@ fn an_offset_moves_a_clip_with_what_it_holds() {
             items: vec![boxed(moved)],
         }
     );
+}
+
+#[test]
+fn a_picture_button_is_as_wide_as_its_picture_and_centred() {
+    let picture = Picture::new(2, 1, vec![0; 8]).expect("a picture");
+    let row = [Module {
+        content: Content::Buttons {
+            buttons: vec![Button {
+                text: "W".to_owned(),
+                colour: theme().foreground,
+                picture: Some(picture.clone().sized(18.0)),
+            }],
+            gap: 0.0,
+        },
+        target: "tray",
+    }];
+    let (list, _) = build(&bar(&[], &[], &row), &theme(), measure);
+    let rect = boxes(&list)[0];
+    // 36 px wide for a 2:1 picture 18 tall, plus 10 px of padding each side
+    // and 14 of border and padding each side of the box.
+    assert!((rect.width - (36.0 + 20.0 + 28.0)).abs() < f32::EPSILON);
+    let image = list
+        .items
+        .iter()
+        .find_map(|item| match item {
+            Item::Group { items, .. } => items.iter().find_map(|item| match item {
+                Item::Image { rect, picture } => Some((*rect, picture.clone())),
+                _ => None,
+            }),
+            _ => None,
+        })
+        .expect("the picture is drawn");
+    assert_eq!(image.1, picture);
+    assert_eq!(
+        image.0,
+        Rect {
+            x: rect.x + 14.0 + 10.0,
+            y: rect.y + (rect.height - 18.0) / 2.0,
+            width: 36.0,
+            height: 18.0,
+        }
+    );
+    assert!(texts(&list).is_empty(), "the letter is not drawn too");
+}
+
+#[test]
+fn a_picture_needs_its_pixels() {
+    assert!(Picture::new(2, 2, vec![0; 16]).is_some());
+    assert!(Picture::new(2, 2, vec![0; 15]).is_none());
+    assert!(Picture::new(0, 2, Vec::new()).is_none());
 }

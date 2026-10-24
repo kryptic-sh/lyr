@@ -1703,6 +1703,13 @@ mod linux {
     };
     use crate::wifi_menu::Joined;
 
+    /// The pixels a tray icon is found at, theme icons drawn and pixmaps
+    /// chosen for it: more than the default `tray.icon_size` takes on a 3x
+    /// output. Each window resizes a picture to the pixels it covers
+    /// (`lyr_render::pictures`), so neither the size setting nor an output's
+    /// scale has to reach the host.
+    const TRAY_PICTURE_SIZE: u32 = 64;
+
     /// Hands `update` to the main loop and wakes it. `false` once the main
     /// loop has gone.
     fn deliver(sender: &mpsc::Sender<Update>, waker: Option<&ShellWaker>, update: Update) -> bool {
@@ -1993,8 +2000,12 @@ mod linux {
         let forward = async {
             let mut reported = Vec::new();
             let mut drawn = None;
+            let mut icons = lyr_sources::tray::icon::Icons::default();
             while changed.changed().await.is_ok() {
-                let listing = changed.borrow_and_update().clone();
+                let mut listing = changed.borrow_and_update().clone();
+                for item in listing.items.iter_mut().filter(|item| item.shown()) {
+                    item.picture = icons.picture(item, TRAY_PICTURE_SIZE);
+                }
                 // Each item that cannot be read is said once, not on every
                 // change.
                 for unreadable in &listing.unreadable {
@@ -2003,9 +2014,10 @@ mod linux {
                     }
                 }
                 reported = listing.unreadable;
-                // A change the bar does not draw (a tooltip, an icon) waits
-                // for the next wake-up; apps such as Spotify and Discord
-                // send a dozen a minute while busy.
+                // A change the bar does not draw (a tooltip, or an icon that
+                // came to the same picture) waits for the next wake-up; apps
+                // such as Spotify and Discord send a dozen a minute while
+                // busy.
                 let faces = lyr_core::tray::faces(&listing.items);
                 let waker = waker.as_ref().filter(|_| drawn.as_ref() != Some(&faces));
                 drawn = Some(faces);

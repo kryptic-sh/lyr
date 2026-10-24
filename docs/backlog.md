@@ -37,11 +37,6 @@ implementation follows meanwhile.
   `theme.calendar_font` defaults to the bar's font, where waybar's `<tt>` makes
   the calendar monospace. Should the default be `"monospace"`? Judge it against
   waybar's look on the owner's machine.
-- **Images: may lyr take `crcbl-image`?** (M6, M8.) **Q:** Add `crcbl-image`
-  (crcbl's decoder for PNG, JPEG, SVG and icon themes) so toasts show `app_icon`
-  and `image-data`, players their art, and the tray its icons? crcbl-ui already
-  draws images. Until then the tray shows each item's first letter, and
-  `icon-static` is not advertised.
 - **Notification links: how should a click open one?** (M6.) **Q:** lyr draws a
   body's `<a href>` (in `toast_link`, underlined) but opens nothing and does not
   advertise `body-hyperlinks`. A link comes from any program on the session bus,
@@ -104,8 +99,8 @@ implementation follows meanwhile.
   expression and show each output's own focused window. Neither is in plan 07;
   `rewrite` would need the `regex` crate, new to lyr, and `separate-outputs`
   needs Hyprland's per-monitor active window. Carry them, or keep the module to
-  `{title}`, `{class}` and `max_length`? (Its app icon waits on images, the
-  `crcbl-image` question above.)
+  `{title}`, `{class}` and `max_length`? (An app icon for it would use
+  `crcbl-image`'s theme lookup, as the tray does.)
 
 - **The `objc2` framework crates on macOS: keep them?** (M10.) **Q:** The macOS
   sources take `objc2-io-kit`, `objc2-core-audio`, `objc2-core-foundation`,
@@ -400,6 +395,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Known gaps in the design
 
+- **Images in toasts and the media module: not drawn.** `crcbl-image` and the
+  draw path's pictures (`lyr_core::draw::Picture`, `lyr_render::pictures`) came
+  with the tray's icons, so a toast's `app_icon` and `image-data` and a player's
+  art can use them: `crcbl_image::raw::from_image_data` for `image-data`, the
+  theme lookup for an `app_icon` name, and `file://` art decoded by its format
+  (JPEG and WebP are crcbl-image features not taken yet). Until then toasts show
+  no image and `icon-static` is not advertised.
 - **Hyprland backend, rest of M2.** `lyr-wm::hyprland` is built against Hyprland
   v0.56.2's formats: the event parser, the `Tracker` that folds events into the
   shared `lyr_wm::State`, the JSON seed, and `Hyprland` (socket I/O, `from_env`,
@@ -446,10 +448,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   the rows still came at once). A tray item's updates (Spotify's and Discord's,
   a dozen in a minute at times) woke it too; one now wakes the bar only when
   what it draws of the items changed (`lyr_core::tray::faces`, each shown item's
-  letter and status), and waits for the next wake-up otherwise (a test item
-  flipping its icon every second: 13 wake-ups in 12 s before, none after its
-  first showing). A tooltip that changes under a pointer held still shows the
-  new text at that next wake-up. The empty wake-up after the tick is Mesa's:
+  letter, status and picture), and waits for the next wake-up otherwise (a test
+  item flipping its icon every second: 13 wake-ups in 12 s before, none after
+  its first showing). A tooltip that changes under a pointer held still shows
+  the new text at that next wake-up. The empty wake-up after the tick is Mesa's:
   traced with `WAYLAND_DEBUG` (2026-10-22), the present's commit is answered
   within about 9 ms by `wp_presentation_feedback` and the buffer's release on
   Mesa's own queues and by the frame callback on crcbl's, all on the one
@@ -985,8 +987,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   strftime format), with tests that were each broken and seen to fail. The
   `[<module>.on]` action bindings (`actions.rs`) are checked against the module
   they are bound in, and the main loop runs them (see "Pointer input"). The
-  tray's table is `[tray] spacing` (the dotfiles' 10 px between items, which
-  `lyr import-waybar` now carries); waybar's `icon-size` waits on images. Not
+  tray's table is `[tray]`: `spacing` and `icon_size` (the dotfiles' 10 px
+  between items and 18 px icons, both carried by `lyr import-waybar`). Not
   built: the file watcher that reloads on save (it needs a crate such as
   `notify`, new to lyr, so the owner's call), a finer diff (a reload redraws
   everything, and reshapes the bars only when `[bar]` changed; starting and
@@ -1227,9 +1229,33 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   bar, not on the screen. Each item's button has its tooltip, its `ToolTip`
   title or else its `Title` (`Item::tooltip_text`, as waybar falls back),
   through the bar's tooltips, now keyed by the hovered target rather than the
-  module. Icons wait on images (the decision above); until then an item is drawn
-  as its title's first letter (`Item::letter`), where plan 08 asks for a generic
-  icon.
+  module. Icons are drawn: see "Tray icons" below.
+- **Tray icons (2026-10-25, the owner asked for them).** `crcbl-image` 0.9.0
+  came in for them (PNG, SVG, XPM and the theme lookup; the owner had asked
+  crcbl for it as the shared asset crate, S28). Each shown item's icon is found
+  in waybar's order (`Item::icon_sources`, after waybar master's
+  `Item::getIconPixbuf`, read 2026-10-25): while it needs attention its
+  attention icon's name, then its pixels; then its icon's name (or a file's
+  path), then its pixels; else the theme's `image-missing`; else its letter
+  (`lyr_sources::tray::icon::Icons`). Names are looked up in the theme GTK's
+  `settings.ini` names (`gtk-icon-theme-name`, GTK 3's then GTK 4's;
+  Papirus-Dark here) with the item's `IconThemePath` first, or `hicolor` with no
+  setting. A pixmap is the one nearest the host's size (`TRAY_PICTURE_SIZE` in
+  `apps/lyr/src/sources.rs`; waybar takes the largest). Each window resizes a
+  picture to the device pixels it covers and keeps it on its own atlas until a
+  frame stops drawing it (`lyr_render::pictures`), drawn `tray.icon_size` tall
+  with its aspect kept, as waybar does. Tested, each mutation-checked: the
+  order, the pixel conversion, the size choice, a changed file read again, the
+  theme path, the missing-image fallback, the GTK setting, the atlas's keeping
+  and giving back, and the device size asked for. Run in a nested Hyprland
+  (2026-10-25): Teams' and Discord's pixmaps drawn next to waybar's watcher
+  (Discord with its red badge), and on a private bus a test item's
+  `dialog-information` from Papirus-Dark flipping to `dialog-warning` on
+  `NewIcon`. Not done: waybar's overlay icon and attention movie; `svg-text` (an
+  SVG icon with text is refused and the next source tried); reading the theme
+  from GSettings, which GNOME keeps there rather than in `settings.ini`. Not
+  seen: an output at a scale above 1, a theme icon given by file path, Steam's
+  or Spotify's own icons (neither was showing).
 - **Clicking lyr in tests.** The owner installed `wlrctl` (2026-10-20), which
   moves and clicks a virtual pointer in the compositor named by
   `WAYLAND_DISPLAY` alone, so a nested Hyprland can be clicked without touching

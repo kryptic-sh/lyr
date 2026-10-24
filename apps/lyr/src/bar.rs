@@ -28,7 +28,6 @@ use crcbl_shell::{Shell, ShellEvent, WindowId};
 use lyr_config::{Config, Platform};
 use lyr_core::clock::Tick;
 use lyr_render::text::Text;
-use lyr_render::translate::translate;
 use lyr_shell::bars::Bars;
 
 use crate::audio_menu::AudioMenu;
@@ -591,9 +590,7 @@ impl App {
                 window.dirty = false;
                 continue;
             }
-            let presented = window
-                .surface
-                .draw(shell, &translate(&drawn.list, text, window.surface.scale()))?;
+            let presented = window.surface.draw_bar(shell, &drawn.list, text)?;
             window.dirty = !presented;
             if presented {
                 window.shown = Some(drawn.list);

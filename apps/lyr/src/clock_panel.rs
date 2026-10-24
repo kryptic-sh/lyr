@@ -25,7 +25,6 @@ use lyr_core::notifications::Store;
 use lyr_core::pointer::Press;
 use lyr_render::surface::Surface;
 use lyr_render::text::Text;
-use lyr_render::translate::translate;
 use lyr_shell::bars::NAMESPACE;
 
 use crate::input::Pointer;
@@ -385,7 +384,7 @@ impl ClockPanel {
     pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
         self.ask_size(shell)?;
         if let (true, Some(surface)) = (self.dirty, &mut self.surface) {
-            self.dirty = !surface.draw(shell, &translate(&self.list, text, surface.scale()))?;
+            self.dirty = !surface.draw_bar(shell, &self.list, text)?;
         }
         Ok(())
     }

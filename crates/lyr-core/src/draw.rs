@@ -7,6 +7,8 @@
 //! Text is measured by the caller (`measure`), since only the renderer has the
 //! font. Lengths are logical pixels.
 
+use std::sync::Arc;
+
 use lyr_config::{Colour, Theme};
 
 use crate::hit::{Rect, Regions};
@@ -33,6 +35,67 @@ impl TextStyle {
     };
 }
 
+/// A picture: `width` × `height` pixels of straight-alpha RGBA8, rows top
+/// to bottom. Two pictures are equal when their pixels are, which is what
+/// the renderer keys its copies by, so a tray item read again with the
+/// same icon is not uploaded again.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Picture {
+    width: u32,
+    height: u32,
+    pixels: Arc<[u8]>,
+}
+
+impl Picture {
+    /// The picture of `pixels`; `None` when it is empty or `pixels` is not
+    /// `width * height * 4` bytes.
+    #[must_use]
+    pub fn new(width: u32, height: u32, pixels: Vec<u8>) -> Option<Self> {
+        let expected = (width as usize)
+            .checked_mul(height as usize)?
+            .checked_mul(4)?;
+        (expected > 0 && pixels.len() == expected).then(|| Self {
+            width,
+            height,
+            pixels: pixels.into(),
+        })
+    }
+
+    #[must_use]
+    pub const fn width(&self) -> u32 {
+        self.width
+    }
+
+    #[must_use]
+    pub const fn height(&self) -> u32 {
+        self.height
+    }
+
+    #[must_use]
+    pub fn pixels(&self) -> &[u8] {
+        &self.pixels
+    }
+
+    /// It drawn `height` logical pixels tall, its aspect kept.
+    #[must_use]
+    pub fn sized(self, height: f32) -> SizedPicture {
+        let width = height * self.width as f32 / self.height as f32;
+        SizedPicture {
+            picture: self,
+            width,
+            height,
+        }
+    }
+}
+
+/// A picture and the size it is drawn at, in logical pixels.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SizedPicture {
+    pub picture: Picture,
+    pub width: f32,
+    pub height: f32,
+}
+
 /// Something to draw.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Item {
@@ -52,6 +115,8 @@ pub enum Item {
         colour: Colour,
         style: TextStyle,
     },
+    /// A picture stretched to fill `rect`.
+    Image { rect: Rect, picture: Picture },
     /// Items drawn together and then faded as one, like CSS `opacity`, so a
     /// box's text does not show its background through itself.
     Group { opacity: f32, items: Vec<Self> },
@@ -92,6 +157,10 @@ impl Item {
                 colour,
                 style,
             },
+            Self::Image { rect, picture } => Self::Image {
+                rect: moved(rect),
+                picture,
+            },
             Self::Group { opacity, items } => Self::Group {
                 opacity,
                 items: items.into_iter().map(|item| item.offset(dx, dy)).collect(),
@@ -120,16 +189,27 @@ pub enum Content {
         compact: Option<String>,
         colour: Colour,
     },
-    /// A row of buttons, each with its own text and colour, `gap` logical
-    /// pixels apart: the workspaces, the tray's items.
+    /// A row of buttons, each with its own text and colour or a picture,
+    /// `gap` logical pixels apart: the workspaces, the tray's items.
     Buttons { buttons: Vec<Button>, gap: f32 },
 }
 
-/// One button in a [`Content::Buttons`] row.
+/// One button in a [`Content::Buttons`] row: its picture when it has one,
+/// else its text.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Button {
     pub text: String,
     pub colour: Colour,
+    pub picture: Option<SizedPicture>,
+}
+
+impl Button {
+    /// The width of what it shows, without its padding.
+    fn face_width(&self, measure: impl Fn(&str) -> f32) -> f32 {
+        self.picture
+            .as_ref()
+            .map_or_else(|| measure(&self.text), |picture| picture.width)
+    }
 }
 
 /// A module to place: what it shows, and what a click on it stands for.
@@ -158,7 +238,7 @@ pub struct Bar<'a, T> {
 }
 
 /// One module's box size, before placement.
-struct Sized {
+struct ModuleSize {
     /// The box's own width, without margins.
     full: f32,
     compact: Option<f32>,
@@ -194,14 +274,14 @@ pub fn build<T: Clone>(
                 box_width(
                     buttons
                         .iter()
-                        .map(|button| measure(&button.text) + 2.0 * button_padding)
+                        .map(|button| button.face_width(&measure) + 2.0 * button_padding)
                         .sum::<f32>()
                         + gap * buttons.len().saturating_sub(1) as f32,
                 ),
                 None,
             ),
         };
-        Sized {
+        ModuleSize {
             full,
             compact,
             margin_left: px(theme.module_margin_left),
@@ -212,7 +292,7 @@ pub fn build<T: Clone>(
             },
         }
     };
-    let sizes = |modules: &[Module<T>], is_last_zone: bool| -> Vec<Sized> {
+    let sizes = |modules: &[Module<T>], is_last_zone: bool| -> Vec<ModuleSize> {
         modules
             .iter()
             .enumerate()
@@ -224,7 +304,7 @@ pub fn build<T: Clone>(
         sizes(bar.center, false),
         sizes(bar.right, true),
     );
-    let slots = |sized: &[Sized]| -> Vec<Slot> {
+    let slots = |sized: &[ModuleSize]| -> Vec<Slot> {
         sized
             .iter()
             .map(|s| {
@@ -301,17 +381,30 @@ pub fn build<T: Clone>(
                 Content::Buttons { buttons, gap } => {
                     let mut x = rect.x + border_width + padding;
                     for (i, button) in buttons.iter().enumerate() {
-                        let width = measure(&button.text) + 2.0 * button_padding;
+                        let width = button.face_width(&measure) + 2.0 * button_padding;
                         let button_rect = Rect { x, width, ..rect };
-                        items.push(Item::Text {
-                            rect: Rect {
-                                x: x + button_padding,
-                                width: width - 2.0 * button_padding,
-                                ..rect
+                        items.push(match &button.picture {
+                            // Centred in the box's height, as GTK centres
+                            // waybar's tray images.
+                            Some(picture) => Item::Image {
+                                rect: Rect {
+                                    x: x + button_padding,
+                                    y: rect.y + (rect.height - picture.height) / 2.0,
+                                    width: picture.width,
+                                    height: picture.height,
+                                },
+                                picture: picture.picture.clone(),
                             },
-                            text: button.text.clone(),
-                            colour: button.colour,
-                            style: TextStyle::PLAIN,
+                            None => Item::Text {
+                                rect: Rect {
+                                    x: x + button_padding,
+                                    width: width - 2.0 * button_padding,
+                                    ..rect
+                                },
+                                text: button.text.clone(),
+                                colour: button.colour,
+                                style: TextStyle::PLAIN,
+                            },
                         });
                         regions.push(button_rect, Target::Button(module.target.clone(), i));
                         x += width + gap;

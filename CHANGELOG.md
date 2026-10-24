@@ -158,11 +158,15 @@ and this project adheres to
   `{title}` and `{class}` placeholders and `max_length`.
 - On Linux, the tray: lyr hosts StatusNotifierItems (Steam, Teams and the like),
   and serves `org.kde.StatusNotifierWatcher` when nothing else does. Each item
-  shows as a button with its title's first letter until lyr draws icons, passive
-  items hidden; a click activates it, a middle click secondary-activates it, the
-  wheel scrolls it, and a right click (or a left one on an item that is only a
-  menu) opens its menu under the button, with submenus, check marks and disabled
-  entries, or its own menu when it serves none.
+  shows as its icon, `tray.icon_size` tall (18 by default, and carried by
+  `lyr import-waybar` from waybar's `icon-size`): its theme icon, looked up in
+  the GTK icon theme and its own theme path, or the pixels it sends, its
+  attention icon while it needs attention, and the theme's missing-image icon
+  when it has none. Passive items are hidden; a click activates it, a middle
+  click secondary-activates it, the wheel scrolls it, and a right click (or a
+  left one on an item that is only a menu) opens its menu under the button, with
+  submenus, check marks and disabled entries, or its own menu when it serves
+  none.
 - On Linux, the Wi-Fi menu, opened by a click on the network module or
   `lyr panel wifi`, over NetworkManager: a switch for the radio, the networks a
   scan found (one row per name, strongest first, the one in use marked), a fresh

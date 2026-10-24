@@ -198,9 +198,11 @@ pub struct Window {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Tray {
-    /// Logical pixels between two items (waybar's `spacing`). waybar's
-    /// `icon-size` waits for lyr to draw icons.
+    /// Logical pixels between two items (waybar's `spacing`).
     pub spacing: u32,
+    /// An item's icon's height in logical pixels (waybar's `icon-size`); a
+    /// wider icon keeps its aspect.
+    pub icon_size: u32,
 }
 
 /// The power button (`docs/plan/07-modules.md#power-button`).

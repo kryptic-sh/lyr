@@ -14,7 +14,7 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use futures_util::stream::select;
 use lyr_core::tray::menu::{self, Entry};
-use lyr_core::tray::{Item, Registry, Status, item_address};
+use lyr_core::tray::{Item, Pixmap, Registry, Status, item_address};
 use tokio::sync::watch;
 use zbus::fdo::{DBusProxy, PropertiesProxy, RequestNameFlags};
 use zbus::message::{Header, Type};
@@ -354,6 +354,19 @@ fn item(bus_name: &str, path: &str, properties: &HashMap<String, OwnedVariant>) 
         .and_then(|value| OwnedObjectPath::try_from(value.clone()).ok())
         .filter(|menu| menu.as_str() != "/")
         .map(|menu| menu.to_string());
+    let pixmaps = |name: &str| {
+        properties
+            .get(name)
+            .and_then(|value| Vec::<(i32, i32, Vec<u8>)>::try_from(value.clone()).ok())
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(width, height, data)| Pixmap {
+                width,
+                height,
+                data,
+            })
+            .collect()
+    };
     let tooltip = properties
         .get("ToolTip")
         .and_then(|value| ToolTip::try_from(value.clone()).ok())
@@ -366,7 +379,9 @@ fn item(bus_name: &str, path: &str, properties: &HashMap<String, OwnedVariant>) 
         title: text("Title"),
         status: Status::parse(&text("Status")),
         icon_name: text("IconName"),
+        icon_pixmap: pixmaps("IconPixmap"),
         attention_icon_name: text("AttentionIconName"),
+        attention_icon_pixmap: pixmaps("AttentionIconPixmap"),
         icon_theme_path: text("IconThemePath"),
         tooltip,
         menu,
@@ -374,6 +389,8 @@ fn item(bus_name: &str, path: &str, properties: &HashMap<String, OwnedVariant>) 
             .get("ItemIsMenu")
             .and_then(|value| bool::try_from(value).ok())
             .unwrap_or(false),
+        // The host's to find (`tray::icon`).
+        picture: None,
     }
 }
 

@@ -20,7 +20,6 @@ use lyr_core::hit::{Rect, Regions};
 use lyr_core::pointer::Press;
 use lyr_render::surface::Surface;
 use lyr_render::text::Text;
-use lyr_render::translate::translate;
 use lyr_shell::bars::NAMESPACE;
 
 use crate::input::Pointer;
@@ -554,7 +553,7 @@ impl<T: Copy> MenuPanel<T> {
         if self.dirty {
             let visible = self.visible();
             if let Some(surface) = &mut self.surface {
-                self.dirty = !surface.draw(shell, &translate(&visible, text, surface.scale()))?;
+                self.dirty = !surface.draw_bar(shell, &visible, text)?;
             }
         }
         Ok(())

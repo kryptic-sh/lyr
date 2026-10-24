@@ -15,7 +15,6 @@ use lyr_core::hit::{Rect, Regions};
 use lyr_core::tooltip::Tooltip;
 use lyr_render::surface::Surface;
 use lyr_render::text::Text;
-use lyr_render::translate::translate;
 use lyr_shell::bars::NAMESPACE;
 
 /// The popup showing a tooltip.
@@ -218,7 +217,7 @@ impl Tooltips {
             return Ok(());
         };
         if let (true, Some(surface)) = (popup.dirty, &mut popup.surface) {
-            popup.dirty = !surface.draw(shell, &translate(&popup.list, text, surface.scale()))?;
+            popup.dirty = !surface.draw_bar(shell, &popup.list, text)?;
         }
         Ok(())
     }

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use futures_util::StreamExt;
-use lyr_core::tray::{Click, Status};
+use lyr_core::tray::{Click, Pixmap, Status};
 use tokio::sync::watch;
 use zbus::connection::Builder;
 use zbus::object_server::{InterfaceRef, SignalEmitter};
@@ -58,6 +58,11 @@ impl FakeItem {
     #[zbus(property)]
     fn icon_name(&self) -> String {
         "steam_tray_mono".to_owned()
+    }
+    /// Two sizes, as Electron's items send one and Qt's several.
+    #[zbus(property)]
+    fn icon_pixmap(&self) -> Vec<(i32, i32, Vec<u8>)> {
+        vec![(1, 1, vec![255, 1, 2, 3]), (2, 1, vec![9; 8])]
     }
     #[zbus(property)]
     fn tool_tip(&self) -> ToolTip {
@@ -177,6 +182,22 @@ async fn a_registered_item_is_listed_and_read() {
     assert_eq!(item.menu.as_deref(), Some("/MenuBar"));
     assert!(item.item_is_menu);
     assert!(item.attention_icon_name.is_empty(), "not set");
+    assert_eq!(
+        item.icon_pixmap,
+        [
+            Pixmap {
+                width: 1,
+                height: 1,
+                data: vec![255, 1, 2, 3]
+            },
+            Pixmap {
+                width: 2,
+                height: 1,
+                data: vec![9; 8]
+            }
+        ]
+    );
+    assert!(item.attention_icon_pixmap.is_empty(), "not set");
 }
 
 #[tokio::test]

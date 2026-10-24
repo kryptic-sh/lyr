@@ -64,8 +64,10 @@ click_right = "cycle_profile_back"
 click_middle = "cycle_profile_back"
 
 [tray]
-# Between two items, as the dotfiles' waybar tray has it.
+# Between two items, and each icon's height, as the dotfiles' waybar tray has
+# them.
 spacing = 10
+icon_size = 18
 
 [window]
 # The focused window's title, as waybar's hyprland/window shows it. Not in the

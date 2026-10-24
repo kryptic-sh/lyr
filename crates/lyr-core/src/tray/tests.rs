@@ -1,4 +1,8 @@
-use super::{Click, ITEM_PATH, Item, Registry, Status, click, faces, item_address, scroll};
+use super::{
+    Click, Face, ITEM_PATH, IconSource, Item, Pixmap, Registry, Status, click, faces, item_address,
+    scroll,
+};
+use crate::draw::Picture;
 use crate::pointer::Press;
 
 #[test]
@@ -44,18 +48,74 @@ fn the_faces_are_the_shown_items_letters_and_statuses() {
         item("hidden", Status::Passive),
         item("discord", Status::NeedsAttention),
     ];
+    let face = |letter: &str, status| Face {
+        letter: letter.to_owned(),
+        status,
+        picture: None,
+    };
     assert_eq!(
         faces(&items),
-        [
-            ("S".to_owned(), Status::Active),
-            ("D".to_owned(), Status::NeedsAttention)
-        ]
+        [face("S", Status::Active), face("D", Status::NeedsAttention)]
     );
-    // A new tooltip or icon leaves them alone.
+    // A new tooltip, or an icon name that came to the same picture, leaves
+    // them alone.
     let mut quiet = items.clone();
     quiet[0].tooltip = "now playing".to_owned();
     quiet[0].icon_name = "spotify-playing".to_owned();
     assert_eq!(faces(&quiet), faces(&items));
+    // A new picture does not.
+    let mut drawn = items.clone();
+    drawn[0].picture = Picture::new(1, 1, vec![1, 2, 3, 4]);
+    assert_ne!(faces(&drawn), faces(&items));
+}
+
+#[test]
+fn an_icon_comes_from_its_name_then_its_pixels_and_attention_first() {
+    let pixmaps = |side| {
+        vec![Pixmap {
+            width: side,
+            height: side,
+            data: vec![0; 4 * (side * side) as usize],
+        }]
+    };
+    let item = Item {
+        icon_name: "steam".to_owned(),
+        icon_pixmap: pixmaps(2),
+        attention_icon_name: "steam-alert".to_owned(),
+        attention_icon_pixmap: pixmaps(3),
+        ..Item::default()
+    };
+    assert_eq!(
+        item.icon_sources(),
+        [
+            IconSource::Name("steam"),
+            IconSource::Pixmaps(&item.icon_pixmap)
+        ],
+        "the attention icon only while it needs attention"
+    );
+    let alerting = Item {
+        status: Status::NeedsAttention,
+        ..item.clone()
+    };
+    assert_eq!(
+        alerting.icon_sources(),
+        [
+            IconSource::Name("steam-alert"),
+            IconSource::Pixmaps(&alerting.attention_icon_pixmap),
+            IconSource::Name("steam"),
+            IconSource::Pixmaps(&alerting.icon_pixmap),
+        ]
+    );
+    let electron = Item {
+        icon_pixmap: pixmaps(2),
+        status: Status::NeedsAttention,
+        ..Item::default()
+    };
+    assert_eq!(
+        electron.icon_sources(),
+        [IconSource::Pixmaps(&electron.icon_pixmap)],
+        "what it does not send is not tried"
+    );
 }
 
 #[test]

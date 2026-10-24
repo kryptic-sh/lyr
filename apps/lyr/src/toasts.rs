@@ -22,7 +22,6 @@ use lyr_core::pointer::Press;
 use lyr_core::toast::stack::{Part, Stack};
 use lyr_render::surface::Surface;
 use lyr_render::text::Text;
-use lyr_render::translate::translate;
 use lyr_shell::bars::NAMESPACE;
 
 use crate::input::Pointer;
@@ -309,7 +308,7 @@ impl Toasts {
         if let Some(panel) = &mut self.panel
             && let (true, Some(surface)) = (panel.dirty, &mut panel.surface)
         {
-            panel.dirty = !surface.draw(shell, &translate(&panel.list, text, surface.scale()))?;
+            panel.dirty = !surface.draw_bar(shell, &panel.list, text)?;
         }
         Ok(())
     }

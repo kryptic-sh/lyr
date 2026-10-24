@@ -20,14 +20,18 @@ The tray is the largest single source on Linux. Three parts are needed:
    lyr in a popup ([10](10-popups-and-menus.md#two-kinds-of-window)). Steam and
    Teams both depend on DBusMenu, so it is MVP for the tray, not a stretch.
 
-**Icons** come from `IconPixmap` (ARGB32, network byte order, choosing the size
-nearest 18 px × scale) when it is set. Otherwise lyr looks `IconName` up in the
-icon theme: the XDG icon-theme lookup, `IconThemePath` first, PNG and SVG. The
-lookup, decoding and rasterising come from crcbl's asset crate (S28,
-[03](03-surfaces-and-input.md#what-crcbl-must-provide)), and each size is
-rasterised once. crcbl's SVG support is a subset that refuses an SVG it cannot
-fully draw. An icon that is refused, or not found, is drawn as a generic icon
-rather than left blank, so an item stays clickable.
+**Icons** are found in waybar's order: while the item needs attention, its
+`AttentionIconName` and then `AttentionIconPixmap`; then `IconName` (a theme
+name or a file's path) and then `IconPixmap` (ARGB32, network byte order, the
+size nearest what the host asks for). A name is looked up in the user's icon
+theme with the XDG icon-theme lookup, `IconThemePath` first, PNG, SVG and XPM.
+The lookup, decoding and rasterising come from crcbl's asset crate,
+`crcbl-image` (S28, [03](03-surfaces-and-input.md#what-crcbl-must-provide)).
+Each window resizes an icon to the pixels it covers, `tray.icon_size` tall with
+its aspect kept. crcbl's SVG support is a subset that refuses an SVG it cannot
+fully draw. An icon that is refused or not found gives way to the theme's
+`image-missing`, and failing that the item's first letter, so an item is never
+blank and stays clickable.
 
 Clicks map to `Activate(x, y)`, `SecondaryActivate` (middle button) and
 `Scroll(delta, orientation)`, with `ContextMenu` as the fallback when an item
