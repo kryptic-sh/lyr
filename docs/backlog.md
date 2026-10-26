@@ -1325,13 +1325,24 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `leave` and the popup `enter` right after `xdg_popup.grab`, and `wtype` keys
   moved the dropdown's selection. The audio menu hands the panel's keys to the
   dropdown anyway, in case a compositor leaves them there.
-- **A panel that shrinks can show one stretched frame (seen once, not chased).**
-  In the same run, switching the audio menu from Output devices to Configuration
-  narrowed the panel, and a screenshot right after the click showed the new,
-  narrower panel holding the old content squeezed to fit; a second screenshot
-  two seconds later was right. That looks like the compositor scaling the old
-  buffer to the new size until lyr's next frame lands. Not timed, and not tried
-  on sway or niri.
+- **A panel that resizes shows one squeezed frame: crcbl's, reported.** When the
+  audio menu switches from Output devices to Configuration, the panel shrinks
+  (`set_panel`) and for a moment shows its content scaled into the new size.
+  Traced with `WAYLAND_DEBUG=1` in a nested Hyprland (2026-10-26): crcbl answers
+  the layer surface's `configure` with `wp_viewport.set_destination`,
+  `ack_configure` and a `wl_surface.commit` at once (crcbl-shell 0.11.0's
+  configure handler), so the compositor applies the new size to the buffer still
+  attached, the old-size one, before the swapchain is rebuilt. Here the right
+  buffer was committed 21 ms later, but the compositor showed it 380 ms after
+  that (FIFO on the nested headless output), and a screenshot at 0.4 s caught
+  the squeeze (787 × 55 where the panel was 915 × 102: the scale of the old 1063
+  × 188 to the new size). Reported to office-crcbl the same day, with the fix of
+  leaving the commit to the next present for a surface that already has a
+  buffer. lyr also presents one frame into the old swapchain between `set_panel`
+  and `Resized` (`MenuPanel::show`); holding it until `Resized` is not done,
+  since a configure that keeps the size brings no `Resized` and the panel would
+  never draw, and with crcbl's fix that frame shows the old size unscaled. On
+  crcbl's release: run the tab switch again with a screenshot at 0.4 s.
 
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,
