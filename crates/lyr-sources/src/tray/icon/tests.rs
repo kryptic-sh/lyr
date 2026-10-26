@@ -4,7 +4,7 @@ use crcbl_image::{Rgba8Image, png};
 use lyr_core::draw::Picture;
 use lyr_core::tray::{Item, Pixmap, Status};
 
-use super::{Icons, icon_theme_setting, pixmap};
+use super::{Icons, pixmap};
 
 /// The theme the fixtures are in, named so no real theme can answer for it.
 const THEME: &str = "lyr-test-theme";
@@ -161,29 +161,4 @@ fn the_pixmap_nearest_the_size_is_taken_and_a_broken_one_is_not() {
     };
     assert_eq!(pixmap(&[negative], 16), None);
     assert_eq!(pixmap(&[short], 16), None);
-}
-
-#[test]
-fn the_icon_theme_is_gtk_s_setting() {
-    assert_eq!(
-        icon_theme_setting(
-            "[Settings]\ngtk-theme-name=Adwaita\ngtk-icon-theme-name = Papirus-Dark\n"
-        )
-        .as_deref(),
-        Some("Papirus-Dark")
-    );
-    assert_eq!(
-        icon_theme_setting("[Settings]\ngtk-icon-theme-name=\"Papirus\"\n").as_deref(),
-        Some("Papirus"),
-        "quotes are not part of the name"
-    );
-    assert_eq!(
-        icon_theme_setting("[Other]\ngtk-icon-theme-name=Papirus\n"),
-        None,
-        "only the Settings group"
-    );
-    assert_eq!(
-        icon_theme_setting("[Settings]\ngtk-icon-theme-name=\n"),
-        None
-    );
 }

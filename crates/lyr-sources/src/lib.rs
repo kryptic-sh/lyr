@@ -22,6 +22,8 @@ pub mod bluetooth;
 #[cfg(target_os = "linux")]
 mod bus;
 pub mod clock;
+#[cfg(target_os = "linux")]
+mod icons;
 pub mod locale;
 #[cfg(target_os = "macos")]
 mod macos_runloop;
