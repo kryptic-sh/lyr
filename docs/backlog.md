@@ -1484,8 +1484,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   panel and the Bluetooth menu, toasts on a private session bus (the
   notification daemon's entry), and the idle counts with `--stats`: after
   start-up, 3 – 4 wake-ups and 1 – 2 presents a minute over three idle minutes,
-  the clock's minute tick among them. Not exercised: a click on a toast or a
-  tray item.
+  the clock's minute tick among them. Clicks on a toast (an action button, a
+  link) and on a tray item's menu have been made there since; their entries say
+  what each showed.
 - The sway backend runs against a real sway only in CI's `sway e2e` job
   (headless, two outputs; first green 2026-10-20, run 39371299842): the first
   state with a workspace on each output, a switch to a name with a space and a
