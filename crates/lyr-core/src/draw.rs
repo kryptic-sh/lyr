@@ -483,6 +483,24 @@ pub fn tooltip(
     (DrawList { items }, size)
 }
 
+/// `picture` drawn in the `side`-pixel square at `x`, `y`: as large as
+/// fits, its aspect kept, centred.
+#[must_use]
+pub fn fitted(picture: &Picture, x: f32, y: f32, side: f32) -> Item {
+    let (width, height) = (picture.width() as f32, picture.height() as f32);
+    let scale = side / width.max(height);
+    let (width, height) = (width * scale, height * scale);
+    Item::Image {
+        rect: Rect {
+            x: x + (side - width) / 2.0,
+            y: y + (side - height) / 2.0,
+            width,
+            height,
+        },
+        picture: picture.clone(),
+    }
+}
+
 /// Between a switch's edge and its knob: swaync's 4 px.
 const KNOB_INSET: f32 = 4.0;
 /// A switch's border.

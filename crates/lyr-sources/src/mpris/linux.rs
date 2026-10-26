@@ -3,7 +3,8 @@
 //! `/org/mpris/MediaPlayer2`, re-read when a player comes or goes
 //! (`NameOwnerChanged`) or changes (`PropertiesChanged`). Nothing is polled.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use futures_util::StreamExt;
 use futures_util::stream;
@@ -13,9 +14,12 @@ use zbus::message::Type;
 use zbus::proxy::CacheProperties;
 use zbus::{Connection, MatchRule, MessageStream, OwnedVariant};
 
+use crcbl_image::theme::FileVersion;
+use lyr_core::draw::Picture;
 use lyr_core::media::{Control, Player, Status};
 
 use crate::bus::Follow;
+use crate::icons;
 
 /// The bus names MPRIS players take.
 pub const PREFIX: &str = "org.mpris.MediaPlayer2.";
@@ -45,12 +49,54 @@ async fn proxy(connection: &Connection, bus_name: &str) -> zbus::Result<MediaPla
         .await
 }
 
-/// What the player at `bus_name` plays now.
+/// The side an SVG's art is drawn at, in pixels; other formats keep their
+/// own size.
+const ART_SIZE: u32 = 256;
+
+/// Players' art read so far, by `mpris:artUrl`, each file read again only
+/// once it changed.
+#[derive(Debug, Default)]
+pub struct Art {
+    read: HashMap<String, (FileVersion, Option<Picture>)>,
+    /// The URLs asked for since the last [`Self::sweep`].
+    asked: HashSet<String>,
+}
+
+impl Art {
+    /// The picture `url` names. Only a `file://` URI is read: lyr fetches
+    /// nothing over the network (plan 09).
+    fn picture(&mut self, url: &str) -> Option<Picture> {
+        let path = icons::file_uri(url)?;
+        let version = FileVersion::of(&path)?;
+        self.asked.insert(url.to_owned());
+        if let Some((read, picture)) = self.read.get(url)
+            && *read == version
+        {
+            return picture.clone();
+        }
+        let picture = icons::read(&path, ART_SIZE);
+        self.read.insert(url.to_owned(), (version, picture.clone()));
+        picture
+    }
+
+    /// Forgets the art no player asked for since the last sweep, so a
+    /// player moving through an album keeps only its current track's.
+    fn sweep(&mut self) {
+        let asked = std::mem::take(&mut self.asked);
+        self.read.retain(|url, _| asked.contains(url));
+    }
+}
+
+/// What the player at `bus_name` plays now, its art read through `art`.
 ///
 /// # Errors
 ///
 /// When it does not answer.
-pub async fn read(connection: &Connection, bus_name: &str) -> zbus::Result<Player> {
+pub async fn read(
+    connection: &Connection,
+    bus_name: &str,
+    art: &Mutex<Art>,
+) -> zbus::Result<Player> {
     let player = proxy(connection, bus_name).await?;
     let metadata = player.metadata().await?;
     let text = |key: &str| {
@@ -64,11 +110,17 @@ pub async fn read(connection: &Connection, bus_name: &str) -> zbus::Result<Playe
         .and_then(|value| Vec::<String>::try_from(value.clone()).ok())
         .map(|artists| artists.join(", "))
         .unwrap_or_default();
+    let status = Status::from_name(&player.playback_status().await?);
+    let art = art
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .picture(&text("mpris:artUrl"));
     Ok(Player {
         bus_name: bus_name.to_owned(),
         title: text("xesam:title"),
         artist,
-        status: Status::from_name(&player.playback_status().await?),
+        status,
+        art,
     })
 }
 
@@ -94,6 +146,7 @@ pub async fn control(
 #[derive(Clone, Debug)]
 pub struct Players {
     connection: Connection,
+    art: Arc<Mutex<Art>>,
 }
 
 impl Players {
@@ -105,6 +158,7 @@ impl Players {
     pub async fn session() -> zbus::Result<Self> {
         Ok(Self {
             connection: Connection::session().await?,
+            art: Arc::default(),
         })
     }
 
@@ -126,10 +180,14 @@ impl Players {
         names.sort();
         let mut players = Vec::new();
         for name in names {
-            if let Ok(player) = read(&self.connection, &name).await {
+            if let Ok(player) = read(&self.connection, &name, &self.art).await {
                 players.push(player);
             }
         }
+        self.art
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .sweep();
         Ok(players)
     }
 

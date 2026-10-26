@@ -3,6 +3,8 @@
 //! plays and its controls. The platforms' sources fill it in
 //! (`lyr_sources::mpris`).
 
+use crate::draw::Picture;
+
 /// Whether a player is playing: MPRIS's `PlaybackStatus`.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Status {
@@ -35,6 +37,8 @@ pub struct Player {
     /// `xesam:artist`, joined with ", ".
     pub artist: String,
     pub status: Status,
+    /// The art `mpris:artUrl` names, when lyr could read it.
+    pub art: Option<Picture>,
 }
 
 /// A control button.

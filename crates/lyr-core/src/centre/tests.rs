@@ -2,8 +2,8 @@ use std::time::Instant;
 
 use lyr_config::{Platform, Theme, from_sources};
 
-use super::{GAP, Shown, Target, draw};
-use crate::draw::{Item, TextStyle};
+use super::{ART_MARGIN, ART_SIZE, ART_SPACING, GAP, Shown, Target, draw};
+use crate::draw::{Item, Picture, TextStyle};
 use crate::notifications::{Incoming, Store, Urgency};
 use crate::toast::{BORDER, CLOSE_INSET, CLOSE_SIZE, INSET};
 
@@ -257,6 +257,7 @@ fn a_media_player_is_a_card_with_its_controls_before_the_history() {
         title: "A Song".to_owned(),
         artist: "Someone".to_owned(),
         status: Status::Playing,
+        art: None,
     }];
     let (list, _, regions) = draw(
         &Shown {
@@ -303,6 +304,56 @@ fn a_media_player_is_a_card_with_its_controls_before_the_history() {
             .any(|item| matches!(item, Item::Text { text, .. } if *text == pause)),
         "a playing player offers pause"
     );
+}
+
+#[test]
+fn a_media_player_s_art_stands_left_of_its_text() {
+    use crate::media::{Player, Status};
+    let theme = theme();
+    let store = Store::default();
+    // Twice as wide as tall, so it fills the square's width.
+    let art = Picture::new(2, 1, vec![255; 8]).expect("a picture");
+    let players = [Player {
+        bus_name: "org.mpris.MediaPlayer2.test".to_owned(),
+        title: "A Song".to_owned(),
+        artist: "Someone".to_owned(),
+        status: Status::Paused,
+        art: Some(art.clone()),
+    }];
+    let (list, size, _) = draw(
+        &Shown {
+            store: &store,
+            players: &players,
+            now: Instant::now(),
+            hovered: None,
+        },
+        WIDTH,
+        &measure,
+        LINE,
+        &theme,
+    );
+    let card_top = 32.0 + GAP + LINE + GAP;
+    // The art is taller than the two lines, inside an 8 px padding and a
+    // 2 px border.
+    let inner = 2.0 + 8.0;
+    assert_eq!(size.height, card_top + 2.0 * inner + ART_SIZE);
+    let image = list.items.iter().find_map(|item| match item {
+        Item::Image { rect, picture } if *picture == art => Some(*rect),
+        _ => None,
+    });
+    let image = image.expect("the art drawn");
+    assert_eq!((image.x, image.width), (inner + ART_MARGIN, ART_SIZE));
+    // Its aspect kept, centred in its square.
+    assert_eq!(image.height, ART_SIZE / 2.0);
+    assert_eq!(image.y, card_top + inner + ART_SIZE / 4.0);
+    let title = list.items.iter().find_map(|item| match item {
+        Item::Text { text, rect, .. } if text == "A Song" => Some(*rect),
+        _ => None,
+    });
+    let title = title.expect("the title drawn");
+    assert_eq!(title.x, inner + 2.0 * ART_MARGIN + ART_SIZE + ART_SPACING);
+    // The two lines centred on the art.
+    assert_eq!(title.y, card_top + inner + (ART_SIZE - 2.0 * LINE) / 2.0);
 }
 
 #[test]

@@ -112,3 +112,21 @@ fn a_jpeg_is_read_too() {
         "red: {r} {g} {b} {a}"
     );
 }
+
+#[test]
+fn a_file_with_no_extension_is_read_by_its_contents() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let png_path = dir.path().join("art");
+    write_png(&png_path, [0, 255, 0, 255]);
+    let jpeg_path = dir.path().join("art.tmp");
+    std::fs::write(&jpeg_path, include_bytes!("red.jpg")).expect("written");
+    let mut icons = Icons::new("lyr-test-theme".to_owned());
+    let png = icons
+        .uri_or_name(png_path.to_str().expect("UTF-8"), 16)
+        .expect("decoded as PNG");
+    assert_eq!(png.pixels(), [0, 255, 0, 255]);
+    let jpeg = icons
+        .uri_or_name(jpeg_path.to_str().expect("UTF-8"), 16)
+        .expect("decoded as JPEG");
+    assert_eq!((jpeg.width(), jpeg.height()), (8, 8));
+}

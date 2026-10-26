@@ -77,8 +77,8 @@ impl Icons {
     /// than kept, since each notification can name a new one (a
     /// screenshot's, say) and the cache would only grow.
     pub fn uri_or_name(&mut self, value: &str, size: u32) -> Option<Picture> {
-        if let Some(uri) = value.strip_prefix("file://") {
-            return read(&file_uri_path(uri)?, size);
+        if value.starts_with("file://") {
+            return read(&file_uri(value)?, size);
         }
         if value.is_empty() {
             return None;
@@ -104,11 +104,17 @@ impl Icons {
     }
 }
 
-/// The picture in the file at `path`.
-fn read(path: &Path, size: u32) -> Option<Picture> {
+/// The picture in the file at `path`, an SVG drawn `size` pixels square.
+pub fn read(path: &Path, size: u32) -> Option<Picture> {
     std::fs::read(path)
         .ok()
         .and_then(|bytes| decode(path, &bytes, size))
+}
+
+/// The path the `file://` URI `uri` names; `None` for another scheme
+/// ([`file_uri_path`]).
+pub fn file_uri(uri: &str) -> Option<PathBuf> {
+    file_uri_path(uri.strip_prefix("file://")?)
 }
 
 /// The path a `file://` URI names, given what follows `file://`: an empty
@@ -148,15 +154,20 @@ fn percent_decode(text: &str) -> Option<Vec<u8>> {
 }
 
 /// An icon file's bytes as a picture, by its extension; an SVG is drawn
-/// `size` pixels square.
+/// `size` pixels square. A file with no extension lyr knows is tried as
+/// PNG and then JPEG, whose decoders check the format's signature: browsers
+/// write a player's art to files with no extension.
 fn decode(path: &Path, bytes: &[u8], size: u32) -> Option<Picture> {
-    let extension = path.extension()?.to_str()?.to_ascii_lowercase();
-    let image = match extension.as_str() {
-        "png" => png::decode(bytes, &LIMITS),
-        "jpg" | "jpeg" => jpeg::decode(bytes, &LIMITS),
-        "svg" => svg::decode(bytes, size, 1, &LIMITS),
-        "xpm" => xpm::decode(bytes, &LIMITS),
-        _ => return None,
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(str::to_ascii_lowercase);
+    let image = match extension.as_deref() {
+        Some("png") => png::decode(bytes, &LIMITS),
+        Some("jpg" | "jpeg") => jpeg::decode(bytes, &LIMITS),
+        Some("svg") => svg::decode(bytes, size, 1, &LIMITS),
+        Some("xpm") => xpm::decode(bytes, &LIMITS),
+        _ => png::decode(bytes, &LIMITS).or_else(|_| jpeg::decode(bytes, &LIMITS)),
     };
     image.ok().and_then(picture)
 }

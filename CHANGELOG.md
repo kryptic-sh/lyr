@@ -8,6 +8,19 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Breaking
+
+- For the library crates: `lyr_core::media::Player` gains `art`, and
+  `lyr_sources::mpris::linux::read` takes the art cache (`mpris::linux::Art`).
+
+### Added
+
+- The clock panel's media player cards draw the player's art (`mpris:artUrl`)
+  left of the title, at the dotfiles' 100 px. Art is read from `file://` URLs
+  only; lyr fetches nothing over the network.
+- A picture file with no extension (as browsers write a player's art) is read as
+  PNG or JPEG by its contents.
+
 ## [0.2.0] - 2026-10-26
 
 ### Breaking

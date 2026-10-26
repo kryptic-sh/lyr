@@ -3,8 +3,7 @@
 //! `notifications` widgets in its order, in the dotfiles' style.
 //!
 //! The title and the do-not-disturb label are drawn at the bar's text size,
-//! not swaync's 2rem: lyr draws one size of text so far. A media player's art
-//! is not drawn: lyr draws no images yet.
+//! not swaync's 2rem: lyr draws one size of text so far.
 
 use std::time::Instant;
 
@@ -63,6 +62,14 @@ const GROUP_GAP: f32 = 8.0;
 const CARD_PADDING: f32 = 8.0;
 /// Between a media player's control buttons: swaync's 5 px.
 const CONTROL_GAP: f32 = 5.0;
+/// A media player's art: the dotfiles' `.widget-mpris-album-art`
+/// `-gtk-icon-size`.
+const ART_SIZE: f32 = 100.0;
+/// Each side of the art: the dotfiles' `.widget-mpris-album-art` margin.
+const ART_MARGIN: f32 = 10.0;
+/// Between the art and the text: swaync 0.12.6's `spacing` in
+/// `mpris_player.blp`.
+const ART_SPACING: f32 = 12.0;
 
 /// A control's symbol: the standard media symbols, which most fonts carry.
 const fn symbol(control: Control, status: Status) -> &'static str {
@@ -163,11 +170,16 @@ pub fn draw(
 
     // The media players, a card each.
     for (index, player) in players.iter().enumerate() {
+        let inner = BORDER + CARD_PADDING;
+        let content_height = match player.art {
+            Some(_) => ART_SIZE.max(2.0 * line_height),
+            None => 2.0 * line_height,
+        };
         let card = Rect {
             x: 0.0,
             y,
             width,
-            height: 2.0 * (BORDER + CARD_PADDING + line_height),
+            height: 2.0 * inner + content_height,
         };
         items.push(Item::Box {
             rect: card,
@@ -175,7 +187,13 @@ pub fn draw(
             fill: theme.toast_background,
             border: Some((BORDER, theme.panel_border)),
         });
-        let inner = BORDER + CARD_PADDING;
+        let mut left = card.x + inner;
+        if let Some(art) = &player.art {
+            left += ART_MARGIN;
+            let top = card.y + (card.height - ART_SIZE) / 2.0;
+            items.push(draw::fitted(art, left, top, ART_SIZE));
+            left += ART_SIZE + ART_MARGIN + ART_SPACING;
+        }
         let mut right = card.x + card.width - inner;
         // The controls, right to left, centred on the card's height.
         let middle = card.y + (card.height - line_height) / 2.0;
@@ -191,7 +209,9 @@ pub fn draw(
             regions.push(button, Target::Media(index, control));
             right = button.x - CONTROL_GAP;
         }
-        let text_width = (right - CONTROL_GAP - (card.x + inner)).max(0.0);
+        let text_width = (right - CONTROL_GAP - left).max(0.0);
+        // The title and artist, centred on the art when it is the taller.
+        let text_top = card.y + (card.height - 2.0 * line_height) / 2.0;
         for (line, (text, colour)) in [
             (player.title.as_str(), theme.panel_foreground),
             (player.artist.as_str(), theme.media_artist),
@@ -201,8 +221,8 @@ pub fn draw(
         {
             items.push(Item::Text {
                 rect: Rect {
-                    x: card.x + inner,
-                    y: card.y + inner + line_height * line as f32,
+                    x: left,
+                    y: text_top + line_height * line as f32,
                     width: text_width,
                     height: line_height,
                 },

@@ -13,7 +13,7 @@ use std::time::Duration;
 use crcbl_ui::font::breaks;
 use lyr_config::Theme;
 
-use crate::draw::{DrawList, Item, Picture, Size, TextStyle};
+use crate::draw::{self, DrawList, Item, Size, TextStyle};
 use crate::hit::Rect;
 use crate::markup::{self, Span, Style};
 use crate::notifications::{Incoming, Urgency};
@@ -437,29 +437,12 @@ pub fn draw(
     if let Some(picture) = main {
         let x = BORDER + INSET + PICTURE_MARGIN;
         let y = top + (row_height - PICTURE_SIZE) / 2.0;
-        items.push(fitted(picture, x, y));
+        items.push(draw::fitted(picture, x, y, PICTURE_SIZE));
         if let Some(icon) = over {
-            items.push(fitted(icon, x + PICTURE_PADDING, y));
+            items.push(draw::fitted(icon, x + PICTURE_PADDING, y, PICTURE_SIZE));
         }
     }
     (DrawList { items }, size, areas)
-}
-
-/// `picture` drawn in the [`PICTURE_SIZE`] square at `x`, `y`: as large as
-/// fits, its aspect kept, centred.
-fn fitted(picture: &Picture, x: f32, y: f32) -> Item {
-    let (width, height) = (picture.width() as f32, picture.height() as f32);
-    let scale = PICTURE_SIZE / width.max(height);
-    let (width, height) = (width * scale, height * scale);
-    Item::Image {
-        rect: Rect {
-            x: x + (PICTURE_SIZE - width) / 2.0,
-            y: y + (PICTURE_SIZE - height) / 2.0,
-            width,
-            height,
-        },
-        picture: picture.clone(),
-    }
 }
 
 #[cfg(test)]

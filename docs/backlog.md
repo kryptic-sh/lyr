@@ -390,13 +390,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Known gaps in the design
 
-- **The media module's art: not drawn.** Toasts draw their images through the
-  pictures the tray's icons brought (`lyr_core::draw::Picture`,
-  `lyr_render::pictures`), and a player's `mpris:artUrl` can follow: a `file://`
-  URI goes through `lyr_sources::icons` as a notification's `image-path` does.
-  JPEG is decoded (the owner took crcbl-image's `jpeg` feature, 2026-10-26);
-  WebP is a crcbl-image feature lyr has not taken, so WebP art and images are
-  left out until it does.
+- **The media player card: where it still differs from swaync's.** The card
+  draws the player's art (`lyr_core::centre`, `ART_SIZE`), read from a `file://`
+  `mpris:artUrl` through `lyr_sources::icons` and cached per URL until no player
+  names it (`lyr_sources::mpris::linux::Art`); run in a nested Hyprland
+  (2026-10-26) with a stand-in player whose art was a PNG with no extension. Not
+  carried from swaync 0.12.6 (`data/ui/mpris_player.blp`, `mpris_player.vala`):
+  `http(s)` art (no HTTP client, plan 09) and `data:` URIs (base64, which lyr
+  has no decoder for); the generic `audio-x-generic-symbolic` icon swaync shows
+  when there is no art (its `show-album-art` defaults to `always`); the art's
+  rounded corners (`Item::Image` has no radius); the blurred art behind the card
+  (`mpris-background`); and swaync's layout, with the controls centred in a row
+  under the art and text, and shuffle and repeat buttons. lyr keeps previous,
+  play/pause and next at the card's right. WebP art is left out until lyr takes
+  crcbl-image's `webp` feature. swaync is no longer installed on the owner's
+  laptop (2026-10-26), so a side-by-side comparison needs it installed again.
 - **Hyprland backend, rest of M2.** `lyr-wm::hyprland` is built against Hyprland
   v0.56.2's formats: the event parser, the `Tracker` that folds events into the
   shared `lyr_wm::State`, the JSON seed, and `Hyprland` (socket I/O, `from_env`,
@@ -545,12 +553,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mtime changes, checking at most once a second (`src/offset/local/unix.rs`); a
   change within a second of the last draw shows on the next tick instead. Text
   is cut at its rect's edges (`lyr_render::translate` clips each text item), so
-  a label wider than its box no longer runs over its neighbours. Not built:
-  images (tray, M8). A format cannot drop the literal text around an empty
-  placeholder; the one case that came up, a battery with no power reading, now
-  shows 0 W as waybar 0.15.0 does (`total_power / 1e6`), and UPower always
-  reports a rate. Measuring text (the widths `layout` takes) needs crcbl-ui's
-  font atlas, so it is done by the caller in `lyr-render`.
+  a label wider than its box no longer runs over its neighbours. A format cannot
+  drop the literal text around an empty placeholder; the one case that came up,
+  a battery with no power reading, now shows 0 W as waybar 0.15.0 does
+  (`total_power / 1e6`), and UPower always reports a rate. Measuring text (the
+  widths `layout` takes) needs crcbl-ui's font atlas, so it is done by the
+  caller in `lyr-render`.
 - **Notification daemon, M6.** Built: the store (`lyr_core::notifications`): ids
   from 1 that skip 0 and held ids, `replaces_id` kept as the id and replacing in
   place (even for an id lyr does not hold, as the spec says), swaync's timeouts
@@ -1368,10 +1376,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   between the switch and the history (swaync's order): a card per player with
   its title, artist and previous, play/pause and next, the standard media
   symbols since Nerd Font codepoints were not checked; a click presses the
-  control. Not built: a player's art (lyr draws no images), the day and month
-  names from the locale (the calendar locale question above), Hyprland's click
-  on the bare desktop while it is open closes it (nested, `wlrctl`, 2026-10-21;
-  "How Hyprland treats a panel's keyboard and pointer").
+  control. Not built: the day and month names from the locale (the calendar
+  locale question above), Hyprland's click on the bare desktop while it is open
+  closes it (nested, `wlrctl`, 2026-10-21; "How Hyprland treats a panel's
+  keyboard and pointer").
 - **macOS cannot reserve screen space.** The bar overlaps windows unless the
   menu bar is set to auto-hide.
 - **No tray and no notification state on Windows or macOS.** Neither platform
