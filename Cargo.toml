@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*", "apps/*"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.98"
 license = "MIT"
@@ -24,12 +24,12 @@ redundant_pub_crate = "warn"
 
 [workspace.dependencies]
 # internal
-lyr-config = { path = "crates/lyr-config", version = "0.2.0" }
-lyr-core = { path = "crates/lyr-core", version = "0.2.0" }
-lyr-render = { path = "crates/lyr-render", version = "0.2.0" }
-lyr-shell = { path = "crates/lyr-shell", version = "0.2.0" }
-lyr-wm = { path = "crates/lyr-wm", version = "0.2.0" }
-lyr-sources = { path = "crates/lyr-sources", version = "0.2.0" }
+lyr-config = { path = "crates/lyr-config", version = "0.3.0" }
+lyr-core = { path = "crates/lyr-core", version = "0.3.0" }
+lyr-render = { path = "crates/lyr-render", version = "0.3.0" }
+lyr-shell = { path = "crates/lyr-shell", version = "0.3.0" }
+lyr-wm = { path = "crates/lyr-wm", version = "0.3.0" }
+lyr-sources = { path = "crates/lyr-sources", version = "0.3.0" }
 
 [profile.release]
 lto = "thin"
