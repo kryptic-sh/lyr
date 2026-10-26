@@ -1353,13 +1353,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   buffer was committed 21 ms later, but the compositor showed it 380 ms after
   that (FIFO on the nested headless output), and a screenshot at 0.4 s caught
   the squeeze (787 × 55 where the panel was 915 × 102: the scale of the old 1063
-  × 188 to the new size). Reported to office-crcbl the same day, with the fix of
-  leaving the commit to the next present for a surface that already has a
-  buffer. lyr also presents one frame into the old swapchain between `set_panel`
-  and `Resized` (`MenuPanel::show`); holding it until `Resized` is not done,
-  since a configure that keeps the size brings no `Resized` and the panel would
-  never draw, and with crcbl's fix that frame shows the old size unscaled. On
-  crcbl's release: run the tab switch again with a screenshot at 0.4 s.
+  × 188 to the new size). Reported to office-crcbl the same day; fixed on
+  crcbl's main as `f2b3bb5b` ("fix(shell): leave a resized surface's commit to
+  its frame": a mapped surface's ack and new destination ride its next present,
+  with a nested Hyprland test that failed before it), not in 0.12.0 but in the
+  release after. lyr also presents one frame into the old swapchain between
+  `set_panel` and `Resized` (`MenuPanel::show`); holding it until `Resized` is
+  not done, since a configure that keeps the size brings no `Resized` and the
+  panel would never draw, and with crcbl's fix that frame shows the old size
+  unscaled. On that release: run the tab switch again with a screenshot at 0.4
+  s.
 
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,
