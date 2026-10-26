@@ -51,6 +51,31 @@ The design lives in [docs/plan/](docs/plan/00-index.md), the build order in
 [docs/plan/15-milestones.md](docs/plan/15-milestones.md), and what is not done
 yet in [docs/backlog.md](docs/backlog.md).
 
+## Installing
+
+```sh
+# AUR (Arch Linux)
+yay -S lyr-bin
+
+# Homebrew (macOS)
+brew install kryptic-sh/tap/lyr
+
+# Scoop (Windows)
+scoop bucket add kryptic-sh https://github.com/kryptic-sh/scoop-bucket
+scoop install lyr
+
+# crates.io (the package is lyr-bin; the binary is lyr)
+cargo install --locked lyr-bin
+```
+
+Or download the archive for your platform from
+[GitHub Releases](https://github.com/kryptic-sh/lyr/releases) and put `lyr`
+(`lyr.exe` on Windows) on your `PATH`. Each file has a `.sha256` beside it.
+There are builds for Linux (x86_64 and aarch64, glibc 2.28+), macOS 11+ (Apple
+silicon and Intel) and Windows (x86_64). On Linux, lyr opens the Wayland client
+library, a Vulkan driver through its loader, xkbcommon and fontconfig at run
+time, so those must be installed.
+
 ## Using it
 
 `lyr` with no command runs the bar. Every other command talks to the running

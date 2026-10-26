@@ -10,6 +10,11 @@ and this project adheres to
 
 ### Added
 
+- Release builds for Linux (x86_64 and aarch64, glibc 2.28+), macOS 11+ (Apple
+  silicon and Intel) and Windows (x86_64) on GitHub Releases, published as
+  `lyr-bin` on the AUR and crates.io (the binary is `lyr`; the crates.io name
+  `lyr` is another project's), `lyr` in the `kryptic-sh/tap` Homebrew tap, and
+  `lyr` in the `kryptic-sh` Scoop bucket.
 - `lyr` with no command runs the bar: one transparent bar along the top of every
   output (a layer-shell panel on Wayland, an appbar on Windows), drawn through
   crcbl, with the power button and the clock module, and on Linux the battery

@@ -1,9 +1,9 @@
 name: CI
 
-# Checks only for now: fmt, clippy, tests and a smoke run on Linux, macOS and
-# Windows, plus dependency hygiene. The release jobs (build matrix, GitHub
-# Release, crates.io, AUR, Homebrew, Scoop, Alpine) are added at the first
-# release, mirroring hrdr's pipeline — see docs/plan/14-ci-and-release.md.
+# fmt, clippy, tests and a smoke run on Linux, macOS and Windows, dependency
+# hygiene, and the release: binaries built on every push to main, and on a
+# `v*` tag the GitHub Release, crates.io, the AUR, Homebrew and Scoop,
+# mirroring tmxr's pipeline — see docs/plan/14-ci-and-release.md.
 
 on:
   pull_request:
@@ -174,9 +174,9 @@ jobs:
           cache: false
       - run: rustup update --no-self-update stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --locked -p lyr
-      - run: cargo run --locked -p lyr -- --version
-      - run: cargo run --locked -p lyr -- --help
+      - run: cargo build --locked -p lyr-bin
+      - run: cargo run --locked -p lyr-bin -- --version
+      - run: cargo run --locked -p lyr-bin -- --help
 
   # The defaults' Nerd Font glyphs against the font they name (plan 04, M1's
   # check): Hack Nerd Font Propo from Nerd Fonts' release, pinned. The test
@@ -259,3 +259,482 @@ jobs:
           kill "$sway_pid" 2>/dev/null || true
           if [ "$status" -ne 0 ]; then cat "$runtime/sway.log"; fi
           exit "$status"
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: [test]
+    if: github.event_name != 'pull_request'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # No musl builds: crcbl opens libwayland and the Vulkan loader with
+        # dlopen, which a static musl binary cannot do. crcbl's Metal backend
+        # refuses macOS 10.15, so both Macs build for 11.0.
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            zigbuild_target: x86_64-unknown-linux-gnu.2.28
+            zig: 'true'
+            macos_min: ''
+            archive: tar.gz
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            zigbuild_target: aarch64-unknown-linux-gnu.2.28
+            zig: 'true'
+            macos_min: ''
+            archive: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            zigbuild_target: ''
+            zig: 'false'
+            macos_min: ''
+            archive: zip
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            zigbuild_target: ''
+            zig: 'false'
+            macos_min: '11.0'
+            archive: tar.gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            zigbuild_target: ''
+            zig: 'false'
+            macos_min: '11.0'
+            archive: tar.gz
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify tag matches Cargo.toml version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          CARGO_VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          if [ "v$CARGO_VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME != Cargo.toml version $CARGO_VERSION"
+            exit 1
+          fi
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+          cache: false
+      - run: rustup update --no-self-update stable
+      - run: rustup target add ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - name: Setup zig
+        if: matrix.zig == 'true'
+        uses: step-security/setup-zig@1e9fbd457bcc3587b58845344a267f12f151709c # v2.2.2
+        with:
+          version: '0.15.1'
+      - name: Install cargo-zigbuild
+        if: matrix.zig == 'true'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+      - name: Build binary (zigbuild)
+        if: matrix.zig == 'true'
+        env:
+          # zig's linker reports that it ignores rustc's `-O1` linker flag,
+          # and setup-rust-toolchain@v2's CARGO_BUILD_WARNINGS=deny turns
+          # that linker message into an error. Code warnings still fail the
+          # build through RUSTFLAGS=-D warnings.
+          CARGO_BUILD_WARNINGS: warn
+        run:
+          cargo zigbuild --release --locked --target ${{ matrix.zigbuild_target
+          }} -p lyr-bin --bin lyr
+      - name: Build binary (native)
+        if: matrix.zig == 'false'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.macos_min }}
+        run:
+          cargo build --release --locked --target ${{ matrix.target }} -p
+          lyr-bin --bin lyr
+      - name: Smoke artifact
+        if:
+          matrix.target == 'x86_64-unknown-linux-gnu' || matrix.target ==
+          'aarch64-apple-darwin' || matrix.target == 'x86_64-pc-windows-msvc'
+        shell: bash
+        run: ./target/${{ matrix.target }}/release/lyr --version
+      - name: Package (Linux / macOS)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          TAG=${GITHUB_REF_NAME}
+          ARCHIVE="lyr-${TAG}-${{ matrix.target }}.tar.gz"
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/lyr dist/
+          cp README.md LICENSE dist/
+          tar -czf "$ARCHIVE" -C dist .
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "$ARCHIVE" > "$ARCHIVE.sha256"
+          else
+            shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
+          fi
+      - name: Package (Windows)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $archive = "lyr-$tag-${{ matrix.target }}.zip"
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item target/${{ matrix.target }}/release/lyr.exe dist/
+          Copy-Item README.md, LICENSE dist/
+          Compress-Archive -Path dist/* -DestinationPath $archive
+          $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLower()
+          # An LF line, as sha256sum writes: Out-File's CRLF breaks
+          # `sha256sum -c` on the file name.
+          [IO.File]::WriteAllText("$PWD/$archive.sha256", "$hash  $archive`n")
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: lyr-${{ matrix.target }}
+          path: |
+            lyr-*.tar.gz
+            lyr-*.tar.gz.sha256
+            lyr-*.zip
+            lyr-*.zip.sha256
+
+  # Every crate packaged and built from its package, the libraries from a
+  # local registry, as `cargo publish` will build them: a crate that cannot
+  # publish fails here on main, before a tag strands the ones after it.
+  package:
+    name: cargo package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+          cache: false
+      - run: rustup update --no-self-update stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo package --workspace --locked
+
+  publish-github-release:
+    name: Publish GitHub Release
+    needs:
+      [
+        build,
+        package,
+        fmt,
+        clippy,
+        deny,
+        audit,
+        machete,
+        smoke,
+        test,
+        leak-guard,
+        nerd-font,
+        sway-e2e,
+      ]
+    # A tag's push, or a re-run dispatched on the tag: never a branch.
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') && (github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: lyr-*
+          merge-multiple: true
+          path: dist
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-crates:
+    name: Publish to crates.io
+    needs: [publish-github-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+          cache: false
+      - name: Publish workspace crates (topo order, idempotent)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          # hjkl-style publish helper: idempotency probe (crates.io 403s
+          # UA-less requests, so it must send a User-Agent), 429 retries
+          # parsing the "try again after" timestamp (11-min fallback), and
+          # pacing between crates to stay under the publish rate limits.
+          publish_if_missing() {
+            local crate="$1"
+            local url="https://crates.io/api/v1/crates/${crate}/${VERSION}"
+            if curl -fsS -A "${crate}-release-ci" -o /dev/null "$url"; then
+              echo "::notice::${crate}@${VERSION} already on crates.io, skipping"
+              return 0
+            fi
+            local attempt=0
+            while [ $attempt -lt 6 ]; do
+              if cargo publish -p "${crate}" --locked 2>&1 | tee /tmp/publish_"${crate}".log; then
+                # Pacing across the workspace (cargo itself waits for index
+                # propagation before returning).
+                sleep 25
+                return 0
+              fi
+              if grep -qiE "429|Too Many Requests" /tmp/publish_"${crate}".log; then
+                local wait_until wait_secs target
+                # Match the RFC 1123 stamp exactly. The old pattern was
+                # `try again after [^.]+`, which runs past the timestamp and
+                # stops at the first period — inside `crates.io` — yielding
+                # "… 10:18:27 GMT and see https://crates". `date -d` then fails,
+                # the substitution is empty, the arithmetic goes hugely negative
+                # and the floor below turns every wait into a flat 30s. v0.8.1
+                # retried 11s BEFORE the limit lifted, three times, and gave up
+                # with eight of nine crates published.
+                wait_until=$(grep -oE 'try again after [A-Za-z]{3}, [0-9]{1,2} [A-Za-z]{3} [0-9]{4} [0-9]{2}:[0-9]{2}:[0-9]{2} GMT' \
+                  /tmp/publish_"${crate}".log | head -1 | sed 's/try again after //' || true)
+                if [ -n "$wait_until" ] && target=$(date -d "$wait_until" +%s 2>/dev/null); then
+                  wait_secs=$(( target - $(date +%s) + 15 ))
+                  # Only a floor for a stamp already in the past, never a cap:
+                  # sleeping less than the server asked for burns an attempt and
+                  # pushes the next slot further out.
+                  [ "$wait_secs" -lt 15 ] && wait_secs=15
+                  echo "::warning::rate limited publishing ${crate}, sleeping ${wait_secs}s until $wait_until"
+                else
+                  wait_secs=660
+                  echo "::warning::rate limited publishing ${crate}, sleeping ${wait_secs}s (11 min fallback; no parsable stamp)"
+                fi
+                sleep "$wait_secs"
+                attempt=$(( attempt + 1 ))
+              else
+                echo "::error::publish failed for ${crate} (non-rate-limit error)"
+                return 1
+              fi
+            done
+            # Every attempt honours the server's own timestamp: a whole release
+            # publishes every crate in `ORDER`, and crates.io refills the "updates to existing
+            # crates" bucket about once a minute, so a release cut minutes after
+            # another one needs real patience here.
+            echo "::error::publish failed for ${crate} after 6 rate-limit retries"
+            return 1
+          }
+          # Dependency order: the crates with no internal deps first, each
+          # crate after the ones it needs, and `lyr-bin` (the `lyr` binary)
+          # last because it depends on the rest.
+          ORDER="lyr-config lyr-wm lyr-core lyr-shell lyr-render lyr-sources lyr-bin"
+          # A crate missing from ORDER fails the release *before* anything is
+          # uploaded, rather than half-publishing and stranding the binary: a new
+          # library that ships without being added here cannot be published, and
+          # neither can `lyr-bin` once the libs ahead of it are already up — leaving
+          # a tagged release with no binary. `publish = false` members are not
+          # publishable and are not listed.
+          MEMBERS=$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.publish != []) | .name' | sort)
+          LISTED=$(printf '%s\n' $ORDER | sort)
+          if [ "$MEMBERS" != "$LISTED" ]; then
+            echo "::error::publish list drift — every publishable workspace member must be in ORDER, in dependency order"
+            diff <(echo "$LISTED") <(echo "$MEMBERS") | sed 's/^/  /' || true
+            exit 1
+          fi
+          for CRATE in $ORDER; do
+            publish_if_missing "$CRATE"
+          done
+
+  aur-bin:
+    name: Publish AUR (lyr-bin)
+    needs: [publish-github-release]
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - name: Install deps
+        run: pacman -Sy --noconfirm --needed base-devel git openssh curl
+      - uses: actions/checkout@v7
+      - name: Resolve version
+        id: tag
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Render PKGBUILD
+        run: |
+          VERSION=${{ steps.tag.outputs.version }}
+          BASE="https://github.com/kryptic-sh/lyr/releases/download/v${VERSION}"
+          SHA_X86=$(curl -sL "$BASE/lyr-v${VERSION}-x86_64-unknown-linux-gnu.tar.gz.sha256" | awk '{print $1}')
+          SHA_A64=$(curl -sL "$BASE/lyr-v${VERSION}-aarch64-unknown-linux-gnu.tar.gz.sha256" | awk '{print $1}')
+          test -n "$SHA_X86" && test -n "$SHA_A64"
+          mkdir -p out
+          sed -e "s/{VERSION}/${VERSION}/g" \
+              -e "s/{SHA256_X86_64}/${SHA_X86}/g" \
+              -e "s/{SHA256_AARCH64}/${SHA_A64}/g" \
+              pkg/aur/PKGBUILD-bin.in > out/PKGBUILD
+      - name: Generate .SRCINFO
+        run: |
+          useradd -m builder
+          chown -R builder out
+          su -s /bin/bash builder -c 'cd out && makepkg --printsrcinfo > .SRCINFO'
+      - name: Push to AUR
+        run: |
+          # Assigned HERE, not in an `env:` block: a `~` inside an env value is
+          # never expanded. git runs this via `sh -c`, tilde expansion does not
+          # apply to the result of a parameter expansion, and ssh does not expand
+          # `~` in a `-o` value either -- so the pin below would go unread and
+          # StrictHostKeyChecking=yes would fail with "No ED25519 host key is
+          # known". That is exactly how buffr's v0.14.7 AUR publish broke.
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/aur -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
+          install -dm700 ~/.ssh
+          echo "${{ secrets.AUR_SSH_KEY }}" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          # Pinned host keys. Source: ssh-keyscan aur.archlinux.org.
+          cat > ~/.ssh/known_hosts <<'KNOWN_HOSTS_EOF'
+          aur.archlinux.org ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBLMiLrP8pVi5BFX2i3vepSUnpedeiewE5XptnUnau+ZoeUOPkpoCgZZuYfpaIQfhhJJI5qgnjJmr4hyJbe/zxow=
+          aur.archlinux.org ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEuBKrPzbawxA/k2g6NcyV5jmqwJ2s+zpgZGZ7tpLIcN
+          aur.archlinux.org ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDKF9vAFWdgm9Bi8uc+tYRBmXASBb5cB5iZsB7LOWWFeBrLp3r14w0/9S2vozjgqY5sJLDPONWoTTaVTbhe3vwO8CBKZTEt1AcWxuXNlRnk9FliR1/eNB9uz/7y1R0+c1Md+P98AJJSJWKN12nqIDIhjl2S1vOUvm7FNY43fU2knIhEbHybhwWeg+0wxpKwcAd/JeL5i92Uv03MYftOToUijd1pqyVFdJvQFhqD4v3M157jxS5FTOBrccAEjT+zYmFyD8WvKUa9vUclRddNllmBJdy4NyLB8SvVZULUPrP3QOlmzemeKracTlVOUG1wsDbxknF1BwSCU7CmU6UFP90kpWIyz66bP0bl67QAvlIc52Yix7pKJPbw85+zykvnfl2mdROsaT8p8R9nwCdFsBc9IiD0NhPEHcyHRwB8fokXTajk2QnGhL+zP5KnkmXnyQYOCUYo3EKMXIlVOVbPDgRYYT/XqvBuzq5S9rrU70KoI/S5lDnFfx/+lPLdtcnnEPk=
+          KNOWN_HOSTS_EOF
+          chmod 600 ~/.ssh/known_hosts
+          git config --global user.name  "lyr-ci"
+          git config --global user.email "ci@kryptic.sh"
+          git clone ssh://aur@aur.archlinux.org/lyr-bin.git aur-repo
+          cp out/PKGBUILD out/.SRCINFO aur-repo/
+          cp pkg/aur/LICENSE pkg/aur/.gitignore aur-repo/
+          cd aur-repo
+          git add PKGBUILD .SRCINFO LICENSE .gitignore
+          if git diff --cached --quiet; then echo "nothing to push"; exit 0; fi
+          git commit -m "lyr-bin ${{ steps.tag.outputs.version }}-1"
+          git push origin master
+
+  brew-tap:
+    name: Publish Homebrew formula
+    needs: [publish-github-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve version
+        id: tag
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Render formula
+        run: |
+          VERSION=${{ steps.tag.outputs.version }}
+          BASE="https://github.com/kryptic-sh/lyr/releases/download/v${VERSION}"
+          SHA_ARM=$(curl -sL "$BASE/lyr-v${VERSION}-aarch64-apple-darwin.tar.gz.sha256" | awk '{print $1}')
+          SHA_X86=$(curl -sL "$BASE/lyr-v${VERSION}-x86_64-apple-darwin.tar.gz.sha256" | awk '{print $1}')
+          test -n "$SHA_ARM" && test -n "$SHA_X86"
+          mkdir -p out
+          sed -e "s/{VERSION}/${VERSION}/g" \
+              -e "s/{SHA256_AARCH64_DARWIN}/${SHA_ARM}/g" \
+              -e "s/{SHA256_X86_64_DARWIN}/${SHA_X86}/g" \
+              pkg/homebrew/lyr.rb.in > out/lyr.rb
+      - name: Push to tap
+        run: |
+          # Assigned HERE, not in an `env:` block: a `~` inside an env value is
+          # never expanded. git runs this via `sh -c`, tilde expansion does not
+          # apply to the result of a parameter expansion, and ssh does not expand
+          # `~` in a `-o` value either -- so the pin below would go unread and
+          # StrictHostKeyChecking=yes would fail with "No ED25519 host key is
+          # known". That is exactly how buffr's v0.14.7 AUR publish broke.
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/brew -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
+          install -dm700 ~/.ssh
+          echo "${{ secrets.BREW_SSH_KEY }}" > ~/.ssh/brew
+          chmod 600 ~/.ssh/brew
+          # Pinned host keys. Source: https://api.github.com/meta (.ssh_keys).
+          cat > ~/.ssh/known_hosts <<'KNOWN_HOSTS_EOF'
+          github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+          github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+          github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+          KNOWN_HOSTS_EOF
+          chmod 600 ~/.ssh/known_hosts
+          git config --global user.name  "lyr-ci"
+          git config --global user.email "ci@kryptic.sh"
+          git clone git@github.com:kryptic-sh/homebrew-tap.git tap
+          mkdir -p tap/Formula
+          cp out/lyr.rb tap/Formula/lyr.rb
+          cd tap
+          git add Formula/lyr.rb
+          if git diff --cached --quiet; then echo "nothing to push"; exit 0; fi
+          git commit -m "lyr ${{ steps.tag.outputs.version }}"
+          git push origin HEAD:main
+
+  scoop-bucket:
+    name: Publish Scoop manifest
+    needs: [publish-github-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve version
+        id: tag
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - name: Render manifest
+        run: |
+          VERSION=${{ steps.tag.outputs.version }}
+          BASE="https://github.com/kryptic-sh/lyr/releases/download/v${VERSION}"
+          SHA_WIN=$(curl -sL "$BASE/lyr-v${VERSION}-x86_64-pc-windows-msvc.zip.sha256" | awk '{print $1}')
+          test -n "$SHA_WIN"
+          mkdir -p out
+          sed -e "s/{VERSION}/${VERSION}/g" \
+              -e "s/{SHA256_X86_64_WINDOWS}/${SHA_WIN}/g" \
+              pkg/scoop/lyr.json.in > out/lyr.json
+      - name: Push to bucket
+        run: |
+          # Assigned HERE, not in an `env:` block: a `~` inside an env value is
+          # never expanded. git runs this via `sh -c`, tilde expansion does not
+          # apply to the result of a parameter expansion, and ssh does not expand
+          # `~` in a `-o` value either -- so the pin below would go unread and
+          # StrictHostKeyChecking=yes would fail with "No ED25519 host key is
+          # known". That is exactly how buffr's v0.14.7 AUR publish broke.
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/scoop -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts"
+          install -dm700 ~/.ssh
+          echo "${{ secrets.SCOOP_SSH_KEY }}" > ~/.ssh/scoop
+          chmod 600 ~/.ssh/scoop
+          # Pinned host keys. Source: https://api.github.com/meta (.ssh_keys).
+          cat > ~/.ssh/known_hosts <<'KNOWN_HOSTS_EOF'
+          github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+          github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+          github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+          KNOWN_HOSTS_EOF
+          chmod 600 ~/.ssh/known_hosts
+          git config --global user.name  "lyr-ci"
+          git config --global user.email "ci@kryptic.sh"
+          git clone git@github.com:kryptic-sh/scoop-bucket.git bucket
+          mkdir -p bucket/bucket
+          cp out/lyr.json bucket/bucket/lyr.json
+          cd bucket
+          git add bucket/lyr.json
+          if git diff --cached --quiet; then echo "nothing to push"; exit 0; fi
+          git commit -m "lyr ${{ steps.tag.outputs.version }}"
+          git push origin HEAD:main
+
+  tag-release-status:
+    name: tag-release status
+    needs:
+      [
+        fmt,
+        clippy,
+        machete,
+        deny,
+        audit,
+        test,
+        leak-guard,
+        smoke,
+        nerd-font,
+        sway-e2e,
+        build,
+        package,
+        publish-github-release,
+        publish-crates,
+        aur-bin,
+        brew-tap,
+        scoop-bucket,
+      ]
+    if:
+      always() && github.event_name == 'push' && startsWith(github.ref,
+      'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          RESULT='${{ toJSON(needs.*.result) }}'
+          echo "Release job results: $RESULT"
+          if ! echo "$RESULT" | jq -e 'all(. == "success")' >/dev/null; then
+            echo "❌ Every required check and publish job must succeed on a release tag"
+            exit 1
+          fi
+          echo "✅ All release checks and publish jobs completed successfully"

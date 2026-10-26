@@ -1,5 +1,5 @@
 [package]
-name = "lyr"
+name = "lyr-bin"
 description = "A desktop status bar for Linux (Wayland), Windows and macOS."
 keywords = ["waybar", "statusbar", "wayland", "hyprland", "desktop"]
 categories = ["gui"]

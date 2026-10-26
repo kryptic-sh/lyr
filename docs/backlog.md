@@ -66,22 +66,13 @@ implementation follows meanwhile.
   Arch machine (2026-10-20, 55 values). A copy of `config.jsonc` checked in as a
   fixture would let CI run it too, at the cost of a copy that drifts from the
   dotfiles. Check one in, or keep it a local check?
-- **The `lyr` name on crates.io is taken** (M11). **Q:** `lyr` on crates.io is
-  someone else's (Serial-ATA's lyrics tool, 0.3.0, last published 2024-07-23;
-  checked 2026-10-20), so the app crate cannot be published under it. The
-  library names (`lyr-core`, `lyr-config`, `lyr-render`, `lyr-shell`,
-  `lyr-sources`, `lyr-wm`) are free, and `lyr` and `lyr-bin` are free on the
-  AUR. Options: publish the app as another package (say `lyr-bar`) with its
-  binary still named `lyr`; ask the owner of `lyr` for the name; or do not
-  publish the app to crates.io (the libraries only, with binaries from the
-  release page, the AUR, Homebrew and Scoop).
-- **Release pipeline: build it now, and may it take `clap_complete` and
-  `clap_mangen`?** (M11.) **Q:** crcbl is on crates.io, which was phase 2's hard
-  block (plan 14). Copy tmxr's release jobs and `pkg/` templates now, untried
-  until the first tag, or when the owner decides to cut the first release? The
-  binary's `--completions` and `--man` need `clap_complete` and `clap_mangen`,
-  new to lyr. The org secrets' allowlists and the site entry are the owner's to
-  set.
+- **Completions and a man page: may lyr take `clap_complete` and
+  `clap_mangen`?** (M11.) **Q:** tmxr's binary has `--completions <shell>` and
+  `--man`, which its AUR package, Homebrew formula and release tarball install.
+  lyr's release pipeline (2026-10-26) ships without them, since both crates are
+  new to lyr. Take them and add the flags and the install steps (tmxr's
+  `pkg/aur/PKGBUILD-bin.in`, `pkg/homebrew/tmxr.rb.in` and its release job show
+  each), or keep shipping the binary alone?
 - **The dotfiles' standalone tools** (M8). **Q:** When the dotfiles switch to
   lyr, do `wiremix` and `bluetui` stay installed, and do the `krypt menu` names
   stay as wrappers?
@@ -1486,5 +1477,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (2026-10-21), as both rules give on this laptop. Not seen: a hybrid laptop
   whose panel is wired to the discrete GPU, which is the case that tells them
   apart; that is the run that would show the display rule at work on Wayland.
-- The release pipeline (phase 2 of [plan/14](plan/14-ci-and-release.md)) does
-  not exist yet.
+- The release pipeline's publish jobs (`publish-crates`, `aur-bin`, `brew-tap`,
+  `scoop-bucket`, [plan/14](plan/14-ci-and-release.md)) run only on a tag; the
+  `build` and `package` jobs run on every push to main. The Linux aarch64 and
+  macOS x86_64 binaries are built but run by no job: only x86_64 Linux, Apple
+  silicon macOS and Windows get a `--version` smoke run.
