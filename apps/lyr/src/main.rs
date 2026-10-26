@@ -10,6 +10,7 @@ mod bluetooth_menu;
 mod clock_panel;
 mod control;
 mod exec;
+mod gpu;
 mod input;
 mod keys;
 mod list_popup;

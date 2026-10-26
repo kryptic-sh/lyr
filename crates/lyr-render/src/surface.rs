@@ -102,18 +102,22 @@ impl Surface {
         // power. The presenter takes it through `crcbl_app::adapter::choose`
         // with the display's adapter; low power is named so a change to
         // crcbl's default cannot wake a discrete GPU for a bar.
-        let desc = |backend| PresenterDesc {
+        // Only a surface on its own device opens by the saved GPU: the
+        // others share the first's.
+        let saved = crate::gpu::saved();
+        let desc = |backend, gpu_choice| PresenterDesc {
             label: "lyr",
             backend,
             adapter_pin: adapter_pin.as_deref(),
             power_preference: PowerPreference::LowPower,
+            gpu_choice,
             ..PresenterDesc::default()
         };
         let mut shared = SHARED.lock().unwrap_or_else(PoisonError::into_inner);
         let on_shared = shared.as_ref().and_then(|(gpu, asked)| {
             // One the shared device cannot present to, a display wired to
             // another GPU, gets a device of its own below.
-            gpu.open(shell, window, size, &desc(*asked))
+            gpu.open(shell, window, size, &desc(*asked, None))
                 .ok()
                 .map(|presenter| (presenter, *asked))
         });
@@ -121,17 +125,19 @@ impl Surface {
             Some(opened) => opened,
             None => {
                 let (presenter, asked) =
-                    match Presenter::open(shell, window, size, &desc(preferred)) {
+                    match Presenter::open(shell, window, size, &desc(preferred, saved.as_ref())) {
                         Ok(presenter) => (presenter, preferred),
                         // The preferred backend refused: let crcbl walk its
                         // own order.
-                        Err(_) if preferred.is_some() => {
-                            (Presenter::open(shell, window, size, &desc(None))?, None)
-                        }
+                        Err(_) if preferred.is_some() => (
+                            Presenter::open(shell, window, size, &desc(None, saved.as_ref()))?,
+                            None,
+                        ),
                         Err(error) => return Err(error.into()),
                     };
                 if shared.is_none() {
                     *shared = Some((presenter.shared(), asked));
+                    crate::gpu::opened(&presenter);
                 }
                 (presenter, asked)
             }

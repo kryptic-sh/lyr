@@ -8,6 +8,18 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- lyr remembers the GPU it ran on, in `gpu-choice` under its state directory
+  (`~/.local/state/lyr/`), and opens on it at the next start. On Vulkan it then
+  loads that GPU's driver alone, so a hybrid laptop's other driver (such as
+  NVIDIA's beside Intel's) is not loaded at all. A saved GPU that no longer fits
+  is replaced; `CRCBL_ADAPTER` still wins over it.
+
+### Changed
+
+- Built on crcbl 0.12.0 (from 0.11.0).
+
 ## [0.3.0] - 2026-10-26
 
 ### Breaking

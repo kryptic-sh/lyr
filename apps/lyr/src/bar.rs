@@ -126,6 +126,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
 
     let text = load_text(&config)?;
     let tick = Tick::of(&config.clock.format);
+    crate::gpu::remember();
 
     // Read once: a reload does not hand the daemon's name over.
     let (updates, commands) = sources::start(shell.waker(), config.notifications.replace)

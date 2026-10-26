@@ -222,26 +222,29 @@ implementation follows meanwhile.
   `display_adapter`, and the scripted resize and read-back as CI jobs.
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
-  `=0.11.0` (2026-10-26; 0.10.0 was skipped, since its crates.io publish stopped
-  halfway; none of 0.11.0's breaking changes touch lyr's code, and its icon
-  theme lookups take the nearest size from a per-theme index; the bar and its
-  tray icons drew in a nested Hyprland on it). The next crcbl release brings
-  `crcbl_app::gpu_choice` (on crcbl's main at 8d383ef4): saving
-  `Presenter::gpu_choice()` and handing it back as `PresenterDesc::gpu_choice`
-  opens Vulkan on that adapter's driver alone, 8-9 ms on the owner's laptop
-  against 60-77 ms for every driver, and `SharedGpu` follows the first
-  presenter; lyr takes it once it is released. 0.9.0 came 2026-10-23 for
-  `SharedGpu` (that bump needed no change in lyr's code; 0.8.0's `Presenter`
-  drains before a reconfigure, so lyr no longer does; 0.7.0 brought `set_panel`,
-  frame pacing and `font::breaks`; crcbl's `rust-version` is 1.98, and lyr's
-  follows). 0.8.1 ran on Windows. crcbl 0.4.0 (2026-10-18) brought `crcbl-app`,
-  the window-plus-device crate lyr asked for so that it links no engine, audio
-  (cpal, ALSA) or physics; 0.5.0's only breaking change is in crcbl-phys. M1
-  adds `crcbl-app`, `crcbl-hal`, `crcbl-ui` (with `system-fonts`),
-  `crcbl-frame`, `crcbl-font` and the backend per platform (Vulkan on Linux,
-  D3D12 on Windows, Metal on macOS), each pinned exactly, and `crcbl-image` with
-  M6. The GPU path, as crcbl reported it (not read yet at 0.4.0 or later; read
-  before M1 relies on it):
+  `=0.12.0` (2026-10-26; its one breaking change in lyr's reach,
+  `PresenterDesc::gpu_choice`, is a field lyr's `..Default` already covered).
+  lyr remembers the GPU between runs with it (`lyr_render::gpu`, the file
+  `gpu-choice` in lyr's state directory, `apps/lyr/src/gpu.rs`): run twice in a
+  nested Hyprland on the owner's laptop, the first start enumerated the NVIDIA,
+  Intel and llvmpipe adapters, saved the Intel one, and a thread then added its
+  driver's manifest; the second opened on Intel's driver alone, enumerating one
+  adapter. That thread's search makes the Vulkan loader log "Failed to detect
+  any valid GPUs" at error level once per driver with no GPU behind it (eight
+  lines here, on the first start only): harmless, and passed to crcbl as a
+  logging nit. 0.11.0 (0.10.0 was skipped, since its crates.io publish stopped
+  halfway) brought icon theme lookups that take the nearest size from a
+  per-theme index. 0.9.0 came 2026-10-23 for `SharedGpu` (that bump needed no
+  change in lyr's code; 0.8.0's `Presenter` drains before a reconfigure, so lyr
+  no longer does; 0.7.0 brought `set_panel`, frame pacing and `font::breaks`;
+  crcbl's `rust-version` is 1.98, and lyr's follows). 0.8.1 ran on Windows.
+  crcbl 0.4.0 (2026-10-18) brought `crcbl-app`, the window-plus-device crate lyr
+  asked for so that it links no engine, audio (cpal, ALSA) or physics; 0.5.0's
+  only breaking change is in crcbl-phys. M1 adds `crcbl-app`, `crcbl-hal`,
+  `crcbl-ui` (with `system-fonts`), `crcbl-frame`, `crcbl-font` and the backend
+  per platform (Vulkan on Linux, D3D12 on Windows, Metal on macOS), each pinned
+  exactly, and `crcbl-image` with M6. The GPU path, as crcbl reported it (not
+  read yet at 0.4.0 or later; read before M1 relies on it):
   `crcbl_app::window::open_window(shell, elapsed, desc)`, `wait_for_configure`
   for the extent, then
   `crcbl_app::present::Presenter::open(&shell, window, extent, &PresenterDesc)`

@@ -11,13 +11,13 @@ authors.workspace = true
 readme.workspace = true
 
 [dependencies]
-crcbl-app = "=0.11.0"
-crcbl-font = "=0.11.0"
-crcbl-frame = "=0.11.0"
-crcbl-hal = "=0.11.0"
-crcbl-image = "=0.11.0"
-crcbl-shell = "=0.11.0"
-crcbl-ui = { version = "=0.11.0", features = ["system-fonts"] }
+crcbl-app = "=0.12.0"
+crcbl-font = "=0.12.0"
+crcbl-frame = "=0.12.0"
+crcbl-hal = "=0.12.0"
+crcbl-image = "=0.12.0"
+crcbl-shell = "=0.12.0"
+crcbl-ui = { version = "=0.12.0", features = ["system-fonts"] }
 glam = "0.34.1"
 lyr-config.workspace = true
 lyr-core.workspace = true
