@@ -214,15 +214,17 @@ pub fn draw(
             right = button.x - CONTROL_GAP;
         }
         let text_width = (right - CONTROL_GAP - left).max(0.0);
-        // The title and artist, centred on the art when it is the taller.
-        let text_top = card.y + (card.height - 2.0 * line_height) / 2.0;
-        for (line, (text, colour)) in [
+        // The title and the subtitle, which is left out when empty as
+        // swaync hides it, centred in the card.
+        let lines: Vec<_> = [
             (player.title.as_str(), theme.panel_foreground),
-            (player.artist.as_str(), theme.media_artist),
+            (player.subtitle.as_str(), theme.media_artist),
         ]
         .into_iter()
-        .enumerate()
-        {
+        .filter(|(text, _)| !text.is_empty())
+        .collect();
+        let text_top = card.y + (card.height - lines.len() as f32 * line_height) / 2.0;
+        for (line, (text, colour)) in lines.into_iter().enumerate() {
             items.push(Item::Text {
                 rect: Rect {
                     x: left,

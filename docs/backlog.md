@@ -400,17 +400,22 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `show-album-art` defaults to `always`), a `-symbolic` icon tinted to the
   panel's text colour as GTK recolours one (`media::Artwork::Symbolic`); seen in
   the nested Hyprland with Papirus-Dark's icon. The generic icon's test depends
-  on the installed themes and passes vacuously where none has it. Not carried
-  from swaync 0.12.6 (`data/ui/mpris_player.blp`, `mpris_player.vala`):
-  `http(s)` art (no HTTP client, plan 09) and `data:` URIs (base64, which lyr
-  has no decoder for); swaync's title and subtitle fallbacks (the entry's name,
-  else "Media Player"; the first artist and the album); the art's rounded
-  corners (`Item::Image` has no radius); the blurred art behind the card
-  (`mpris-background`); and swaync's layout, with the controls centred in a row
-  under the art and text, and shuffle and repeat buttons. lyr keeps previous,
-  play/pause and next at the card's right. WebP art is left out until lyr takes
-  crcbl-image's `webp` feature. swaync is no longer installed on the owner's
-  laptop (2026-10-26), so a side-by-side comparison needs it installed again.
+  on the installed themes and passes vacuously where none has it. The title is
+  `xesam:title`, else the entry's name, else "Media Player", and the line under
+  it the first artist (`xesam:artist`, else `xesam:albumArtist`) and the album,
+  "artist - album", left out when empty, as swaync's `update_title` and
+  `update_sub_title` have them; one departure, lyr's own call: swaync shows no
+  subtitle for an artist without an album, where lyr shows the artist
+  (`lyr_core::media::subtitle`). Not carried from swaync 0.12.6
+  (`data/ui/mpris_player.blp`, `mpris_player.vala`): `http(s)` art (no HTTP
+  client, plan 09) and `data:` URIs (base64, which lyr has no decoder for); the
+  art's rounded corners (`Item::Image` has no radius); the blurred art behind
+  the card (`mpris-background`); and swaync's layout, with the controls centred
+  in a row under the art and text, and shuffle and repeat buttons. lyr keeps
+  previous, play/pause and next at the card's right. WebP art is left out until
+  lyr takes crcbl-image's `webp` feature. swaync is no longer installed on the
+  owner's laptop (2026-10-26), so a side-by-side comparison needs it installed
+  again.
 - **Hyprland backend, rest of M2.** `lyr-wm::hyprland` is built against Hyprland
   v0.56.2's formats: the event parser, the `Tracker` that folds events into the
   shared `lyr_wm::State`, the JSON seed, and `Hyprland` (socket I/O, `from_env`,

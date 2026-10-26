@@ -11,9 +11,10 @@ and this project adheres to
 ### Breaking
 
 - For the library crates: `lyr_core::media::Player` gains `art` (a
-  `media::Artwork`), and `lyr_sources::mpris::linux::read` takes the art cache
-  (`mpris::linux::Art`), and `lyr_core::tray::Item` gains
-  `attention_movie_name`, `overlay_icon_name` and `overlay_icon_pixmap`.
+  `media::Artwork`) and its `artist` is now `subtitle`, and
+  `lyr_sources::mpris::linux::read` takes the art cache (`mpris::linux::Art`),
+  and `lyr_core::tray::Item` gains `attention_movie_name`, `overlay_icon_name`
+  and `overlay_icon_pixmap`.
 
 ### Added
 
@@ -22,12 +23,20 @@ and this project adheres to
   only; lyr fetches nothing over the network. A player with no art shows the
   icon of its desktop entry (`DesktopEntry`), else `audio-x-generic-symbolic`,
   as swaync does; a symbolic icon is drawn in the panel's text colour.
+- A media player card's title falls back to the player's desktop entry name,
+  else "Media Player", as swaync's does.
 - A picture file with no extension (as browsers write a player's art) is read as
   PNG or JPEG by its contents.
 - Tray items draw their overlay icon (`OverlayIconName` or `OverlayIconPixmap`)
   in the bottom right corner of their icon, and an item that needs attention
   falls back to its `AttentionMovieName` as a still icon, as waybar's master
   does.
+
+### Changed
+
+- A media player card's second line is the first artist and the album ("artist -
+  album"), as swaync shows it, where it was every artist; it is left out when
+  there is neither, centring the title.
 
 ## [0.2.0] - 2026-10-26
 

@@ -255,7 +255,7 @@ fn a_media_player_is_a_card_with_its_controls_before_the_history() {
     let players = [Player {
         bus_name: "org.mpris.MediaPlayer2.test".to_owned(),
         title: "A Song".to_owned(),
-        artist: "Someone".to_owned(),
+        subtitle: "Someone".to_owned(),
         status: Status::Playing,
         art: None,
     }];
@@ -316,7 +316,7 @@ fn a_media_player_s_art_stands_left_of_its_text() {
     let players = [Player {
         bus_name: "org.mpris.MediaPlayer2.test".to_owned(),
         title: "A Song".to_owned(),
-        artist: "Someone".to_owned(),
+        subtitle: "Someone".to_owned(),
         status: Status::Paused,
         art: Some(Artwork::Picture(art.clone())),
     }];
@@ -354,6 +354,45 @@ fn a_media_player_s_art_stands_left_of_its_text() {
     assert_eq!(title.x, inner + 2.0 * ART_MARGIN + ART_SIZE + ART_SPACING);
     // The two lines centred on the art.
     assert_eq!(title.y, card_top + inner + (ART_SIZE - 2.0 * LINE) / 2.0);
+}
+
+#[test]
+fn a_player_with_no_subtitle_has_its_title_centred() {
+    use crate::media::{Player, Status};
+    let theme = theme();
+    let store = Store::default();
+    let players = [Player {
+        title: "A Song".to_owned(),
+        status: Status::Paused,
+        ..Player::default()
+    }];
+    let (list, _, _) = draw(
+        &Shown {
+            store: &store,
+            players: &players,
+            now: Instant::now(),
+            hovered: None,
+        },
+        WIDTH,
+        &measure,
+        LINE,
+        &theme,
+    );
+    let card_top = 32.0 + GAP + LINE + GAP;
+    let inner = 2.0 + 8.0;
+    let title = list.items.iter().find_map(|item| match item {
+        Item::Text { text, rect, .. } if text == "A Song" => Some(rect.y),
+        _ => None,
+    });
+    // Half a line down from where two lines would start.
+    assert_eq!(title, Some(card_top + inner + LINE / 2.0));
+    assert!(
+        !list
+            .items
+            .iter()
+            .any(|item| matches!(item, Item::Text { colour, .. } if *colour == theme.media_artist)),
+        "no empty subtitle drawn"
+    );
 }
 
 #[test]

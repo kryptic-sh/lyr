@@ -1,7 +1,7 @@
 //! An application's desktop entry, as the Desktop Entry Specification
 //! places it: `<id>.desktop` under `applications` in each XDG data
 //! directory, the user's first. Only what a notification or a media
-//! player needs is read: the entry's icon.
+//! player needs is read: the entry's icon and name.
 //!
 //! An id that the specification maps to a subdirectory (`kde-foo` as
 //! `kde/foo.desktop`) is looked for only as the flat file.
@@ -25,12 +25,31 @@ pub fn dirs() -> Vec<PathBuf> {
 
 /// [`icon`], looking in `dirs`.
 pub fn icon_in<'a>(dirs: &[PathBuf], ids: impl IntoIterator<Item = &'a str>) -> Option<String> {
+    first_in(dirs, ids, &["Icon"])
+}
+
+/// The name the first of `ids` with a desktop entry shows, looking in
+/// `dirs`: its `X-GNOME-FullName`, else its `Name`, as GLib's
+/// `g_app_info_get_display_name` gives it (unlocalized).
+pub fn name_in<'a>(dirs: &[PathBuf], ids: impl IntoIterator<Item = &'a str>) -> Option<String> {
+    first_in(dirs, ids, &["X-GNOME-FullName", "Name"])
+}
+
+/// The first of `keys` set in the first of `ids`' entries under `dirs`
+/// that sets one, not empty.
+fn first_in<'a>(
+    dirs: &[PathBuf],
+    ids: impl IntoIterator<Item = &'a str>,
+    keys: &[&str],
+) -> Option<String> {
     ids.into_iter().filter(|id| is_id(id)).find_map(|id| {
         dirs.iter().find_map(|dir| {
             let path = dir.join("applications").join(format!("{id}.desktop"));
             let text = std::fs::read_to_string(path).ok()?;
-            let icon = crate::ini::value(&text, "Desktop Entry", "Icon")?;
-            (!icon.is_empty()).then(|| icon.to_owned())
+            keys.iter().find_map(|key| {
+                let value = crate::ini::value(&text, "Desktop Entry", key)?;
+                (!value.is_empty()).then(|| value.to_owned())
+            })
         })
     })
 }

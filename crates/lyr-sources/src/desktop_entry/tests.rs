@@ -1,7 +1,7 @@
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
-use super::{data_dirs, icon_in};
+use super::{data_dirs, icon_in, name_in};
 
 fn entry(dir: &Path, id: &str, text: &str) {
     let applications = dir.join("applications");
@@ -86,5 +86,25 @@ fn the_data_directories_follow_the_base_directory_specification() {
             PathBuf::from("/a"),
             PathBuf::from("/b"),
         ]
+    );
+}
+
+#[test]
+fn a_name_is_the_full_name_else_the_name() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    entry(
+        dir.path(),
+        "gnome",
+        "[Desktop Entry]\nName=Music\nX-GNOME-FullName=GNOME Music\n",
+    );
+    entry(dir.path(), "plain", "[Desktop Entry]\nName=Player\n");
+    entry(dir.path(), "nameless", "[Desktop Entry]\nIcon=x\n");
+    let dirs = [dir.path().to_owned()];
+    assert_eq!(name_in(&dirs, ["gnome"]).as_deref(), Some("GNOME Music"));
+    assert_eq!(name_in(&dirs, ["plain"]).as_deref(), Some("Player"));
+    assert_eq!(
+        name_in(&dirs, ["nameless", "plain"]).as_deref(),
+        Some("Player"),
+        "an entry without one gives way to the next id"
     );
 }

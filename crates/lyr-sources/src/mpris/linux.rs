@@ -17,7 +17,7 @@ use zbus::{Connection, MatchRule, MessageStream, OwnedVariant};
 
 use crcbl_image::theme::FileVersion;
 use lyr_core::draw::Picture;
-use lyr_core::media::{Artwork, Control, Player, Status};
+use lyr_core::media::{self, Artwork, Control, Player, Status};
 
 use crate::bus::Follow;
 use crate::desktop_entry;
@@ -31,6 +31,10 @@ pub const PATH: &str = "/org/mpris/MediaPlayer2";
 /// What stands for a player's art when it has none and its desktop entry
 /// gives no icon: swaync 0.12.6's default in `update_album_art`.
 const NO_ART_ICON: &str = "audio-x-generic-symbolic";
+
+/// The title of a player that gives none and has no desktop entry: swaync
+/// 0.12.6's `update_title`.
+const UNNAMED: &str = "Media Player";
 
 #[zbus::proxy(
     interface = "org.mpris.MediaPlayer2",
@@ -69,7 +73,8 @@ async fn proxy(connection: &Connection, bus_name: &str) -> zbus::Result<MediaPla
 const ART_SIZE: u32 = 256;
 
 /// Players' art read so far, by `mpris:artUrl`, each file read again only
-/// once it changed, and the icons that stand in for art a player lacks.
+/// once it changed, the icons that stand in for art a player lacks, and
+/// where players' desktop entries are.
 #[derive(Debug)]
 pub struct Art {
     read: HashMap<String, (FileVersion, Option<Picture>)>,
@@ -148,8 +153,8 @@ impl Art {
     }
 }
 
-/// What the player at `bus_name` plays now, its art read through `art`
-/// ([`Art::shown`]).
+/// What the player at `bus_name` plays now, its art and desktop entry read
+/// through `art` ([`Art::shown`]).
 ///
 /// # Errors
 ///
@@ -167,10 +172,16 @@ pub async fn read(
             .and_then(|value| String::try_from(value.clone()).ok())
             .unwrap_or_default()
     };
-    let artist = metadata
-        .get("xesam:artist")
-        .and_then(|value| Vec::<String>::try_from(value.clone()).ok())
-        .map(|artists| artists.join(", "))
+    // The first artist, as swaync takes it.
+    let first = |key: &str| {
+        metadata
+            .get(key)
+            .and_then(|value| Vec::<String>::try_from(value.clone()).ok())
+            .and_then(|names| names.into_iter().next())
+            .filter(|name| !name.is_empty())
+    };
+    let artist = first("xesam:artist")
+        .or_else(|| first("xesam:albumArtist"))
         .unwrap_or_default();
     let status = Status::from_name(&player.playback_status().await?);
     // A player that does not say has none, as swaync reads it.
@@ -182,14 +193,16 @@ pub async fn read(
         .desktop_entry()
         .await
         .unwrap_or_default();
-    let art = art
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
-        .shown(&text("mpris:artUrl"), &entry);
+    let mut looks = art.lock().unwrap_or_else(PoisonError::into_inner);
+    let title = Some(text("xesam:title"))
+        .filter(|title| !title.is_empty())
+        .or_else(|| desktop_entry::name_in(&looks.entry_dirs, [entry.as_str()]))
+        .unwrap_or_else(|| UNNAMED.to_owned());
+    let art = looks.shown(&text("mpris:artUrl"), &entry);
     Ok(Player {
         bus_name: bus_name.to_owned(),
-        title: text("xesam:title"),
-        artist,
+        title,
+        subtitle: media::subtitle(&artist, &text("xesam:album")),
         status,
         art,
     })

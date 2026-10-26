@@ -17,7 +17,9 @@ const NAME: &str = "org.mpris.MediaPlayer2.test";
 struct FakePlayer {
     status: &'static str,
     artists: Vec<String>,
-    art_url: String,
+    album_artists: Vec<String>,
+    /// Text entries over the default title "A Song".
+    texts: Vec<(&'static str, String)>,
     pressed: Arc<Mutex<Vec<&'static str>>>,
 }
 
@@ -35,21 +37,24 @@ impl FakePlayer {
 
     #[zbus(property)]
     fn metadata(&self) -> HashMap<String, OwnedVariant> {
-        HashMap::from([
+        let names = |names: &[String]| {
+            OwnedVariant::try_from(zbus::Variant::from(names.to_vec())).expect("an array")
+        };
+        let mut metadata = HashMap::from([
             (
                 "xesam:title".to_owned(),
                 OwnedVariant::from(zbus::Str::from("A Song")),
             ),
-            (
-                "xesam:artist".to_owned(),
-                OwnedVariant::try_from(zbus::Variant::from(self.artists.clone()))
-                    .expect("an array"),
-            ),
-            (
-                "mpris:artUrl".to_owned(),
-                OwnedVariant::from(zbus::Str::from(self.art_url.clone())),
-            ),
-        ])
+            ("xesam:artist".to_owned(), names(&self.artists)),
+            ("xesam:albumArtist".to_owned(), names(&self.album_artists)),
+        ]);
+        for (key, value) in &self.texts {
+            metadata.insert(
+                (*key).to_owned(),
+                OwnedVariant::from(zbus::Str::from(value.clone())),
+            );
+        }
+        metadata
     }
 
     #[zbus(property)]
@@ -76,7 +81,18 @@ async fn player(
     status: &'static str,
     artists: &[&str],
 ) -> (Connection, Connection, Arc<Mutex<Vec<&'static str>>>) {
-    with_art(status, artists, "").await
+    playing(FakePlayer {
+        status,
+        artists: names(artists),
+        album_artists: Vec::new(),
+        texts: Vec::new(),
+        pressed: Arc::default(),
+    })
+    .await
+}
+
+fn names(names: &[&str]) -> Vec<String> {
+    names.iter().map(|name| (*name).to_owned()).collect()
 }
 
 async fn with_art(
@@ -84,20 +100,36 @@ async fn with_art(
     artists: &[&str],
     art_url: &str,
 ) -> (Connection, Connection, Arc<Mutex<Vec<&'static str>>>) {
-    let pressed = Arc::new(Mutex::new(Vec::new()));
+    with_texts(artists, &[("mpris:artUrl", art_url)], status).await
+}
+
+async fn with_texts(
+    artists: &[&str],
+    texts: &[(&'static str, &str)],
+    status: &'static str,
+) -> (Connection, Connection, Arc<Mutex<Vec<&'static str>>>) {
+    playing(FakePlayer {
+        status,
+        artists: names(artists),
+        album_artists: Vec::new(),
+        texts: texts
+            .iter()
+            .map(|(key, value)| (*key, (*value).to_owned()))
+            .collect(),
+        pressed: Arc::default(),
+    })
+    .await
+}
+
+/// `fake` serving on one end of a socket pair, with [`FakeRoot`]: the
+/// server, the client, and what was pressed.
+async fn playing(fake: FakePlayer) -> (Connection, Connection, Arc<Mutex<Vec<&'static str>>>) {
+    let pressed = fake.pressed.clone();
     let (server, client) = UnixStream::pair().expect("socket pair");
     let server = Builder::unix_stream(server)
         .server(Guid::generate())
         .p2p()
-        .serve_at(
-            PATH,
-            FakePlayer {
-                status,
-                artists: artists.iter().map(|artist| (*artist).to_owned()).collect(),
-                art_url: art_url.to_owned(),
-                pressed: pressed.clone(),
-            },
-        )
+        .serve_at(PATH, fake)
         .serve_at(PATH, FakeRoot)
         .build();
     let client = Builder::unix_stream(client).p2p().build();
@@ -111,7 +143,7 @@ async fn a_player_is_read_with_its_title_artists_and_status() {
     let read = read(&client, NAME, &Mutex::default()).await.expect("read");
     assert_eq!(read.bus_name, NAME);
     assert_eq!(read.title, "A Song");
-    assert_eq!(read.artist, "One, Two");
+    assert_eq!(read.subtitle, "One", "the first artist, as swaync shows it");
     assert_eq!(read.status, Status::Playing);
 }
 
@@ -211,7 +243,7 @@ fn art_is_read_again_once_its_file_changed_and_swept_once_unasked() {
 async fn a_player_with_no_artist_has_none() {
     let (_server, client, _) = player("Paused", &[]).await;
     let read = read(&client, NAME, &Mutex::default()).await.expect("read");
-    assert_eq!((read.artist.as_str(), read.status), ("", Status::Paused));
+    assert_eq!((read.subtitle.as_str(), read.status), ("", Status::Paused));
 }
 
 #[tokio::test]
@@ -224,4 +256,46 @@ async fn each_control_presses_its_method() {
         *pressed.lock().expect("pressed"),
         ["Previous", "PlayPause", "Next"]
     );
+}
+
+#[tokio::test]
+async fn the_subtitle_is_the_artist_and_the_album() {
+    let (_server, client, _) = with_texts(
+        &["Miles Davis"],
+        &[("xesam:album", "Kind of Blue")],
+        "Playing",
+    )
+    .await;
+    let read = read(&client, NAME, &Mutex::default()).await.expect("read");
+    assert_eq!(read.subtitle, "Miles Davis - Kind of Blue");
+}
+
+#[tokio::test]
+async fn with_no_artist_the_album_artist_is_taken() {
+    let (_server, client, _) = playing(FakePlayer {
+        status: "Playing",
+        artists: Vec::new(),
+        album_artists: names(&["Various"]),
+        texts: Vec::new(),
+        pressed: Arc::default(),
+    })
+    .await;
+    let read = read(&client, NAME, &Mutex::default()).await.expect("read");
+    assert_eq!(read.subtitle, "Various");
+}
+
+#[tokio::test]
+async fn an_untitled_player_is_named_by_its_entry_else_media_player() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let (_server, client, _) = with_texts(&[], &[("xesam:title", "")], "Playing").await;
+    let named = read(&client, NAME, &with_entry(dir.path()))
+        .await
+        .expect("read");
+    assert_eq!(named.title, "Player");
+    let unnamed = Mutex::new(Art::new(
+        Icons::new("lyr-test-theme".to_owned()),
+        Vec::new(),
+    ));
+    let read = read(&client, NAME, &unnamed).await.expect("read");
+    assert_eq!(read.title, "Media Player");
 }
