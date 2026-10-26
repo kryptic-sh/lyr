@@ -24,6 +24,10 @@ and this project adheres to
 
 - Built on crcbl 0.11.0 (from 0.9.0). Icon theme lookups are faster and take the
   icon nearest the size drawn.
+- Dependencies at their latest releases: `hjkl-config` and `hjkl-xdg` 0.43,
+  `tokio` 1.54, `zbus` 6.1, `interprocess` 2.4.7. `windows-core` and
+  `windows-collections` stay at the versions `windows` 0.62 (its latest) is
+  built on, since 0.100 of either alone would split the Windows types in two.
 
 ### Fixed
 
