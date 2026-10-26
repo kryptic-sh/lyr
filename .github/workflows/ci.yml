@@ -395,6 +395,37 @@ jobs:
             lyr-*.zip
             lyr-*.zip.sha256
 
+  # The release archives `build` cannot run where it builds them, checked
+  # against their `.sha256` and run on a machine of their own architecture:
+  # what a user downloads, unpacked.
+  smoke-cross:
+    name: smoke ${{ matrix.target }}
+    needs: [build]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: lyr-${{ matrix.target }}
+      - name: Unpack and run
+        shell: bash
+        run: |
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum -c lyr-*.tar.gz.sha256
+          else
+            shasum -a 256 -c lyr-*.tar.gz.sha256
+          fi
+          mkdir unpacked
+          tar -xzf lyr-*-${{ matrix.target }}.tar.gz -C unpacked
+          ./unpacked/lyr --version
+
   # Every crate packaged and built from its package, the libraries from a
   # local registry, as `cargo publish` will build them: a crate that cannot
   # publish fails here on main, before a tag strands the ones after it.
@@ -416,6 +447,7 @@ jobs:
     needs:
       [
         build,
+        smoke-cross,
         package,
         fmt,
         clippy,
@@ -764,6 +796,7 @@ jobs:
         nerd-font,
         sway-e2e,
         build,
+        smoke-cross,
         package,
         publish-github-release,
         publish-crates,

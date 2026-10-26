@@ -1528,5 +1528,7 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `lyr-core` timed out, `wait_for_index` waited a further 210 s until the index
   had it, and every channel published in one run, the AUR, formula and Scoop
   hashes matching the release's `.sha256` files. The Linux aarch64 and macOS
-  x86_64 binaries are built but run by no job: only x86_64 Linux, Apple silicon
-  macOS and Windows get a `--version` smoke run.
+  x86_64 archives are checked against their `.sha256` and run with `--version`
+  on their own architecture by `smoke-cross` (`ubuntu-24.04-arm`,
+  `macos-15-intel`), which publishing waits on; `--version` is all it runs,
+  since neither runner has a desktop to open the bar on.

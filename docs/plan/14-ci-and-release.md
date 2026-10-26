@@ -55,9 +55,11 @@ tmxr's release jobs, renamed for lyr, in `.github/workflows/ci.yml`:
 - `build`, on every push that is not a pull request: Linux gnu (x86_64 and
   aarch64, glibc 2.28 through `cargo zigbuild`), Windows MSVC, and macOS aarch64
   and x86_64 at a deployment target of 11.0 (crcbl's Metal floor); the tag ↔
-  `Cargo.toml` version check; `.tar.gz` / `.zip` + `.sha256`. No musl build:
-  crcbl `dlopen`s libwayland and the Vulkan loader, which a static musl binary
-  cannot.
+  `Cargo.toml` version check; `.tar.gz` / `.zip` + `.sha256`. The three it
+  builds natively run `lyr --version` there; `smoke-cross` checks the other two
+  archives' `.sha256` and runs `lyr --version` from them on an arm64 Linux and
+  an Intel Mac runner, and publishing waits on it. No musl build: crcbl
+  `dlopen`s libwayland and the Vulkan loader, which a static musl binary cannot.
 - `package`: `cargo package --workspace`, every crate built from its package as
   `cargo publish` builds it, so a crate that cannot publish fails on main rather
   than stranding the crates after it on a tag.
