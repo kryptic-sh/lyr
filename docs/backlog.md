@@ -231,20 +231,22 @@ implementation follows meanwhile.
   driver's manifest; the second opened on Intel's driver alone, enumerating one
   adapter. That thread's search makes the Vulkan loader log "Failed to detect
   any valid GPUs" at error level once per driver with no GPU behind it (eight
-  lines here, on the first start only): harmless, and passed to crcbl as a
-  logging nit. 0.11.0 (0.10.0 was skipped, since its crates.io publish stopped
-  halfway) brought icon theme lookups that take the nearest size from a
-  per-theme index. 0.9.0 came 2026-10-23 for `SharedGpu` (that bump needed no
-  change in lyr's code; 0.8.0's `Presenter` drains before a reconfigure, so lyr
-  no longer does; 0.7.0 brought `set_panel`, frame pacing and `font::breaks`;
-  crcbl's `rust-version` is 1.98, and lyr's follows). 0.8.1 ran on Windows.
-  crcbl 0.4.0 (2026-10-18) brought `crcbl-app`, the window-plus-device crate lyr
-  asked for so that it links no engine, audio (cpal, ALSA) or physics; 0.5.0's
-  only breaking change is in crcbl-phys. M1 adds `crcbl-app`, `crcbl-hal`,
-  `crcbl-ui` (with `system-fonts`), `crcbl-frame`, `crcbl-font` and the backend
-  per platform (Vulkan on Linux, D3D12 on Windows, Metal on macOS), each pinned
-  exactly, and `crcbl-image` with M6. The GPU path, as crcbl reported it (not
-  read yet at 0.4.0 or later; read before M1 relies on it):
+  lines here, on the first start only): harmless; crcbl demoted it to debug for
+  a single-driver instance on its main (`152bb077`), shipping with the squeeze
+  fix in the release after 0.12.0, when the first start should log none. 0.11.0
+  (0.10.0 was skipped, since its crates.io publish stopped halfway) brought icon
+  theme lookups that take the nearest size from a per-theme index. 0.9.0 came
+  2026-10-23 for `SharedGpu` (that bump needed no change in lyr's code; 0.8.0's
+  `Presenter` drains before a reconfigure, so lyr no longer does; 0.7.0 brought
+  `set_panel`, frame pacing and `font::breaks`; crcbl's `rust-version` is 1.98,
+  and lyr's follows). 0.8.1 ran on Windows. crcbl 0.4.0 (2026-10-18) brought
+  `crcbl-app`, the window-plus-device crate lyr asked for so that it links no
+  engine, audio (cpal, ALSA) or physics; 0.5.0's only breaking change is in
+  crcbl-phys. M1 adds `crcbl-app`, `crcbl-hal`, `crcbl-ui` (with
+  `system-fonts`), `crcbl-frame`, `crcbl-font` and the backend per platform
+  (Vulkan on Linux, D3D12 on Windows, Metal on macOS), each pinned exactly, and
+  `crcbl-image` with M6. The GPU path, as crcbl reported it (not read yet at
+  0.4.0 or later; read before M1 relies on it):
   `crcbl_app::window::open_window(shell, elapsed, desc)`, `wait_for_configure`
   for the extent, then
   `crcbl_app::present::Presenter::open(&shell, window, extent, &PresenterDesc)`
