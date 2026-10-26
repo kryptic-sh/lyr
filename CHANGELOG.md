@@ -8,6 +8,16 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-26
+
+### Breaking
+
+- For the library crates: `lyr_core::toast::draw` returns its action buttons and
+  links as `toast::Area`s, `lyr_core::markup::Style::link` is the link's index
+  (`Option<u32>`), `lyr_core::draw::Content::Buttons` takes a `padding`,
+  `lyr_core::notifications::Incoming` gains `icon` and `image`, and
+  `lyr_sources::notifications::linux::Daemon` is built with `Daemon::new`.
+
 ### Added
 
 - Notification toasts and the notification centre draw the notification's image
@@ -240,5 +250,6 @@ and this project adheres to
   tables. An invalid config is an error naming the key, such as
   ``theme.border: `teal` is not a colour``.
 
-[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kryptic-sh/lyr/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kryptic-sh/lyr/releases/tag/v0.1.0

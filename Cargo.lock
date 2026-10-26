@@ -890,7 +890,7 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "lyr-bin"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -913,7 +913,7 @@ dependencies = [
 
 [[package]]
 name = "lyr-config"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "hjkl-config",
@@ -925,7 +925,7 @@ dependencies = [
 
 [[package]]
 name = "lyr-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "crcbl-ui",
@@ -934,7 +934,7 @@ dependencies = [
 
 [[package]]
 name = "lyr-render"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crcbl-app",
  "crcbl-font",
@@ -951,7 +951,7 @@ dependencies = [
 
 [[package]]
 name = "lyr-shell"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crcbl-shell",
  "lyr-config",
@@ -959,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "lyr-sources"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "block2",
  "crcbl-image",
@@ -986,7 +986,7 @@ dependencies = [
 
 [[package]]
 name = "lyr-wm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
