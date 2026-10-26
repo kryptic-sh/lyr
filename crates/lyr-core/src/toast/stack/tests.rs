@@ -275,3 +275,34 @@ fn the_toast_under_the_pointer_shows_its_close_button() {
         "swaync's 24 px margin outside the toast's 18, and a 16 px icon padded 2"
     );
 }
+
+#[test]
+fn a_link_is_its_own_region_on_top_of_the_toast() {
+    let theme = from_sources(None, Platform::Linux)
+        .expect("the defaults")
+        .theme;
+    let measure = |text: &str, _| text.chars().count() as f32 * 10.0;
+    let start = Instant::now();
+    let mut store = Store::default();
+    let mut stack = Stack::default();
+    let id = store.notify(
+        Incoming {
+            summary: "x".to_owned(),
+            body: "go <a href=\"https://x\">there</a>".to_owned(),
+            ..Incoming::default()
+        },
+        start,
+    );
+    stack.notified(&store, id, false, start);
+    let (_, _, regions) = stack.draw(&store, start, measure, 20.0, &theme);
+    let body_y = BORDER + INSET + 20.0 + 1.0;
+    // "go " is 30 px; the link starts after it.
+    assert_eq!(
+        regions.hit(BORDER + INSET + 31.0, body_y),
+        Some(&Part::Link(id, 0))
+    );
+    assert_eq!(
+        regions.hit(BORDER + INSET + 1.0, body_y),
+        Some(&Part::Body(id))
+    );
+}

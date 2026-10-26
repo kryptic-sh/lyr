@@ -208,6 +208,44 @@ fn an_entry_s_action_button_is_its_own_target() {
 }
 
 #[test]
+fn a_link_in_an_entry_is_its_own_target() {
+    let theme = theme();
+    let now = Instant::now();
+    let mut store = Store::default();
+    let id = store.notify(
+        Incoming {
+            summary: "x".to_owned(),
+            body: "<a href=\"https://x\">there</a>".to_owned(),
+            ..Incoming::default()
+        },
+        now,
+    );
+    let (_, _, regions) = draw(
+        &Shown {
+            store: &store,
+            players: &[],
+            now,
+            hovered: None,
+        },
+        WIDTH,
+        &measure,
+        LINE,
+        &theme,
+    );
+    let entry = 32.0 + GAP + LINE + GAP;
+    let body_y = entry + BORDER + INSET + LINE + 1.0;
+    assert_eq!(
+        regions.hit(BORDER + INSET + 1.0, body_y),
+        Some(&Target::Link(id, 0))
+    );
+    assert_eq!(
+        regions.hit(WIDTH - BORDER - INSET - 1.0, body_y),
+        Some(&Target::Notification(id)),
+        "past the link's end"
+    );
+}
+
+#[test]
 fn a_media_player_is_a_card_with_its_controls_before_the_history() {
     use crate::media::{Control, Player, Status};
     let theme = theme();

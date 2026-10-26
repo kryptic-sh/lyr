@@ -104,10 +104,10 @@ The interface is the freedesktop Desktop Notifications Specification, version
   are ignored.
 - **Body markup:** the spec's tags are `<b>`, `<i>`, `<u>`, `<a href>` and
   `<img>`. lyr draws the first four (links in the spec's "standard blue
-  underline"; how a click opens one is settled in M6) and leaves `<img>` out,
-  which is why `body-images` is not advertised. Anything else is shown as text,
-  never interpreted. `.menu-wifi` escapes `&`, `<` and `>` because swaync
-  renders markup, so lyr must too.
+  underline"; a click opens an `http` or `https` link with `xdg-open`, and
+  nothing else) and leaves `<img>` out, which is why `body-images` is not
+  advertised. Anything else is shown as text, never interpreted. `.menu-wifi`
+  escapes `&`, `<` and `>` because swaync renders markup, so lyr must too.
 - **Images:** lyr shows an image and the app's icon as swaync does: the image is
   the first of `image-data`, `image-path` and `icon_data` (and the deprecated
   `image_data` and `image_path`), drawn left of the text with the app's icon

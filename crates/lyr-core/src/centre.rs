@@ -14,7 +14,7 @@ use crate::draw::{self, DrawList, Item, Size, TextStyle};
 use crate::hit::{Rect, Regions};
 use crate::media::{Control, Player, Status};
 use crate::notifications::Store;
-use crate::toast;
+use crate::toast::{self, Area};
 
 /// What a click in the centre lands on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,6 +25,8 @@ pub enum Target {
     /// An action button, by the action's index in the notification's
     /// actions.
     Action(u32, usize),
+    /// A link in an entry's body, by its index among the body's links.
+    Link(u32, usize),
     /// A media player's control, by the player's index in the list drawn.
     Media(usize, Control),
     /// The close button of the entry under the pointer.
@@ -36,7 +38,9 @@ impl Target {
     #[must_use]
     pub const fn entry(self) -> Option<u32> {
         match self {
-            Self::Notification(id) | Self::Action(id, _) | Self::Close(id) => Some(id),
+            Self::Notification(id) | Self::Action(id, _) | Self::Link(id, _) | Self::Close(id) => {
+                Some(id)
+            }
             Self::ClearAll | Self::Dnd | Self::Media(..) => None,
         }
     }
@@ -218,7 +222,7 @@ pub fn draw(
         }
         for held in members {
             let elapsed = now.saturating_duration_since(held.received);
-            let (entry, size, buttons) =
+            let (entry, size, areas) =
                 toast::draw(&held.content, elapsed, width, measure, line_height, theme);
             items.extend(entry.items.into_iter().map(|item| item.offset(0.0, y)));
             regions.push(
@@ -230,13 +234,16 @@ pub fn draw(
                 },
                 Target::Notification(held.id),
             );
-            for (index, rect) in buttons {
+            for (area, rect) in areas {
                 regions.push(
                     Rect {
                         y: rect.y + y,
                         ..rect
                     },
-                    Target::Action(held.id, index),
+                    match area {
+                        Area::Action(index) => Target::Action(held.id, index),
+                        Area::Link(index) => Target::Link(held.id, index),
+                    },
                 );
             }
             if hovered == Some(held.id) {

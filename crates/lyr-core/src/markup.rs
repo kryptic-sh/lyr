@@ -11,8 +11,9 @@ pub struct Style {
     pub bold: bool,
     pub italic: bool,
     pub underline: bool,
-    /// Inside `<a href="…">`: drawn as a link, though not opened.
-    pub link: bool,
+    /// Inside `<a href="…">`: the link's index among the body's
+    /// ([`links`]).
+    pub link: Option<u32>,
 }
 
 /// A run of text in one style.
@@ -29,6 +30,8 @@ struct Depth {
     italic: u32,
     underline: u32,
     link: u32,
+    /// The innermost link opened, by its index.
+    href: Option<u32>,
 }
 
 impl Depth {
@@ -37,7 +40,7 @@ impl Depth {
             bold: self.bold > 0,
             italic: self.italic > 0,
             underline: self.underline > 0,
-            link: self.link > 0,
+            link: if self.link > 0 { self.href } else { None },
         }
     }
 }
@@ -46,14 +49,40 @@ impl Depth {
 /// change.
 #[must_use]
 pub fn parse(body: &str) -> Vec<Span> {
+    scan(body).0
+}
+
+/// The `href` of each `<a>` in `body`, in order, its entities decoded: what
+/// a span's [`Style::link`] indexes.
+#[must_use]
+pub fn links(body: &str) -> Vec<String> {
+    scan(body).1
+}
+
+/// Whether a click may open `href`: an `http` or `https` URL, the scheme's
+/// case aside (RFC 3986 section 3.1). Any other scheme, `file:` among them,
+/// could run or reveal something on the user's machine on the word of
+/// whichever program sent the notification.
+#[must_use]
+pub fn openable(href: &str) -> bool {
+    href.split_once("://").is_some_and(|(scheme, rest)| {
+        (scheme.eq_ignore_ascii_case("http") || scheme.eq_ignore_ascii_case("https"))
+            && !rest.is_empty()
+    })
+}
+
+/// [`parse`] and [`links`] in one pass, so the two agree on which link is
+/// which.
+fn scan(body: &str) -> (Vec<Span>, Vec<String>) {
     let mut spans: Vec<Span> = Vec::new();
+    let mut links = Vec::new();
     let mut depth = Depth::default();
     let mut rest = body;
     while let Some(next) = rest.chars().next() {
         let (text, used) = match next {
             '<' => match tag(rest) {
                 Some((tag, used)) => {
-                    apply(tag, &mut depth);
+                    apply(tag, &mut depth, &mut links);
                     rest = &rest[used..];
                     continue;
                 }
@@ -72,7 +101,7 @@ pub fn parse(body: &str) -> Vec<Span> {
             _ => spans.push(Span { text, style }),
         }
     }
-    spans
+    (spans, links)
 }
 
 /// The text of `spans` without its styles.
@@ -99,9 +128,11 @@ pub fn escape(text: &str) -> String {
 
 /// A tag the spec lists.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Tag {
+enum Tag<'a> {
     Open(Name),
     Close(Name),
+    /// `<a href="…">`, with its `href` as written.
+    Link(&'a str),
     /// `<img …>`, left out.
     Image,
 }
@@ -114,10 +145,15 @@ enum Name {
     Link,
 }
 
-fn apply(tag: Tag, depth: &mut Depth) {
+fn apply(tag: Tag<'_>, depth: &mut Depth, links: &mut Vec<String>) {
     let (name, opens) = match tag {
         Tag::Open(name) => (name, true),
         Tag::Close(name) => (name, false),
+        Tag::Link(href) => {
+            depth.href = u32::try_from(links.len()).ok();
+            links.push(decoded(href));
+            (Name::Link, true)
+        }
         Tag::Image => return,
     };
     let count = match name {
@@ -136,7 +172,7 @@ fn apply(tag: Tag, depth: &mut Depth) {
 
 /// The tag `text` starts with, and its length, when it is one the spec
 /// lists.
-fn tag(text: &str) -> Option<(Tag, usize)> {
+fn tag(text: &str) -> Option<(Tag<'_>, usize)> {
     let end = text.find('>')?;
     let inside = &text[1..end];
     let used = end + 1;
@@ -148,8 +184,11 @@ fn tag(text: &str) -> Option<(Tag, usize)> {
         "u" => Tag::Open(Name::Underline),
         "/u" => Tag::Close(Name::Underline),
         "/a" => Tag::Close(Name::Link),
-        _ if inside.starts_with("a ") && attribute(&inside[2..], "href").is_some() => {
-            Tag::Open(Name::Link)
+        _ if let Some(href) = inside
+            .strip_prefix("a ")
+            .and_then(|attributes| attribute(attributes, "href")) =>
+        {
+            Tag::Link(href)
         }
         _ if inside.starts_with("img ") => Tag::Image,
         _ => return None,
@@ -168,6 +207,21 @@ fn attribute<'a>(attributes: &'a str, name: &str) -> Option<&'a str> {
     let quote = value.chars().next().filter(|c| matches!(c, '"' | '\''))?;
     let value = &value[1..];
     value.find(quote).map(|end| &value[..end])
+}
+
+/// `text` with its entities and character references decoded, as an
+/// attribute's value is.
+fn decoded(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find('&') {
+        out.push_str(&rest[..at]);
+        let (piece, used) = entity(&rest[at..]).unwrap_or_else(|| (String::from('&'), 1));
+        out.push_str(&piece);
+        rest = &rest[at + used..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// The entity or character reference `text` starts with, decoded, and its

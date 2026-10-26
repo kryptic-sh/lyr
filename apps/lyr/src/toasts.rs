@@ -3,8 +3,9 @@
 //! the user is on, above windows and clear of the bar.
 //!
 //! A click on a toast invokes its `default` action when it has one and takes
-//! the toast down; a middle click, or a click on the close button the toast
-//! under the pointer shows, dismisses the notification. The panel follows
+//! the toast down, and a click on a link opens it and leaves the toast up; a
+//! middle click, or a click on the close button the toast under the pointer
+//! shows, dismisses the notification. The panel follows
 //! the stack's size in place (`Shell::set_panel`), so a toast arriving or
 //! going does not flicker the others.
 
@@ -49,6 +50,8 @@ pub enum Clicked {
     Invoke(u32),
     /// Invoke the action at this index in the notification's actions.
     Action(u32, usize),
+    /// Open the link at this index among the body's links.
+    Link(u32, usize),
     /// Dismiss the notification.
     Dismiss(u32),
 }
@@ -290,12 +293,16 @@ impl Toasts {
                 let clicked = presses.into_iter().find_map(|press| match (press, target) {
                     (Press::Left, Part::Body(_)) => Some(Clicked::Invoke(id)),
                     (Press::Left, Part::Action(_, index)) => Some(Clicked::Action(id, index)),
+                    (Press::Left, Part::Link(_, index)) => Some(Clicked::Link(id, index)),
                     (Press::Left, Part::Close(_)) | (Press::Middle, _) => {
                         Some(Clicked::Dismiss(id))
                     }
                     _ => None,
                 });
-                if clicked.is_some() {
+                if clicked
+                    .as_ref()
+                    .is_some_and(|clicked| !matches!(clicked, Clicked::Link(..)))
+                {
                     self.closed(id);
                 }
                 Ok(clicked)

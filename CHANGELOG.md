@@ -16,6 +16,9 @@ and this project adheres to
   the icon of the app's desktop entry (found by the `desktop-entry` hint or the
   app's name). Pictures may be PNG, JPEG, SVG or XPM. lyr now advertises
   `icon-static`.
+- A click on a link in a notification opens it in the browser through
+  `xdg-open`, for `http` and `https` links only; other schemes are not opened.
+  The toast stays up. lyr now advertises `body-hyperlinks`.
 
 ### Fixed
 

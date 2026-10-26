@@ -1,10 +1,10 @@
-use super::{Span, Style, escape, parse, plain};
+use super::{Span, Style, escape, links, openable, parse, plain};
 
 const BOLD: Style = Style {
     bold: true,
     italic: false,
     underline: false,
-    link: false,
+    link: None,
 };
 
 fn span(text: &str, style: Style) -> Span {
@@ -50,7 +50,7 @@ fn the_spec_s_tags_style_their_text() {
             span(
                 "link",
                 Style {
-                    link: true,
+                    link: Some(0),
                     ..Style::default()
                 }
             ),
@@ -134,7 +134,7 @@ fn an_image_is_left_out_and_a_link_takes_either_quote() {
         [span(
             "y",
             Style {
-                link: true,
+                link: Some(0),
                 ..Style::default()
             }
         )]
@@ -149,4 +149,39 @@ fn escaped_text_reads_back_as_itself() {
         assert!(spans.iter().all(|span| span.style == Style::default()));
     }
     assert_eq!(escape("a<b>&c"), "a&lt;b&gt;&amp;c");
+}
+
+#[test]
+fn each_link_keeps_its_href_and_an_index_of_its_own() {
+    let body = "<a href=\"https://a.example/?x=1&amp;y=2\">one</a> and <a href='http://b'>two</a>";
+    assert_eq!(links(body), ["https://a.example/?x=1&y=2", "http://b"]);
+    let spans = parse(body);
+    let styled: Vec<(&str, Option<u32>)> = spans
+        .iter()
+        .map(|span| (span.text.as_str(), span.style.link))
+        .collect();
+    assert_eq!(
+        styled,
+        [("one", Some(0)), (" and ", None), ("two", Some(1))],
+        "adjacent links stay apart"
+    );
+}
+
+#[test]
+fn only_an_http_or_https_link_opens() {
+    for href in ["https://example.com", "HTTP://example.com/a b"] {
+        assert!(openable(href), "{href}");
+    }
+    for href in [
+        "file:///etc/passwd",
+        "javascript:alert(1)",
+        "mailto:a@b",
+        "ftp://example.com",
+        "httpsx://example.com",
+        "https://",
+        "example.com",
+        "",
+    ] {
+        assert!(!openable(href), "{href}");
+    }
 }

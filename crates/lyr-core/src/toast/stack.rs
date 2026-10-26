@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use lyr_config::Theme;
 
-use super::{MARGIN, WIDTH, close_button, draw};
+use super::{Area, MARGIN, WIDTH, close_button, draw};
 use crate::draw::{DrawList, Size, TextStyle};
 use crate::hit::{Rect, Regions};
 use crate::notifications::Store;
@@ -21,6 +21,8 @@ pub enum Part {
     /// An action button, by the action's index in the notification's
     /// actions.
     Action(u32, usize),
+    /// A link in the body, by its index among the body's links.
+    Link(u32, usize),
     /// The close button of the toast under the pointer.
     Close(u32),
 }
@@ -30,7 +32,7 @@ impl Part {
     #[must_use]
     pub const fn id(self) -> u32 {
         match self {
-            Self::Body(id) | Self::Action(id, _) | Self::Close(id) => id,
+            Self::Body(id) | Self::Action(id, _) | Self::Link(id, _) | Self::Close(id) => id,
         }
     }
 }
@@ -157,7 +159,7 @@ impl Stack {
         };
         for notification in self.ids().filter_map(|id| store.get(id)) {
             let elapsed = now.saturating_duration_since(notification.received);
-            let (toast, toast_size, buttons) = draw(
+            let (toast, toast_size, areas) = draw(
                 &notification.content,
                 elapsed,
                 WIDTH,
@@ -181,13 +183,16 @@ impl Stack {
                 },
                 Part::Body(notification.id),
             );
-            for (index, rect) in buttons {
+            for (area, rect) in areas {
                 regions.push(
                     Rect {
                         y: rect.y + top,
                         ..rect
                     },
-                    Part::Action(notification.id, index),
+                    match area {
+                        Area::Action(index) => Part::Action(notification.id, index),
+                        Area::Link(index) => Part::Link(notification.id, index),
+                    },
                 );
             }
             if self.hovered == Some(notification.id) {

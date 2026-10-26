@@ -3,7 +3,7 @@ use std::time::Duration;
 use lyr_config::{Platform, Theme, from_sources};
 
 use super::{
-    BORDER, INSET, PICTURE_MARGIN, PICTURE_PADDING, PICTURE_SIZE, TIME_GAP, WIDTH, draw,
+    Area, BORDER, INSET, PICTURE_MARGIN, PICTURE_PADDING, PICTURE_SIZE, TIME_GAP, WIDTH, draw,
     relative_time, wrap,
 };
 use crate::draw::{Item, Picture, TextStyle};
@@ -294,8 +294,14 @@ fn each_action_but_the_default_gets_a_button_in_a_row() {
             .map(|(index, rect)| (*index, rect.x, rect.y, rect.width, rect.height))
             .collect::<Vec<_>>(),
         [
-            (1, BORDER + INSET, y, width, height),
-            (2, BORDER + INSET + width + 8.0, y, width, height)
+            (Area::Action(1), BORDER + INSET, y, width, height),
+            (
+                Area::Action(2),
+                BORDER + INSET + width + 8.0,
+                y,
+                width,
+                height
+            )
         ]
     );
     assert_eq!(size.height, text_bottom + height + 8.0 + BORDER + INSET);
@@ -522,4 +528,31 @@ fn a_picture_taller_than_the_text_centres_the_text_on_it() {
     assert_eq!(size.height, top + row + top);
     assert!(texts(&list.items).contains(&("Ping", top + (row - 10.0) / 2.0)));
     assert_eq!(images(&list.items)[0].0.y, top + PICTURE_MARGIN);
+}
+
+#[test]
+fn a_link_is_an_area_on_every_line_it_wraps_to() {
+    let theme = theme();
+    let content = Incoming {
+        summary: "x".to_owned(),
+        body: "go <a href=\"https://x\">here now</a>".to_owned(),
+        ..Incoming::default()
+    };
+    // 60 px of text: "go", "here" and "now" each take a line.
+    let width = 2.0 * (BORDER + INSET) + 60.0;
+    let (_, _, areas) = draw(&content, Duration::ZERO, width, measure, 20.0, &theme);
+    let top = BORDER + INSET;
+    let line = |y, width| Rect {
+        x: top,
+        y,
+        width,
+        height: 20.0,
+    };
+    assert_eq!(
+        areas,
+        [
+            (Area::Link(0), line(top + 40.0, 40.0)),
+            (Area::Link(0), line(top + 60.0, 30.0)),
+        ]
+    );
 }

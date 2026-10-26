@@ -37,11 +37,6 @@ implementation follows meanwhile.
   `theme.calendar_font` defaults to the bar's font, where waybar's `<tt>` makes
   the calendar monospace. Should the default be `"monospace"`? Judge it against
   waybar's look on the owner's machine.
-- **Notification links: how should a click open one?** (M6.) **Q:** lyr draws a
-  body's `<a href>` (in `toast_link`, underlined) but opens nothing and does not
-  advertise `body-hyperlinks`. A link comes from any program on the session bus,
-  so: open it with the system's URL handler (`xdg-open`)? Which schemes (only
-  `http`/`https`)? With a confirmation first?
 - **Two swaync style values that look like slips** (M6). **Q:** The dotfiles'
   swaync style has `font-family: 'Hadk Nerd Font'`, which names no font (swaync
   falls back; lyr uses the bar's font), and action buttons at `0.2rem`, about 3
@@ -557,9 +552,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (`lyr_sources::notifications::linux::Daemon`): `Notify` with its hints,
   `CloseNotification` with its signal and the spec's empty error,
   `GetServerInformation` (spec 1.3), and each capability once it works
-  (`notifications::linux::CAPABILITIES`: `actions`, `body`, `body-markup`,
-  `icon-static` and `persistence`; not hyperlinks), tested against an
-  application on a peer-to-peer connection. Claiming the name is
+  (`notifications::linux::CAPABILITIES`: `actions`, `body`, `body-hyperlinks`,
+  `body-markup`, `icon-static` and `persistence`), tested against an application
+  on a peer-to-peer connection. Claiming the name is
   `notifications::linux::serve`: `DO_NOT_QUEUE`, so a name another daemon holds
   comes back as `Exists` and lyr takes its object down and names the owner and
   its pid, or `REPLACE_EXISTING` when told to replace; it allows being replaced
@@ -628,11 +623,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked. An id the spec maps to a subdirectory (`kde-foo` as
   `kde/foo.desktop`) is looked for only as the flat file. libnotify's
   `notify-send -i` sends the icon as the `image-path` hint with `app_icon`
-  empty, so it is the image, not the app's icon. Each action but `default` gets
-  a button under the body (swaync's style, at the bar's text size until the
-  owner rules on swaync's `0.2rem`), in toasts and the panel's history; a click
-  invokes it. A transient notification, kept in no history, closes as expired
-  when its toast times out.
+  empty, so it is the image, not the app's icon. A click on a body's link opens
+  it with `xdg-open` (`exec::open_url`, no shell) when it is `http` or `https`
+  (`markup::openable`; the owner's choice, 2026-10-26, with no confirmation),
+  and leaves the toast up; any other scheme is logged and not opened. Clicked in
+  a nested Hyprland (2026-10-26) with a stand-in `xdg-open` that wrote down its
+  argument: an `https` link's URL arrived with its `&amp;` decoded, and a
+  `file:///etc/passwd` link was refused. There, a second toast arriving was
+  missing from a screenshot taken two seconds later and was up in the next one;
+  not chased. Each action but `default` gets a button under the body (swaync's
+  style, at the bar's text size until the owner rules on swaync's `0.2rem`), in
+  toasts and the panel's history; a click invokes it. A transient notification,
+  kept in no history, closes as expired when its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading

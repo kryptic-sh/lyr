@@ -56,6 +56,17 @@ pub const PICTURE_MARGIN: f32 = 4.0;
 /// image's right side, as swaync's overlay puts it (`halign: end`).
 pub const PICTURE_PADDING: f32 = 7.0;
 
+/// A part of a toast a click can land on, apart from the toast itself.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Area {
+    /// An action button, by the action's index in the notification's
+    /// actions.
+    Action(usize),
+    /// A link in the body, by its index among the body's
+    /// ([`markup::links`]); a link that wraps has an area per line.
+    Link(usize),
+}
+
 /// The action a click on the body invokes, which gets no button.
 pub const DEFAULT_ACTION: &str = "default";
 
@@ -69,7 +80,7 @@ pub const fn text_style(style: Style) -> TextStyle {
     TextStyle {
         bold: style.bold,
         italic: style.italic,
-        underline: style.underline || style.link,
+        underline: style.underline || style.link.is_some(),
         ..TextStyle::PLAIN
     }
 }
@@ -258,8 +269,8 @@ pub fn relative_time(elapsed: Duration) -> String {
 
 /// The toast for `content`, which arrived `elapsed` ago, `width` wide (a
 /// toast is [`WIDTH`]; the clock panel's history is as wide as the panel):
-/// its draw list, its size, and its action buttons' rects by the action's
-/// index in `content.actions`, its text measured by `measure` in lines
+/// its draw list, its size, and the rects of its action buttons and links
+/// ([`Area`]), its text measured by `measure` in lines
 /// `line_height` tall. The body is markup ([`markup`]).
 ///
 /// The image, else the app's icon, stands left of the text, with the
@@ -274,8 +285,9 @@ pub fn draw(
     measure: impl Fn(&str, TextStyle) -> f32,
     line_height: f32,
     theme: &Theme,
-) -> (DrawList, Size, Vec<(usize, Rect)>) {
+) -> (DrawList, Size, Vec<(Area, Rect)>) {
     let plain = |text: &str| measure(text, TextStyle::PLAIN);
+    let mut areas = Vec::new();
     // swaync's `set_icon`: the image, else the app's icon, and the app's
     // icon over an image too.
     let (main, over) = match (&content.image, &content.icon) {
@@ -368,15 +380,19 @@ pub fn draw(
         for span in line {
             let style = text_style(span.style);
             let span_width = measure(&span.text, style);
+            let rect = Rect {
+                x,
+                y,
+                width: span_width.min(right - x).max(0.0),
+                height: line_height,
+            };
+            if let Some(link) = span.style.link {
+                areas.push((Area::Link(link as usize), rect));
+            }
             items.push(Item::Text {
-                rect: Rect {
-                    x,
-                    y,
-                    width: span_width.min(right - x).max(0.0),
-                    height: line_height,
-                },
+                rect,
                 text: span.text,
-                colour: if span.style.link {
+                colour: if span.style.link.is_some() {
                     theme.toast_link
                 } else {
                     theme.toast_foreground
@@ -386,7 +402,6 @@ pub fn draw(
             x += span_width;
         }
     }
-    let mut buttons = Vec::new();
     if !actions.is_empty() {
         let count = actions.len() as f32;
         let button_width = (content_width - (count - 1.0) * 2.0 * BUTTON_MARGIN) / count;
@@ -416,7 +431,7 @@ pub fn draw(
                 colour: theme.toast_foreground,
                 style: TextStyle::PLAIN,
             });
-            buttons.push((index, rect));
+            areas.push((Area::Action(index), rect));
         }
     }
     if let Some(picture) = main {
@@ -427,7 +442,7 @@ pub fn draw(
             items.push(fitted(icon, x + PICTURE_PADDING, y));
         }
     }
-    (DrawList { items }, size, buttons)
+    (DrawList { items }, size, areas)
 }
 
 /// `picture` drawn in the [`PICTURE_SIZE`] square at `x`, `y`: as large as

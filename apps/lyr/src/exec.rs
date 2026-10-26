@@ -5,14 +5,35 @@
 use std::io;
 use std::process::{Command, Stdio};
 
-/// Starts `command` and returns without waiting for it. A thread waits for it
-/// instead, so a finished command does not linger as a zombie.
+/// Starts `command` through the platform shell and returns without waiting
+/// for it ([`start`]).
 ///
 /// # Errors
 ///
 /// When the shell cannot be started.
 pub fn spawn(command: &str) -> io::Result<()> {
-    let mut child = shell(command)
+    start(shell(command))
+}
+
+/// Opens `url` in the user's browser through `xdg-open`, the URL its one
+/// argument and no shell in between, so nothing in it is interpreted.
+/// Which URLs may be opened is the caller's to decide.
+///
+/// # Errors
+///
+/// When `xdg-open` cannot be started.
+#[cfg(target_os = "linux")]
+pub fn open_url(url: &str) -> io::Result<()> {
+    let mut command = Command::new("xdg-open");
+    command.arg(url);
+    start(command)
+}
+
+/// Starts `command` with no input or output and returns without waiting
+/// for it. A thread waits for it instead, so a finished command does not
+/// linger as a zombie.
+fn start(mut command: Command) -> io::Result<()> {
+    let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())

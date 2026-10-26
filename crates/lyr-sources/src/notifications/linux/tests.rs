@@ -226,11 +226,11 @@ async fn the_server_says_what_it_is_and_what_it_can_do() {
         [
             "actions",
             "body",
+            "body-hyperlinks",
             "body-markup",
             "icon-static",
             "persistence"
-        ],
-        "not hyperlinks, which lyr does not open yet"
+        ]
     );
 }
 

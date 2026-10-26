@@ -481,9 +481,16 @@ impl App {
                 self.toast_clicked(Some(Clicked::Action(id, index)));
                 return;
             }
+            (Target::Link(id, index), Press::Left) => {
+                self.toast_clicked(Some(Clicked::Link(id, index)));
+                return;
+            }
             (Target::Close(id), Press::Left)
             | (
-                Target::Notification(id) | Target::Action(id, _) | Target::Close(id),
+                Target::Notification(id)
+                | Target::Action(id, _)
+                | Target::Link(id, _)
+                | Target::Close(id),
                 Press::Middle,
             ) => {
                 self.toast_clicked(Some(Clicked::Dismiss(id)));
@@ -545,7 +552,7 @@ impl App {
     }
 
     /// Carries out a click on a toast: its `default` action when it has one,
-    /// or dismissing it.
+    /// another action, opening a link, or dismissing it.
     #[cfg(target_os = "linux")]
     fn toast_clicked(&self, clicked: Option<Clicked>) {
         use lyr_core::notifications::CloseReason;
@@ -574,6 +581,27 @@ impl App {
             Some(Clicked::Action(id, wanted)) => {
                 if let Some(key) = key(id, &|index, _| index == wanted) {
                     self.commands.invoke(id, key);
+                }
+            }
+            Some(Clicked::Link(id, index)) => {
+                let href = self.toasts.store().and_then(|store| {
+                    let store = store
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    lyr_core::markup::links(&store.get(id)?.content.body)
+                        .into_iter()
+                        .nth(index)
+                });
+                match href {
+                    Some(href) if lyr_core::markup::openable(&href) => {
+                        if let Err(error) = crate::exec::open_url(&href) {
+                            tracing::warn!("notifications: opening {href}: {error}");
+                        }
+                    }
+                    Some(href) => {
+                        tracing::info!("notifications: not opening {href}: not http or https")
+                    }
+                    None => {}
                 }
             }
             Some(Clicked::Dismiss(id)) => {
