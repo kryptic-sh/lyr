@@ -65,6 +65,18 @@ impl FakeItem {
         vec![(1, 1, vec![255, 1, 2, 3]), (2, 1, vec![9; 8])]
     }
     #[zbus(property)]
+    fn attention_movie_name(&self) -> String {
+        "steam-blink".to_owned()
+    }
+    #[zbus(property)]
+    fn overlay_icon_name(&self) -> String {
+        "emblem-important".to_owned()
+    }
+    #[zbus(property)]
+    fn overlay_icon_pixmap(&self) -> Vec<(i32, i32, Vec<u8>)> {
+        vec![(1, 1, vec![255, 4, 5, 6])]
+    }
+    #[zbus(property)]
     fn tool_tip(&self) -> ToolTip {
         (String::new(), Vec::new(), "Steam".to_owned(), String::new())
     }
@@ -198,6 +210,16 @@ async fn a_registered_item_is_listed_and_read() {
         ]
     );
     assert!(item.attention_icon_pixmap.is_empty(), "not set");
+    assert_eq!(item.attention_movie_name, "steam-blink");
+    assert_eq!(item.overlay_icon_name, "emblem-important");
+    assert_eq!(
+        item.overlay_icon_pixmap,
+        [Pixmap {
+            width: 1,
+            height: 1,
+            data: vec![255, 4, 5, 6]
+        }]
+    );
 }
 
 #[tokio::test]

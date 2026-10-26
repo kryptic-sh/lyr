@@ -4,7 +4,7 @@ use crcbl_image::{Rgba8Image, png};
 use lyr_core::draw::Picture;
 use lyr_core::tray::{Item, Pixmap, Status};
 
-use super::{Icons, pixmap};
+use super::{Icons, over_pixel, pixmap};
 
 /// The theme the fixtures are in, named so no real theme can answer for it.
 const THEME: &str = "lyr-test-theme";
@@ -161,4 +161,78 @@ fn the_pixmap_nearest_the_size_is_taken_and_a_broken_one_is_not() {
     };
     assert_eq!(pixmap(&[negative], 16), None);
     assert_eq!(pixmap(&[short], 16), None);
+}
+
+const RED: [u8; 4] = [255, 0, 0, 255];
+
+/// The colour of the pixel at `x`, `y`.
+fn at(picture: &Picture, x: u32, y: u32) -> [u8; 4] {
+    let from = ((y * picture.width() + x) * 4) as usize;
+    picture.pixels()[from..from + 4]
+        .try_into()
+        .expect("a pixel")
+}
+
+#[test]
+fn an_overlay_fills_the_bottom_right_quarter() {
+    let root = theme_root();
+    let flagged = Item {
+        icon_name: "steam".to_owned(),
+        overlay_icon_name: "lyr-no-such-icon".to_owned(),
+        overlay_icon_pixmap: pixmaps([255, 255, 0, 0]),
+        ..item(root.path())
+    };
+    let picture = Icons::new(THEME.to_owned())
+        .picture(&flagged, 16)
+        .expect("a picture");
+    assert_eq!((picture.width(), picture.height()), (16, 16));
+    for (x, y) in [(8, 8), (15, 15), (8, 15), (15, 8)] {
+        assert_eq!(at(&picture, x, y), RED, "{x}, {y} in the corner");
+    }
+    for (x, y) in [(7, 7), (7, 15), (15, 7), (0, 0)] {
+        assert_eq!(at(&picture, x, y), BLUE, "{x}, {y} outside it");
+    }
+}
+
+#[test]
+fn a_wide_icon_is_drawn_its_height_and_its_overlay_square() {
+    let wide = Item {
+        icon_pixmap: vec![Pixmap {
+            width: 2,
+            height: 1,
+            data: [255, 0, 0, 255].repeat(2),
+        }],
+        overlay_icon_pixmap: pixmaps([255, 255, 0, 0]),
+        ..Item::default()
+    };
+    let picture = Icons::new(THEME.to_owned())
+        .picture(&wide, 16)
+        .expect("a picture");
+    assert_eq!((picture.width(), picture.height()), (32, 16));
+    assert_eq!(at(&picture, 24, 8), RED);
+    assert_eq!(at(&picture, 23, 15), BLUE);
+    assert_eq!(at(&picture, 24, 7), BLUE);
+}
+
+#[test]
+fn an_item_with_no_overlay_keeps_its_own_size() {
+    let plain = Item {
+        icon_pixmap: pixmaps([255, 0, 0, 255]),
+        ..Item::default()
+    };
+    assert_eq!(
+        Icons::new(THEME.to_owned()).picture(&plain, 16),
+        Some(picture(1, BLUE))
+    );
+}
+
+#[test]
+fn over_blends_by_the_source_s_alpha() {
+    let mut target = BLUE;
+    over_pixel(&mut target, &[255, 0, 0, 128]);
+    // 128/255 of red over the rest of blue, opaque.
+    assert_eq!(target, [128, 0, 127, 255]);
+    let mut clear = [0, 0, 0, 0];
+    over_pixel(&mut clear, &[10, 20, 30, 51]);
+    assert_eq!(clear, [10, 20, 30, 51], "over nothing it is itself");
 }

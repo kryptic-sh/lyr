@@ -11,7 +11,9 @@ and this project adheres to
 ### Breaking
 
 - For the library crates: `lyr_core::media::Player` gains `art`, and
-  `lyr_sources::mpris::linux::read` takes the art cache (`mpris::linux::Art`).
+  `lyr_sources::mpris::linux::read` takes the art cache (`mpris::linux::Art`),
+  and `lyr_core::tray::Item` gains `attention_movie_name`, `overlay_icon_name`
+  and `overlay_icon_pixmap`.
 
 ### Added
 
@@ -20,6 +22,10 @@ and this project adheres to
   only; lyr fetches nothing over the network.
 - A picture file with no extension (as browsers write a player's art) is read as
   PNG or JPEG by its contents.
+- Tray items draw their overlay icon (`OverlayIconName` or `OverlayIconPixmap`)
+  in the bottom right corner of their icon, and an item that needs attention
+  falls back to its `AttentionMovieName` as a still icon, as waybar's master
+  does.
 
 ## [0.2.0] - 2026-10-26
 

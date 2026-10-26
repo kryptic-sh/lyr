@@ -52,6 +52,16 @@ pub enum IconSource<'a> {
     Pixmaps(&'a [Pixmap]),
 }
 
+impl IconSource<'_> {
+    /// Whether the item gave one: a name that is not empty, or some pixmaps.
+    fn given(&self) -> bool {
+        match self {
+            Self::Name(name) => !name.is_empty(),
+            Self::Pixmaps(pixmaps) => !pixmaps.is_empty(),
+        }
+    }
+}
+
 /// The icon a tray item draws when none of its own can be found, as waybar
 /// draws it.
 pub const MISSING_ICON: &str = "image-missing";
@@ -69,6 +79,10 @@ pub struct Item {
     pub icon_pixmap: Vec<Pixmap>,
     pub attention_icon_name: String,
     pub attention_icon_pixmap: Vec<Pixmap>,
+    /// `AttentionMovieName`, which waybar draws as a still attention icon.
+    pub attention_movie_name: String,
+    pub overlay_icon_name: String,
+    pub overlay_icon_pixmap: Vec<Pixmap>,
     pub icon_theme_path: String,
     /// The `ToolTip`'s title.
     pub tooltip: String,
@@ -100,13 +114,14 @@ impl Item {
 
     /// Where its icon may come from, in waybar's order (`Item::getIconPixbuf`,
     /// master, read 2026-10-25): while it needs attention, its attention
-    /// icon's name and then pixels; then its icon's name and then pixels.
-    /// Empty names and pixmap lists are left out. waybar's attention movie
-    /// and overlay icon are not read.
+    /// icon's name, its attention movie's name and then its attention
+    /// pixels; then its icon's name and then pixels. Empty names and pixmap
+    /// lists are left out.
     #[must_use]
     pub fn icon_sources(&self) -> Vec<IconSource<'_>> {
         let attention = (self.status == Status::NeedsAttention).then_some([
             IconSource::Name(&self.attention_icon_name),
+            IconSource::Name(&self.attention_movie_name),
             IconSource::Pixmaps(&self.attention_icon_pixmap),
         ]);
         attention
@@ -116,11 +131,22 @@ impl Item {
                 IconSource::Name(&self.icon_name),
                 IconSource::Pixmaps(&self.icon_pixmap),
             ])
-            .filter(|source| match source {
-                IconSource::Name(name) => !name.is_empty(),
-                IconSource::Pixmaps(pixmaps) => !pixmaps.is_empty(),
-            })
+            .filter(IconSource::given)
             .collect()
+    }
+
+    /// Where the icon drawn over its icon's corner may come from, in
+    /// waybar's order (`Item::getOverlayIconPixbuf`, master `c15ec02`): its
+    /// overlay's name, then its pixels. Empty ones are left out.
+    #[must_use]
+    pub fn overlay_sources(&self) -> Vec<IconSource<'_>> {
+        [
+            IconSource::Name(&self.overlay_icon_name),
+            IconSource::Pixmaps(&self.overlay_icon_pixmap),
+        ]
+        .into_iter()
+        .filter(IconSource::given)
+        .collect()
     }
 
     /// What stands in for its icon when it has no picture: the first letter

@@ -83,6 +83,7 @@ fn an_icon_comes_from_its_name_then_its_pixels_and_attention_first() {
         icon_pixmap: pixmaps(2),
         attention_icon_name: "steam-alert".to_owned(),
         attention_icon_pixmap: pixmaps(3),
+        attention_movie_name: "steam-blink".to_owned(),
         ..Item::default()
     };
     assert_eq!(
@@ -101,6 +102,7 @@ fn an_icon_comes_from_its_name_then_its_pixels_and_attention_first() {
         alerting.icon_sources(),
         [
             IconSource::Name("steam-alert"),
+            IconSource::Name("steam-blink"),
             IconSource::Pixmaps(&alerting.attention_icon_pixmap),
             IconSource::Name("steam"),
             IconSource::Pixmaps(&alerting.icon_pixmap),
@@ -116,6 +118,27 @@ fn an_icon_comes_from_its_name_then_its_pixels_and_attention_first() {
         [IconSource::Pixmaps(&electron.icon_pixmap)],
         "what it does not send is not tried"
     );
+}
+
+#[test]
+fn an_overlay_comes_from_its_name_then_its_pixels() {
+    let item = Item {
+        overlay_icon_name: "emblem-important".to_owned(),
+        overlay_icon_pixmap: vec![Pixmap {
+            width: 1,
+            height: 1,
+            data: vec![0; 4],
+        }],
+        ..Item::default()
+    };
+    assert_eq!(
+        item.overlay_sources(),
+        [
+            IconSource::Name("emblem-important"),
+            IconSource::Pixmaps(&item.overlay_icon_pixmap)
+        ]
+    );
+    assert_eq!(Item::default().overlay_sources(), [], "none given");
 }
 
 #[test]

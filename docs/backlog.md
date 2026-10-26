@@ -1286,11 +1286,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (2026-10-25): Teams' and Discord's pixmaps drawn next to waybar's watcher
   (Discord with its red badge), and on a private bus a test item's
   `dialog-information` from Papirus-Dark flipping to `dialog-warning` on
-  `NewIcon`. Not done: waybar's overlay icon and attention movie; `svg-text` (an
-  SVG icon with text is refused and the next source tried); reading the theme
-  from GSettings, which GNOME keeps there rather than in `settings.ini`. Not
-  seen: an output at a scale above 1, a theme icon given by file path, Steam's
-  or Spotify's own icons (neither was showing).
+  `NewIcon`. The overlay icon (`OverlayIconName`, else `OverlayIconPixmap`) is
+  composited into the icon's bottom right quarter after waybar master's
+  `Item::overlayPixbufs`, the icon first resized to the tray's size, and
+  `AttentionMovieName` is tried as a still attention icon after
+  `AttentionIconName`, as master does (`lyr_sources::tray::icon`, tested and
+  mutation-checked; a test item's `emblem-important` from Papirus-Dark seen over
+  its icon in a nested Hyprland, 2026-10-26). waybar 0.15.0 reads both and draws
+  neither. Not done: `svg-text` (an SVG icon with text is refused and the next
+  source tried); reading the theme from GSettings, which GNOME keeps there
+  rather than in `settings.ini`. Not seen: an output at a scale above 1, a theme
+  icon given by file path, Steam's or Spotify's own icons (neither was showing).
 - **Clicking lyr in tests.** The owner installed `wlrctl` (2026-10-20), which
   moves and clicks a virtual pointer in the compositor named by
   `WAYLAND_DISPLAY` alone, so a nested Hyprland can be clicked without touching
