@@ -1,4 +1,9 @@
-use crcbl_shell::{HeadlessShell, KeyCode, Shell, ShellEvent, WindowDesc, WindowId};
+use crcbl_shell::{
+    ClipboardOffer, ClipboardRequestId, CloseReply, CursorIcon, DisplayMode, HeadlessShell,
+    KeyCode, MimeType, MonitorInfo, PhysicalPoint, PointerMode, PopupDesc, PopupInput, Shell,
+    ShellBackend, ShellCaps, ShellError, ShellEvent, SizeConstraints, SurfaceTarget, WindowDesc,
+    WindowId, WindowRole, WindowState,
+};
 use lyr_config::{Platform, Position, Theme, from_sources};
 use lyr_core::hit::Rect;
 use lyr_core::tray::menu::Entry;
@@ -42,15 +47,143 @@ fn root() -> Entry {
     root
 }
 
+/// The headless shell with a compositor's rule for grabbing popups
+/// (xdg-shell's `xdg_popup.grab`): one opened while another grabs, from
+/// a parent other than that one, is dismissed at once, as Hyprland 0.56.2
+/// dismisses it.
+#[derive(Debug)]
+struct Grabbing {
+    inner: HeadlessShell,
+    /// The grabbing popups open, oldest first.
+    grabs: Vec<WindowId>,
+}
+
+impl std::ops::Deref for Grabbing {
+    type Target = HeadlessShell;
+
+    fn deref(&self) -> &HeadlessShell {
+        &self.inner
+    }
+}
+
+impl std::ops::DerefMut for Grabbing {
+    fn deref_mut(&mut self) -> &mut HeadlessShell {
+        &mut self.inner
+    }
+}
+
+impl Shell for Grabbing {
+    fn backend(&self) -> ShellBackend {
+        self.inner.backend()
+    }
+    fn caps(&self) -> ShellCaps {
+        self.inner.caps()
+    }
+    fn create_window(&mut self, desc: &WindowDesc<'_>) -> Result<WindowId, ShellError> {
+        let window = self.inner.create_window(desc)?;
+        if let WindowRole::Popup(PopupDesc {
+            parent,
+            input: PopupInput::Grab,
+            ..
+        }) = desc.role
+        {
+            if self.grabs.last().is_some_and(|&top| top != parent) {
+                self.inner.request_close(window)?;
+            }
+            self.grabs.push(window);
+        }
+        Ok(window)
+    }
+    fn destroy_window(&mut self, window: WindowId) -> Result<(), ShellError> {
+        self.grabs.retain(|&grab| grab != window);
+        self.inner.destroy_window(window)
+    }
+    fn window_state(&self, window: WindowId) -> Result<WindowState, ShellError> {
+        self.inner.window_state(window)
+    }
+    fn set_title(&mut self, window: WindowId, title: &str) -> Result<(), ShellError> {
+        self.inner.set_title(window, title)
+    }
+    fn set_visible(&mut self, window: WindowId, visible: bool) -> Result<(), ShellError> {
+        self.inner.set_visible(window, visible)
+    }
+    fn set_mode(&mut self, window: WindowId, mode: DisplayMode) -> Result<(), ShellError> {
+        self.inner.set_mode(window, mode)
+    }
+    fn set_constraints(
+        &mut self,
+        window: WindowId,
+        constraints: SizeConstraints,
+    ) -> Result<(), ShellError> {
+        self.inner.set_constraints(window, constraints)
+    }
+    fn monitors(&self) -> &[MonitorInfo] {
+        self.inner.monitors()
+    }
+    fn pump(&mut self, sink: &mut dyn FnMut(ShellEvent)) {
+        self.inner.pump(sink);
+    }
+    fn keep_alive(&mut self) {
+        self.inner.keep_alive();
+    }
+    fn surface_target(&self, window: WindowId) -> Result<SurfaceTarget, ShellError> {
+        self.inner.surface_target(window)
+    }
+    fn set_pointer_mode(&mut self, window: WindowId, mode: PointerMode) -> Result<(), ShellError> {
+        self.inner.set_pointer_mode(window, mode)
+    }
+    fn set_cursor(
+        &mut self,
+        window: WindowId,
+        cursor: Option<CursorIcon>,
+    ) -> Result<(), ShellError> {
+        self.inner.set_cursor(window, cursor)
+    }
+    fn warp_pointer(
+        &mut self,
+        window: WindowId,
+        position: PhysicalPoint,
+    ) -> Result<(), ShellError> {
+        self.inner.warp_pointer(window, position)
+    }
+    fn reply_close_request(
+        &mut self,
+        window: WindowId,
+        reply: CloseReply,
+    ) -> Result<(), ShellError> {
+        self.inner.reply_close_request(window, reply)
+    }
+    fn clipboard_offer(
+        &mut self,
+        window: WindowId,
+        offers: &[ClipboardOffer<'_>],
+    ) -> Result<(), ShellError> {
+        self.inner.clipboard_offer(window, offers)
+    }
+    fn clipboard_request(
+        &mut self,
+        window: WindowId,
+        mime: MimeType,
+    ) -> Result<ClipboardRequestId, ShellError> {
+        self.inner.clipboard_request(window, mime)
+    }
+    fn request_frame(&mut self, window: WindowId) -> Result<(), ShellError> {
+        self.inner.request_frame(window)
+    }
+}
+
 struct Setup {
-    shell: HeadlessShell,
+    shell: Grabbing,
     theme: Theme,
     menu: TrayMenu,
     bar: WindowId,
 }
 
 fn setup() -> Setup {
-    let mut shell = HeadlessShell::new();
+    let mut shell = Grabbing {
+        inner: HeadlessShell::new(),
+        grabs: Vec::new(),
+    };
     let bar = shell
         .create_window(&WindowDesc {
             title: "lyr",
@@ -88,6 +221,11 @@ impl Setup {
     fn key(&mut self, key: KeyCode) -> Outcome {
         let window = self.menu.popup.window();
         self.shell.key_press(window, key).expect("a key");
+        self.settle()
+    }
+
+    /// Applies the events the shell has queued for the menu.
+    fn settle(&mut self) -> Outcome {
         let mut events = Vec::new();
         self.shell.pump(&mut |event| events.push(event));
         let theme = self.theme.clone();
@@ -126,6 +264,7 @@ fn a_submenu_opens_in_place_and_back_leaves_it() {
     let second = setup.menu.popup.window();
     assert_ne!(second, first, "opened again");
     assert!(setup.shell.title(first).is_err(), "the first popup is gone");
+    assert_eq!(setup.settle(), Outcome::Kept, "and the compositor keeps it");
     // Back, then Sync.
     setup.key(KeyCode::ArrowDown);
     assert_eq!(setup.key(KeyCode::Enter), Outcome::Clicked(5));

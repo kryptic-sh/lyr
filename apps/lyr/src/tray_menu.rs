@@ -113,6 +113,10 @@ impl TrayMenu {
             return Ok(Outcome::Closed(false));
         };
         let rows = rows(shown, !self.path.is_empty());
+        // The old popup goes first: a grab popup that is not a child of the
+        // topmost one is dismissed as it opens (xdg-shell's `grab`), which
+        // closed the menu on every step on Hyprland 0.56.2.
+        self.popup.close_in_place(shell)?;
         let Some(popup) = ListPopup::open(
             shell,
             self.read.bar,
@@ -122,9 +126,10 @@ impl TrayMenu {
             look,
         )?
         else {
-            return Ok(Outcome::Closed(false));
+            // Its window is gone already.
+            return Ok(Outcome::Closed(true));
         };
-        std::mem::replace(&mut self.popup, popup).close(shell, false)?;
+        self.popup = popup;
         Ok(Outcome::Kept)
     }
 

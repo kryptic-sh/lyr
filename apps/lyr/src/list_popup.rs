@@ -230,6 +230,15 @@ impl<T: Clone + PartialEq> ListPopup<T> {
         }
         Ok(())
     }
+
+    /// Closes its surface and window ahead of the popup replacing it.
+    pub fn close_in_place(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {
+        if let Some(surface) = self.surface.take() {
+            surface.destroy()?;
+        }
+        shell.destroy_window(self.window)?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

@@ -1223,13 +1223,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   letter, a right click opened its menu 16 px under the bar, and a click on the
   entry reached the item as `clicked`. That run found the menu 14 px right of
   the tray's box, anchored to the item's button inside it; it now opens under
-  the module's box as every other menu does. Not met: a real application's item,
-  submenus served by one, or icons. Wayland gives a window no place on the
-  screen, so `Activate` and `ContextMenu` get the point under the button on the
-  bar, not on the screen. Each item's button has its tooltip, its `ToolTip`
-  title or else its `Title` (`Item::tooltip_text`, as waybar falls back),
-  through the bar's tooltips, now keyed by the hovered target rather than the
-  module. Icons are drawn: see "Tray icons" below.
+  the module's box as every other menu does. Submenus closed the whole menu
+  until 2026-10-26: each step opened the next grab popup before closing the old
+  one, and Hyprland 0.56.2 dismisses a grab popup opened while another grabs
+  (xdg-shell's `xdg_popup.grab`); `TrayMenu::reopen` now closes the old one
+  first (`ListPopup::close_in_place`), and the headless test's `Grabbing` shell
+  models that rule, mutation-checked. Then verified in the nested Hyprland: a
+  test item's two-level menu by pointer and by keys (a click on a leaf reached
+  it as `clicked`), and Teams for Linux's Settings › Theme › Built-in, three
+  levels with its check mark, opened and closed without clicking an entry.
+  Wayland gives a window no place on the screen, so `Activate` and `ContextMenu`
+  get the point under the button on the bar, not on the screen. Each item's
+  button has its tooltip, its `ToolTip` title or else its `Title`
+  (`Item::tooltip_text`, as waybar falls back), through the bar's tooltips, now
+  keyed by the hovered target rather than the module. Icons are drawn: see "Tray
+  icons" below.
 - **Tray icons (2026-10-25, the owner asked for them).** `crcbl-image` 0.9.0
   came in for them (PNG, SVG, XPM and the theme lookup; the owner had asked
   crcbl for it as the shared asset crate, S28). Each shown item's icon is found
