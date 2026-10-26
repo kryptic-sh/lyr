@@ -23,7 +23,11 @@ pub mod bluetooth;
 mod bus;
 pub mod clock;
 #[cfg(target_os = "linux")]
+mod desktop_entry;
+#[cfg(target_os = "linux")]
 mod icons;
+#[cfg(target_os = "linux")]
+mod ini;
 pub mod locale;
 #[cfg(target_os = "macos")]
 mod macos_runloop;

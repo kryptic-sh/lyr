@@ -2,8 +2,12 @@ use std::time::Duration;
 
 use lyr_config::{Platform, Theme, from_sources};
 
-use super::{BORDER, INSET, TIME_GAP, WIDTH, draw, relative_time, wrap};
-use crate::draw::{Item, TextStyle};
+use super::{
+    BORDER, INSET, PICTURE_MARGIN, PICTURE_PADDING, PICTURE_SIZE, TIME_GAP, WIDTH, draw,
+    relative_time, wrap,
+};
+use crate::draw::{Item, Picture, TextStyle};
+use crate::hit::Rect;
 use crate::markup::{Span, Style, parse, plain};
 use crate::notifications::{Incoming, Urgency};
 
@@ -383,4 +387,139 @@ fn a_span_is_cut_at_the_text_s_right_edge() {
         _ => None,
     });
     assert_eq!(width, Some(WIDTH - 2.0 * (BORDER + INSET)), "not 600 px");
+}
+
+/// A picture `width` by `height` pixels.
+fn picture(width: u32, height: u32) -> Picture {
+    Picture::new(width, height, vec![255; (width * height * 4) as usize]).expect("a picture")
+}
+
+/// Each picture drawn, and where.
+fn images(items: &[Item]) -> Vec<(Rect, &Picture)> {
+    items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Image { rect, picture } => Some((*rect, picture)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Where each text starts.
+fn text_xs(items: &[Item]) -> Vec<(&str, f32)> {
+    items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Text { text, rect, .. } => Some((text.as_str(), rect.x)),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn an_image_stands_left_of_the_text_with_the_app_icon_over_it() {
+    let theme = theme();
+    let (image, icon) = (picture(2, 1), picture(1, 1));
+    let content = Incoming {
+        summary: "Shot".to_owned(),
+        body: "saved".to_owned(),
+        image: Some(image.clone()),
+        icon: Some(icon.clone()),
+        ..with_actions()
+    };
+    let (list, size, buttons) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let top = BORDER + INSET;
+    let left = top + 2.0 * PICTURE_MARGIN + PICTURE_SIZE + PICTURE_PADDING;
+    // The text's two lines are 40 px, the picture's square 16 in its 4 px
+    // margins: the square is centred on the text.
+    let y = top + (40.0 - PICTURE_SIZE) / 2.0;
+    let x = top + PICTURE_MARGIN;
+    assert_eq!(
+        images(&list.items),
+        [
+            (
+                Rect {
+                    x,
+                    y: y + 4.0,
+                    width: 16.0,
+                    height: 8.0
+                },
+                &image
+            ),
+            (
+                Rect {
+                    x: x + PICTURE_PADDING,
+                    y,
+                    width: 16.0,
+                    height: 16.0
+                },
+                &icon
+            ),
+        ],
+        "the image fitted to the square, the icon at its right end"
+    );
+    let xs = text_xs(&list.items);
+    assert!(xs.contains(&("Shot", left)) && xs.contains(&("saved", left)));
+    assert_eq!(
+        (buttons[0].1.x, buttons[0].1.width),
+        (top, (WIDTH - 2.0 * top - 8.0) / 2.0),
+        "the buttons run under the picture as well"
+    );
+    assert_eq!(
+        size.height,
+        top + 40.0 + buttons[0].1.height + 8.0 + top,
+        "no taller than the text needs"
+    );
+}
+
+#[test]
+fn the_app_icon_alone_takes_the_image_s_place() {
+    let theme = theme();
+    let icon = picture(1, 1);
+    let content = Incoming {
+        summary: "Ping".to_owned(),
+        body: "pong".to_owned(),
+        icon: Some(icon.clone()),
+        ..Incoming::default()
+    };
+    let (list, _, _) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let top = BORDER + INSET;
+    assert_eq!(
+        images(&list.items),
+        [(
+            Rect {
+                x: top + PICTURE_MARGIN,
+                y: top + (40.0 - PICTURE_SIZE) / 2.0,
+                width: 16.0,
+                height: 16.0
+            },
+            &icon
+        )]
+    );
+    let plain = Incoming {
+        icon: None,
+        ..content
+    };
+    let (list, _, _) = draw(&plain, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    assert!(images(&list.items).is_empty());
+    assert!(
+        text_xs(&list.items).contains(&("Ping", top)),
+        "the text moves back"
+    );
+}
+
+#[test]
+fn a_picture_taller_than_the_text_centres_the_text_on_it() {
+    let theme = theme();
+    let content = Incoming {
+        summary: "Ping".to_owned(),
+        icon: Some(picture(1, 1)),
+        ..Incoming::default()
+    };
+    let (list, size, _) = draw(&content, Duration::ZERO, WIDTH, measure, 10.0, &theme);
+    let top = BORDER + INSET;
+    let row = PICTURE_SIZE + 2.0 * PICTURE_MARGIN;
+    assert_eq!(size.height, top + row + top);
+    assert!(texts(&list.items).contains(&("Ping", top + (row - 10.0) / 2.0)));
+    assert_eq!(images(&list.items)[0].0.y, top + PICTURE_MARGIN);
 }

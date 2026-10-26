@@ -8,6 +8,15 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Notification toasts and the notification centre draw the notification's image
+  (`image-data`, `image-path` or `icon_data`) and the app's icon, laid out as
+  swaync draws them with the dotfiles' style. The app's icon is `app_icon`, else
+  the icon of the app's desktop entry (found by the `desktop-entry` hint or the
+  app's name). lyr now advertises `icon-static`. JPEG images are not decoded
+  yet.
+
 ### Fixed
 
 - The tray's icons are `[tray] spacing` apart, as waybar's are. They also took

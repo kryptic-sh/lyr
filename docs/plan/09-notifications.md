@@ -108,15 +108,20 @@ The interface is the freedesktop Desktop Notifications Specification, version
   which is why `body-images` is not advertised. Anything else is shown as text,
   never interpreted. `.menu-wifi` escapes `&`, `<` and `>` because swaync
   renders markup, so lyr must too.
-- **Images:** lyr shows an icon and an image, so, as the spec orders it, the
-  icon is `app_icon` and the image is the first of `image-data`, `image-path`
-  and `icon_data`. `image-data` is `(iiibiiay)`: width, height, row stride, has
-  alpha, 8 bits per sample, 3 or 4 channels, RGB(A) bytes. `app_icon` and
-  `image-path` are a `file://` URI (the only scheme the spec allows) or a name
-  in the icon theme, looked up as the tray does ([08](08-tray.md)); a plain
-  absolute path is accepted too, though the spec does not name it. An icon that
-  cannot be found or decoded (crcbl's SVG subset refuses what it cannot draw)
-  falls back to a generic icon. An image that fails is left out, and the
+- **Images:** lyr shows an image and the app's icon as swaync does: the image is
+  the first of `image-data`, `image-path` and `icon_data` (and the deprecated
+  `image_data` and `image_path`), drawn left of the text with the app's icon
+  over its right side; with no image the app's icon takes its place, and with
+  neither the text starts at the edge (swaync's `image-visibility` of
+  `when-available`). The app's icon is `app_icon`, else the `Icon` of the app's
+  desktop entry, found by the `desktop-entry` hint and then by the app's name,
+  each as sent and lowercased. `image-data` is `(iiibiiay)`: width, height, row
+  stride, has alpha, 8 bits per sample, 3 or 4 channels, RGB(A) bytes.
+  `app_icon` and `image-path` are a `file://` URI (the only scheme the spec
+  allows) or a name in the icon theme, looked up as the tray does
+  ([08](08-tray.md)); a plain absolute path is accepted too, though the spec
+  does not name it. A picture that cannot be found or decoded (crcbl's SVG
+  subset refuses what it cannot draw; JPEG is not decoded) is left out, and the
   notification is still shown.
 
 ### Toasts

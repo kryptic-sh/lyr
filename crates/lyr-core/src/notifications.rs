@@ -8,6 +8,8 @@
 
 use std::time::{Duration, Instant};
 
+use crate::draw::Picture;
+
 /// How urgent a notification is: the `urgency` hint's byte.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Urgency {
@@ -71,6 +73,11 @@ pub struct Incoming {
     /// The notification it replaces, or 0 for none.
     pub replaces_id: u32,
     pub app_icon: String,
+    /// `app_icon`'s picture, when it was found.
+    pub icon: Option<Picture>,
+    /// The notification's image: from `image-data`, else `image-path`, else
+    /// the deprecated `icon_data`, as the spec orders them.
+    pub image: Option<Picture>,
     pub summary: String,
     pub body: String,
     /// Action id and label pairs.

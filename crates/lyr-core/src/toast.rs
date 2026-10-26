@@ -2,9 +2,9 @@
 //! wrapped to the toast's width, and its draw list, in swaync's look from the
 //! dotfiles' `config.json` and `style.css`.
 //!
-//! Drawn so far: the summary over the body, the body's markup, when it
-//! arrived, the border coloured by urgency, a button per action, and the
-//! close button. Not yet: images.
+//! Drawn: the summary over the body, the body's markup, when it arrived,
+//! the border coloured by urgency, the image and the app's icon, a button
+//! per action, and the close button.
 
 pub mod stack;
 
@@ -13,7 +13,7 @@ use std::time::Duration;
 use crcbl_ui::font::breaks;
 use lyr_config::Theme;
 
-use crate::draw::{DrawList, Item, Size, TextStyle};
+use crate::draw::{DrawList, Item, Picture, Size, TextStyle};
 use crate::hit::Rect;
 use crate::markup::{self, Span, Style};
 use crate::notifications::{Incoming, Urgency};
@@ -44,6 +44,17 @@ pub const CLOSE_INSET: f32 = 24.0 - MARGIN;
 /// The close button's cross, a character every font has where swaync draws
 /// its `swaync-close-symbolic` icon.
 const CLOSE: &str = "\u{d7}";
+
+/// The side of a notification's image, and of the app's icon over it:
+/// GTK's default `-gtk-icon-size`, which the dotfiles' `* { all: unset }`
+/// leaves swaync's `.image` and `.app-icon` at (seen in swaync 0.12.6).
+pub const PICTURE_SIZE: f32 = 16.0;
+/// Around the image: the dotfiles' `.notification-content overlay` margin.
+pub const PICTURE_MARGIN: f32 = 4.0;
+/// Right of the image: the dotfiles' `.image` `padding-right: 0.5rem`, at
+/// their 14 px font. The app's icon sits at the far end of it, over the
+/// image's right side, as swaync's overlay puts it (`halign: end`).
+pub const PICTURE_PADDING: f32 = 7.0;
 
 /// The action a click on the body invokes, which gets no button.
 pub const DEFAULT_ACTION: &str = "default";
@@ -251,9 +262,10 @@ pub fn relative_time(elapsed: Duration) -> String {
 /// index in `content.actions`, its text measured by `measure` in lines
 /// `line_height` tall. The body is markup ([`markup`]).
 ///
-/// The buttons share a row under the body, as swaync's do, at the bar's
-/// text size: swaync's `font-size: 0.2rem` is one of the slips plan 09 asks
-/// the owner about.
+/// The image, else the app's icon, stands left of the text, with the
+/// app's icon over an image ([`PICTURE_SIZE`]). The buttons share a row
+/// under both, as swaync's do, at the bar's text size: swaync's
+/// `font-size: 0.2rem` is one of the slips plan 09 asks the owner about.
 #[must_use]
 pub fn draw(
     content: &Incoming,
@@ -264,7 +276,19 @@ pub fn draw(
     theme: &Theme,
 ) -> (DrawList, Size, Vec<(usize, Rect)>) {
     let plain = |text: &str| measure(text, TextStyle::PLAIN);
-    let text_width = width - 2.0 * (BORDER + INSET);
+    // swaync's `set_icon`: the image, else the app's icon, and the app's
+    // icon over an image too.
+    let (main, over) = match (&content.image, &content.icon) {
+        (Some(image), icon) => (Some(image), icon.as_ref()),
+        (None, icon) => (icon.as_ref(), None),
+    };
+    let picture_column = if main.is_some() {
+        2.0 * PICTURE_MARGIN + PICTURE_SIZE + PICTURE_PADDING
+    } else {
+        0.0
+    };
+    let content_width = width - 2.0 * (BORDER + INSET);
+    let text_width = content_width - picture_column;
     let body = wrap(&markup::parse(&content.body), text_width, &measure);
     let actions: Vec<(usize, &str)> = content
         .actions
@@ -279,8 +303,18 @@ pub fn draw(
     } else {
         button_height + 2.0 * BUTTON_MARGIN
     };
-    // The summary's line, then the body's.
-    let text_bottom = BORDER + INSET + line_height * (1 + body.len()) as f32;
+    // The summary's line, then the body's, centred on the picture when
+    // the picture is the taller.
+    let text_height = line_height * (1 + body.len()) as f32;
+    let row_height = if main.is_some() {
+        text_height.max(PICTURE_SIZE + 2.0 * PICTURE_MARGIN)
+    } else {
+        text_height
+    };
+    let top = BORDER + INSET;
+    let text_top = top + (row_height - text_height) / 2.0;
+    let left = BORDER + INSET + picture_column;
+    let text_bottom = top + row_height;
     let size = Size {
         width,
         height: text_bottom + buttons_height + BORDER + INSET,
@@ -307,7 +341,7 @@ pub fn draw(
     items.push(Item::Text {
         rect: Rect {
             x: width - BORDER - INSET - time_width,
-            y: BORDER + INSET,
+            y: text_top,
             width: time_width,
             height: line_height,
         },
@@ -317,8 +351,8 @@ pub fn draw(
     });
     items.push(Item::Text {
         rect: Rect {
-            x: BORDER + INSET,
-            y: BORDER + INSET,
+            x: left,
+            y: text_top,
             width: (text_width - time_width - TIME_GAP).max(0.0),
             height: line_height,
         },
@@ -327,10 +361,10 @@ pub fn draw(
         style: TextStyle::PLAIN,
     });
     // Each span after the last, cut at the text's right edge.
-    let right = BORDER + INSET + text_width;
+    let right = left + text_width;
     for (index, line) in body.into_iter().enumerate() {
-        let y = BORDER + INSET + line_height * (index + 1) as f32;
-        let mut x = BORDER + INSET;
+        let y = text_top + line_height * (index + 1) as f32;
+        let mut x = left;
         for span in line {
             let style = text_style(span.style);
             let span_width = measure(&span.text, style);
@@ -355,7 +389,7 @@ pub fn draw(
     let mut buttons = Vec::new();
     if !actions.is_empty() {
         let count = actions.len() as f32;
-        let button_width = (text_width - (count - 1.0) * 2.0 * BUTTON_MARGIN) / count;
+        let button_width = (content_width - (count - 1.0) * 2.0 * BUTTON_MARGIN) / count;
         let y = text_bottom + BUTTON_MARGIN;
         for (column, (index, label)) in actions.into_iter().enumerate() {
             let rect = Rect {
@@ -385,7 +419,32 @@ pub fn draw(
             buttons.push((index, rect));
         }
     }
+    if let Some(picture) = main {
+        let x = BORDER + INSET + PICTURE_MARGIN;
+        let y = top + (row_height - PICTURE_SIZE) / 2.0;
+        items.push(fitted(picture, x, y));
+        if let Some(icon) = over {
+            items.push(fitted(icon, x + PICTURE_PADDING, y));
+        }
+    }
     (DrawList { items }, size, buttons)
+}
+
+/// `picture` drawn in the [`PICTURE_SIZE`] square at `x`, `y`: as large as
+/// fits, its aspect kept, centred.
+fn fitted(picture: &Picture, x: f32, y: f32) -> Item {
+    let (width, height) = (picture.width() as f32, picture.height() as f32);
+    let scale = PICTURE_SIZE / width.max(height);
+    let (width, height) = (width * scale, height * scale);
+    Item::Image {
+        rect: Rect {
+            x: x + (PICTURE_SIZE - width) / 2.0,
+            y: y + (PICTURE_SIZE - height) / 2.0,
+            width,
+            height,
+        },
+        picture: picture.clone(),
+    }
 }
 
 #[cfg(test)]

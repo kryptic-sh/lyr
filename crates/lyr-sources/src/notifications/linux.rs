@@ -10,6 +10,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Instant;
 
+use crcbl_image::raw::{self, ImageData};
+use lyr_core::draw::Picture;
 use lyr_core::notifications::{CloseReason, Expiry, Incoming, Store, Urgency};
 use tokio::sync::mpsc::UnboundedSender;
 use zbus::fdo::{DBusProxy, RequestNameFlags};
@@ -17,12 +19,26 @@ use zbus::names::BusName;
 use zbus::object_server::SignalEmitter;
 use zbus::{Connection, OwnedVariant};
 
+use crate::desktop_entry;
+use crate::icons::{self, Icons};
+
 /// The object path the spec puts the daemon at.
 pub const PATH: &str = "/org/freedesktop/Notifications";
 /// The bus name the spec gives the daemon.
 pub const NAME: &str = "org.freedesktop.Notifications";
 /// What `GetCapabilities` answers.
-pub const CAPABILITIES: [&str; 4] = ["actions", "body", "body-markup", "persistence"];
+pub const CAPABILITIES: [&str; 5] = [
+    "actions",
+    "body",
+    "body-markup",
+    "icon-static",
+    "persistence",
+];
+
+/// The size an icon from the theme is found and drawn at: more than a
+/// toast's [`lyr_core::toast::PICTURE_SIZE`] takes on a 3x output. Each
+/// window resizes a picture to the pixels it covers, as the tray's do.
+const PICTURE_SIZE: u32 = 64;
 
 /// What changed in the store, for the bar to redraw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -31,15 +47,27 @@ pub enum Change {
     Closed(u32, CloseReason),
 }
 
-/// The daemon: the store it shares with the bar, and where it reports
-/// changes.
+/// The daemon: the store it shares with the bar, where it reports
+/// changes, and the icons it reads for the notifications.
 #[derive(Debug)]
 pub struct Daemon {
     pub store: Arc<Mutex<Store>>,
     pub changes: UnboundedSender<Change>,
+    icons: Mutex<Icons>,
 }
 
 impl Daemon {
+    /// The daemon over `store`, reporting to `changes`, finding icons in
+    /// the user's icon theme.
+    #[must_use]
+    pub fn new(store: Arc<Mutex<Store>>, changes: UnboundedSender<Change>) -> Self {
+        Self {
+            store,
+            changes,
+            icons: Mutex::new(Icons::default()),
+        }
+    }
+
     fn store(&self) -> std::sync::MutexGuard<'_, Store> {
         // A panic while the store was held leaves it as it was; carrying on
         // with it is better than a daemon that never answers again.
@@ -50,6 +78,74 @@ impl Daemon {
         // The bar has gone only when lyr is exiting.
         let _gone = self.changes.send(change);
     }
+
+    /// The notification's image: `image-data`, else `image-path`, else
+    /// `icon_data`, each under its deprecated name too, as the spec orders
+    /// them. One that cannot be read is left out.
+    fn image(&self, hints: &HashMap<String, OwnedVariant>) -> Option<Picture> {
+        let hint = |names: &[&str]| names.iter().find_map(|name| hints.get(*name));
+        hint(&["image-data", "image_data"])
+            .and_then(image_data)
+            .or_else(|| {
+                let path = String::try_from(hint(&["image-path", "image_path"])?.clone()).ok()?;
+                self.icons().uri_or_name(&path, PICTURE_SIZE)
+            })
+            .or_else(|| hint(&["icon_data"]).and_then(image_data))
+    }
+
+    /// The app's icon: `app_icon`, else the icon of its desktop entry
+    /// ([`entry_ids`]).
+    fn icon(&self, app_icon: &str, desktop_entry: Option<&str>, app_name: &str) -> Option<Picture> {
+        if let Some(icon) = self.icons().uri_or_name(app_icon, PICTURE_SIZE) {
+            return Some(icon);
+        }
+        let ids = entry_ids(desktop_entry, app_name);
+        let icon = desktop_entry::icon(ids.iter().map(String::as_str))?;
+        self.icons().uri_or_name(&icon, PICTURE_SIZE)
+    }
+
+    fn icons(&self) -> std::sync::MutexGuard<'_, Icons> {
+        self.icons.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+/// The desktop entries a notification's app may have, in the order swaync
+/// 0.12.6 tries them (`NotifyParams`): the `desktop-entry` hint, then the
+/// app's name, each as sent and lowercased, without a `.desktop` ending.
+fn entry_ids(desktop_entry: Option<&str>, app_name: &str) -> Vec<String> {
+    desktop_entry
+        .into_iter()
+        .chain([app_name])
+        .map(|id| id.strip_suffix(".desktop").unwrap_or(id))
+        .flat_map(|id| [id.to_owned(), id.to_lowercase()])
+        .collect()
+}
+
+/// An `image-data` hint, `(iiibiiay)`, as a picture.
+fn image_data(value: &OwnedVariant) -> Option<Picture> {
+    let (width, height, rowstride, has_alpha, bits_per_sample, channels, data): (
+        i32,
+        i32,
+        i32,
+        bool,
+        i32,
+        i32,
+        Vec<u8>,
+    ) = value.clone().try_into().ok()?;
+    let image = raw::from_image_data(
+        &ImageData {
+            width,
+            height,
+            rowstride,
+            has_alpha,
+            bits_per_sample,
+            channels,
+            data: &data,
+        },
+        &icons::LIMITS,
+    )
+    .ok()?;
+    icons::picture(image)
 }
 
 #[zbus::interface(name = "org.freedesktop.Notifications")]
@@ -77,10 +173,15 @@ impl Daemon {
                 .and_then(|value| bool::try_from(value).ok())
                 .unwrap_or(false)
         };
+        let desktop_entry = text("desktop-entry");
+        let icon = self.icon(&app_icon, desktop_entry.as_deref(), &app_name);
+        let image = self.image(&hints);
         let incoming = Incoming {
             app_name,
             replaces_id,
             app_icon,
+            icon,
+            image,
             summary,
             body,
             // A flat list of id and label pairs; an odd one out has no label.
@@ -95,7 +196,7 @@ impl Daemon {
                 .and_then(|value| u8::try_from(value).ok())
                 .map_or(Urgency::Normal, Urgency::from_byte),
             category: text("category"),
-            desktop_entry: text("desktop-entry"),
+            desktop_entry,
             transient: flag("transient"),
             resident: flag("resident"),
             expiry: Some(Expiry::from_millis(expire_timeout)),
@@ -120,9 +221,10 @@ impl Daemon {
     }
 
     /// Each capability is advertised only once it works: the body is drawn
-    /// with its markup, actions get buttons and are invoked, and the history
-    /// keeps a notification until it is dismissed or cleared. Not yet:
-    /// hyperlinks (a link is drawn but not opened) and icons.
+    /// with its markup, actions get buttons and are invoked, the image and
+    /// the app's icon are drawn, and the history keeps a notification until
+    /// it is dismissed or cleared. Not yet: hyperlinks (a link is drawn but
+    /// not opened).
     fn get_capabilities(&self) -> Vec<String> {
         CAPABILITIES.iter().map(|&name| name.to_owned()).collect()
     }

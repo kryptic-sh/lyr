@@ -2366,10 +2366,7 @@ mod linux {
     ) {
         let store = Arc::new(Mutex::new(Store::default()));
         let (changes, mut changed) = tokio::sync::mpsc::unbounded_channel();
-        let daemon = Daemon {
-            store: store.clone(),
-            changes,
-        };
+        let daemon = Daemon::new(store.clone(), changes);
         let served = match serve_session(daemon, replace).await {
             Ok(served) => served,
             Err(error) => {

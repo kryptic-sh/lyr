@@ -9,7 +9,7 @@ use tokio::sync::mpsc;
 use zbus::connection::Builder;
 use zbus::{Connection, Guid, OwnedVariant};
 
-use super::{Change, Daemon, NotificationsProxy, PATH, Served, notify};
+use super::{Change, Daemon, NotificationsProxy, PATH, Served, entry_ids, notify};
 
 struct Running {
     store: Arc<Mutex<Store>>,
@@ -25,13 +25,7 @@ async fn daemon() -> Running {
     let server = Builder::unix_stream(server)
         .server(Guid::generate())
         .p2p()
-        .serve_at(
-            PATH,
-            Daemon {
-                store: store.clone(),
-                changes: sender,
-            },
-        )
+        .serve_at(PATH, Daemon::new(store.clone(), sender))
         .build();
     let client = Builder::unix_stream(client).p2p().build();
     let (server, client) = tokio::try_join!(server, client).expect("connected");
@@ -86,6 +80,110 @@ async fn a_notification_is_stored_with_its_hints() {
     );
 }
 
+/// An `image-data` hint: one RGBA pixel, or one RGB pixel without alpha.
+fn image_data(pixel: &[u8]) -> OwnedVariant {
+    let alpha = pixel.len() == 4;
+    let channels = i32::try_from(pixel.len()).expect("a channel count");
+    zbus::Variant::from((
+        1_i32,
+        1_i32,
+        channels,
+        alpha,
+        8_i32,
+        channels,
+        pixel.to_vec(),
+    ))
+    .try_into()
+    .expect("owned")
+}
+
+/// A 1 px PNG of `rgba` at `path`.
+fn write_png(path: &std::path::Path, rgba: [u8; 4]) {
+    let image = crcbl_image::Rgba8Image::new(1, 1, rgba.to_vec()).expect("an image");
+    std::fs::write(path, crcbl_image::png::encode(&image).expect("encoded")).expect("written");
+}
+
+#[tokio::test]
+async fn the_image_comes_from_its_hints_in_the_spec_s_order_and_the_icon_from_app_icon() {
+    let mut running = daemon().await;
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let (icon, shot) = (dir.path().join("icon.png"), dir.path().join("shot one.png"));
+    write_png(&icon, [1, 1, 1, 255]);
+    write_png(&shot, [2, 2, 2, 255]);
+    let shot_uri = format!(
+        "file://{}",
+        shot.to_str().expect("UTF-8").replace(' ', "%20")
+    );
+    let path_hint = || OwnedVariant::from(zbus::Str::from(shot_uri.clone()));
+    let cases = [
+        (
+            HashMap::from([
+                ("image-data", image_data(&[3, 3, 3, 255])),
+                ("image-path", path_hint()),
+            ]),
+            [3, 3, 3, 255],
+            "image-data first",
+        ),
+        (
+            HashMap::from([("image_data", image_data(&[4, 4, 4]))]),
+            [4, 4, 4, 255],
+            "under its deprecated name, and without alpha",
+        ),
+        (
+            HashMap::from([
+                ("image-path", path_hint()),
+                ("icon_data", image_data(&[5, 5, 5, 255])),
+            ]),
+            [2, 2, 2, 255],
+            "then image-path, as a file URI",
+        ),
+        (
+            HashMap::from([("icon_data", image_data(&[5, 5, 5, 255]))]),
+            [5, 5, 5, 255],
+            "then icon_data",
+        ),
+    ];
+    for (hints, pixel, why) in cases {
+        let id = running
+            .client
+            .notify(
+                "app",
+                0,
+                icon.to_str().expect("UTF-8"),
+                "x",
+                "",
+                &[],
+                hints,
+                0,
+            )
+            .await
+            .expect("notified");
+        running.changes.recv().await;
+        let store = running.store.lock().expect("store");
+        let content = &store.get(id).expect("held").content;
+        assert_eq!(
+            content.image.as_ref().map(lyr_core::draw::Picture::pixels),
+            Some(&pixel[..]),
+            "{why}"
+        );
+        assert_eq!(
+            content.icon.as_ref().map(lyr_core::draw::Picture::pixels),
+            Some(&[1, 1, 1, 255][..]),
+            "app_icon, by its path"
+        );
+    }
+    let broken = HashMap::from([("image-data", image_data(&[1, 2]))]);
+    let id = running
+        .client
+        .notify("app", 0, "", "x", "", &[], broken, 0)
+        .await
+        .expect("still notified");
+    running.changes.recv().await;
+    let store = running.store.lock().expect("store");
+    let content = &store.get(id).expect("held").content;
+    assert_eq!((&content.image, &content.icon), (&None, &None), "left out");
+}
+
 #[tokio::test]
 async fn closing_signals_the_reason_and_an_unknown_id_is_an_error() {
     let mut running = daemon().await;
@@ -125,8 +223,14 @@ async fn the_server_says_what_it_is_and_what_it_can_do() {
     assert_eq!((name.as_str(), spec.as_str()), ("lyr", "1.3"));
     assert_eq!(
         running.client.get_capabilities().await.expect("answered"),
-        ["actions", "body", "body-markup", "persistence"],
-        "not hyperlinks or icons, which lyr does not open or draw yet"
+        [
+            "actions",
+            "body",
+            "body-markup",
+            "icon-static",
+            "persistence"
+        ],
+        "not hyperlinks, which lyr does not open yet"
     );
 }
 
@@ -148,10 +252,7 @@ async fn served() -> (
     let (server, client) = tokio::try_join!(server, client).expect("connected");
     let served = Served::at(
         &server,
-        Daemon {
-            store: Arc::new(Mutex::new(Store::default())),
-            changes: sender,
-        },
+        Daemon::new(Arc::new(Mutex::new(Store::default())), sender),
     )
     .await
     .expect("served");
@@ -306,10 +407,7 @@ async fn lyr_s_own_notice_reaches_the_daemon() {
 
 fn fresh_daemon() -> Daemon {
     let (sender, _changes) = mpsc::unbounded_channel();
-    Daemon {
-        store: Arc::new(Mutex::new(Store::default())),
-        changes: sender,
-    }
+    Daemon::new(Arc::new(Mutex::new(Store::default())), sender)
 }
 
 #[tokio::test]
@@ -344,4 +442,18 @@ async fn replacing_takes_the_name_from_the_daemon_holding_it() {
     super::serve(&ours, fresh_daemon(), true)
         .await
         .expect("replacing takes the name");
+}
+
+#[test]
+fn the_app_s_desktop_entry_is_looked_for_as_swaync_does() {
+    assert_eq!(
+        entry_ids(Some("org.mozilla.Firefox.desktop"), "Firefox"),
+        [
+            "org.mozilla.Firefox",
+            "org.mozilla.firefox",
+            "Firefox",
+            "firefox"
+        ]
+    );
+    assert_eq!(entry_ids(None, "discord"), ["discord", "discord"]);
 }

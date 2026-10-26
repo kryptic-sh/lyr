@@ -386,13 +386,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Known gaps in the design
 
-- **Images in toasts and the media module: not drawn.** `crcbl-image` and the
-  draw path's pictures (`lyr_core::draw::Picture`, `lyr_render::pictures`) came
-  with the tray's icons, so a toast's `app_icon` and `image-data` and a player's
-  art can use them: `crcbl_image::raw::from_image_data` for `image-data`, the
-  theme lookup for an `app_icon` name, and `file://` art decoded by its format
-  (JPEG and WebP are crcbl-image features not taken yet). Until then toasts show
-  no image and `icon-static` is not advertised.
+- **The media module's art: not drawn.** Toasts draw their images through the
+  pictures the tray's icons brought (`lyr_core::draw::Picture`,
+  `lyr_render::pictures`), and a player's `mpris:artUrl` can follow: a `file://`
+  URI goes through `lyr_sources::icons` as a notification's `image-path` does.
+  Art is mostly JPEG, and a notification's `image-path` can be too; JPEG and
+  WebP are crcbl-image features lyr has not taken, so both are left out until it
+  does (the owner's call, as a feature of a dependency lyr already has).
 - **Hyprland backend, rest of M2.** `lyr-wm::hyprland` is built against Hyprland
   v0.56.2's formats: the event parser, the `Tracker` that folds events into the
   shared `lyr_wm::State`, the JSON seed, and `Hyprland` (socket I/O, `from_env`,
@@ -557,18 +557,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (`lyr_sources::notifications::linux::Daemon`): `Notify` with its hints,
   `CloseNotification` with its signal and the spec's empty error,
   `GetServerInformation` (spec 1.3), and each capability once it works
-  (`notifications::linux::CAPABILITIES`: `actions`, `body` and `persistence` so
-  far; not markup, hyperlinks or icons), tested against an application on a
-  peer-to-peer connection. Claiming the name is `notifications::linux::serve`:
-  `DO_NOT_QUEUE`, so a name another daemon holds comes back as `Exists` and lyr
-  takes its object down and names the owner and its pid, or `REPLACE_EXISTING`
-  when told to replace; it allows being replaced in turn. Claiming is tested on
-  a private `dbus-daemon` (`lyr_sources::bus::test::Bus`), since zbus 6 reports
-  a taken name as `Error::NameTaken` on a bus and never as `Exists`, which the
-  peer-to-peer tests could not show (`bus::claim` handles both). On the owner's
-  Hyprland (2026-10-20) lyr named swaync (`:1.6`, its pid) and left the name to
-  it. `Served::close` and `Served::invoke` are lyr's side, with their signals
-  (an invoked action closes a notification that is not `resident`), tested and
+  (`notifications::linux::CAPABILITIES`: `actions`, `body`, `body-markup`,
+  `icon-static` and `persistence`; not hyperlinks), tested against an
+  application on a peer-to-peer connection. Claiming the name is
+  `notifications::linux::serve`: `DO_NOT_QUEUE`, so a name another daemon holds
+  comes back as `Exists` and lyr takes its object down and names the owner and
+  its pid, or `REPLACE_EXISTING` when told to replace; it allows being replaced
+  in turn. Claiming is tested on a private `dbus-daemon`
+  (`lyr_sources::bus::test::Bus`), since zbus 6 reports a taken name as
+  `Error::NameTaken` on a bus and never as `Exists`, which the peer-to-peer
+  tests could not show (`bus::claim` handles both). On the owner's Hyprland
+  (2026-10-20) lyr named swaync (`:1.6`, its pid) and left the name to it.
+  `Served::close` and `Served::invoke` are lyr's side, with their signals (an
+  invoked action closes a notification that is not `resident`), tested and
   mutation-checked. The toast stack is `lyr_core::toast::stack::Stack` (newest
   on top, timeouts paused under the pointer) and a toast's draw list
   `lyr_core::toast` (swaync's look with the `toast_*` theme keys, its body
@@ -613,13 +614,25 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   lyr keeps the toast's placement there. A body's markup is drawn
   (`lyr_core::markup`: the spec's `<b>`, `<i>`, `<u>` and `<a href>`, XML's
   entities, `<img>` left out, anything else shown as text; `toast::wrap` wraps
-  the styled spans), and `body-markup` is advertised. Not built: a toast's
-  images (the panel's Clear All, switch and media players work; `lyr dnd` and
-  `lyr clear` work; on Windows they answer that lyr is not the daemon, run
-  there). Each action but `default` gets a button under the body (swaync's
-  style, at the bar's text size until the owner rules on swaync's `0.2rem`), in
-  toasts and the panel's history; a click invokes it. A transient notification,
-  kept in no history, closes as expired when its toast times out.
+  the styled spans), and `body-markup` is advertised. The panel's Clear All,
+  switch and media players work; `lyr dnd` and `lyr clear` work, and on Windows
+  answer that lyr is not the daemon, run there. A toast and a centre entry draw
+  the notification's image (`image-data`, else `image-path`, else `icon_data`)
+  left of the text with the app's icon over its right side, or the app's icon
+  alone (`toast::PICTURE_SIZE`): the app's icon is `app_icon`, else the `Icon`
+  of its desktop entry, looked for as swaync does
+  (`notifications::linux::entry_ids`, `lyr_sources::desktop_entry`). The sizes
+  are what swaync 0.12.6 drew with the dotfiles' style in a nested Hyprland
+  (2026-10-26): 16 px, since their `* { all: unset }` leaves GTK's default icon
+  size. lyr drew the same four notifications the same way there; tested and
+  mutation-checked. An id the spec maps to a subdirectory (`kde-foo` as
+  `kde/foo.desktop`) is looked for only as the flat file. libnotify's
+  `notify-send -i` sends the icon as the `image-path` hint with `app_icon`
+  empty, so it is the image, not the app's icon. Each action but `default` gets
+  a button under the body (swaync's style, at the bar's text size until the
+  owner rules on swaync's `0.2rem`), in toasts and the panel's history; a click
+  invokes it. A transient notification, kept in no history, closes as expired
+  when its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading
