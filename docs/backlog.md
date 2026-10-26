@@ -394,12 +394,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   draws the player's art (`lyr_core::centre`, `ART_SIZE`), read from a `file://`
   `mpris:artUrl` through `lyr_sources::icons` and cached per URL until no player
   names it (`lyr_sources::mpris::linux::Art`); run in a nested Hyprland
-  (2026-10-26) with a stand-in player whose art was a PNG with no extension. Not
-  carried from swaync 0.12.6 (`data/ui/mpris_player.blp`, `mpris_player.vala`):
+  (2026-10-26) with a stand-in player whose art was a PNG with no extension.
+  With no art it shows the icon of the player's `DesktopEntry`, else
+  `audio-x-generic-symbolic` (`Art::shown`, swaync's `update_album_art`; its
+  `show-album-art` defaults to `always`), a `-symbolic` icon tinted to the
+  panel's text colour as GTK recolours one (`media::Artwork::Symbolic`); seen in
+  the nested Hyprland with Papirus-Dark's icon. The generic icon's test depends
+  on the installed themes and passes vacuously where none has it. Not carried
+  from swaync 0.12.6 (`data/ui/mpris_player.blp`, `mpris_player.vala`):
   `http(s)` art (no HTTP client, plan 09) and `data:` URIs (base64, which lyr
-  has no decoder for); the generic `audio-x-generic-symbolic` icon swaync shows
-  when there is no art (its `show-album-art` defaults to `always`); the art's
-  rounded corners (`Item::Image` has no radius); the blurred art behind the card
+  has no decoder for); swaync's title and subtitle fallbacks (the entry's name,
+  else "Media Player"; the first artist and the album); the art's rounded
+  corners (`Item::Image` has no radius); the blurred art behind the card
   (`mpris-background`); and swaync's layout, with the controls centred in a row
   under the art and text, and shuffle and repeat buttons. lyr keeps previous,
   play/pause and next at the card's right. WebP art is left out until lyr takes

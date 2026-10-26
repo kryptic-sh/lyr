@@ -37,8 +37,18 @@ pub struct Player {
     /// `xesam:artist`, joined with ", ".
     pub artist: String,
     pub status: Status,
-    /// The art `mpris:artUrl` names, when lyr could read it.
-    pub art: Option<Picture>,
+    /// What it shows for art: the art `mpris:artUrl` names, else an icon
+    /// standing in for it.
+    pub art: Option<Artwork>,
+}
+
+/// A player's art, or the icon shown in its place.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Artwork {
+    /// Drawn as it is.
+    Picture(Picture),
+    /// A symbolic icon, drawn in the text's colour as GTK draws one.
+    Symbolic(Picture),
 }
 
 /// A control button.

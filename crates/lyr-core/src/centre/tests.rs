@@ -308,7 +308,7 @@ fn a_media_player_is_a_card_with_its_controls_before_the_history() {
 
 #[test]
 fn a_media_player_s_art_stands_left_of_its_text() {
-    use crate::media::{Player, Status};
+    use crate::media::{Artwork, Player, Status};
     let theme = theme();
     let store = Store::default();
     // Twice as wide as tall, so it fills the square's width.
@@ -318,7 +318,7 @@ fn a_media_player_s_art_stands_left_of_its_text() {
         title: "A Song".to_owned(),
         artist: "Someone".to_owned(),
         status: Status::Paused,
-        art: Some(art.clone()),
+        art: Some(Artwork::Picture(art.clone())),
     }];
     let (list, size, _) = draw(
         &Shown {
@@ -354,6 +354,38 @@ fn a_media_player_s_art_stands_left_of_its_text() {
     assert_eq!(title.x, inner + 2.0 * ART_MARGIN + ART_SIZE + ART_SPACING);
     // The two lines centred on the art.
     assert_eq!(title.y, card_top + inner + (ART_SIZE - 2.0 * LINE) / 2.0);
+}
+
+#[test]
+fn a_symbolic_icon_is_drawn_in_the_text_s_colour() {
+    use crate::media::{Artwork, Player, Status};
+    let theme = theme();
+    let store = Store::default();
+    let icon = Picture::new(1, 1, vec![40, 40, 40, 128]).expect("a picture");
+    let players = [Player {
+        art: Some(Artwork::Symbolic(icon)),
+        status: Status::Paused,
+        ..Player::default()
+    }];
+    let (list, _, _) = draw(
+        &Shown {
+            store: &store,
+            players: &players,
+            now: Instant::now(),
+            hovered: None,
+        },
+        WIDTH,
+        &measure,
+        LINE,
+        &theme,
+    );
+    let drawn = list.items.iter().find_map(|item| match item {
+        Item::Image { picture, .. } => Some(picture.pixels().to_vec()),
+        _ => None,
+    });
+    let colour = theme.panel_foreground;
+    let alpha = (128 * u16::from(colour.a) / 255) as u8;
+    assert_eq!(drawn, Some(vec![colour.r, colour.g, colour.b, alpha]));
 }
 
 #[test]

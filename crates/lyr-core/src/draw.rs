@@ -76,6 +76,27 @@ impl Picture {
         &self.pixels
     }
 
+    /// It in `colour` alone, each pixel keeping its coverage: how GTK draws
+    /// a symbolic icon in the text's colour.
+    #[must_use]
+    pub fn tinted(&self, colour: Colour) -> Self {
+        let pixels: Vec<u8> = self
+            .pixels
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .flat_map(|pixel| {
+                let alpha = u16::from(pixel[3]) * u16::from(colour.a) / 255;
+                [colour.r, colour.g, colour.b, alpha as u8]
+            })
+            .collect();
+        Self {
+            width: self.width,
+            height: self.height,
+            pixels: pixels.into(),
+        }
+    }
+
     /// It drawn `height` logical pixels tall, its aspect kept.
     #[must_use]
     pub fn sized(self, height: f32) -> SizedPicture {

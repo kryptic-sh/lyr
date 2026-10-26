@@ -4,6 +4,7 @@
 //! (`NameOwnerChanged`) or changes (`PropertiesChanged`). Nothing is polled.
 
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use futures_util::StreamExt;
@@ -16,15 +17,29 @@ use zbus::{Connection, MatchRule, MessageStream, OwnedVariant};
 
 use crcbl_image::theme::FileVersion;
 use lyr_core::draw::Picture;
-use lyr_core::media::{Control, Player, Status};
+use lyr_core::media::{Artwork, Control, Player, Status};
 
 use crate::bus::Follow;
-use crate::icons;
+use crate::desktop_entry;
+use crate::icons::{self, Icons};
 
 /// The bus names MPRIS players take.
 pub const PREFIX: &str = "org.mpris.MediaPlayer2.";
 /// Where every player serves its interfaces.
 pub const PATH: &str = "/org/mpris/MediaPlayer2";
+
+/// What stands for a player's art when it has none and its desktop entry
+/// gives no icon: swaync 0.12.6's default in `update_album_art`.
+const NO_ART_ICON: &str = "audio-x-generic-symbolic";
+
+#[zbus::proxy(
+    interface = "org.mpris.MediaPlayer2",
+    default_path = "/org/mpris/MediaPlayer2"
+)]
+trait MediaPlayer2 {
+    #[zbus(property)]
+    fn desktop_entry(&self) -> zbus::Result<String>;
+}
 
 #[zbus::proxy(
     interface = "org.mpris.MediaPlayer2.Player",
@@ -54,15 +69,61 @@ async fn proxy(connection: &Connection, bus_name: &str) -> zbus::Result<MediaPla
 const ART_SIZE: u32 = 256;
 
 /// Players' art read so far, by `mpris:artUrl`, each file read again only
-/// once it changed.
-#[derive(Debug, Default)]
+/// once it changed, and the icons that stand in for art a player lacks.
+#[derive(Debug)]
 pub struct Art {
     read: HashMap<String, (FileVersion, Option<Picture>)>,
     /// The URLs asked for since the last [`Self::sweep`].
     asked: HashSet<String>,
+    icons: Icons,
+    /// Where players' desktop entries are looked for.
+    entry_dirs: Vec<PathBuf>,
+}
+
+impl Default for Art {
+    fn default() -> Self {
+        Self::new(Icons::default(), desktop_entry::dirs())
+    }
 }
 
 impl Art {
+    /// Art looked up in `icons`, desktop entries under `entry_dirs`.
+    #[must_use]
+    pub fn new(icons: Icons, entry_dirs: Vec<PathBuf>) -> Self {
+        Self {
+            read: HashMap::new(),
+            asked: HashSet::new(),
+            icons,
+            entry_dirs,
+        }
+    }
+
+    /// What a player shows for art, as swaync 0.12.6's `update_album_art`
+    /// picks it: the art `url` names, else the icon of the player's desktop
+    /// entry `entry`, else [`NO_ART_ICON`]. An icon named `…-symbolic` is
+    /// drawn in the text's colour, as GTK draws it.
+    fn shown(&mut self, url: &str, entry: &str) -> Option<Artwork> {
+        let icon = |name: &str, picture: Picture| {
+            if name.ends_with("-symbolic") {
+                Artwork::Symbolic(picture)
+            } else {
+                Artwork::Picture(picture)
+            }
+        };
+        self.picture(url)
+            .map(Artwork::Picture)
+            .or_else(|| {
+                let name = desktop_entry::icon_in(&self.entry_dirs, [entry])?;
+                Some(icon(&name, self.icons.uri_or_name(&name, ART_SIZE)?))
+            })
+            .or_else(|| {
+                Some(icon(
+                    NO_ART_ICON,
+                    self.icons.named(NO_ART_ICON, "", ART_SIZE)?,
+                ))
+            })
+    }
+
     /// The picture `url` names. Only a `file://` URI is read: lyr fetches
     /// nothing over the network (plan 09).
     fn picture(&mut self, url: &str) -> Option<Picture> {
@@ -87,7 +148,8 @@ impl Art {
     }
 }
 
-/// What the player at `bus_name` plays now, its art read through `art`.
+/// What the player at `bus_name` plays now, its art read through `art`
+/// ([`Art::shown`]).
 ///
 /// # Errors
 ///
@@ -111,10 +173,19 @@ pub async fn read(
         .map(|artists| artists.join(", "))
         .unwrap_or_default();
     let status = Status::from_name(&player.playback_status().await?);
+    // A player that does not say has none, as swaync reads it.
+    let entry = MediaPlayer2Proxy::builder(connection)
+        .destination(bus_name.to_owned())
+        .cache_properties(CacheProperties::No)
+        .build()
+        .await?
+        .desktop_entry()
+        .await
+        .unwrap_or_default();
     let art = art
         .lock()
         .unwrap_or_else(PoisonError::into_inner)
-        .picture(&text("mpris:artUrl"));
+        .shown(&text("mpris:artUrl"), &entry);
     Ok(Player {
         bus_name: bus_name.to_owned(),
         title: text("xesam:title"),

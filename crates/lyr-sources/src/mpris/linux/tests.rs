@@ -7,8 +7,9 @@ use crcbl_image::{Rgba8Image, png};
 use zbus::connection::Builder;
 use zbus::{Connection, Guid, OwnedVariant};
 
-use super::{Art, PATH, control, read};
-use lyr_core::media::{Control, Status};
+use super::{ART_SIZE, Art, NO_ART_ICON, PATH, control, read};
+use crate::icons::Icons;
+use lyr_core::media::{Artwork, Control, Status};
 
 const NAME: &str = "org.mpris.MediaPlayer2.test";
 
@@ -57,6 +58,20 @@ impl FakePlayer {
     }
 }
 
+/// A stand-in for a player's root interface, naming its desktop entry.
+struct FakeRoot;
+
+#[zbus::interface(name = "org.mpris.MediaPlayer2")]
+impl FakeRoot {
+    #[zbus(property)]
+    fn desktop_entry(&self) -> String {
+        ENTRY.to_owned()
+    }
+}
+
+/// The desktop entry the stand-in names.
+const ENTRY: &str = "lyr-test-player";
+
 async fn player(
     status: &'static str,
     artists: &[&str],
@@ -83,6 +98,7 @@ async fn with_art(
                 pressed: pressed.clone(),
             },
         )
+        .serve_at(PATH, FakeRoot)
         .build();
     let client = Builder::unix_stream(client).p2p().build();
     let (server, client) = tokio::try_join!(server, client).expect("connected");
@@ -97,13 +113,32 @@ async fn a_player_is_read_with_its_title_artists_and_status() {
     assert_eq!(read.title, "A Song");
     assert_eq!(read.artist, "One, Two");
     assert_eq!(read.status, Status::Playing);
-    assert_eq!(read.art, None, "it names no art");
 }
 
 /// A 1 × 1 PNG of `rgba` at `path`.
 fn write_png(path: &Path, rgba: [u8; 4]) {
     let image = Rgba8Image::new(1, 1, rgba.to_vec()).expect("an image");
     std::fs::write(path, png::encode(&image).expect("encoded")).expect("written");
+}
+
+const GREEN: [u8; 4] = [0, 255, 0, 255];
+
+/// Art whose desktop entries are under `dir`, where [`ENTRY`]'s icon is a
+/// green PNG.
+fn with_entry(dir: &Path) -> Mutex<Art> {
+    let applications = dir.join("applications");
+    std::fs::create_dir_all(&applications).expect("created");
+    let icon = dir.join("player.png");
+    write_png(&icon, GREEN);
+    std::fs::write(
+        applications.join(format!("{ENTRY}.desktop")),
+        format!("[Desktop Entry]\nName=Player\nIcon={}\n", icon.display()),
+    )
+    .expect("written");
+    Mutex::new(Art::new(
+        Icons::new("lyr-test-theme".to_owned()),
+        vec![dir.to_owned()],
+    ))
 }
 
 #[tokio::test]
@@ -116,16 +151,36 @@ async fn a_player_s_art_is_read_from_its_file_uri() {
         path.to_str().expect("UTF-8").replace(' ', "%20")
     );
     let (_server, client, _) = with_art("Playing", &[], &url).await;
-    let read = read(&client, NAME, &Mutex::default()).await.expect("read");
-    let art = read.art.expect("the art read");
-    assert_eq!(art.pixels(), [0, 0, 255, 255]);
+    let art = with_entry(dir.path());
+    let read = read(&client, NAME, &art).await.expect("read");
+    let Some(Artwork::Picture(art)) = read.art else {
+        panic!("the art read: {:?}", read.art)
+    };
+    assert_eq!(art.pixels(), [0, 0, 255, 255], "before the entry's icon");
 }
 
 #[tokio::test]
-async fn art_over_the_network_is_not_fetched() {
+async fn art_over_the_network_is_not_fetched_and_the_entry_s_icon_shows() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
     let (_server, client, _) = with_art("Playing", &[], "https://example.com/a.png").await;
-    let read = read(&client, NAME, &Mutex::default()).await.expect("read");
-    assert_eq!(read.art, None);
+    let read = read(&client, NAME, &with_entry(dir.path()))
+        .await
+        .expect("read");
+    let Some(Artwork::Picture(icon)) = read.art else {
+        panic!("the entry's icon: {:?}", read.art)
+    };
+    assert_eq!(icon.pixels(), GREEN);
+}
+
+#[test]
+fn with_no_art_and_no_entry_it_is_the_generic_icon() {
+    // What the generic icon is depends on the themes installed, so this
+    // checks the lookup is made, and can only fail where one has it.
+    let expected = Icons::default()
+        .named(NO_ART_ICON, "", ART_SIZE)
+        .map(Artwork::Symbolic);
+    let mut art = Art::new(Icons::default(), Vec::new());
+    assert_eq!(art.shown("", "lyr-no-such-entry"), expected);
 }
 
 #[test]
@@ -134,7 +189,7 @@ fn art_is_read_again_once_its_file_changed_and_swept_once_unasked() {
     let path = dir.path().join("art.png");
     let url = format!("file://{}", path.to_str().expect("UTF-8"));
     write_png(&path, [255, 0, 0, 255]);
-    let mut art = Art::default();
+    let mut art = Art::new(Icons::new("lyr-test-theme".to_owned()), Vec::new());
     let first = art.picture(&url).expect("read");
     assert_eq!(first.pixels(), [255, 0, 0, 255]);
     // A different length, so the file's version differs whatever the

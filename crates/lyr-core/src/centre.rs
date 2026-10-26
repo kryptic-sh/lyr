@@ -11,7 +11,7 @@ use lyr_config::Theme;
 
 use crate::draw::{self, DrawList, Item, Size, TextStyle};
 use crate::hit::{Rect, Regions};
-use crate::media::{Control, Player, Status};
+use crate::media::{Artwork, Control, Player, Status};
 use crate::notifications::Store;
 use crate::toast::{self, Area};
 
@@ -188,7 +188,11 @@ pub fn draw(
             border: Some((BORDER, theme.panel_border)),
         });
         let mut left = card.x + inner;
-        if let Some(art) = &player.art {
+        let art = player.art.as_ref().map(|art| match art {
+            Artwork::Picture(picture) => picture.clone(),
+            Artwork::Symbolic(icon) => icon.tinted(theme.panel_foreground),
+        });
+        if let Some(art) = &art {
             left += ART_MARGIN;
             let top = card.y + (card.height - ART_SIZE) / 2.0;
             items.push(draw::fitted(art, left, top, ART_SIZE));

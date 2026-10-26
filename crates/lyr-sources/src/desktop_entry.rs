@@ -1,7 +1,7 @@
 //! An application's desktop entry, as the Desktop Entry Specification
 //! places it: `<id>.desktop` under `applications` in each XDG data
-//! directory, the user's first. Only what a notification needs is read:
-//! the entry's icon.
+//! directory, the user's first. Only what a notification or a media
+//! player needs is read: the entry's icon.
 //!
 //! An id that the specification maps to a subdirectory (`kde-foo` as
 //! `kde/foo.desktop`) is looked for only as the flat file.
@@ -13,11 +13,18 @@ use std::path::PathBuf;
 /// icon theme, or a path.
 #[must_use]
 pub fn icon<'a>(ids: impl IntoIterator<Item = &'a str>) -> Option<String> {
-    icon_in(&data_dirs(|name| std::env::var_os(name)), ids)
+    icon_in(&dirs(), ids)
+}
+
+/// The data directories desktop entries are looked for under, from the
+/// environment ([`data_dirs`]).
+#[must_use]
+pub fn dirs() -> Vec<PathBuf> {
+    data_dirs(|name| std::env::var_os(name))
 }
 
 /// [`icon`], looking in `dirs`.
-fn icon_in<'a>(dirs: &[PathBuf], ids: impl IntoIterator<Item = &'a str>) -> Option<String> {
+pub fn icon_in<'a>(dirs: &[PathBuf], ids: impl IntoIterator<Item = &'a str>) -> Option<String> {
     ids.into_iter().filter(|id| is_id(id)).find_map(|id| {
         dirs.iter().find_map(|dir| {
             let path = dir.join("applications").join(format!("{id}.desktop"));
