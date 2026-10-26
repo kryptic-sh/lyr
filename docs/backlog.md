@@ -1512,7 +1512,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   resolve `lyr-config`. Re-running the failed jobs once the index had both
   crates published the rest; all seven crates are at 0.1.0. The step now waits
   for each crate in the sparse index (`wait_for_index`) and retries an
-  unresolvable dependency; that is tested locally against the live index, not
-  yet on a tag. The Linux aarch64 and macOS x86_64 binaries are built but run by
-  no job: only x86_64 Linux, Apple silicon macOS and Windows get a `--version`
-  smoke run.
+  unresolvable dependency. On v0.2.0's tag run it did its job: cargo's wait for
+  `lyr-core` timed out, `wait_for_index` waited a further 210 s until the index
+  had it, and every channel published in one run, the AUR, formula and Scoop
+  hashes matching the release's `.sha256` files. The Linux aarch64 and macOS
+  x86_64 binaries are built but run by no job: only x86_64 Linux, Apple silicon
+  macOS and Windows get a `--version` smoke run.
