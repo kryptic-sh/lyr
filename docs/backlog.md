@@ -647,11 +647,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   a nested Hyprland (2026-10-26) with a stand-in `xdg-open` that wrote down its
   argument: an `https` link's URL arrived with its `&amp;` decoded, and a
   `file:///etc/passwd` link was refused. There, a second toast arriving was
-  missing from a screenshot taken two seconds later and was up in the next one;
-  not chased. Each action but `default` gets a button under the body (swaync's
-  style, at the bar's text size until the owner rules on swaync's `0.2rem`), in
-  toasts and the panel's history; a click invokes it. A transient notification,
-  kept in no history, closes as expired when its toast times out.
+  missing from a screenshot taken two seconds later and was up in the next one.
+  It did not happen again (2026-10-26, nested Hyprland): two plain toasts sent
+  0, 0.3 and 1 s apart were both up in every screenshot, taken each half second
+  from 0.5 s to 4 s after the second. If it comes back, the difference from that
+  run was the link bodies and a pointer moved by `wlrctl`. Each action but
+  `default` gets a button under the body (swaync's style, at the bar's text size
+  until the owner rules on swaync's `0.2rem`), in toasts and the panel's
+  history; a click invokes it. A transient notification, kept in no history,
+  closes as expired when its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading
