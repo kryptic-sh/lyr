@@ -20,6 +20,11 @@ and this project adheres to
   `xdg-open`, for `http` and `https` links only; other schemes are not opened.
   The toast stays up. lyr now advertises `body-hyperlinks`.
 
+### Changed
+
+- Built on crcbl 0.11.0 (from 0.9.0). Icon theme lookups are faster and take the
+  icon nearest the size drawn.
+
 ### Fixed
 
 - The tray's icons are `[tray] spacing` apart, as waybar's are. They also took

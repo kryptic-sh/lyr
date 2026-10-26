@@ -17,10 +17,10 @@ lyr-core.workspace = true
 workspace = true
 
 [target.'cfg(any(target_os = "linux", windows))'.dependencies]
-crcbl-mixer = "=0.9.0"
+crcbl-mixer = "=0.11.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-crcbl-image = { version = "=0.9.0", features = ["png", "svg", "xpm", "theme", "jpeg"] }
+crcbl-image = { version = "=0.11.0", features = ["png", "svg", "xpm", "theme", "jpeg"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["alloc"] }
 thiserror = "2.0.21"
 tokio = { version = "1.53.3", features = ["sync"] }
