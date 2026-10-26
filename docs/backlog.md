@@ -390,9 +390,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   pictures the tray's icons brought (`lyr_core::draw::Picture`,
   `lyr_render::pictures`), and a player's `mpris:artUrl` can follow: a `file://`
   URI goes through `lyr_sources::icons` as a notification's `image-path` does.
-  Art is mostly JPEG, and a notification's `image-path` can be too; JPEG and
-  WebP are crcbl-image features lyr has not taken, so both are left out until it
-  does (the owner's call, as a feature of a dependency lyr already has).
+  JPEG is decoded (the owner took crcbl-image's `jpeg` feature, 2026-10-26);
+  WebP is a crcbl-image feature lyr has not taken, so WebP art and images are
+  left out until it does.
 - **Hyprland backend, rest of M2.** `lyr-wm::hyprland` is built against Hyprland
   v0.56.2's formats: the event parser, the `Tracker` that folds events into the
   shared `lyr_wm::State`, the JSON seed, and `Hyprland` (socket I/O, `from_env`,

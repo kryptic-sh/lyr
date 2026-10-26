@@ -121,7 +121,7 @@ The interface is the freedesktop Desktop Notifications Specification, version
   allows) or a name in the icon theme, looked up as the tray does
   ([08](08-tray.md)); a plain absolute path is accepted too, though the spec
   does not name it. A picture that cannot be found or decoded (crcbl's SVG
-  subset refuses what it cannot draw; JPEG is not decoded) is left out, and the
+  subset refuses what it cannot draw; WebP is not decoded) is left out, and the
   notification is still shown.
 
 ### Toasts

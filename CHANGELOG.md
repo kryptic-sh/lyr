@@ -14,8 +14,8 @@ and this project adheres to
   (`image-data`, `image-path` or `icon_data`) and the app's icon, laid out as
   swaync draws them with the dotfiles' style. The app's icon is `app_icon`, else
   the icon of the app's desktop entry (found by the `desktop-entry` hint or the
-  app's name). lyr now advertises `icon-static`. JPEG images are not decoded
-  yet.
+  app's name). Pictures may be PNG, JPEG, SVG or XPM. lyr now advertises
+  `icon-static`.
 
 ### Fixed
 

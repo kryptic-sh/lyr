@@ -94,3 +94,21 @@ fn a_notification_names_its_icon_by_uri_path_or_name() {
     assert!(icons.files.is_empty(), "and none is kept");
     assert_eq!(icons.uri_or_name("", 16), None);
 }
+
+#[test]
+fn a_jpeg_is_read_too() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let path = dir.path().join("art.JPG");
+    std::fs::write(&path, include_bytes!("red.jpg")).expect("written");
+    let picture = Icons::new("lyr-test-theme".to_owned())
+        .uri_or_name(path.to_str().expect("UTF-8"), 16)
+        .expect("decoded");
+    assert_eq!((picture.width(), picture.height()), (8, 8));
+    let [r, g, b, a] = picture.pixels()[..4] else {
+        panic!("a pixel")
+    };
+    assert!(
+        r > 250 && g < 5 && b < 5 && a == 255,
+        "red: {r} {g} {b} {a}"
+    );
+}

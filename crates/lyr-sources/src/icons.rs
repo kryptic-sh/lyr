@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crcbl_image::theme::{FileVersion, HICOLOR, IconThemes, SearchPath};
-use crcbl_image::{Limits, Rgba8Image, png, svg, xpm};
+use crcbl_image::{Limits, Rgba8Image, jpeg, png, svg, xpm};
 use lyr_core::draw::Picture;
 
 /// The largest icon read, each way: more than a tray ever draws, and a stop
@@ -153,6 +153,7 @@ fn decode(path: &Path, bytes: &[u8], size: u32) -> Option<Picture> {
     let extension = path.extension()?.to_str()?.to_ascii_lowercase();
     let image = match extension.as_str() {
         "png" => png::decode(bytes, &LIMITS),
+        "jpg" | "jpeg" => jpeg::decode(bytes, &LIMITS),
         "svg" => svg::decode(bytes, size, 1, &LIMITS),
         "xpm" => xpm::decode(bytes, &LIMITS),
         _ => return None,
