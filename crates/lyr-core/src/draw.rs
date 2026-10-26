@@ -190,8 +190,13 @@ pub enum Content {
         colour: Colour,
     },
     /// A row of buttons, each with its own text and colour or a picture,
-    /// `gap` logical pixels apart: the workspaces, the tray's items.
-    Buttons { buttons: Vec<Button>, gap: f32 },
+    /// `padding` logical pixels each side of its face and `gap` apart: the
+    /// workspaces, the tray's items.
+    Buttons {
+        buttons: Vec<Button>,
+        padding: f32,
+        gap: f32,
+    },
 }
 
 /// One button in a [`Content::Buttons`] row: its picture when it has one,
@@ -256,7 +261,6 @@ pub fn build<T: Clone>(
 ) -> (DrawList, Regions<Target<T>>) {
     let px = |value: u32| value as f32;
     let padding = px(theme.module_padding_x);
-    let button_padding = px(theme.workspace_padding_x);
     let min_width = px(theme.module_min_width);
     let border_width = px(theme.border_width);
 
@@ -270,7 +274,11 @@ pub fn build<T: Clone>(
                 box_width(measure(text)),
                 compact.as_deref().map(|icon| box_width(measure(icon))),
             ),
-            Content::Buttons { buttons, gap } => (
+            Content::Buttons {
+                buttons,
+                padding: button_padding,
+                gap,
+            } => (
                 box_width(
                     buttons
                         .iter()
@@ -378,7 +386,12 @@ pub fn build<T: Clone>(
                         style: TextStyle::PLAIN,
                     });
                 }
-                Content::Buttons { buttons, gap } => {
+                Content::Buttons {
+                    buttons,
+                    padding: button_padding,
+                    gap,
+                } => {
+                    let button_padding = *button_padding;
                     let mut x = rect.x + border_width + padding;
                     for (i, button) in buttons.iter().enumerate() {
                         let width = button.face_width(&measure) + 2.0 * button_padding;

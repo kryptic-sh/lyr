@@ -289,8 +289,11 @@ fn content(
                         .map(|picture| picture.sized(config.tray.icon_size as f32)),
                 })
                 .collect();
+            // No padding: waybar pads only its workspace buttons, so the
+            // icons are `spacing` apart.
             (!buttons.is_empty()).then_some(Content::Buttons {
                 buttons,
+                padding: 0.0,
                 gap: config.tray.spacing as f32,
             })
         }
@@ -331,7 +334,11 @@ fn content(
                     picture: None,
                 })
                 .collect();
-            Some(Content::Buttons { buttons, gap: 0.0 })
+            Some(Content::Buttons {
+                buttons,
+                padding: theme.workspace_padding_x as f32,
+                gap: 0.0,
+            })
         }
         // Every module has an arm on Linux; elsewhere some are not built yet.
         #[cfg(not(target_os = "linux"))]

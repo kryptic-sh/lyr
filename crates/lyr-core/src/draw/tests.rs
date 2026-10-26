@@ -153,6 +153,7 @@ fn buttons_keep_their_gap_apart_and_the_gap_is_the_modules() {
                         picture: None,
                     },
                 ],
+                padding: 10.0,
                 gap,
             },
             target: "tray",
@@ -197,6 +198,7 @@ fn a_click_on_a_workspace_button_names_the_button() {
                     picture: None,
                 },
             ],
+            padding: 10.0,
             gap: 0.0,
         },
         target: "workspaces",
@@ -399,6 +401,7 @@ fn a_picture_button_is_as_wide_as_its_picture_and_centred() {
                 colour: theme().foreground,
                 picture: Some(picture.clone().sized(18.0)),
             }],
+            padding: 10.0,
             gap: 0.0,
         },
         target: "tray",
@@ -430,6 +433,46 @@ fn a_picture_button_is_as_wide_as_its_picture_and_centred() {
         }
     );
     assert!(texts(&list).is_empty(), "the letter is not drawn too");
+}
+
+#[test]
+fn buttons_without_padding_are_their_gap_apart() {
+    let button = Button {
+        text: "W".to_owned(),
+        colour: theme().foreground,
+        picture: Some(
+            Picture::new(1, 1, vec![0; 4])
+                .expect("a picture")
+                .sized(18.0),
+        ),
+    };
+    let row = [Module {
+        content: Content::Buttons {
+            buttons: vec![button.clone(), button],
+            padding: 0.0,
+            gap: 10.0,
+        },
+        target: "tray",
+    }];
+    let (list, _) = build(&bar(&[], &[], &row), &theme(), measure);
+    let rect = boxes(&list)[0];
+    assert!(
+        (rect.width - (18.0 + 10.0 + 18.0 + 28.0)).abs() < f32::EPSILON,
+        "two icons and one gap, in the box's border and padding"
+    );
+    let xs: Vec<f32> = list
+        .items
+        .iter()
+        .flat_map(|item| match item {
+            Item::Group { items, .. } => items.clone(),
+            _ => Vec::new(),
+        })
+        .filter_map(|item| match item {
+            Item::Image { rect, .. } => Some(rect.x),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(xs, [rect.x + 14.0, rect.x + 14.0 + 18.0 + 10.0]);
 }
 
 #[test]

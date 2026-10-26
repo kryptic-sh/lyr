@@ -8,6 +8,12 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- The tray's icons are `[tray] spacing` apart, as waybar's are. They also took
+  the workspace buttons' `workspace_padding_x` on each side, which put the
+  default 10 px spacing at 30 px.
+
 ## [0.1.0] - 2026-10-26
 
 ### Added
