@@ -470,20 +470,66 @@ jobs:
           # UA-less requests, so it must send a User-Agent), 429 retries
           # parsing the "try again after" timestamp (11-min fallback), and
           # pacing between crates to stay under the publish rate limits.
+          # Each crate must also be in the index before the next is packaged:
+          # cargo's own wait gives up after a minute and exits 0, and on
+          # v0.1.0 the index lagged its uploads by over 25 minutes, so
+          # lyr-core could not resolve lyr-config and the release stopped.
+          INDEX_WAIT_SECS=3600
+          INDEX_POLL_SECS=30
+          # The sparse index's CDN caches a file for up to its max-age, so
+          # the index can show a version cargo's resolver does not see yet.
+          LAG_RETRY_SECS=60
+          LAG_RETRIES=12
+          # The sparse index's file layout, from the Cargo book's
+          # "Index format": by name length, lowercased.
+          index_path() {
+            local name="${1,,}"
+            case ${#name} in
+              1) echo "1/${name}" ;;
+              2) echo "2/${name}" ;;
+              3) echo "3/${name:0:1}/${name}" ;;
+              *) echo "${name:0:2}/${name:2:2}/${name}" ;;
+            esac
+          }
+          wait_for_index() {
+            local crate="$1" waited=0
+            local url="https://index.crates.io/$(index_path "$crate")"
+            until curl -fsS -H 'Cache-Control: no-cache' "$url" 2>/dev/null \
+              | jq -e -s --arg v "$VERSION" 'any(.[]; .vers == $v)' >/dev/null; do
+              if [ "$waited" -ge "$INDEX_WAIT_SECS" ]; then
+                echo "::error::${crate}@${VERSION} not in the index after ${waited}s"
+                return 1
+              fi
+              echo "waiting for ${crate}@${VERSION} in the index (${waited}s)"
+              sleep "$INDEX_POLL_SECS"
+              waited=$(( waited + INDEX_POLL_SECS ))
+            done
+            echo "${crate}@${VERSION} is in the index"
+          }
           publish_if_missing() {
             local crate="$1"
             local url="https://crates.io/api/v1/crates/${crate}/${VERSION}"
             if curl -fsS -A "${crate}-release-ci" -o /dev/null "$url"; then
               echo "::notice::${crate}@${VERSION} already on crates.io, skipping"
-              return 0
+              # A rerun after an index stall lands here with the crate up
+              # and the index still behind.
+              wait_for_index "$crate"
+              return
             fi
-            local attempt=0
+            local attempt=0 lag=0
             while [ $attempt -lt 6 ]; do
               if cargo publish -p "${crate}" --locked 2>&1 | tee /tmp/publish_"${crate}".log; then
-                # Pacing across the workspace (cargo itself waits for index
-                # propagation before returning).
+                wait_for_index "$crate" || return 1
+                # Pacing across the workspace.
                 sleep 25
                 return 0
+              fi
+              if grep -qE "no matching package named|failed to select a version for the requirement" /tmp/publish_"${crate}".log \
+                && [ "$lag" -lt "$LAG_RETRIES" ]; then
+                lag=$(( lag + 1 ))
+                echo "::warning::${crate}'s dependencies not resolvable yet, retrying in ${LAG_RETRY_SECS}s (${lag}/${LAG_RETRIES})"
+                sleep "$LAG_RETRY_SECS"
+                continue
               fi
               if grep -qiE "429|Too Many Requests" /tmp/publish_"${crate}".log; then
                 local wait_until wait_secs target

@@ -1479,6 +1479,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   apart; that is the run that would show the display rule at work on Wayland.
 - The release pipeline's publish jobs (`publish-crates`, `aur-bin`, `brew-tap`,
   `scoop-bucket`, [plan/14](plan/14-ci-and-release.md)) run only on a tag; the
-  `build` and `package` jobs run on every push to main. The Linux aarch64 and
-  macOS x86_64 binaries are built but run by no job: only x86_64 Linux, Apple
-  silicon macOS and Windows get a `--version` smoke run.
+  `build` and `package` jobs run on every push to main. v0.1.0's tag run
+  published the GitHub release, the AUR package, the formula and the Scoop
+  manifest, with hashes matching the release's `.sha256` files. Its
+  `publish-crates` stopped at `lyr-core`: the crates.io index lagged the uploads
+  by over 25 minutes, cargo's own wait gave up after a minute, and `lyr-core`
+  could not resolve `lyr-config`. The step now waits for each crate in the
+  sparse index (`wait_for_index`) and retries an unresolvable dependency; that
+  is tested locally against the live index, not yet on a tag. The Linux aarch64
+  and macOS x86_64 binaries are built but run by no job: only x86_64 Linux,
+  Apple silicon macOS and Windows get a `--version` smoke run.
