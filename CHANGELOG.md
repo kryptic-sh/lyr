@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-26
+
 ### Added
 
 - Release builds for Linux (x86_64 and aarch64, glibc 2.28+), macOS 11+ (Apple
@@ -210,3 +212,6 @@ and this project adheres to
   `[platform.linux]`, `[platform.windows]` and `[platform.macos]` override
   tables. An invalid config is an error naming the key, such as
   ``theme.border: `teal` is not a colour``.
+
+[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/kryptic-sh/lyr/releases/tag/v0.1.0
