@@ -300,8 +300,15 @@ implementation follows meanwhile.
   `lyr_render::fonts::load` loads every fallback face eagerly. crcbl is building
   lazy fallback fonts for pikr. Start: 408 ms from the shell to the first frame
   on the first start, 100 ms with the saved choice. At rest the bar is cheap: 65
-  context switches and under 10 ms of CPU a minute. Not measured: more than one
-  output, VRR, Windows and macOS.
+  context switches and under 10 ms of CPU a minute. crcbl's main has the fix
+  (`ee2f614b`, `Font::from_system_lazy`, unreleased): mapping
+  `SystemFonts::fallbacks` through it in `fonts::load`, keeping the family's own
+  faces eager, took the bar from 124 to 54 MB resident (103 to 33 MB anonymous)
+  and from 110 – 234 ms to 45 – 90 ms from the shell to the first frame, with
+  the bar's pixels unchanged (measured through a local patch, 2026-10-27). Take
+  it with crcbl's next release. It loses `Loaded::unreadable` for fallback
+  faces, since a lazy face fails inside crcbl; crcbl was asked to log that
+  failure. Not measured: more than one output, VRR, Windows and macOS.
 - **crcbl: every lyr and pikr feature on every backend.** At the owner's request
   (2026-10-17), crcbl makes each S-row work on every backend or fail loudly. Its
   matrix is in [plan/03](plan/03-surfaces-and-input.md#backend-matrix). Since
