@@ -21,8 +21,9 @@ pub struct Loaded {
     /// The configured family, when it was not found and [`FALLBACK_FAMILY`]
     /// was used instead.
     pub missing: Option<String>,
-    /// Fallback faces, and the family's other faces, that were found but
-    /// could not be read or parsed, and why.
+    /// The family's other faces that were found but could not be read or
+    /// parsed, and why. Fallback faces are read when first needed, and crcbl
+    /// logs one that fails then.
     pub unreadable: Vec<(PathBuf, String)>,
 }
 
@@ -55,14 +56,15 @@ pub fn load(family: &str) -> Result<Loaded, Error> {
         path: face.path.clone(),
         reason: error.to_string(),
     })?;
-    let mut fallbacks = Vec::new();
+    // Read only when text misses every face before them: most of the
+    // system's fallbacks never are, and read up front they were most of the
+    // bar's memory. One that cannot be read is logged by crcbl when it is.
+    let fallbacks: Vec<Font> = system
+        .fallbacks(&query)
+        .into_iter()
+        .map(Font::from_system_lazy)
+        .collect();
     let mut unreadable = Vec::new();
-    for face in system.fallbacks(&query) {
-        match Font::from_system(&face) {
-            Ok(font) => fallbacks.push(font),
-            Err(error) => unreadable.push((face.path, error.to_string())),
-        }
-    }
     // The family's other faces, each once: the nearest the system has to
     // each may be the regular face again.
     let mut found = vec![face];
@@ -114,5 +116,45 @@ mod tests {
             .map(|glyph| format!("U+{:04X}", u32::from(glyph)))
             .collect();
         assert!(missing.is_empty(), "{family} lacks {missing:?}");
+    }
+
+    #[test]
+    #[ignore = "needs the defaults' font (Hack Nerd Font Propo) installed; CI's nerd-font job installs it"]
+    fn no_fallback_face_is_read_until_text_needs_it() {
+        let family = from_sources(None, Platform::current())
+            .expect("the defaults")
+            .theme
+            .font;
+        let loaded = super::load(&family).expect("a font");
+        let fallbacks = loaded.font.fallback();
+        assert!(!fallbacks.is_empty(), "the system lists fallback faces");
+        assert!(
+            fallbacks.iter().all(|face| !face.is_loaded()),
+            "a fallback face was read up front"
+        );
+    }
+
+    #[test]
+    #[ignore = "needs the defaults' font and a CJK font (Noto Sans CJK) installed"]
+    fn a_character_only_a_fallback_has_is_found_in_it() {
+        // U+4F60, a CJK ideograph that a Latin family lacks.
+        const CJK: char = '\u{4F60}';
+        let family = from_sources(None, Platform::current())
+            .expect("the defaults")
+            .theme
+            .font;
+        let loaded = super::load(&family).expect("a font");
+        assert_eq!(
+            loaded.font.glyph_id(CJK),
+            GlyphId::NOTDEF,
+            "{family} lacks it"
+        );
+        let face = loaded
+            .font
+            .fallback()
+            .iter()
+            .find(|face| face.glyph_id(CJK) != GlyphId::NOTDEF)
+            .expect("a fallback face has it");
+        assert!(face.is_loaded(), "read once asked");
     }
 }

@@ -179,8 +179,9 @@ jobs:
       - run: cargo run --locked -p lyr-bin -- --help
 
   # The defaults' Nerd Font glyphs against the font they name (plan 04, M1's
-  # check): Hack Nerd Font Propo from Nerd Fonts' release, pinned. The test
-  # is #[ignore]d everywhere else, since no runner has the font.
+  # check): Hack Nerd Font Propo from Nerd Fonts' release, pinned, and its
+  # fallback faces left unread until text needs them. The tests are
+  # #[ignore]d everywhere else, since no runner has the font.
   nerd-font:
     name: nerd font glyphs
     runs-on: ubuntu-latest
@@ -202,8 +203,9 @@ jobs:
           fc-list | grep -q 'Hack Nerd Font Propo'
       - run:
           cargo test --locked -p lyr-render --lib
-          fonts::tests::the_bar_font_has_every_glyph_the_defaults_draw --
-          --ignored --exact
+          -- --ignored --exact
+          fonts::tests::the_bar_font_has_every_glyph_the_defaults_draw
+          fonts::tests::no_fallback_face_is_read_until_text_needs_it
 
   # lyr_wm::sway against a real sway: headless (wlroots' headless backend,
   # two virtual outputs, no GPU or input devices), in a private
