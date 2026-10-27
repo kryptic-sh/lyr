@@ -285,6 +285,23 @@ implementation follows meanwhile.
     pixmaps and notification `image-data`, resizes, and looks up theme icons
     (`IconThemes::lookup`).
 
+- **The bar on hybrid-GPU hardware: dGPU file handles and memory.** Measured
+  2026-10-27 on the owner's laptop (Intel RPL-U plus NVIDIA MX550, Hyprland
+  0.56), on the owner's 0.3.0 bar read from `/proc` and on main's release build
+  started twice from a fresh state dir in a nested Hyprland; sent to
+  office-crcbl. The first start's Vulkan instance loads every driver and keeps
+  `/dev/nvidia0` open for the process's life (12 handles), though it draws on
+  Intel; a start with the saved GPU choice (`lyr_render::gpu`) holds none. The
+  dGPU stays awake on this laptop regardless (the driver reports runtime D3
+  disabled, and Hyprland holds it), but on a laptop with it enabled the first
+  start would keep the dGPU awake. Asked of crcbl: choose the adapter from the
+  display's DRM device before loading any driver. Memory: 124 MB resident at
+  rest (103 MB anonymous); a guess, not profiled, is that
+  `lyr_render::fonts::load` loads every fallback face eagerly. crcbl is building
+  lazy fallback fonts for pikr. Start: 408 ms from the shell to the first frame
+  on the first start, 100 ms with the saved choice. At rest the bar is cheap: 65
+  context switches and under 10 ms of CPU a minute. Not measured: more than one
+  output, VRR, Windows and macOS.
 - **crcbl: every lyr and pikr feature on every backend.** At the owner's request
   (2026-10-17), crcbl makes each S-row work on every backend or fail loudly. Its
   matrix is in [plan/03](plan/03-surfaces-and-input.md#backend-matrix). Since
