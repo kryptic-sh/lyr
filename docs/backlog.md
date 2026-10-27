@@ -285,30 +285,31 @@ implementation follows meanwhile.
     pixmaps and notification `image-data`, resizes, and looks up theme icons
     (`IconThemes::lookup`).
 
-- **The bar on hybrid-GPU hardware: dGPU file handles and memory.** Measured
-  2026-10-27 on the owner's laptop (Intel RPL-U plus NVIDIA MX550, Hyprland
-  0.56), on the owner's 0.3.0 bar read from `/proc` and on main's release build
-  started twice from a fresh state dir in a nested Hyprland; sent to
-  office-crcbl. The first start's Vulkan instance loads every driver and keeps
-  `/dev/nvidia0` open for the process's life (12 handles), though it draws on
-  Intel; a start with the saved GPU choice (`lyr_render::gpu`) holds none. The
-  dGPU stays awake on this laptop regardless (the driver reports runtime D3
-  disabled, and Hyprland holds it), but on a laptop with it enabled the first
-  start would keep the dGPU awake. Asked of crcbl: choose the adapter from the
-  display's DRM device before loading any driver. Memory: 124 MB resident at
-  rest (103 MB anonymous); a guess, not profiled, is that
-  `lyr_render::fonts::load` loads every fallback face eagerly. crcbl is building
-  lazy fallback fonts for pikr. Start: 408 ms from the shell to the first frame
-  on the first start, 100 ms with the saved choice. At rest the bar is cheap: 65
-  context switches and under 10 ms of CPU a minute. crcbl's main has the fix
-  (`ee2f614b`, `Font::from_system_lazy`, unreleased): mapping
-  `SystemFonts::fallbacks` through it in `fonts::load`, keeping the family's own
-  faces eager, took the bar from 124 to 54 MB resident (103 to 33 MB anonymous)
-  and from 110 – 234 ms to 45 – 90 ms from the shell to the first frame, with
-  the bar's pixels unchanged (measured through a local patch, 2026-10-27). Take
-  it with crcbl's next release. It loses `Loaded::unreadable` for fallback
-  faces, since a lazy face fails inside crcbl; crcbl was asked to log that
-  failure. Not measured: more than one output, VRR, Windows and macOS.
+- **On crcbl's next release: lazy fallback fonts, and one driver at start.**
+  Measured 2026-10-27 on the owner's laptop (Intel RPL-U plus NVIDIA MX550,
+  Hyprland 0.56) with main's release build in a nested Hyprland, against crcbl
+  main through a local `[patch]`; neither change is in 0.12.0.
+  - Fonts: `lyr_render::fonts::load` reads every fallback face up front. crcbl
+    `ee2f614b` adds `Font::from_system_lazy`; mapping `SystemFonts::fallbacks`
+    through it, with the family's own faces kept eager, took the bar from 124 to
+    54 MB resident with identical pixels. A lazy face that fails logs its file
+    from crcbl (`4e3050c0`), so `Loaded::unreadable` then covers only the
+    family's faces.
+  - GPU: on 0.12.0 the first start loads every Vulkan driver and holds
+    `/dev/nvidia0` open for its life (12 handles) though it draws on Intel; only
+    later starts, on the saved choice, avoid it. That keeps the dGPU awake on a
+    laptop with runtime D3 on (this one has it off, and Hyprland holds the
+    device too). crcbl `c38a74b0` opens a first start on the display's driver
+    alone and names it in the `GpuChoice`: with both changes the first start
+    held no NVIDIA handle and took 76 ms from the shell to the first frame (408
+    ms on 0.12.0), at 43 MB resident. Then drop the locate thread
+    (`lyr_render::gpu`'s `Next::Locate` and `SaveThenLocate`), which only a
+    choice without a driver needs. crcbl was asked to demote the warning
+    `vkEnumeratePhysicalDevices failed: ERROR_INITIALIZATION_FAILED` it logs for
+    `intel_hasvk_icd.json` on the first start.
+  - At rest the bar is cheap (65 context switches and under 10 ms of CPU a
+    minute on the owner's bar). Not measured: more than one output, VRR, Windows
+    and macOS.
 - **crcbl: every lyr and pikr feature on every backend.** At the owner's request
   (2026-10-17), crcbl makes each S-row work on every backend or fail loudly. Its
   matrix is in [plan/03](plan/03-surfaces-and-input.md#backend-matrix). Since
