@@ -222,18 +222,19 @@ implementation follows meanwhile.
   `display_adapter`, and the scripted resize and read-back as CI jobs.
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
-  `=0.12.0` (2026-10-26; its one breaking change in lyr's reach,
-  `PresenterDesc::gpu_choice`, is a field lyr's `..Default` already covered).
-  lyr remembers the GPU between runs with it (`lyr_render::gpu`, the file
-  `gpu-choice` in lyr's state directory, `apps/lyr/src/gpu.rs`): run twice in a
-  nested Hyprland on the owner's laptop, the first start enumerated the NVIDIA,
-  Intel and llvmpipe adapters, saved the Intel one, and a thread then added its
-  driver's manifest; the second opened on Intel's driver alone, enumerating one
-  adapter. That thread's search makes the Vulkan loader log "Failed to detect
-  any valid GPUs" at error level once per driver with no GPU behind it (eight
-  lines here, on the first start only): harmless; crcbl demoted it to debug for
-  a single-driver instance on its main (`152bb077`), shipping with the squeeze
-  fix in the release after 0.12.0, when the first start should log none. 0.11.0
+  `=0.12.1` (2026-10-27). It brought lazy fallback faces (`lyr_render::fonts`:
+  124 to 43 MB resident on the owner's laptop, whose bar font has 17 fallback
+  faces), a first start on the display's Vulkan driver alone (in a nested
+  Hyprland there: no `/dev/nvidia*` handle, 94 ms from the shell to the first
+  frame, where 0.12.0 held 12 handles for the process's life and took 408 ms),
+  the viewport fix for a resized panel (its own entry under the audio menu
+  below) and `RichLayout`. 0.12.0 (2026-10-26) brought `GpuChoice`, which lyr
+  saves between runs (`lyr_render::gpu`, the file `gpu-choice` in lyr's state
+  directory, `apps/lyr/src/gpu.rs`). With 0.12.1 the choice names its driver
+  from the first start, so `lyr_render::gpu`'s locate thread no longer runs
+  (seen: one save, no search); it is kept for a choice crcbl opened without
+  naming a driver (a pin, a loader variable, or the display's device refusing
+  the window), where without it every start would load every driver. 0.11.0
   (0.10.0 was skipped, since its crates.io publish stopped halfway) brought icon
   theme lookups that take the nearest size from a per-theme index. 0.9.0 came
   2026-10-23 for `SharedGpu` (that bump needed no change in lyr's code; 0.8.0's
@@ -285,43 +286,20 @@ implementation follows meanwhile.
     pixmaps and notification `image-data`, resizes, and looks up theme icons
     (`IconThemes::lookup`).
 
-- **On crcbl's next release: lazy fallback fonts, and one driver at start.**
-  Measured 2026-10-27 on the owner's laptop (Intel RPL-U plus NVIDIA MX550,
-  Hyprland 0.56) with main's release build in a nested Hyprland, against crcbl
-  main through a local `[patch]`; neither change is in 0.12.0.
-  - Fonts: `lyr_render::fonts::load` reads every fallback face up front. crcbl
-    `ee2f614b` adds `Font::from_system_lazy`; mapping `SystemFonts::fallbacks`
-    through it, with the family's own faces kept eager, took the bar from 124 to
-    54 MB resident with identical pixels. A lazy face that fails logs its file
-    from crcbl (`4e3050c0`), so `Loaded::unreadable` then covers only the
-    family's faces.
-  - GPU: on 0.12.0 the first start loads every Vulkan driver and holds
-    `/dev/nvidia0` open for its life (12 handles) though it draws on Intel; only
-    later starts, on the saved choice, avoid it. That keeps the dGPU awake on a
-    laptop with runtime D3 on (this one has it off, and Hyprland holds the
-    device too). crcbl `c38a74b0` opens a first start on the display's driver
-    alone and names it in the `GpuChoice`: with both changes the first start
-    held no NVIDIA handle and took 76 ms from the shell to the first frame (408
-    ms on 0.12.0), at 43 MB resident. Then drop the locate thread
-    (`lyr_render::gpu`'s `Next::Locate` and `SaveThenLocate`), which only a
-    choice without a driver needs. The warning
-    `vkEnumeratePhysicalDevices failed: ERROR_INITIALIZATION_FAILED` that first
-    start logged for `intel_hasvk_icd.json` is debug from crcbl `ffee85e2`;
-    crcbl verified the same pick on X11 (`089f4604`).
-  - Rich text: crcbl `bf490c72` adds `crcbl_ui::font::rich::RichLayout`, built
-    to lyr's spec (2026-10-27): runs of text, each with its own `Font` at one
-    size, laid out as one paragraph into `RichLine`s (top, baseline, height,
-    width) of `RichSegment`s (run index, byte range, x, width), with UAX #14
-    across runs, hard breaks, spaces at a soft break dropped, and `measure()`.
-    Use it in place of `lyr_core::toast::wrap`'s layout on `font::breaks`:
-    lyr-render lays a body's spans out in the regular, bold, italic and
-    bold-italic faces and hands lyr-core each line's segments, each drawn as an
-    `Item::Text` at its x, with underline and link rects at its width. Then
-    check that the one-space quirk is gone and that a style change inside a word
-    does not break it.
-  - At rest the bar is cheap (65 context switches and under 10 ms of CPU a
-    minute on the owner's bar). Not measured: more than one output, VRR, Windows
-    and macOS.
+- **Toast bodies on crcbl's `RichLayout`.** crcbl 0.12.1 has
+  `crcbl_ui::font::rich::RichLayout`, built to lyr's spec (2026-10-27): runs of
+  text, each with its own `Font` at one size, laid out as one paragraph into
+  `RichLine`s (top, baseline, height, width) of `RichSegment`s (run index, byte
+  range, x, width), with UAX #14 across runs, hard breaks, spaces at a soft
+  break dropped, and `measure()`. Use it in place of `lyr_core::toast::wrap`'s
+  layout on `font::breaks`: lyr-render lays a body's spans out in the regular,
+  bold, italic and bold-italic faces and hands lyr-core each line's segments,
+  each drawn as an `Item::Text` at its x, with underline and link rects at its
+  width. Then check that the one-space quirk is gone and that a style change
+  inside a word does not break it.
+- **The bar's cost at rest, and what is not measured.** On the owner's bar
+  (2026-10-27): 65 context switches and under 10 ms of CPU a minute. Not
+  measured: more than one output, VRR, Windows and macOS.
 - **crcbl: every lyr and pikr feature on every backend.** At the owner's request
   (2026-10-17), crcbl makes each S-row work on every backend or fail loudly. Its
   matrix is in [plan/03](plan/03-surfaces-and-input.md#backend-matrix). Since
@@ -1384,27 +1362,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `leave` and the popup `enter` right after `xdg_popup.grab`, and `wtype` keys
   moved the dropdown's selection. The audio menu hands the panel's keys to the
   dropdown anyway, in case a compositor leaves them there.
-- **A panel that resizes shows one squeezed frame: crcbl's, reported.** When the
-  audio menu switches from Output devices to Configuration, the panel shrinks
-  (`set_panel`) and for a moment shows its content scaled into the new size.
-  Traced with `WAYLAND_DEBUG=1` in a nested Hyprland (2026-10-26): crcbl answers
-  the layer surface's `configure` with `wp_viewport.set_destination`,
-  `ack_configure` and a `wl_surface.commit` at once (crcbl-shell 0.11.0's
-  configure handler), so the compositor applies the new size to the buffer still
-  attached, the old-size one, before the swapchain is rebuilt. Here the right
-  buffer was committed 21 ms later, but the compositor showed it 380 ms after
-  that (FIFO on the nested headless output), and a screenshot at 0.4 s caught
-  the squeeze (787 × 55 where the panel was 915 × 102: the scale of the old 1063
-  × 188 to the new size). Reported to office-crcbl the same day; fixed on
-  crcbl's main as `f2b3bb5b` ("fix(shell): leave a resized surface's commit to
-  its frame": a mapped surface's ack and new destination ride its next present,
-  with a nested Hyprland test that failed before it), not in 0.12.0 but in the
-  release after. lyr also presents one frame into the old swapchain between
-  `set_panel` and `Resized` (`MenuPanel::show`); holding it until `Resized` is
+- **A panel that grows shows one cropped frame.** crcbl 0.12.1 fixed the
+  squeezed frame a resized panel showed (crcbl `f2b3bb5b`: a surface's new
+  viewport rides its next present). Switching the audio menu between Output
+  devices and Configuration in a nested Hyprland (2026-10-27), with screenshots
+  every 80 ms: no squeezed frame either way; shrinking showed nothing amiss, and
+  growing showed one frame of the new content at the old size, cut off rather
+  than scaled. That frame is lyr's own: `MenuPanel::show` presents once into the
+  old swapchain between `set_panel` and `Resized`. Holding it until `Resized` is
   not done, since a configure that keeps the size brings no `Resized` and the
-  panel would never draw, and with crcbl's fix that frame shows the old size
-  unscaled. On that release: run the tab switch again with a screenshot at 0.4
-  s.
+  panel would never draw; holding it only when the size changes would.
 
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,

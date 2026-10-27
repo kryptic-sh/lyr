@@ -14,7 +14,10 @@ and this project adheres to
   (`~/.local/state/lyr/`), and opens on it at the next start. On Vulkan it then
   loads that GPU's driver alone, so a hybrid laptop's other driver (such as
   NVIDIA's beside Intel's) is not loaded at all. A saved GPU that no longer fits
-  is replaced; `CRCBL_ADAPTER` still wins over it.
+  is replaced; `CRCBL_ADAPTER` still wins over it. With crcbl 0.12.1 the first
+  start, too, loads only the driver of the GPU driving the display, so it no
+  longer holds the NVIDIA device open on an Intel-driven laptop, and reaches its
+  first frame in about a quarter of the time (408 to 94 ms there).
 
 ### Changed
 
@@ -24,6 +27,12 @@ and this project adheres to
   0.12.1 the bar went from 124 MB resident to 43 MB on a laptop with 17 fallback
   faces. A fallback font that cannot be read is now logged when it is first
   needed, by crcbl, rather than at start.
+
+### Fixed
+
+- A menu that changes size (the audio menu between its tabs, the Wi-Fi and
+  Bluetooth menus as their lists change) no longer shows its content squeezed
+  into the new size for a moment (crcbl 0.12.1).
 
 ## [0.3.0] - 2026-10-26
 
