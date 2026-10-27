@@ -304,9 +304,17 @@ implementation follows meanwhile.
     held no NVIDIA handle and took 76 ms from the shell to the first frame (408
     ms on 0.12.0), at 43 MB resident. Then drop the locate thread
     (`lyr_render::gpu`'s `Next::Locate` and `SaveThenLocate`), which only a
-    choice without a driver needs. crcbl was asked to demote the warning
-    `vkEnumeratePhysicalDevices failed: ERROR_INITIALIZATION_FAILED` it logs for
-    `intel_hasvk_icd.json` on the first start.
+    choice without a driver needs. The warning
+    `vkEnumeratePhysicalDevices failed: ERROR_INITIALIZATION_FAILED` that first
+    start logged for `intel_hasvk_icd.json` is debug from crcbl `ffee85e2`;
+    crcbl verified the same pick on X11 (`089f4604`).
+  - Rich text: crcbl is building a standalone layout of runs, each with its own
+    `Font` at one size, to lyr's spec (2026-10-27): lines with their top,
+    baseline and height, and segments with a run index, a byte range, x and an
+    advance; UAX #14 across runs, hard breaks, and spaces trimmed at a soft
+    break. When it lands, `lyr_core::toast::wrap` can hand a body's spans to it
+    in place of laying them out on `font::breaks`, which drops the one-space
+    quirk.
   - At rest the bar is cheap (65 context switches and under 10 ms of CPU a
     minute on the owner's bar). Not measured: more than one output, VRR, Windows
     and macOS.
