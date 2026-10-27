@@ -308,13 +308,17 @@ implementation follows meanwhile.
     `vkEnumeratePhysicalDevices failed: ERROR_INITIALIZATION_FAILED` that first
     start logged for `intel_hasvk_icd.json` is debug from crcbl `ffee85e2`;
     crcbl verified the same pick on X11 (`089f4604`).
-  - Rich text: crcbl is building a standalone layout of runs, each with its own
-    `Font` at one size, to lyr's spec (2026-10-27): lines with their top,
-    baseline and height, and segments with a run index, a byte range, x and an
-    advance; UAX #14 across runs, hard breaks, and spaces trimmed at a soft
-    break. When it lands, `lyr_core::toast::wrap` can hand a body's spans to it
-    in place of laying them out on `font::breaks`, which drops the one-space
-    quirk.
+  - Rich text: crcbl `bf490c72` adds `crcbl_ui::font::rich::RichLayout`, built
+    to lyr's spec (2026-10-27): runs of text, each with its own `Font` at one
+    size, laid out as one paragraph into `RichLine`s (top, baseline, height,
+    width) of `RichSegment`s (run index, byte range, x, width), with UAX #14
+    across runs, hard breaks, spaces at a soft break dropped, and `measure()`.
+    Use it in place of `lyr_core::toast::wrap`'s layout on `font::breaks`:
+    lyr-render lays a body's spans out in the regular, bold, italic and
+    bold-italic faces and hands lyr-core each line's segments, each drawn as an
+    `Item::Text` at its x, with underline and link rects at its width. Then
+    check that the one-space quirk is gone and that a style change inside a word
+    does not break it.
   - At rest the bar is cheap (65 context switches and under 10 ms of CPU a
     minute on the owner's bar). Not measured: more than one output, VRR, Windows
     and macOS.
