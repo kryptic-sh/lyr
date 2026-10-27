@@ -18,7 +18,7 @@ and this project adheres to
 
 ### Changed
 
-- Built on crcbl 0.12.0 (from 0.11.0).
+- Built on crcbl 0.12.1 (from 0.11.0).
 
 ## [0.3.0] - 2026-10-26
 

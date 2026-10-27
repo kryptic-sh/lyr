@@ -20,7 +20,7 @@ path = "src/main.rs"
 anyhow = { version = "1.0.104" }
 chrono = { version = "0.4.45", default-features = false, features = ["clock"] }
 clap = { version = "4.6.7", features = ["derive"] }
-crcbl-shell = "=0.12.0"
+crcbl-shell = "=0.12.1"
 hjkl-xdg = "0.43.4"
 interprocess = "2.4.7"
 lyr-config.workspace = true
