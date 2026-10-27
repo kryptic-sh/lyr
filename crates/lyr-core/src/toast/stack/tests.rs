@@ -5,6 +5,7 @@ use lyr_config::{Platform, from_sources};
 use super::{Part, Stack};
 use crate::draw::Item;
 use crate::notifications::{Expiry, Incoming, LOW_TIMEOUT, NORMAL_TIMEOUT, Store, Urgency};
+use crate::toast::tests::lay_out;
 use crate::toast::{BORDER, CLOSE_INSET, CLOSE_SIZE, INSET, MARGIN, WIDTH};
 
 const MS: Duration = Duration::from_millis(1);
@@ -153,7 +154,7 @@ fn the_stack_draws_each_toast_below_the_last() {
     stack.notified(&store, older, false, start);
     let newer = notify(&mut store, "newer", Urgency::Normal, start);
     stack.notified(&store, newer, false, start);
-    let (list, size, regions) = stack.draw(&store, start, measure, 20.0, &theme);
+    let (list, size, regions) = stack.draw(&store, start, measure, &lay_out, 20.0, &theme);
     let toast = 2.0 * (BORDER + INSET) + 20.0;
     assert_eq!(size.height, 2.0 * toast + MARGIN);
     let tops: Vec<(&str, f32)> = list
@@ -177,7 +178,7 @@ fn the_stack_draws_each_toast_below_the_last() {
         Some(&Part::Body(older))
     );
     assert_eq!(regions.hit(10.0, toast + 1.0), None, "between them");
-    let empty = Stack::default().draw(&store, start, measure, 20.0, &theme);
+    let empty = Stack::default().draw(&store, start, measure, &lay_out, 20.0, &theme);
     assert!(empty.0.items.is_empty() && empty.1.height == 0.0);
 }
 
@@ -220,7 +221,7 @@ fn an_action_button_is_its_own_region_on_top_of_the_toast() {
         start,
     );
     stack.notified(&store, id, false, start);
-    let (_, _, regions) = stack.draw(&store, start, measure, 20.0, &theme);
+    let (_, _, regions) = stack.draw(&store, start, measure, &lay_out, 20.0, &theme);
     let button_y = BORDER + INSET + 20.0 + 4.0 + 1.0;
     assert_eq!(
         regions.hit(BORDER + INSET + 1.0, button_y),
@@ -242,11 +243,11 @@ fn the_toast_under_the_pointer_shows_its_close_button() {
     stack.notified(&store, first, false, start);
     let second = notify(&mut store, "second", Urgency::Normal, start);
     stack.notified(&store, second, false, start);
-    let (plain, _, regions) = stack.draw(&store, start, measure, 20.0, &theme);
+    let (plain, _, regions) = stack.draw(&store, start, measure, &lay_out, 20.0, &theme);
     assert!(!regions.targets().any(|part| matches!(part, Part::Close(_))));
     assert!(stack.hover(Some(first), start), "moved onto a toast");
     assert!(!stack.hover(Some(first), start), "still on it");
-    let (list, size, regions) = stack.draw(&store, start, measure, 20.0, &theme);
+    let (list, size, regions) = stack.draw(&store, start, measure, &lay_out, 20.0, &theme);
     // The first is now the lower toast.
     let top = (size.height + MARGIN) / 2.0;
     let x = WIDTH - CLOSE_INSET - CLOSE_SIZE + 1.0;
@@ -294,7 +295,7 @@ fn a_link_is_its_own_region_on_top_of_the_toast() {
         start,
     );
     stack.notified(&store, id, false, start);
-    let (_, _, regions) = stack.draw(&store, start, measure, 20.0, &theme);
+    let (_, _, regions) = stack.draw(&store, start, measure, &lay_out, 20.0, &theme);
     let body_y = BORDER + INSET + 20.0 + 1.0;
     // "go " is 30 px; the link starts after it.
     assert_eq!(

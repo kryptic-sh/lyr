@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use lyr_config::Theme;
 
-use super::{Area, MARGIN, WIDTH, close_button, draw};
+use super::{Area, LayOut, MARGIN, WIDTH, close_button, draw};
 use crate::draw::{DrawList, Size, TextStyle};
 use crate::hit::{Rect, Regions};
 use crate::notifications::Store;
@@ -148,6 +148,7 @@ impl Stack {
         store: &Store,
         now: Instant,
         measure: impl Fn(&str, TextStyle) -> f32,
+        lay_out: &LayOut<'_>,
         line_height: f32,
         theme: &Theme,
     ) -> (DrawList, Size, Regions<Part>) {
@@ -164,6 +165,7 @@ impl Stack {
                 elapsed,
                 WIDTH,
                 &measure,
+                lay_out,
                 line_height,
                 theme,
             );

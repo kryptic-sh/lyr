@@ -13,7 +13,7 @@ use crate::draw::{self, DrawList, Item, Size, TextStyle};
 use crate::hit::{Rect, Regions};
 use crate::media::{Artwork, Control, Player, Status};
 use crate::notifications::Store;
-use crate::toast::{self, Area};
+use crate::toast::{self, Area, LayOut};
 
 /// What a click in the centre lands on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -93,13 +93,14 @@ pub struct Shown<'a> {
 }
 
 /// The centre showing `shown`, `width` wide: its draw list, its size, and
-/// what each click lands on, its text measured by `measure` in lines
-/// `line_height` tall.
+/// what each click lands on, its text measured by `measure` and its
+/// notifications' bodies laid out by `lay_out`, in lines `line_height` tall.
 #[must_use]
 pub fn draw(
     shown: &Shown<'_>,
     width: f32,
     measure: &dyn Fn(&str, TextStyle) -> f32,
+    lay_out: &LayOut<'_>,
     line_height: f32,
     theme: &Theme,
 ) -> (DrawList, Size, Regions<Target>) {
@@ -248,8 +249,15 @@ pub fn draw(
         }
         for held in members {
             let elapsed = now.saturating_duration_since(held.received);
-            let (entry, size, areas) =
-                toast::draw(&held.content, elapsed, width, measure, line_height, theme);
+            let (entry, size, areas) = toast::draw(
+                &held.content,
+                elapsed,
+                width,
+                measure,
+                lay_out,
+                line_height,
+                theme,
+            );
             items.extend(entry.items.into_iter().map(|item| item.offset(0.0, y)));
             regions.push(
                 Rect {

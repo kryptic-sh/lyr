@@ -8,6 +8,14 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Breaking
+
+- `lyr-core`: `toast::wrap` is gone. `toast::draw`, `toast::stack::Stack::draw`
+  and `centre::draw` take a `&toast::LayOut` after `measure`, which lays a
+  notification body's spans out into lines of `toast::Placed` stretches;
+  `lyr_render::text::Text::lay_out` is the renderer's. `lyr-core` no longer
+  depends on `crcbl-ui`.
+
 ### Added
 
 - lyr remembers the GPU it ran on, in `gpu-choice` under its state directory
@@ -33,6 +41,12 @@ and this project adheres to
 - A menu that changes size (the audio menu between its tabs, the Wi-Fi and
   Bluetooth menus as their lists change) no longer shows its content squeezed
   into the new size for a moment (crcbl 0.12.1).
+- A notification body's bold, italic, underlined and linked stretches are laid
+  out together as one paragraph (crcbl 0.12.1's `RichLayout`): a link's
+  underline starts at its first letter rather than at the space before it, and a
+  space before bold text is no longer drawn bold. Spaces are kept as written
+  rather than collapsed to one, and a word too long for the toast is broken
+  across lines rather than cut at its edge.
 
 ## [0.3.0] - 2026-10-26
 

@@ -8,9 +8,9 @@
 
 pub mod stack;
 
+use std::ops::Range;
 use std::time::Duration;
 
-use crcbl_ui::font::breaks;
 use lyr_config::Theme;
 
 use crate::draw::{self, DrawList, Item, Size, TextStyle};
@@ -85,131 +85,24 @@ pub const fn text_style(style: Style) -> TextStyle {
     }
 }
 
-/// `spans` broken into lines no wider than `width`, keeping the text's own
-/// line breaks, each line in spans of one style. A line may end where
-/// Unicode's line breaking rules (UAX #14) allow, as crcbl-ui's
-/// `font::breaks` finds it: after the spaces between words, after a hyphen,
-/// between ideographs. A run of whitespace between two pieces becomes one
-/// space, which starts the second piece's span, so a span's width does not
-/// count a space at its end; whitespace at a line's ends goes. A piece wider
-/// than `width` gets a line of its own and runs past it.
-#[must_use]
-pub fn wrap(
-    spans: &[Span],
-    width: f32,
-    measure: impl Fn(&str, TextStyle) -> f32,
-) -> Vec<Vec<Span>> {
-    let width_of = |line: &[Span]| -> f32 {
-        line.iter()
-            .map(|span| measure(&span.text, text_style(span.style)))
-            .sum()
-    };
-    let mut lines = Vec::new();
-    for paragraph in paragraphs(spans) {
-        let mut line: Vec<Span> = Vec::new();
-        for (spaced, piece) in pieces(&paragraph) {
-            if line.is_empty() {
-                line = piece;
-                continue;
-            }
-            let mut candidate = line.clone();
-            let mut joined = piece.clone();
-            if spaced {
-                joined[0].text.insert(0, ' ');
-            }
-            append(&mut candidate, joined);
-            if width_of(&candidate) <= width {
-                line = candidate;
-            } else {
-                lines.push(std::mem::replace(&mut line, piece));
-            }
-        }
-        lines.push(line);
-    }
-    lines
+/// A stretch of one span on a line of a laid-out body: the bytes `text` of
+/// span `span`'s text, `x` from the line's left and `width` wide. A space a
+/// line breaks at belongs to no stretch, and the width of a line's last
+/// stretch leaves out the spaces it ends with.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Placed {
+    pub span: usize,
+    pub text: Range<usize>,
+    pub x: f32,
+    pub width: f32,
 }
 
-/// The text's paragraphs, between UAX #14's hard breaks (a line feed, a
-/// carriage return and line feed as one, a line separator, …), each as its
-/// characters and their styles. A final hard break ends the last paragraph
-/// rather than starting another, as `str::lines` has it.
-fn paragraphs(spans: &[Span]) -> Vec<Vec<(char, Style)>> {
-    let text: String = spans.iter().map(|span| span.text.as_str()).collect();
-    let styles: Vec<Style> = spans
-        .iter()
-        .flat_map(|span| span.text.chars().map(move |_| span.style))
-        .collect();
-    // Each char's style, by the byte it starts at.
-    let styled = |range: std::ops::Range<usize>| -> Vec<(char, Style)> {
-        let first = text[..range.start].chars().count();
-        text[range]
-            .chars()
-            .zip(styles[first..].iter().copied())
-            .collect()
-    };
-    let mut paragraphs: Vec<Vec<(char, Style)>> = breaks::paragraphs(&text).map(styled).collect();
-    if paragraphs.last().is_some_and(Vec::is_empty) {
-        paragraphs.pop();
-    }
-    paragraphs
-}
-
-/// A paragraph cut where a line may end, each piece in spans of one style
-/// with the whitespace around it left out, and whether whitespace came
-/// before it. Whitespace alone makes no piece.
-fn pieces(paragraph: &[(char, Style)]) -> Vec<(bool, Vec<Span>)> {
-    let text: String = paragraph.iter().map(|&(c, _)| c).collect();
-    // Where each soft break falls, as a char index rather than a byte.
-    let mut cuts: Vec<usize> = breaks::soft_breaks(&text)
-        .into_iter()
-        .map(|byte| text[..byte].chars().count())
-        .collect();
-    cuts.push(paragraph.len());
-    let mut pieces = Vec::new();
-    let mut spaced = false;
-    let mut start = 0;
-    for end in cuts {
-        let chars = &paragraph[start..end];
-        start = end;
-        let leading = chars
-            .iter()
-            .take_while(|&&(c, _)| c.is_whitespace())
-            .count();
-        let trailing = chars[leading..]
-            .iter()
-            .rev()
-            .take_while(|&&(c, _)| c.is_whitespace())
-            .count();
-        spaced |= leading > 0;
-        let word = &chars[leading..chars.len() - trailing];
-        if !word.is_empty() {
-            let mut spans = Vec::new();
-            for &(c, style) in word {
-                append(
-                    &mut spans,
-                    vec![Span {
-                        text: String::from(c),
-                        style,
-                    }],
-                );
-            }
-            pieces.push((spaced, spans));
-            spaced = false;
-        }
-        spaced |= trailing > 0;
-    }
-    pieces
-}
-
-/// Adds `more` to the end of `line`, joining spans of one style.
-fn append(line: &mut Vec<Span>, more: Vec<Span>) {
-    for span in more {
-        match line.last_mut() {
-            Some(last) if last.style == span.style => last.text.push_str(&span.text),
-            _ => line.push(span),
-        }
-    }
-}
+/// Lays `spans` out in lines no wider than its `f32`, keeping the text's own
+/// line breaks, each line its stretches left to right: what only the
+/// renderer, which has the fonts, can do. lyr-render's lays them out as one
+/// paragraph, breaking where Unicode's line breaking rules (UAX #14) allow
+/// across the spans, so a style change inside a word does not break it.
+pub type LayOut<'a> = dyn Fn(&[Span], f32) -> Vec<Vec<Placed>> + 'a;
 
 /// The close button of a toast `width` wide, which swaync shows while the
 /// pointer is over the toast (`NotificationCloseButton`): its items and its
@@ -270,8 +163,8 @@ pub fn relative_time(elapsed: Duration) -> String {
 /// The toast for `content`, which arrived `elapsed` ago, `width` wide (a
 /// toast is [`WIDTH`]; the clock panel's history is as wide as the panel):
 /// its draw list, its size, and the rects of its action buttons and links
-/// ([`Area`]), its text measured by `measure` in lines
-/// `line_height` tall. The body is markup ([`markup`]).
+/// ([`Area`]), its text measured by `measure` and its body laid out by
+/// `lay_out`, in lines `line_height` tall. The body is markup ([`markup`]).
 ///
 /// The image, else the app's icon, stands left of the text, with the
 /// app's icon over an image ([`PICTURE_SIZE`]). The buttons share a row
@@ -283,6 +176,7 @@ pub fn draw(
     elapsed: Duration,
     width: f32,
     measure: impl Fn(&str, TextStyle) -> f32,
+    lay_out: &LayOut<'_>,
     line_height: f32,
     theme: &Theme,
 ) -> (DrawList, Size, Vec<(Area, Rect)>) {
@@ -301,7 +195,8 @@ pub fn draw(
     };
     let content_width = width - 2.0 * (BORDER + INSET);
     let text_width = content_width - picture_column;
-    let body = wrap(&markup::parse(&content.body), text_width, &measure);
+    let spans = markup::parse(&content.body);
+    let body = lay_out(&spans, text_width);
     let actions: Vec<(usize, &str)> = content
         .actions
         .iter()
@@ -372,18 +267,17 @@ pub fn draw(
         colour: theme.toast_foreground,
         style: TextStyle::PLAIN,
     });
-    // Each span after the last, cut at the text's right edge.
+    // Each stretch where the layout puts it, cut at the text's right edge.
     let right = left + text_width;
     for (index, line) in body.into_iter().enumerate() {
         let y = text_top + line_height * (index + 1) as f32;
-        let mut x = left;
-        for span in line {
-            let style = text_style(span.style);
-            let span_width = measure(&span.text, style);
+        for placed in line {
+            let span = &spans[placed.span];
+            let x = left + placed.x;
             let rect = Rect {
                 x,
                 y,
-                width: span_width.min(right - x).max(0.0),
+                width: placed.width.min(right - x).max(0.0),
                 height: line_height,
             };
             if let Some(link) = span.style.link {
@@ -391,15 +285,14 @@ pub fn draw(
             }
             items.push(Item::Text {
                 rect,
-                text: span.text,
+                text: span.text[placed.text].to_owned(),
                 colour: if span.style.link.is_some() {
                     theme.toast_link
                 } else {
                     theme.toast_foreground
                 },
-                style,
+                style: text_style(span.style),
             });
-            x += span_width;
         }
     }
     if !actions.is_empty() {
@@ -446,4 +339,4 @@ pub fn draw(
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

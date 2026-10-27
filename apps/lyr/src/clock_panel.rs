@@ -324,6 +324,7 @@ impl ClockPanel {
                 &shown,
                 width - 2.0 * inset,
                 look.measure_in,
+                look.lay_out,
                 look.line_height,
                 look.theme,
             );

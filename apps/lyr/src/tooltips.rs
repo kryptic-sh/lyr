@@ -12,6 +12,7 @@ use crcbl_shell::{
 use lyr_config::{Module, Position, Theme};
 use lyr_core::draw::{self, DrawList, Size, Target, TextStyle};
 use lyr_core::hit::{Rect, Regions};
+use lyr_core::toast::LayOut;
 use lyr_core::tooltip::Tooltip;
 use lyr_render::surface::Surface;
 use lyr_render::text::Text;
@@ -48,6 +49,8 @@ pub struct Look<'a> {
     /// The same in a style, for text that may be bold or italic
     /// (notification markup).
     pub measure_in: &'a dyn Fn(&str, TextStyle) -> f32,
+    /// Lays a notification body's spans out in lines (`Text::lay_out`).
+    pub lay_out: &'a LayOut<'a>,
     pub line_height: f32,
     /// The calendar's, in its own font.
     pub calendar_line_height: f32,

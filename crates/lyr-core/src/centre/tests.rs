@@ -5,6 +5,7 @@ use lyr_config::{Platform, Theme, from_sources};
 use super::{ART_MARGIN, ART_SIZE, ART_SPACING, GAP, Shown, Target, draw};
 use crate::draw::{Item, Picture, TextStyle};
 use crate::notifications::{Incoming, Store, Urgency};
+use crate::toast::tests::lay_out;
 use crate::toast::{BORDER, CLOSE_INSET, CLOSE_SIZE, INSET};
 
 fn theme() -> Theme {
@@ -45,6 +46,7 @@ fn the_title_row_has_clear_all_at_the_right() {
         },
         WIDTH,
         &measure,
+        &lay_out,
         LINE,
         &theme,
     );
@@ -73,6 +75,7 @@ fn the_switch_shows_do_not_disturb() {
             },
             WIDTH,
             &measure,
+            &lay_out,
             LINE,
             &theme,
         );
@@ -115,6 +118,7 @@ fn the_history_follows_the_switch_newest_first() {
         },
         WIDTH,
         &measure,
+        &lay_out,
         LINE,
         &theme,
     );
@@ -139,6 +143,7 @@ fn an_empty_history_ends_at_the_switch() {
         },
         WIDTH,
         &measure,
+        &lay_out,
         LINE,
         &theme(),
     );
@@ -161,6 +166,7 @@ fn entries_of_one_app_sit_closer_than_groups() {
         },
         WIDTH,
         &measure,
+        &lay_out,
         LINE,
         &theme,
     );
@@ -195,6 +201,7 @@ fn an_entry_s_action_button_is_its_own_target() {
         },
         WIDTH,
         &measure,
+        &lay_out,
         LINE,
         &theme,
     );
@@ -229,6 +236,7 @@ fn a_link_in_an_entry_is_its_own_target() {
         },
         WIDTH,
         &measure,
+        &lay_out,
         LINE,
         &theme,
     );
@@ -268,6 +276,7 @@ fn a_media_player_is_a_card_with_its_controls_before_the_history() {
         },
         WIDTH,
         &measure,
+        &lay_out,
         LINE,
         &theme,
     );
@@ -329,6 +338,7 @@ fn a_media_player_s_art_stands_left_of_its_text() {
         },
         WIDTH,
         &measure,
+        &lay_out,
         LINE,
         &theme,
     );
@@ -375,6 +385,7 @@ fn a_player_with_no_subtitle_has_its_title_centred() {
         },
         WIDTH,
         &measure,
+        &lay_out,
         LINE,
         &theme,
     );
@@ -415,6 +426,7 @@ fn a_symbolic_icon_is_drawn_in_the_text_s_colour() {
         },
         WIDTH,
         &measure,
+        &lay_out,
         LINE,
         &theme,
     );
@@ -448,6 +460,7 @@ fn the_entry_under_the_pointer_has_a_close_button() {
         },
         WIDTH,
         &measure,
+        &lay_out,
         LINE,
         &theme,
     );
@@ -465,6 +478,7 @@ fn the_entry_under_the_pointer_has_a_close_button() {
         },
         WIDTH,
         &measure,
+        &lay_out,
         LINE,
         &theme,
     );

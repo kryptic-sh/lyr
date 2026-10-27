@@ -286,17 +286,6 @@ implementation follows meanwhile.
     pixmaps and notification `image-data`, resizes, and looks up theme icons
     (`IconThemes::lookup`).
 
-- **Toast bodies on crcbl's `RichLayout`.** crcbl 0.12.1 has
-  `crcbl_ui::font::rich::RichLayout`, built to lyr's spec (2026-10-27): runs of
-  text, each with its own `Font` at one size, laid out as one paragraph into
-  `RichLine`s (top, baseline, height, width) of `RichSegment`s (run index, byte
-  range, x, width), with UAX #14 across runs, hard breaks, spaces at a soft
-  break dropped, and `measure()`. Use it in place of `lyr_core::toast::wrap`'s
-  layout on `font::breaks`: lyr-render lays a body's spans out in the regular,
-  bold, italic and bold-italic faces and hands lyr-core each line's segments,
-  each drawn as an `Item::Text` at its x, with underline and link rects at its
-  width. Then check that the one-space quirk is gone and that a style change
-  inside a word does not break it.
 - **The bar's cost at rest, and what is not measured.** On the owner's bar
   (2026-10-27): 65 context switches and under 10 ms of CPU a minute. Not
   measured: more than one output, VRR, Windows and macOS.
@@ -615,12 +604,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   invoked action closes a notification that is not `resident`), tested and
   mutation-checked. The toast stack is `lyr_core::toast::stack::Stack` (newest
   on top, timeouts paused under the pointer) and a toast's draw list
-  `lyr_core::toast` (swaync's look with the `toast_*` theme keys, its body
-  wrapped where UAX #14 allows, through crcbl-ui 0.7.0's public `font::breaks`:
-  `paragraphs` for the hard breaks and `soft_breaks` for where a line may end,
-  which lyr asked crcbl to export because its bodies mix bold, italic and plain
-  spans that crcbl's own `TextLayout` cannot lay out together; whitespace
-  between pieces still becomes the one space that starts the next span), both
+  `lyr_core::toast` (swaync's look with the `toast_*` theme keys, its body laid
+  out by the renderer through `toast::LayOut`, which lyr-render answers with
+  crcbl-ui's `RichLayout`: the spans in their own faces as one paragraph, broken
+  where UAX #14 allows across them, a space kept in the span it is in), both
   tested and mutation-checked. The bar serves it on Linux
   (`apps/lyr/src/sources.rs`) and leaves notifications to another daemon that
   has the name, logging which, unless `notifications.replace = true` (read at
@@ -656,14 +643,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   lyr's entries do not keep the 18 px notification margin they count from, so
   lyr keeps the toast's placement there. A body's markup is drawn
   (`lyr_core::markup`: the spec's `<b>`, `<i>`, `<u>` and `<a href>`, XML's
-  entities, `<img>` left out, anything else shown as text; `toast::wrap` wraps
-  the styled spans), and `body-markup` is advertised. The panel's Clear All,
-  switch and media players work; `lyr dnd` and `lyr clear` work, and on Windows
-  answer that lyr is not the daemon, run there. A toast and a centre entry draw
-  the notification's image (`image-data`, else `image-path`, else `icon_data`)
-  left of the text with the app's icon over its right side, or the app's icon
-  alone (`toast::PICTURE_SIZE`): the app's icon is `app_icon`, else the `Icon`
-  of its desktop entry, looked for as swaync does
+  entities, `<img>` left out, anything else shown as text; lyr-render lays the
+  styled spans out, `Text::lay_out`), and `body-markup` is advertised. The
+  panel's Clear All, switch and media players work; `lyr dnd` and `lyr clear`
+  work, and on Windows answer that lyr is not the daemon, run there. A toast and
+  a centre entry draw the notification's image (`image-data`, else `image-path`,
+  else `icon_data`) left of the text with the app's icon over its right side, or
+  the app's icon alone (`toast::PICTURE_SIZE`): the app's icon is `app_icon`,
+  else the `Icon` of its desktop entry, looked for as swaync does
   (`notifications::linux::entry_ids`, `lyr_sources::desktop_entry`). The sizes
   are what swaync 0.12.6 drew with the dotfiles' style in a nested Hyprland
   (2026-10-26): 16 px, since their `* { all: unset }` leaves GTK's default icon

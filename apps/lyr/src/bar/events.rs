@@ -262,6 +262,7 @@ impl App {
                             theme: &self.config.theme,
                             measure: &|s: &str| self.text.measure(s),
                             measure_in: &|s: &str, style| self.text.measure_in(s, style),
+                            lay_out: &|spans, width| self.text.lay_out(spans, width),
                             line_height: self.text.line_height(),
                             calendar_line_height: self.text.calendar_line_height(),
                         };
@@ -432,6 +433,7 @@ impl App {
             theme: &self.config.theme,
             measure: &|s: &str| self.text.measure(s),
             measure_in: &|s: &str, style| self.text.measure_in(s, style),
+            lay_out: &|spans, width| self.text.lay_out(spans, width),
             line_height: self.text.line_height(),
             calendar_line_height: self.text.calendar_line_height(),
         };
@@ -523,6 +525,7 @@ impl App {
             theme: &self.config.theme,
             measure: &|s: &str| self.text.measure(s),
             measure_in: &|s: &str, style| self.text.measure_in(s, style),
+            lay_out: &|spans, width| self.text.lay_out(spans, width),
             line_height: self.text.line_height(),
             calendar_line_height: self.text.calendar_line_height(),
         };

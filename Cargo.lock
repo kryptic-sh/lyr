@@ -930,7 +930,6 @@ name = "lyr-core"
 version = "0.3.0"
 dependencies = [
  "chrono",
- "crcbl-ui",
  "lyr-config",
 ]
 

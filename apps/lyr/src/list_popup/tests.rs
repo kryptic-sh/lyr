@@ -49,6 +49,7 @@ fn setup() -> Setup {
             theme: &theme,
             measure: &measure,
             measure_in: &|text, _| measure(text),
+            lay_out: &|_, _| Vec::new(),
             line_height: 20.0,
             calendar_line_height: 20.0,
         },
@@ -73,6 +74,7 @@ impl Setup {
             theme: &self.theme,
             measure: &measure,
             measure_in: &|text, _| measure(text),
+            lay_out: &|_, _| Vec::new(),
             line_height: 20.0,
             calendar_line_height: 20.0,
         };

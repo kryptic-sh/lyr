@@ -1,14 +1,15 @@
+use std::ops::Range;
 use std::time::Duration;
 
 use lyr_config::{Platform, Theme, from_sources};
 
 use super::{
-    Area, BORDER, INSET, PICTURE_MARGIN, PICTURE_PADDING, PICTURE_SIZE, TIME_GAP, WIDTH, draw,
-    relative_time, wrap,
+    Area, BORDER, INSET, PICTURE_MARGIN, PICTURE_PADDING, PICTURE_SIZE, Placed, TIME_GAP, WIDTH,
+    draw, relative_time,
 };
 use crate::draw::{Item, Picture, TextStyle};
 use crate::hit::Rect;
-use crate::markup::{Span, Style, parse, plain};
+use crate::markup::{Span, parse};
 use crate::notifications::{Incoming, Urgency};
 
 fn theme() -> Theme {
@@ -23,101 +24,82 @@ fn measure(text: &str, style: TextStyle) -> f32 {
     text.chars().count() as f32 * each
 }
 
-/// `text`'s lines in a body 100 px wide, without their styles.
-fn lines(text: &str) -> Vec<String> {
-    wrap(&parse(text), 100.0, measure)
-        .iter()
-        .map(|line| plain(line))
+/// A stand-in for lyr-render's layout, measuring as [`measure`] does: lines
+/// break at spaces, which go on no line where they break it, and at a line
+/// feed; a final one starts no line.
+pub fn lay_out(spans: &[Span], width: f32) -> Vec<Vec<Placed>> {
+    // Each char: its span, its bytes there, the char, its width.
+    let mut chars = Vec::new();
+    for (index, span) in spans.iter().enumerate() {
+        let each = if span.style.bold { 15.0 } else { 10.0 };
+        for (at, c) in span.text.char_indices() {
+            chars.push((index, at..at + c.len_utf8(), c, each));
+        }
+    }
+    let width_of = |run: &[(usize, Range<usize>, char, f32)]| -> f32 {
+        run.iter().map(|&(_, _, _, each)| each).sum()
+    };
+    let mut lines = Vec::new();
+    for paragraph in chars.split(|&(_, _, c, _)| c == '\n') {
+        let mut line = Vec::new();
+        let mut spaces: &[_] = &[];
+        for run in paragraph.chunk_by(|a, b| (a.2 == ' ') == (b.2 == ' ')) {
+            if run[0].2 == ' ' {
+                spaces = run;
+                continue;
+            }
+            if line.is_empty() {
+            } else if width_of(&line) + width_of(spaces) + width_of(run) > width {
+                lines.push(placed(&std::mem::take(&mut line)));
+            } else {
+                line.extend_from_slice(spaces);
+            }
+            line.extend_from_slice(run);
+            spaces = &[];
+        }
+        lines.push(placed(&line));
+    }
+    if chars.last().is_none_or(|&(_, _, c, _)| c == '\n') {
+        lines.pop();
+    }
+    lines
+}
+
+/// `line`'s chars as stretches of one span each.
+fn placed(line: &[(usize, Range<usize>, char, f32)]) -> Vec<Placed> {
+    let mut x = 0.0;
+    line.chunk_by(|a, b| a.0 == b.0)
+        .map(|run| {
+            let width = run.iter().map(|&(_, _, _, each)| each).sum();
+            let placed = Placed {
+                span: run[0].0,
+                text: run[0].1.start..run[run.len() - 1].1.end,
+                x,
+                width,
+            };
+            x += width;
+            placed
+        })
         .collect()
 }
 
 #[test]
-fn text_wraps_at_spaces_within_the_width() {
-    assert_eq!(lines("the quick brown fox"), ["the quick", "brown fox"]);
-    // "the quick" is 90 px, and "the quick b" would be 110.
-    assert_eq!(lines("the quick b"), ["the quick", "b"]);
-    assert_eq!(lines("exactly 10"), ["exactly 10"], "fits");
-}
-
-#[test]
-fn line_breaks_are_kept_and_a_long_word_runs_over() {
-    assert_eq!(
-        lines(
-            "one
-two three"
-        ),
-        ["one", "two three"]
-    );
-    assert_eq!(
-        lines("a supercalifragilistic b"),
-        ["a", "supercalifragilistic", "b"]
-    );
-    assert_eq!(
-        lines("supercalifragilistic b"),
-        ["supercalifragilistic", "b"],
-        "no empty line before a long first word"
-    );
-    assert_eq!(
-        lines(
-            "first
-
-third"
-        ),
-        ["first", "", "third"]
-    );
-    assert_eq!(
-        lines(
-            "one
-two
-"
-        ),
-        ["one", "two"],
-        "as str::lines"
-    );
-    assert!(lines("").is_empty());
-    assert_eq!(lines("  a   b "), ["a b"], "spaces collapse");
-}
-
-#[test]
-fn a_line_may_also_end_after_a_hyphen_or_between_ideographs() {
-    // "a well-known" is 120 px; UAX #14 allows a break after the hyphen.
-    assert_eq!(lines("a well-known"), ["a well-", "known"]);
-    // Twelve ideographs, 120 px, with a break allowed between any two.
-    assert_eq!(
-        lines(
-            "\u{4e00}\u{4e8c}\u{4e09}\u{56db}\u{4e94}\u{516d}\u{4e03}\u{516b}\u{4e5d}\u{5341}\u{767e}\u{5343}"
-        ),
-        [
-            "\u{4e00}\u{4e8c}\u{4e09}\u{56db}\u{4e94}\u{516d}\u{4e03}\u{516b}\u{4e5d}\u{5341}",
-            "\u{767e}\u{5343}"
-        ]
-    );
-    // A line separator (U+2028) is a hard break, as a line feed is.
-    assert_eq!(lines("one\u{2028}two"), ["one", "two"]);
-}
-
-#[test]
-fn bold_is_measured_bold_and_the_space_starts_the_next_span() {
-    // "bold words" fits 100 px in the regular face, but "bold" is 60 px.
-    assert_eq!(lines("<b>bold</b> words"), ["bold", "words"]);
-    let bold = Style {
-        bold: true,
-        ..Style::default()
+fn the_stand_in_layout_wraps_as_lyr_render_s_does() {
+    let lines = |text: &str| -> Vec<Vec<String>> {
+        let spans = parse(text);
+        lay_out(&spans, 100.0)
+            .iter()
+            .map(|line| {
+                line.iter()
+                    .map(|placed| spans[placed.span].text[placed.text.clone()].to_owned())
+                    .collect()
+            })
+            .collect()
     };
-    assert_eq!(
-        wrap(&parse("a <b>b c</b>"), 1000.0, measure),
-        [vec![
-            Span {
-                text: "a".to_owned(),
-                style: Style::default()
-            },
-            Span {
-                text: " b c".to_owned(),
-                style: bold
-            },
-        ]],
-        "no span ends in a space"
-    );
+    assert_eq!(lines("the quick brown fox"), [["the quick"], ["brown fox"]]);
+    assert_eq!(lines("one\ntwo\n"), [["one"], ["two"]]);
+    assert!(lines("").is_empty());
+    assert_eq!(lines("a <b>b</b>"), [vec!["a ", "b"]]);
 }
 
 fn texts(items: &[Item]) -> Vec<(&str, f32)> {
@@ -138,7 +120,15 @@ fn a_toast_stacks_its_summary_over_its_body() {
         body: "file.zip".to_owned(),
         ..Incoming::default()
     };
-    let (list, size, _) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let (list, size, _) = draw(
+        &content,
+        Duration::ZERO,
+        WIDTH,
+        measure,
+        &lay_out,
+        20.0,
+        &theme,
+    );
     let top = BORDER + INSET;
     assert_eq!((size.width, size.height), (WIDTH, 2.0 * top + 40.0));
     assert_eq!(
@@ -153,7 +143,15 @@ fn a_toast_stacks_its_summary_over_its_body() {
         summary: "Ping".to_owned(),
         ..Incoming::default()
     };
-    let (list, size, _) = draw(&no_body, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let (list, size, _) = draw(
+        &no_body,
+        Duration::ZERO,
+        WIDTH,
+        measure,
+        &lay_out,
+        20.0,
+        &theme,
+    );
     assert_eq!(texts(&list.items), [("Now", top), ("Ping", top)]);
     assert_eq!(size.height, 2.0 * top + 20.0);
 }
@@ -167,9 +165,17 @@ fn the_border_follows_the_urgency() {
             urgency,
             ..Incoming::default()
         };
-        match draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme)
-            .0
-            .items[0]
+        match draw(
+            &content,
+            Duration::ZERO,
+            WIDTH,
+            measure,
+            &lay_out,
+            20.0,
+            &theme,
+        )
+        .0
+        .items[0]
         {
             Item::Box {
                 border: Some((width, colour)),
@@ -215,6 +221,7 @@ fn the_time_sits_at_the_right_of_the_summary() {
         Duration::from_secs(120),
         WIDTH,
         measure,
+        &lay_out,
         20.0,
         &theme,
     );
@@ -241,7 +248,15 @@ fn the_summary_stops_short_of_the_time() {
         body: "a body that may use the whole width".to_owned(),
         ..Incoming::default()
     };
-    let (list, _, _) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let (list, _, _) = draw(
+        &content,
+        Duration::ZERO,
+        WIDTH,
+        measure,
+        &lay_out,
+        20.0,
+        &theme,
+    );
     let width = |wanted: &str| {
         list.items
             .iter()
@@ -279,6 +294,7 @@ fn each_action_but_the_default_gets_a_button_in_a_row() {
         Duration::ZERO,
         WIDTH,
         measure,
+        &lay_out,
         20.0,
         &theme,
     );
@@ -326,7 +342,15 @@ fn a_notification_with_only_the_default_action_has_no_buttons() {
         actions: vec![("default".to_owned(), "Open".to_owned())],
         ..Incoming::default()
     };
-    let (_, size, buttons) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let (_, size, buttons) = draw(
+        &content,
+        Duration::ZERO,
+        WIDTH,
+        measure,
+        &lay_out,
+        20.0,
+        &theme,
+    );
     assert!(buttons.is_empty());
     assert_eq!(size.height, 2.0 * (BORDER + INSET) + 20.0);
 }
@@ -339,7 +363,15 @@ fn the_body_s_spans_follow_one_another_and_a_link_is_blue_and_underlined() {
         body: "a <b>b</b> <a href=\"https://x\">link</a>".to_owned(),
         ..Incoming::default()
     };
-    let (list, _, _) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let (list, _, _) = draw(
+        &content,
+        Duration::ZERO,
+        WIDTH,
+        measure,
+        &lay_out,
+        20.0,
+        &theme,
+    );
     let body: Vec<(&str, f32, f32, TextStyle, bool)> = list
         .items
         .iter()
@@ -371,10 +403,12 @@ fn the_body_s_spans_follow_one_another_and_a_link_is_blue_and_underlined() {
     assert_eq!(
         body,
         [
-            ("a", left, 10.0, TextStyle::PLAIN, false),
-            (" b", left + 10.0, 30.0, bold, false),
-            (" link", left + 40.0, 50.0, underlined, true),
-        ]
+            ("a ", left, 20.0, TextStyle::PLAIN, false),
+            ("b", left + 20.0, 15.0, bold, false),
+            (" ", left + 35.0, 10.0, TextStyle::PLAIN, false),
+            ("link", left + 45.0, 40.0, underlined, true),
+        ],
+        "each stretch where the layout puts it, a space in its own span"
     );
 }
 
@@ -387,7 +421,15 @@ fn a_span_is_cut_at_the_text_s_right_edge() {
         body: long.clone(),
         ..Incoming::default()
     };
-    let (list, _, _) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let (list, _, _) = draw(
+        &content,
+        Duration::ZERO,
+        WIDTH,
+        measure,
+        &lay_out,
+        20.0,
+        &theme,
+    );
     let width = list.items.iter().find_map(|item| match item {
         Item::Text { text, rect, .. } if *text == long => Some(rect.width),
         _ => None,
@@ -433,7 +475,15 @@ fn an_image_stands_left_of_the_text_with_the_app_icon_over_it() {
         icon: Some(icon.clone()),
         ..with_actions()
     };
-    let (list, size, buttons) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let (list, size, buttons) = draw(
+        &content,
+        Duration::ZERO,
+        WIDTH,
+        measure,
+        &lay_out,
+        20.0,
+        &theme,
+    );
     let top = BORDER + INSET;
     let left = top + 2.0 * PICTURE_MARGIN + PICTURE_SIZE + PICTURE_PADDING;
     // The text's two lines are 40 px, the picture's square 16 in its 4 px
@@ -488,7 +538,15 @@ fn the_app_icon_alone_takes_the_image_s_place() {
         icon: Some(icon.clone()),
         ..Incoming::default()
     };
-    let (list, _, _) = draw(&content, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let (list, _, _) = draw(
+        &content,
+        Duration::ZERO,
+        WIDTH,
+        measure,
+        &lay_out,
+        20.0,
+        &theme,
+    );
     let top = BORDER + INSET;
     assert_eq!(
         images(&list.items),
@@ -506,7 +564,15 @@ fn the_app_icon_alone_takes_the_image_s_place() {
         icon: None,
         ..content
     };
-    let (list, _, _) = draw(&plain, Duration::ZERO, WIDTH, measure, 20.0, &theme);
+    let (list, _, _) = draw(
+        &plain,
+        Duration::ZERO,
+        WIDTH,
+        measure,
+        &lay_out,
+        20.0,
+        &theme,
+    );
     assert!(images(&list.items).is_empty());
     assert!(
         text_xs(&list.items).contains(&("Ping", top)),
@@ -522,7 +588,15 @@ fn a_picture_taller_than_the_text_centres_the_text_on_it() {
         icon: Some(picture(1, 1)),
         ..Incoming::default()
     };
-    let (list, size, _) = draw(&content, Duration::ZERO, WIDTH, measure, 10.0, &theme);
+    let (list, size, _) = draw(
+        &content,
+        Duration::ZERO,
+        WIDTH,
+        measure,
+        &lay_out,
+        10.0,
+        &theme,
+    );
     let top = BORDER + INSET;
     let row = PICTURE_SIZE + 2.0 * PICTURE_MARGIN;
     assert_eq!(size.height, top + row + top);
@@ -540,7 +614,15 @@ fn a_link_is_an_area_on_every_line_it_wraps_to() {
     };
     // 60 px of text: "go", "here" and "now" each take a line.
     let width = 2.0 * (BORDER + INSET) + 60.0;
-    let (_, _, areas) = draw(&content, Duration::ZERO, width, measure, 20.0, &theme);
+    let (_, _, areas) = draw(
+        &content,
+        Duration::ZERO,
+        width,
+        measure,
+        &lay_out,
+        20.0,
+        &theme,
+    );
     let top = BORDER + INSET;
     let line = |y, width| Rect {
         x: top,

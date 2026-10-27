@@ -4,9 +4,12 @@ use crcbl_ui::DrawList;
 use crcbl_ui::font::Font;
 use crcbl_ui::font::face::{FontStyle, FontWeight, select_face};
 use crcbl_ui::font::layout::TextLayout;
+use crcbl_ui::font::rich::{RichLayout, RichRun};
 use glam::Vec2;
 use lyr_core::draw::TextStyle;
 use lyr_core::hit::Rect;
+use lyr_core::markup::Span;
+use lyr_core::toast::{self, Placed};
 
 /// How much smaller the calendar is: Pango's `<small>`, one step down its
 /// scale of 1.2 (`PANGO_SCALE_SMALL`).
@@ -112,6 +115,50 @@ impl Text {
     pub fn measure_in(&self, text: &str, style: TextStyle) -> f32 {
         let within = self.in_style(style);
         within.layout(text, &within.font(style)).width()
+    }
+
+    /// `spans` laid out together in lines no wider than `width`, each span
+    /// in its style's face ([`toast::text_style`]): crcbl-ui's
+    /// [`RichLayout`], which breaks where UAX #14 allows across the spans and
+    /// measures each stretch as [`Self::draw`] shapes it.
+    #[must_use]
+    pub fn lay_out(&self, spans: &[Span], width: f32) -> Vec<Vec<Placed>> {
+        let fonts: Vec<Font> = spans
+            .iter()
+            .map(|span| self.font(toast::text_style(span.style)))
+            .collect();
+        let runs: Vec<RichRun<'_>> = spans
+            .iter()
+            .zip(&fonts)
+            .map(|(span, font)| RichRun {
+                text: &span.text,
+                font,
+                size: self.size,
+            })
+            .collect();
+        let layout = RichLayout::new(&runs, self.line_height, Some(width));
+        let mut lines: Vec<Vec<Placed>> = layout
+            .lines()
+            .iter()
+            .map(|line| {
+                layout
+                    .line_segments(line)
+                    .iter()
+                    .map(|segment| Placed {
+                        span: segment.run,
+                        text: segment.text.clone(),
+                        x: segment.x,
+                        width: segment.width,
+                    })
+                    .collect()
+            })
+            .collect();
+        // A final hard break ends the last line rather than starting another,
+        // as `str::lines` has it.
+        if lines.last().is_some_and(Vec::is_empty) {
+            lines.pop();
+        }
+        lines
     }
 
     /// Draws `text` in `style` from `rect`'s left edge, centred in its
@@ -374,5 +421,74 @@ mod tests {
             (alone.measure_in("abc", calendar) - alone.measure("abc")).abs() < f32::EPSILON,
             "without its own, the calendar is the bar's"
         );
+    }
+
+    /// `body`'s lines laid out `width` wide, each as its stretches' text.
+    fn lines(body: &str, width: f32) -> Vec<Vec<String>> {
+        let spans = lyr_core::markup::parse(body);
+        text()
+            .lay_out(&spans, width)
+            .iter()
+            .map(|line| {
+                line.iter()
+                    .map(|placed| spans[placed.span].text[placed.text.clone()].to_owned())
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_body_wraps_between_words_and_keeps_its_line_breaks() {
+        assert_eq!(
+            lines("one two three four five six seven", 100.0),
+            [["one two three"], ["four five six"], ["seven"]]
+        );
+        assert_eq!(lines("a\n\nb", 100.0), [vec!["a"], vec![], vec!["b"]]);
+        assert_eq!(
+            lines("a\n", 100.0),
+            [["a"]],
+            "a final line break starts no line"
+        );
+        assert!(lines("", 100.0).is_empty());
+        assert_eq!(
+            lines("one\u{2028}two", 100.0),
+            [["one"], ["two"]],
+            "a line separator is a hard break too"
+        );
+        let hyphenated = text().measure("a well-") + 1.0;
+        assert_eq!(
+            lines("a well-known", hyphenated),
+            [["a well-"], ["known"]],
+            "a line may end after a hyphen"
+        );
+    }
+
+    #[test]
+    fn a_style_change_inside_a_word_does_not_break_it() {
+        assert_eq!(
+            lines("one hello<b>world</b>", 100.0),
+            [vec!["one"], vec!["hello", "world"]]
+        );
+    }
+
+    #[test]
+    fn a_space_stays_in_its_own_span_and_bold_is_measured_bold() {
+        let text = text();
+        let spans = lyr_core::markup::parse("a <b>b</b> <a href=\"x\">link</a>");
+        let line = &text.lay_out(&spans, 1000.0)[0];
+        let texts: Vec<&str> = line
+            .iter()
+            .map(|placed| &spans[placed.span].text[placed.text.clone()])
+            .collect();
+        assert_eq!(texts, ["a ", "b", " ", "link"], "no space starts a link");
+        for pair in line.windows(2) {
+            assert!((pair[0].x + pair[0].width - pair[1].x).abs() < 0.01);
+        }
+        let bold = TextStyle {
+            bold: true,
+            ..TextStyle::PLAIN
+        };
+        assert!((line[1].width - text.measure_in("b", bold)).abs() < 0.01);
+        assert!(line[1].width > text.measure("b"), "measured bold");
     }
 }

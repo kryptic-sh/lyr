@@ -73,6 +73,7 @@ fn setup(devices: &[Device]) -> Setup {
         theme: &theme,
         measure: &measure,
         measure_in: &|text, _| measure(text),
+        lay_out: &|_, _| Vec::new(),
         line_height: 20.0,
         calendar_line_height: 20.0,
     };
@@ -119,6 +120,7 @@ fn a_refresh_keeps_the_window_and_a_new_size_resizes_it() {
         theme: &theme,
         measure: &measure,
         measure_in: &|text, _| measure(text),
+        lay_out: &|_, _| Vec::new(),
         line_height: 20.0,
         calendar_line_height: 20.0,
     };
@@ -213,6 +215,7 @@ fn a_pin_is_typed_with_the_text_input_on_and_sent_with_enter() {
         theme: &theme,
         measure: &measure,
         measure_in: &|text, _| measure(text),
+        lay_out: &|_, _| Vec::new(),
         line_height: 20.0,
         calendar_line_height: 20.0,
     };
@@ -276,6 +279,7 @@ fn a_new_question_of_the_same_size_still_turns_the_text_input_on() {
         theme: &theme,
         measure: &measure,
         measure_in: &|text, _| measure(text),
+        lay_out: &|_, _| Vec::new(),
         line_height: 20.0,
         calendar_line_height: 20.0,
     };
@@ -322,6 +326,7 @@ fn a_paired_device_is_renamed_through_a_field_and_escape_cancels_it() {
         theme: &theme,
         measure: &measure,
         measure_in: &|text, _| measure(text),
+        lay_out: &|_, _| Vec::new(),
         line_height: 20.0,
         calendar_line_height: 20.0,
     };
@@ -403,6 +408,7 @@ fn the_agent_s_question_takes_the_header_from_a_rename() {
         theme: &theme,
         measure: &measure,
         measure_in: &|text, _| measure(text),
+        lay_out: &|_, _| Vec::new(),
         line_height: 20.0,
         calendar_line_height: 20.0,
     };
@@ -439,6 +445,7 @@ fn a_new_question_takes_enter_from_the_outline() {
         theme: &theme,
         measure: &measure,
         measure_in: &|text, _| measure(text),
+        lay_out: &|_, _| Vec::new(),
         line_height: 20.0,
         calendar_line_height: 20.0,
     };
