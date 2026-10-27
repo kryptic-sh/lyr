@@ -21,7 +21,7 @@ and this project adheres to
 - Built on crcbl 0.12.1 (from 0.11.0).
 - The system's fallback fonts (for emoji, CJK and other characters the bar's
   font lacks) are read when text first needs one, not all at start. With crcbl
-  0.12.1 the bar went from 124 MB resident to 43 MB on a laptop with 18 fallback
+  0.12.1 the bar went from 124 MB resident to 43 MB on a laptop with 17 fallback
   faces. A fallback font that cannot be read is now logged when it is first
   needed, by crcbl, rather than at start.
 
