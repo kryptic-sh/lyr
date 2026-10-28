@@ -431,6 +431,11 @@ pub struct Volume {
     pub icons: NamedIcons,
     /// Percent per `volume_up` or `volume_down`, as `pactl ... +5%` steps.
     pub scroll_step: u32,
+    /// `toggle_mute` here mutes the mic with the output, and unmuting gives
+    /// the mic back the state it had (`docs/plan/07-modules.md#mute-linkage`).
+    /// Off by default: waybar's click mutes the output alone.
+    #[serde(default)]
+    pub mute_links_mic: bool,
     /// What a click or a scroll does.
     #[serde(default)]
     pub on: On,

@@ -138,5 +138,46 @@ pub fn mic(source: &Source, config: &Mic) -> View {
     }
 }
 
+/// `volume.mute_links_mic` (`docs/plan/07-modules.md#mute-linkage`): muting
+/// the output mutes the mic too, remembering whether it already was, and
+/// unmuting the output gives the mic that state back.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct MuteLink {
+    /// Whether the mic was muted when this link last muted the output;
+    /// `None` when it has not, or has given it back since.
+    mic_before: Option<bool>,
+}
+
+/// What a linked mute sets: the output's mute, and the mic's when it
+/// changes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Mutes {
+    pub output: bool,
+    pub mic: Option<bool>,
+}
+
+impl MuteLink {
+    /// Toggles the output, muted now as `output_muted`, with the mic, muted
+    /// now as `mic_muted` (`None` with no mic). An output muted elsewhere
+    /// leaves the mic as it is when it is unmuted here.
+    pub const fn toggle(&mut self, output_muted: bool, mic_muted: Option<bool>) -> Mutes {
+        if output_muted {
+            Mutes {
+                output: false,
+                mic: self.mic_before.take(),
+            }
+        } else {
+            self.mic_before = mic_muted;
+            Mutes {
+                output: true,
+                mic: match mic_muted {
+                    Some(_) => Some(true),
+                    None => None,
+                },
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests;

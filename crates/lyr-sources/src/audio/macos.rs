@@ -294,12 +294,27 @@ fn target(which: Which) -> io::Result<(AudioObjectID, Flow)> {
 /// When there is no such device, it has no mute control, or it refuses.
 pub fn toggle_mute(which: Which) -> io::Result<()> {
     let (device, flow) = target(which)?;
+    let muted = muted(device, flow)?;
+    write_mute(device, flow, !muted)
+}
+
+/// Mutes what `which` names, or unmutes it, as `muted` says.
+///
+/// # Errors
+///
+/// As [`toggle_mute`].
+pub fn set_mute(which: Which, muted: bool) -> io::Result<()> {
+    let (device, flow) = target(which)?;
+    write_mute(device, flow, muted)
+}
+
+/// Sets `device`'s mute on `flow`, when it has one.
+fn write_mute(device: AudioObjectID, flow: Flow, muted: bool) -> io::Result<()> {
     if !has(device, mute_address(flow)) {
         return Err(io::Error::other(format!("the {flow:?} device has no mute")));
     }
-    let muted = muted(device, flow)?;
     // SAFETY: mute is a `UInt32`.
-    unsafe { set(device, mute_address(flow), u32::from(!muted), "mute") }
+    unsafe { set(device, mute_address(flow), u32::from(muted), "mute") }
 }
 
 /// Moves the volume of what `which` names by `delta` percent, held to

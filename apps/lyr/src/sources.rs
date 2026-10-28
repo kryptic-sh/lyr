@@ -126,6 +126,7 @@ pub enum BluetoothRequest {
 #[derive(Debug)]
 pub enum AudioRequest {
     ToggleMute(lyr_sources::audio::mixer::Target),
+    SetMute(lyr_sources::audio::mixer::Target, bool),
     /// By this many percent.
     Step(lyr_sources::audio::mixer::Target, i32),
     /// To this percent.
@@ -221,6 +222,8 @@ pub struct Commands {
     audio: std::sync::mpsc::Sender<macos::AudioRequest>,
     /// Whether the audio source was last told the menu is open.
     audio_menu: std::cell::Cell<bool>,
+    /// What `volume.mute_links_mic` gives back to the mic.
+    pub mute_link: std::cell::Cell<lyr_core::audio::MuteLink>,
     #[cfg(target_os = "linux")]
     focus: tokio::sync::mpsc::UnboundedSender<lyr_wm::Workspace>,
     #[cfg(target_os = "linux")]
@@ -321,6 +324,11 @@ impl Commands {
     /// Mutes or unmutes `target`.
     pub fn toggle_mute(&self, target: lyr_sources::audio::mixer::Target) {
         self.audio_request(AudioRequest::ToggleMute(target));
+    }
+
+    /// Mutes `target`, or unmutes it.
+    pub fn set_mute(&self, target: lyr_sources::audio::mixer::Target, muted: bool) {
+        self.audio_request(AudioRequest::SetMute(target, muted));
     }
 
     /// Moves the volume of `target` by `delta` percent.
@@ -430,6 +438,12 @@ impl Commands {
         let _stopped = self.audio.send(macos::AudioRequest::ToggleMute(which));
     }
 
+    /// macOS: mutes what `which` names, or unmutes it.
+    #[cfg(target_os = "macos")]
+    pub fn set_mute(&self, which: lyr_sources::audio::macos::Which, muted: bool) {
+        let _stopped = self.audio.send(macos::AudioRequest::SetMute(which, muted));
+    }
+
     /// macOS: moves the volume of what `which` names by `delta` percent.
     #[cfg(target_os = "macos")]
     pub fn step_volume(&self, which: lyr_sources::audio::macos::Which, delta: i32) {
@@ -520,6 +534,7 @@ pub fn start(
                 wifi_menu,
                 audio,
                 audio_menu: std::cell::Cell::new(false),
+                mute_link: std::cell::Cell::default(),
                 notices,
                 tray,
             },
@@ -548,6 +563,7 @@ pub fn start(
                 _window: window,
                 audio,
                 audio_menu: std::cell::Cell::new(false),
+                mute_link: std::cell::Cell::default(),
                 wifi,
                 wifi_menu,
                 bluetooth,
@@ -570,6 +586,7 @@ pub fn start(
                 _power_profile: power_profile,
                 audio,
                 audio_menu: std::cell::Cell::new(false),
+                mute_link: std::cell::Cell::default(),
                 workspaces,
                 _bluetooth: bluetooth,
             },
@@ -624,6 +641,7 @@ mod macos {
         /// The audio menu opened or closed.
         Menu(bool),
         ToggleMute(Which),
+        SetMute(Which, bool),
         Step(Which, i32),
         Set(Which, u32),
         Default(Flow, u32),
@@ -733,6 +751,7 @@ mod macos {
                                 Ok(())
                             }
                             AudioRequest::ToggleMute(which) => audio::toggle_mute(which),
+                            AudioRequest::SetMute(which, muted) => audio::set_mute(which, muted),
                             AudioRequest::Step(which, delta) => audio::step(which, delta),
                             AudioRequest::Set(which, percent) => audio::set_percent(which, percent),
                             AudioRequest::Default(flow, device) => audio::set_default(flow, device),
@@ -1574,12 +1593,13 @@ mod windows {
         menu: &mut bool,
     ) -> Result<(), lyr_sources::audio::mixer::MixerError> {
         use lyr_sources::audio::mixer::{
-            choose, make_default, move_stream, set, step, toggle_mute,
+            choose, make_default, move_stream, set, set_mute, step, toggle_mute,
         };
 
         use super::AudioRequest;
         match request {
             AudioRequest::ToggleMute(target) => toggle_mute(mixer, &target),
+            AudioRequest::SetMute(target, muted) => set_mute(mixer, &target, muted),
             AudioRequest::Step(target, delta) => step(mixer, &target, delta),
             AudioRequest::Set(target, percent) => set(mixer, &target, percent),
             AudioRequest::Default(flow, name) => make_default(mixer, flow, &name),
@@ -1833,6 +1853,7 @@ mod linux {
                 // What changes comes back through the watch.
                 let done = match request {
                     AudioRequest::ToggleMute(target) => audio.toggle_mute(&target),
+                    AudioRequest::SetMute(target, muted) => audio.set_mute(&target, muted),
                     AudioRequest::Step(target, delta) => audio.step(&target, delta),
                     AudioRequest::Set(target, percent) => audio.set(&target, percent),
                     AudioRequest::Default(flow, name) => audio.make_default(flow, &name),

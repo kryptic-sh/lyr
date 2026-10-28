@@ -180,7 +180,7 @@ The draft plan said "muting output also mutes the mic". The current waybar does
 **not** do that: its click is a plain
 `pactl set-sink-mute @DEFAULT_SINK@ toggle`. The linkage would be new behaviour,
 and what unmute should restore was never specified. Provisional default
-([16](16-open-questions.md)): an opt-in `audio.mute_links_mic = false`. When it
+([16](16-open-questions.md)): an opt-in `volume.mute_links_mic = false`. When it
 is on, muting output mutes the mic and **remembers** whether the mic was already
 muted, and unmuting output restores that state.
 

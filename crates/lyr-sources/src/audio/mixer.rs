@@ -346,6 +346,15 @@ impl Audio {
         toggle_mute(&self.mixer(), target)
     }
 
+    /// Mutes `target`, or unmutes it; see [`set_mute`].
+    ///
+    /// # Errors
+    ///
+    /// As [`toggle_mute`].
+    pub fn set_mute(&self, target: &Target, muted: bool) -> Result<(), MixerError> {
+        set_mute(&self.mixer(), target, muted)
+    }
+
     /// Moves `target`'s volume by `delta` percent; see [`step`].
     ///
     /// # Errors
@@ -400,6 +409,15 @@ impl Audio {
 /// When the target is gone or the server could not be told.
 pub fn toggle_mute(mixer: &Mixer, target: &Target) -> Result<(), MixerError> {
     apply(mixer, target, &Action::ToggleMute)
+}
+
+/// Mutes `target` in `mixer`, or unmutes it.
+///
+/// # Errors
+///
+/// As [`toggle_mute`].
+pub fn set_mute(mixer: &Mixer, target: &Target, muted: bool) -> Result<(), MixerError> {
+    apply(mixer, target, &Action::SetMute(muted))
 }
 
 /// Moves `target`'s volume by `delta` percent, held to the mixer's range.

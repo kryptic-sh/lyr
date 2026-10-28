@@ -1,6 +1,6 @@
 use lyr_config::{Config, Format, Icon, Platform, from_sources};
 
-use super::{Sink, Source, mic, volume};
+use super::{MuteLink, Mutes, Sink, Source, mic, volume};
 
 fn defaults() -> Config {
     from_sources(None, Platform::Linux).expect("defaults")
@@ -98,4 +98,20 @@ fn the_mic_shows_its_own_icon_and_description() {
     assert_eq!(mic(&source, &config).tooltip, "USB Microphone");
     source.muted = true;
     assert_eq!(mic(&source, &config).text, "\u{F131} 65%");
+}
+
+#[test]
+fn a_linked_mute_takes_the_mic_and_gives_its_state_back() {
+    let mut link = MuteLink::default();
+    let both = |output, mic| Mutes { output, mic };
+    // A live mic is muted with the output, and live again after.
+    assert_eq!(link.toggle(false, Some(false)), both(true, Some(true)));
+    assert_eq!(link.toggle(true, Some(true)), both(false, Some(false)));
+    // A mic already muted stays muted.
+    assert_eq!(link.toggle(false, Some(true)), both(true, Some(true)));
+    assert_eq!(link.toggle(true, Some(true)), both(false, Some(true)));
+    // An output muted elsewhere leaves the mic alone, as does no mic.
+    assert_eq!(link.toggle(true, Some(true)), both(false, None));
+    assert_eq!(link.toggle(false, None), both(true, None));
+    assert_eq!(link.toggle(true, None), both(false, None));
 }

@@ -162,16 +162,27 @@ pub fn act(
             };
             let step = i32::try_from(step).unwrap_or(i32::MAX);
             #[cfg(target_os = "macos")]
-            let which = {
+            let default = {
                 use lyr_sources::audio::macos::{Flow, Which};
-                Which::Default(if input { Flow::Input } else { Flow::Output })
+                |input| Which::Default(if input { Flow::Input } else { Flow::Output })
             };
             #[cfg(any(target_os = "linux", windows))]
-            let which = {
+            let default = {
                 use lyr_sources::audio::mixer::{Flow, Target};
-                Target::Default(if input { Flow::Input } else { Flow::Output })
+                |input| Target::Default(if input { Flow::Input } else { Flow::Output })
             };
+            let which = default(input);
             match builtin {
+                Builtin::ToggleMute if !input && config.volume.mute_links_mic => {
+                    let sink = data.sink.as_ref()?;
+                    let mut link = commands.mute_link.get();
+                    let mutes = link.toggle(sink.muted, data.source.as_ref().map(|mic| mic.muted));
+                    commands.mute_link.set(link);
+                    commands.set_mute(which, mutes.output);
+                    if let Some(muted) = mutes.mic {
+                        commands.set_mute(default(true), muted);
+                    }
+                }
                 Builtin::ToggleMute => commands.toggle_mute(which),
                 Builtin::VolumeUp => commands.step_volume(which, step),
                 _ => commands.step_volume(which, -step),

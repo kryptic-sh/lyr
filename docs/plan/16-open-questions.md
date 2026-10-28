@@ -17,7 +17,7 @@ platform layer and rendering are crcbl: [03](03-surfaces-and-input.md),
    `objc2` windows elsewhere, rendered with wgpu.
 2. **Mute linkage** (draft Q9). The draft said muting output also mutes the mic,
    but today's waybar does not do that. Default: off, behind
-   `audio.mute_links_mic`. When it is on, unmuting output restores the mic's
+   `volume.mute_links_mic`. When it is on, unmuting output restores the mic's
    earlier state ([07](07-modules.md#mute-linkage)).
 3. **Notifications** (draft Q6). **Decided by the owner (2026-10-16): lyr is the
    notification daemon** ([09](09-notifications.md)). Critical notifications

@@ -13,6 +13,12 @@ and this project adheres to
 - `lyr-core`: `draw::Bar`'s zones hold `draw::Entry` values, a module or a
   spacer or separator, instead of `draw::Module`s; `Entry::from` wraps a module.
 
+### Added
+
+- `volume.mute_links_mic` (off by default): the volume module's `toggle_mute`
+  mutes the mic with the output, and unmuting the output gives the mic back the
+  state it had, so a mic that was already muted stays muted.
+
 ### Fixed
 
 - A layout's `"separator"` and `{ spacer = N }` entries were accepted and drew

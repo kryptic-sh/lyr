@@ -110,21 +110,21 @@ settings for one platform. An invalid config is an error naming the key.
 The defaults are the reference for every key and value:
 [crates/lyr-config/src/defaults.toml](crates/lyr-config/src/defaults.toml).
 
-| Table             | Keys                                                                                                                              |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `[bar]`           | `position` (`top`, `bottom`), `height`, `output` (names; empty is every output), `layer`                                          |
-| `[layout]`        | `left`, `center`, `right`: module names in order, `"separator"` for a thin rule, `{ spacer = N }` for an N px gap                 |
-| `[workspaces]`    | `all_outputs`, `format` (`{name}`), `scroll`                                                                                      |
-| `[power]`         | `format`, `tooltip_format`, `[power.menu]` (`lock`, `sleep`, `hibernate`, `shutdown`, `logout`, `reboot` as `{ exec = "…" }`)     |
-| `[clock]`         | `format` (strftime)                                                                                                               |
-| `[battery]`       | `format`, `format_charging`, `format_plugged`, `format_full`, `icons`, `tooltip_format`, `warning`, `critical`                    |
-| `[power_profile]` | `format`, `tooltip_format`, `icons`                                                                                               |
-| `[network]`       | `format`, `format_<state>` and `tooltip_format_<state>` for `wifi`, `ethernet`, `linked`, `disconnected`, `disabled`, `icons`     |
-| `[bluetooth]`     | `format`, `format_on`, `format_off`, `format_disabled`, `format_connected`, `format_connected_battery`, `tooltip_format`, `icons` |
-| `[volume]`        | `format`, `format_muted`, `format_bluetooth`, `format_bluetooth_muted`, `tooltip_format`, `icons`, `scroll_step`                  |
-| `[mic]`           | `format`, `format_muted`, `tooltip_format`, `scroll_step`                                                                         |
-| `[notifications]` | `replace`, `format`, `icons`                                                                                                      |
-| `[theme]`         | font, colours and box metrics; see the defaults                                                                                   |
+| Table             | Keys                                                                                                                               |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `[bar]`           | `position` (`top`, `bottom`), `height`, `output` (names; empty is every output), `layer`                                           |
+| `[layout]`        | `left`, `center`, `right`: module names in order, `"separator"` for a thin rule, `{ spacer = N }` for an N px gap                  |
+| `[workspaces]`    | `all_outputs`, `format` (`{name}`), `scroll`                                                                                       |
+| `[power]`         | `format`, `tooltip_format`, `[power.menu]` (`lock`, `sleep`, `hibernate`, `shutdown`, `logout`, `reboot` as `{ exec = "…" }`)      |
+| `[clock]`         | `format` (strftime)                                                                                                                |
+| `[battery]`       | `format`, `format_charging`, `format_plugged`, `format_full`, `icons`, `tooltip_format`, `warning`, `critical`                     |
+| `[power_profile]` | `format`, `tooltip_format`, `icons`                                                                                                |
+| `[network]`       | `format`, `format_<state>` and `tooltip_format_<state>` for `wifi`, `ethernet`, `linked`, `disconnected`, `disabled`, `icons`      |
+| `[bluetooth]`     | `format`, `format_on`, `format_off`, `format_disabled`, `format_connected`, `format_connected_battery`, `tooltip_format`, `icons`  |
+| `[volume]`        | `format`, `format_muted`, `format_bluetooth`, `format_bluetooth_muted`, `tooltip_format`, `icons`, `scroll_step`, `mute_links_mic` |
+| `[mic]`           | `format`, `format_muted`, `tooltip_format`, `scroll_step`                                                                          |
+| `[notifications]` | `replace`, `format`, `icons`                                                                                                       |
+| `[theme]`         | font, colours and box metrics; see the defaults                                                                                    |
 
 Every module also takes an `[<module>.on]` table binding `click`, `click_right`,
 `click_middle`, `scroll_up` and `scroll_down` to a command (`{ exec = "…" }`,
