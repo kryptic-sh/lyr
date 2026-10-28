@@ -166,15 +166,18 @@ implementation follows meanwhile.
   as the owner's call. When it lands: move lyr's daemon and `notify_session`
   onto it, and the Windows bell from `ms-actioncenter:` to real state where the
   seam can read it.
-- **crcbl: what lyr would ask for next (2026-10-28).** An xdg-activation token
-  for a notification's action, so the daemon can send plan 09's
-  `ActivationToken` before `ActionInvoked` and the application can raise its
-  window (`Daemon::activation_token` is declared and never sent; crcbl-shell
-  0.12.1 has no xdg-activation); the `data:` URL decoder crcbl-image keeps
-  private to its SVG reader (`svg::data_url`), for a player's `data:` art; and a
-  read-back of a real backend's frame (on CI's lavapipe), for plan 13's headless
-  render compared as an image, since the headless shell's null backend draws no
-  pixels.
+- **crcbl: what lyr asked for next (2026-10-28), and where each stands.** On
+  crcbl's main, unreleased, to take with its next release: an activation token,
+  `Shell::activation_token(window) -> Result<Option<String>, ShellError>` (crcbl
+  `277bd79a`; ask right after the click's `Button` event, before
+  `ActionInvoked`; `None` without xdg-activation and on every non-Wayland
+  backend), for plan 09's `ActivationToken` (`Daemon::activation_token` is
+  declared and never sent); and `crcbl_image::data_url::parse(&str)` giving a
+  `DataUrl { media_type, bytes }` (crcbl `be2f9a18`, no feature; `media_type` is
+  the lowercase essence, `text/plain` when missing), for a player's `data:` art.
+  Being designed in crcbl: an offscreen render of a draw list read back as RGBA,
+  for plan 13's headless render compared as an image on the Linux runner (lyr
+  answered that an offscreen render through the same UI pass is enough).
 - **crcbl: an audio-control seam, and lyr's audio on it.** The owner decided
   (2026-10-22), answering whether lyr's audio should stay on `pactl` or move to
   `libpulse-binding` or native PipeWire: neither. crcbl gains a proper audio
