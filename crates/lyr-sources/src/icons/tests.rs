@@ -114,6 +114,45 @@ fn a_jpeg_is_read_too() {
 }
 
 #[test]
+fn a_webp_is_read_by_its_extension_or_its_contents() {
+    // Two pixels, lossless: the colours come back exact.
+    let two = include_bytes!("two.webp");
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let mut icons = Icons::new("lyr-test-theme".to_owned());
+    for name in ["art.webp", "art-without-extension"] {
+        let path = dir.path().join(name);
+        std::fs::write(&path, two).expect("written");
+        let picture = icons
+            .uri_or_name(path.to_str().expect("UTF-8"), 16)
+            .unwrap_or_else(|| panic!("{name} decoded"));
+        assert_eq!((picture.width(), picture.height()), (2, 1), "{name}");
+        assert_eq!(
+            picture.pixels(),
+            [10, 20, 30, 255, 200, 100, 50, 255],
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn an_svg_icon_with_text_is_drawn_in_the_system_s_fonts() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let path = dir.path().join("badge.svg");
+    std::fs::write(
+        &path,
+        r##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><text x="0" y="14" font-size="16" fill="#ff0000">W</text></svg>"##,
+    )
+    .expect("written");
+    let picture = Icons::new("lyr-test-theme".to_owned())
+        .uri_or_name(path.to_str().expect("UTF-8"), 16)
+        .expect("drawn, not refused");
+    assert!(
+        picture.pixels().chunks(4).any(|pixel| pixel[3] > 0),
+        "the letter is drawn"
+    );
+}
+
+#[test]
 fn a_file_with_no_extension_is_read_by_its_contents() {
     let dir = tempfile::tempdir().expect("a temporary directory");
     let png_path = dir.path().join("art");

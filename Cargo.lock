@@ -347,8 +347,12 @@ version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "845b65803cd29cf1777102090872b3823a92aad6e0f2b1199c9ab29bdb8cfb21"
 dependencies = [
+ "crcbl-font",
+ "harfrust",
  "png",
+ "skrifa",
  "thiserror",
+ "unicode-bidi",
 ]
 
 [[package]]

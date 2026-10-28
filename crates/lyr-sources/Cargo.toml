@@ -20,7 +20,7 @@ workspace = true
 crcbl-mixer = "=0.12.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-crcbl-image = { version = "=0.12.1", features = ["png", "svg", "xpm", "theme", "jpeg"] }
+crcbl-image = { version = "=0.12.1", features = ["png", "svg", "xpm", "theme", "jpeg", "webp", "svg-text"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["alloc"] }
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["sync"] }

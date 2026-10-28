@@ -37,6 +37,9 @@ and this project adheres to
 - An open tray menu follows its app's changes (DBusMenu's `LayoutUpdated` and
   `ItemsPropertiesUpdated`): it is read again and shown in the same popup,
   resized in place where the compositor can, on the same submenu.
+- WebP pictures: a media player's art, an icon, a notification's image. An SVG
+  icon with text (a tray badge, say) is drawn in the system's fonts rather than
+  refused for the next icon source.
 - On Windows the bar hides while a full-screen app (a game, a video) is open on
   its monitor, and comes back when it closes, keeping its edge reserved.
 

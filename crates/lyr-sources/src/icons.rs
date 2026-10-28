@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crcbl_image::theme::{FileVersion, HICOLOR, IconThemes, SearchPath};
-use crcbl_image::{Limits, Rgba8Image, jpeg, png, svg, xpm};
+use crcbl_image::{Limits, Rgba8Image, jpeg, png, svg, webp, xpm};
 use lyr_core::draw::Picture;
 
 /// The largest icon read, each way: more than a tray ever draws, and a stop
@@ -154,9 +154,10 @@ fn percent_decode(text: &str) -> Option<Vec<u8>> {
 }
 
 /// An icon file's bytes as a picture, by its extension; an SVG is drawn
-/// `size` pixels square. A file with no extension lyr knows is tried as
-/// PNG and then JPEG, whose decoders check the format's signature: browsers
-/// write a player's art to files with no extension.
+/// `size` pixels square, its text in the system's fonts. A file with any
+/// other extension, or none, is tried as PNG, JPEG and then WebP, whose
+/// decoders check the format's signature: browsers write a player's art to
+/// files with no extension.
 fn decode(path: &Path, bytes: &[u8], size: u32) -> Option<Picture> {
     let extension = path
         .extension()
@@ -167,7 +168,9 @@ fn decode(path: &Path, bytes: &[u8], size: u32) -> Option<Picture> {
         Some("jpg" | "jpeg") => jpeg::decode(bytes, &LIMITS),
         Some("svg") => svg::decode(bytes, size, 1, &LIMITS),
         Some("xpm") => xpm::decode(bytes, &LIMITS),
-        _ => png::decode(bytes, &LIMITS).or_else(|_| jpeg::decode(bytes, &LIMITS)),
+        _ => png::decode(bytes, &LIMITS)
+            .or_else(|_| jpeg::decode(bytes, &LIMITS))
+            .or_else(|_| webp::decode(bytes, &LIMITS)),
     };
     image.ok().and_then(picture)
 }

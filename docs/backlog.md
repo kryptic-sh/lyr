@@ -438,14 +438,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   subtitle for an artist without an album, where lyr shows the artist
   (`lyr_core::media::subtitle`). Not carried from swaync 0.12.6
   (`data/ui/mpris_player.blp`, `mpris_player.vala`): `http(s)` art (no HTTP
-  client, plan 09) and `data:` URIs (base64, which lyr has no decoder for); the
-  art's rounded corners (`Item::Image` has no radius); the blurred art behind
-  the card (`mpris-background`); and swaync's layout, with the controls centred
-  in a row under the art and text, and shuffle and repeat buttons. lyr keeps
-  previous, play/pause and next at the card's right. WebP art is left out until
-  lyr takes crcbl-image's `webp` feature. swaync is no longer installed on the
-  owner's laptop (2026-10-26), so a side-by-side comparison needs it installed
-  again.
+  client, plan 09) and `data:` URIs (base64, which lyr has no decoder for;
+  crcbl-image has one, private to its SVG reader in `svg::data_url`, which could
+  be asked for); the art's rounded corners (`Item::Image` has no radius); the
+  blurred art behind the card (`mpris-background`); and swaync's layout, with
+  the controls centred in a row under the art and text, and shuffle and repeat
+  buttons. lyr keeps previous, play/pause and next at the card's right. swaync
+  is no longer installed on the owner's laptop (2026-10-26), so a side-by-side
+  comparison needs it installed again.
 - **Hyprland backend, rest of M2.** `lyr-wm::hyprland` is built against Hyprland
   v0.56.2's formats: the event parser, the `Tracker` that folds events into the
   shared `lyr_wm::State`, the JSON seed, and `Hyprland` (socket I/O, `from_env`,
@@ -1338,10 +1338,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `AttentionIconName`, as master does (`lyr_sources::tray::icon`, tested and
   mutation-checked; a test item's `emblem-important` from Papirus-Dark seen over
   its icon in a nested Hyprland, 2026-10-26). waybar 0.15.0 reads both and draws
-  neither. Not done: `svg-text` (an SVG icon with text is refused and the next
-  source tried); reading the theme from GSettings, which GNOME keeps there
-  rather than in `settings.ini`. Not seen: an output at a scale above 1, a theme
-  icon given by file path, Steam's or Spotify's own icons (neither was showing).
+  neither. An SVG icon with text is drawn in the system's fonts (crcbl-image's
+  `svg-text`, 2026-10-28). Not done: reading the theme from GSettings, which
+  GNOME keeps there rather than in `settings.ini`. Not seen: an output at a
+  scale above 1, a theme icon given by file path, Steam's or Spotify's own icons
+  (neither was showing).
 - **Clicking lyr in tests.** The owner installed `wlrctl` (2026-10-20), which
   moves and clicks a virtual pointer in the compositor named by
   `WAYLAND_DISPLAY` alone, so a nested Hyprland can be clicked without touching
