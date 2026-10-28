@@ -41,8 +41,6 @@ check out of "Not yet verified" there.
       minute, and `perf trace -s -p <pid>` agrees.
 - [ ] **Time zone.** Change the system's zone. The clock shows the new zone's
       time within about a second.
-- [ ] **Reload to a new height.** `lyr reload` from a 50 px to a 30 px bar and
-      back. No frame shows at the old size.
 
 ## Linux (sway and niri)
 

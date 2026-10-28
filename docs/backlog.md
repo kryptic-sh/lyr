@@ -134,6 +134,12 @@ implementation follows meanwhile.
   `[platform.*]`; skipping lets one file serve every platform but hides a typo'd
   platform table. Keep refusing (and fix plans 02 and 07), or skip with a logged
   reason?
+- **A weekly fuzz job: may lyr take `libfuzzer-sys` and `cargo-fuzz`?** (Plan
+  14, phase 3.) **Q:** Plan 14 wants a weekly CI job fuzzing the Hyprland event
+  parser and the config loader. The usual way is `cargo fuzz` (a tool CI
+  installs) with a `fuzz/` crate on `libfuzzer-sys`, new to lyr and needing a
+  nightly toolchain for that job only. The parsers have table tests from
+  recorded and malformed input meanwhile. Add the job, or leave fuzzing out?
 - **Reload: start and stop sources by the layout?** (M3.) **Q:** Plan 05 says a
   layout or module change on reload starts and stops only the affected sources.
   Today every source the platform has starts at launch and runs whatever the
@@ -160,6 +166,15 @@ implementation follows meanwhile.
   as the owner's call. When it lands: move lyr's daemon and `notify_session`
   onto it, and the Windows bell from `ms-actioncenter:` to real state where the
   seam can read it.
+- **crcbl: what lyr would ask for next (2026-10-28).** An xdg-activation token
+  for a notification's action, so the daemon can send plan 09's
+  `ActivationToken` before `ActionInvoked` and the application can raise its
+  window (`Daemon::activation_token` is declared and never sent; crcbl-shell
+  0.12.1 has no xdg-activation); the `data:` URL decoder crcbl-image keeps
+  private to its SVG reader (`svg::data_url`), for a player's `data:` art; and a
+  read-back of a real backend's frame (on CI's lavapipe), for plan 13's headless
+  render compared as an image, since the headless shell's null backend draws no
+  pixels.
 - **crcbl: an audio-control seam, and lyr's audio on it.** The owner decided
   (2026-10-22), answering whether lyr's audio should stay on `pactl` or move to
   `libpulse-binding` or native PipeWire: neither. crcbl gains a proper audio
@@ -407,18 +422,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 - No `xdg_popup` support, so no popups.
 
 ## Known gaps in the design
-
-- **Plan promises neither built nor recorded (found 2026-10-28).** A read of
-  every plan file against the code; the first two were re-read in the code, the
-  rest are that read's findings, each to be confirmed when taken up:
-  - Plan 09's `ActivationToken` signal before `ActionInvoked`:
-    `Daemon::activation_token` is declared and never emitted.
-  - Plan 13: a headless render compared on the Linux runner. It waits on crcbl:
-    its headless shell's null backend draws no pixels, and a read-back of a real
-    backend's frame (on CI's lavapipe) is still open in crcbl ("the scripted
-    resize and read-back as CI jobs", the parity entry above).
-  - Plan 14: a weekly fuzz job for the Hyprland parser and the config loader
-    (`cargo-fuzz` and `libfuzzer-sys` would be new).
 
 - **The media player card: where it still differs from swaync's.** The card
   draws the player's art (`lyr_core::centre`, `ART_SIZE`), read from a `file://`
