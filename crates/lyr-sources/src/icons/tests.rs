@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crcbl_image::{Rgba8Image, png};
 
-use super::{Icons, file_uri_path, icon_theme_setting, percent_decode};
+use super::{Icons, MAX_FILE_BYTES, file_uri_path, icon_theme_setting, percent_decode};
 
 fn write_png(path: &Path, rgba: [u8; 4]) {
     let image = Rgba8Image::new(1, 1, rgba.to_vec()).expect("an image");
@@ -168,6 +168,24 @@ fn a_file_with_no_extension_is_read_by_its_contents() {
         .uri_or_name(jpeg_path.to_str().expect("UTF-8"), 16)
         .expect("decoded as JPEG");
     assert_eq!((jpeg.width(), jpeg.height()), (8, 8));
+}
+
+#[test]
+fn a_file_too_large_to_hold_a_picture_within_the_limits_is_not_read() {
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let path = dir.path().join("padded.png");
+    // A PNG ends at its `IEND` chunk; what follows is not read by a decoder.
+    let padded = |len: u64| {
+        write_png(&path, [0, 0, 255, 255]);
+        let file = std::fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .expect("opened");
+        file.set_len(len).expect("padded");
+        super::read(&path, 16)
+    };
+    assert!(padded(MAX_FILE_BYTES).is_some(), "the largest file read");
+    assert!(padded(MAX_FILE_BYTES + 1).is_none());
 }
 
 /// A desktop portal's settings answering `icon-theme` with `theme`; an old

@@ -82,6 +82,11 @@ and this project adheres to
   otherwise raises them after each large free and keeps later large buffers in a
   thread's heap for good: five notifications with a wallpaper as their image
   left the bar at 59 MB, against 31 MB now.
+- A picture file (a notification's image or icon, a player's art) larger than
+  twice the largest picture lyr decodes is no longer read: such a file holds a
+  picture over 1024 pixels a side, which was read whole only to be refused, so a
+  wallpaper sent as a notification's image no longer briefly costs its size in
+  memory.
 
 ### Fixed
 

@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 use std::ffi::OsString;
+use std::io::Read;
 use std::os::unix::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -22,6 +23,13 @@ pub const LIMITS: Limits = Limits {
     max_height: MAX_SIDE,
     max_bytes: MAX_SIDE as usize * MAX_SIDE as usize * 4,
 };
+
+/// The largest file read for a picture: an image within [`LIMITS`] stored
+/// uncompressed is a little over `max_bytes`, and twice that leaves room for
+/// any format's overhead. A larger file holds a picture the decoders would
+/// refuse, so it is not read at all: a wallpaper sent as a notification's
+/// image would otherwise be read whole only to be refused.
+const MAX_FILE_BYTES: u64 = 2 * LIMITS.max_bytes as u64;
 
 /// How long a name that found no icon is remembered before it is looked up
 /// again, so a theme installed while the bar runs is found.
@@ -172,11 +180,19 @@ impl Icons {
     }
 }
 
-/// The picture in the file at `path`, an SVG drawn `size` pixels square.
+/// The picture in the file at `path`, an SVG drawn `size` pixels square;
+/// `None` for a file larger than [`MAX_FILE_BYTES`].
 pub fn read(path: &Path, size: u32) -> Option<Picture> {
-    std::fs::read(path)
-        .ok()
-        .and_then(|bytes| decode(path, &bytes, size))
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .ok()?
+        .take(MAX_FILE_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    if bytes.len() as u64 > MAX_FILE_BYTES {
+        return None;
+    }
+    decode(path, &bytes, size)
 }
 
 /// The path the `file://` URI `uri` names; `None` for another scheme
