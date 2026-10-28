@@ -323,6 +323,11 @@ impl Toasts {
         Ok(())
     }
 
+    /// Whether the panel is open: whether a toast is up.
+    pub const fn is_open(&self) -> bool {
+        self.panel.is_some()
+    }
+
     /// Closes the panel, if it is open.
     pub fn close(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {
         if let Some(panel) = self.panel.take() {

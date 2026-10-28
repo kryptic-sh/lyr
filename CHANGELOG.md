@@ -74,6 +74,9 @@ and this project adheres to
   the default Hack Nerd Font Propo, lyr starts with about 10 MB less resident
   memory. A face that cannot be read is logged then, and its text falls back to
   the system's fallback fonts.
+- On Linux with glibc, the heap's free pages go back to the system when the last
+  open panel, menu or toast closes (`malloc_trim`). The clock panel and the
+  audio menu had left the bar about 7 MB larger after they closed.
 
 ### Fixed
 

@@ -77,6 +77,9 @@ struct App {
     /// space is given back on every platform; while hidden, outputs coming
     /// and going make no bars.
     hidden: bool,
+    /// Whether a panel, menu or toast was open at the end of the last
+    /// wake-up, so the heap is given back once the last of them closes.
+    popups_open: bool,
     stats: Stats,
 }
 
@@ -154,6 +157,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         tray_menu: None,
         menu_dismissed_at: None,
         hidden: false,
+        popups_open: false,
         stats: Stats::new(Instant::now()),
     };
     let bar = app.config.bar.clone();
@@ -226,6 +230,10 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         #[cfg(any(target_os = "linux", windows))]
         app.commands.wifi_menu(app.wifi_menu.is_some());
         app.draw(shell.as_mut())?;
+        let open = app.popups_open();
+        if std::mem::replace(&mut app.popups_open, open) && !open {
+            crate::memory::give_back();
+        }
     }
 }
 
@@ -460,6 +468,18 @@ impl App {
     /// Closes every panel and popup that is open: the clock panel, the
     /// Bluetooth, Wi-Fi and audio menus, the power menu and a tray menu.
     /// Opening one closes the rest (`docs/plan/10-popups-and-menus.md`).
+    /// Whether a panel, a menu or the toasts are open: what a bar shows
+    /// besides itself and its tooltips.
+    const fn popups_open(&self) -> bool {
+        self.clock_panel.is_some()
+            || self.bluetooth_menu.is_some()
+            || self.wifi_menu.is_some()
+            || self.audio_menu.is_some()
+            || self.power_menu.is_some()
+            || self.tray_menu.is_some()
+            || self.toasts.is_open()
+    }
+
     fn close_menus(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {
         if let Some(panel) = self.clock_panel.take() {
             panel.close(shell, false)?;

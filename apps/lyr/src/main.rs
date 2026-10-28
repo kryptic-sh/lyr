@@ -15,6 +15,7 @@ mod input;
 mod keys;
 mod list_popup;
 mod log;
+mod memory;
 mod menu_panel;
 mod modules;
 mod power_menu;
