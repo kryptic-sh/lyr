@@ -340,8 +340,16 @@ implementation follows meanwhile.
   the heap trimmed (`memory::give_back`), 43.5 MB before. Thirty clock and
   twenty audio open-and-close cycles grew nothing. The owner's live 0.4.0 bar
   showed a 104.8 MB high-water mark (`VmHWM`) after a day, 22.5 MB resident
-  then; what reached it is not known (toasts with images, tray icons and media
-  art were not exercised in the nested runs). Options not taken:
+  then. Large transient buffers fit it: in the nested Hyprland, fifteen
+  notifications naming a 28 MB wallpaper as their image peaked at 67 MB and
+  stayed at 59 MB, since glibc kept them in the sources thread's arena. Now the
+  picture file is not read (`icons::MAX_FILE_BYTES`) and glibc's thresholds are
+  fixed (`memory::configure`), and the same run peaks at 38.9 MB and settles at
+  31 MB. Not exercised: tray icons and media art from real apps. A picture over
+  1024 pixels a side (`icons::LIMITS`) is refused rather than scaled down, so a
+  screenshot tool's notification naming the screenshot shows no image, where
+  swaync shows it scaled; scaling it would mean decoding it whole (a 4K PNG is
+  33 MB of pixels) for a moment. Options not taken:
   - Loading the font on a thread beside the GPU's opening would save at most the
     font's 15 ms, but `App` uses the text everywhere, so every use would wait on
     it; not worth it at 40 ms.
