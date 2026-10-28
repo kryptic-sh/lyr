@@ -611,19 +611,24 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   the transparent bar and the clock box with its border, radius and text, as a
   screenshot showed, and the work area came back when the process was killed
   (again 2026-10-29: `SPI_GETWORKAREA` read 50 px taken while the bar ran and
-  the whole screen 200 ms after `Stop-Process -Force`). Hack Nerd Font Propo is
-  not installed on that machine, so it drew in the monospace fallback, and lyr
-  said so. It has run on Hyprland 0.56.2 since (the entries below). `lyr quit`
-  stops it. It repaints only when something it shows changed (plan 04), and
-  presents only when the window system asks for a frame (crcbl's frame gate, its
-  own entry above). It logs through `tracing` to
-  `~/.local/state/lyr/logs/lyr.log` and to stderr (`apps/lyr/src/log.rs`,
-  `RUST_LOG` to filter), capped at `log::MAX_BYTES` by moving it to `lyr.log.1`
-  (tested on Windows and Linux, not watched rotating in a running bar). Colours
-  go through crcbl-ui's `style::from_srgb8`, and a module's opacity is a
-  crcbl-ui opacity group (`DrawList::push_opacity`), faded as one layer as CSS
-  `opacity` is (crcbl 0.6.0); neither has been seen on screen since the change.
-  crcbl's CI had not verified the opacity layer on Metal when it reported it.
+  the whole screen 200 ms after `Stop-Process -Force`). The bar steps aside for
+  a full-screen app (`ShellEvent::FullScreenApp` in `App::event`, from crcbl's
+  `ABN_FULLSCREENAPP`), run on Windows 2026-10-29: a borderless WinForms window
+  the monitor's size, made the foreground window, hid the bar within 1.5 s, and
+  the bar was listed again after the window closed. A real game or full-screen
+  video has not been tried. Hack Nerd Font Propo is not installed on that
+  machine, so it drew in the monospace fallback, and lyr said so. It has run on
+  Hyprland 0.56.2 since (the entries below). `lyr quit` stops it. It repaints
+  only when something it shows changed (plan 04), and presents only when the
+  window system asks for a frame (crcbl's frame gate, its own entry above). It
+  logs through `tracing` to `~/.local/state/lyr/logs/lyr.log` and to stderr
+  (`apps/lyr/src/log.rs`, `RUST_LOG` to filter), capped at `log::MAX_BYTES` by
+  moving it to `lyr.log.1` (tested on Windows and Linux, not watched rotating in
+  a running bar). Colours go through crcbl-ui's `style::from_srgb8`, and a
+  module's opacity is a crcbl-ui opacity group (`DrawList::push_opacity`), faded
+  as one layer as CSS `opacity` is (crcbl 0.6.0); neither has been seen on
+  screen since the change. crcbl's CI had not verified the opacity layer on
+  Metal when it reported it.
 - **Shell, rest of M1.** `lyr-shell` has the bars (`bars::Bars`): one
   transparent layer panel per output (or per named output), stretched along the
   configured edge and reserving its height, created and destroyed as monitors
@@ -1644,11 +1649,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (`lyr panel clock`, then `audio`, then `wifi` left one panel; the power menu
   went when the clock panel opened). So no run has shown the difference; it
   would show where focus does not move, which no compositor tried has done.
-- The Windows bar hiding while an app is full screen
-  (`ShellEvent::FullScreenApp` in `App::event`, from crcbl's
-  `ABN_FULLSCREENAPP`): built 2026-10-28 and checked by clippy for
-  `x86_64-pc-windows-gnu` only; no Windows machine has run a full-screen app
-  under it.
 - The release pipeline's publish jobs (`publish-crates`, `aur-bin`, `brew-tap`,
   `scoop-bucket`, [plan/14](plan/14-ci-and-release.md)) run only on a tag; the
   `build` and `package` jobs run on every push to main. v0.1.0's tag run

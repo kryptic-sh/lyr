@@ -52,7 +52,7 @@ check out of "Not yet verified" there.
 ## Windows
 
 - [ ] **Full screen.** Play a video full screen, or a game. The bar hides on
-      that monitor and comes back after.
+      that monitor and comes back after (seen with a borderless window only).
 - [ ] **Battery.** On a laptop, unplug and plug in the charger; the module
       follows.
 - [ ] **Wi-Fi.** On a machine with Wi-Fi: the menu lists networks, joins one,
