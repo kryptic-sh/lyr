@@ -609,12 +609,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (2026-10-19, with the owner's go-ahead): Windows 11 at 2560 × 1440, D3D12 on
   an AMD Radeon RX 7900 XTX as asked, the bar an appbar reserving 50 px. It drew
   the transparent bar and the clock box with its border, radius and text, as a
-  screenshot showed, and the work area came back when the process was killed.
-  Hack Nerd Font Propo is not installed on that machine, so it drew in the
-  monospace fallback, and lyr said so. It has run on Hyprland 0.56.2 since (the
-  entries below). `lyr quit` stops it. It repaints only when something it shows
-  changed (plan 04), and presents only when the window system asks for a frame
-  (crcbl's frame gate, its own entry above). It logs through `tracing` to
+  screenshot showed, and the work area came back when the process was killed
+  (again 2026-10-29: `SPI_GETWORKAREA` read 50 px taken while the bar ran and
+  the whole screen 200 ms after `Stop-Process -Force`). Hack Nerd Font Propo is
+  not installed on that machine, so it drew in the monospace fallback, and lyr
+  said so. It has run on Hyprland 0.56.2 since (the entries below). `lyr quit`
+  stops it. It repaints only when something it shows changed (plan 04), and
+  presents only when the window system asks for a frame (crcbl's frame gate, its
+  own entry above). It logs through `tracing` to
   `~/.local/state/lyr/logs/lyr.log` and to stderr (`apps/lyr/src/log.rs`,
   `RUST_LOG` to filter), capped at `log::MAX_BYTES` by moving it to `lyr.log.1`
   (tested on Windows and Linux, not watched rotating in a running bar). Colours

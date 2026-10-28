@@ -63,7 +63,6 @@ check out of "Not yet verified" there.
 - [ ] **Audio.** The audio menu's Default button moves the default output; a
       Bluetooth headset is told apart as Bluetooth.
 - [ ] **Power menu.** Lock, Sleep, Reboot and Power off each do what they say.
-- [ ] **A crash.** Kill lyr. The work area it reserved comes back.
 
 ## macOS
 
