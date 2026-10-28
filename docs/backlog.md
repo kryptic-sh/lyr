@@ -415,8 +415,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     `Daemon::activation_token` is declared and never emitted.
   - Plan 09's toast slide in and out (`transition-time`, 200 ms; plan 12's
     frames only during the slide): toasts appear and go at once.
-  - Plan 08: an open tray menu does not follow DBusMenu's `LayoutUpdated` or
-    `ItemsPropertiesUpdated`.
   - Plan 13: `DrawList` snapshot tests, a headless render compared on the Linux
     runner, and `docs/manual-checks.md`.
   - Plan 14: a weekly fuzz job for the Hyprland parser and the config loader

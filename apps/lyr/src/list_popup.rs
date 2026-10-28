@@ -7,10 +7,10 @@
 
 use crcbl_shell::{
     CloseReply, LogicalPoint, LogicalRect, LogicalSize, PopupDesc, PopupInput, PopupPlacement,
-    Shell, ShellEvent, WindowDesc, WindowId, WindowRole,
+    Shell, ShellCaps, ShellEvent, WindowDesc, WindowId, WindowRole,
 };
 use lyr_config::Position;
-use lyr_core::draw::DrawList;
+use lyr_core::draw::{DrawList, Size};
 use lyr_core::hit::{Rect, Regions};
 use lyr_core::list_menu::{Menu, Row};
 use lyr_render::surface::Surface;
@@ -24,8 +24,11 @@ use crate::tooltips::Look;
 /// An open list menu, whose rows stand for `T`s.
 pub struct ListPopup<T> {
     window: WindowId,
-    /// The bar it opened from.
+    /// The bar it opened from, and where on it.
     bar: WindowId,
+    anchor: Rect,
+    /// Logical pixels, as last asked of the window system.
+    size: Size,
     menu: Menu<T>,
     list: DrawList,
     regions: Regions<T>,
@@ -68,22 +71,10 @@ impl<T: Clone + PartialEq> ListPopup<T> {
         let window = shell.create_window(&WindowDesc {
             title: NAMESPACE,
             app_id: NAMESPACE,
-            size: LogicalSize {
-                width: f64::from(size.width),
-                height: f64::from(size.height),
-            },
+            size: logical_size(size),
             role: WindowRole::Popup(PopupDesc {
                 parent: bar,
-                anchor: LogicalRect {
-                    origin: LogicalPoint {
-                        x: f64::from(anchor.x),
-                        y: f64::from(anchor.y),
-                    },
-                    size: LogicalSize {
-                        width: f64::from(anchor.width),
-                        height: f64::from(anchor.height),
-                    },
-                },
+                anchor: logical_rect(anchor),
                 placement: match position {
                     Position::Top => PopupPlacement::Below,
                     Position::Bottom => PopupPlacement::Above,
@@ -95,6 +86,8 @@ impl<T: Clone + PartialEq> ListPopup<T> {
         Ok(Some(Self {
             window,
             bar,
+            anchor,
+            size,
             menu,
             list,
             regions,
@@ -197,6 +190,42 @@ impl<T: Clone + PartialEq> ListPopup<T> {
         }
     }
 
+    /// Shows `rows` in place of its own, the selection kept where its row
+    /// still is: a menu its app changed while it was open. Returns whether
+    /// it did; not when there are no rows, nor when the size changes and
+    /// the window system cannot resize a popup in place
+    /// (`ShellCaps::POPUP_REPOSITION`), where the caller opens it again.
+    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+    pub fn replace(
+        &mut self,
+        shell: &mut dyn Shell,
+        rows: Vec<Row<T>>,
+        look: &Look<'_>,
+    ) -> anyhow::Result<bool> {
+        let Some(mut menu) = Menu::new(rows) else {
+            return Ok(false);
+        };
+        if let Some(selected) = self.menu.selected() {
+            menu.select(&selected.clone());
+        }
+        let (list, size, regions) = menu.draw(look.measure, look.line_height, look.theme);
+        if size != self.size {
+            if !shell.caps().contains(ShellCaps::POPUP_REPOSITION) {
+                return Ok(false);
+            }
+            shell.reposition_popup(self.window, logical_rect(self.anchor), logical_size(size))?;
+            if let Some(surface) = &mut self.surface {
+                surface.awaiting_size(size);
+            }
+            self.size = size;
+        }
+        self.menu = menu;
+        self.list = list;
+        self.regions = regions;
+        self.dirty = true;
+        Ok(true)
+    }
+
     /// Moves the selection with `step` and redraws.
     fn moved(&mut self, look: &Look<'_>, step: fn(&mut Menu<T>)) {
         step(&mut self.menu);
@@ -238,6 +267,26 @@ impl<T: Clone + PartialEq> ListPopup<T> {
         }
         shell.destroy_window(self.window)?;
         Ok(())
+    }
+}
+
+fn logical_size(size: Size) -> LogicalSize {
+    LogicalSize {
+        width: f64::from(size.width),
+        height: f64::from(size.height),
+    }
+}
+
+fn logical_rect(rect: Rect) -> LogicalRect {
+    LogicalRect {
+        origin: LogicalPoint {
+            x: f64::from(rect.x),
+            y: f64::from(rect.y),
+        },
+        size: LogicalSize {
+            width: f64::from(rect.width),
+            height: f64::from(rect.height),
+        },
     }
 }
 

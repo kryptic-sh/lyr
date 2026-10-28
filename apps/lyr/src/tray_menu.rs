@@ -133,6 +133,33 @@ impl TrayMenu {
         Ok(Outcome::Kept)
     }
 
+    /// Shows `root`, the menu as its app changed it while it was open
+    /// (DBusMenu's `LayoutUpdated` or `ItemsPropertiesUpdated`), on the same
+    /// submenu, or the nearest one out that is still there.
+    pub fn relaid(
+        &mut self,
+        shell: &mut dyn Shell,
+        root: Entry,
+        look: &Look<'_>,
+    ) -> anyhow::Result<Outcome> {
+        self.read.root = root;
+        while !self.path.is_empty()
+            && self
+                .shown()
+                .is_none_or(|shown| shown.shown().next().is_none())
+        {
+            self.path.pop();
+        }
+        let Some(shown) = self.shown() else {
+            return Ok(Outcome::Closed(false));
+        };
+        let rows = rows(shown, !self.path.is_empty());
+        if self.popup.replace(shell, rows, look)? {
+            return Ok(Outcome::Kept);
+        }
+        self.reopen(shell, look)
+    }
+
     /// Applies an event for the menu's window.
     pub fn event(
         &mut self,

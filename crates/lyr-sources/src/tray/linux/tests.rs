@@ -511,6 +511,20 @@ impl FakeMenu {
         self.record(format!("about to show {id}"));
         false
     }
+
+    #[zbus(signal)]
+    async fn layout_updated(
+        emitter: &SignalEmitter<'_>,
+        revision: u32,
+        parent: i32,
+    ) -> zbus::Result<()>;
+
+    #[zbus(signal)]
+    async fn items_properties_updated(
+        emitter: &SignalEmitter<'_>,
+        updated: Vec<(i32, std::collections::HashMap<String, zbus::OwnedVariant>)>,
+        removed: Vec<(i32, Vec<String>)>,
+    ) -> zbus::Result<()>;
 }
 
 impl FakeMenu {
@@ -574,6 +588,44 @@ async fn a_menu_is_read_whole_and_a_click_is_sent() {
         calls(&running.calls),
         ["about to show 0", "layout 0 -1", "event 1 clicked"]
     );
+}
+
+#[tokio::test]
+async fn an_open_menu_s_changes_are_followed_and_read_again() {
+    let running = running("/MenuBar").await;
+    running
+        .server
+        .object_server()
+        .at(
+            "/MenuBar",
+            FakeMenu {
+                calls: running.calls.clone(),
+            },
+        )
+        .await
+        .expect("served");
+    let host = Host::on(&running.client).await.expect("host");
+    let mut changes = host.menu_changes(BUS, "/MenuBar").await.expect("followed");
+    let menu: InterfaceRef<FakeMenu> = running
+        .server
+        .object_server()
+        .interface("/MenuBar")
+        .await
+        .expect("the menu");
+    let wait = Duration::from_secs(5);
+    FakeMenu::layout_updated(menu.signal_emitter(), 8, 0)
+        .await
+        .expect("sent");
+    let changed = tokio::time::timeout(wait, changes.next()).await;
+    assert_eq!(changed.expect("in time"), Some(()));
+    FakeMenu::items_properties_updated(menu.signal_emitter(), Vec::new(), Vec::new())
+        .await
+        .expect("sent");
+    let changed = tokio::time::timeout(wait, changes.next()).await;
+    assert_eq!(changed.expect("in time"), Some(()));
+    let root = host.menu_layout(BUS, "/MenuBar").await.expect("read");
+    assert!(root.find(5).is_some(), "read whole");
+    assert_eq!(calls(&running.calls), ["layout 0 -1"], "no AboutToShow");
 }
 
 #[tokio::test]

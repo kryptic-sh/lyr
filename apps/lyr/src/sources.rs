@@ -70,6 +70,10 @@ pub enum Update {
     /// A tray item's menu, read for the menu the bar asked to open.
     #[cfg(target_os = "linux")]
     TrayMenu(crate::tray_menu::Read),
+    /// The open tray menu as its app changed it: the item's bus name, the
+    /// menu's object path, and the menu read again.
+    #[cfg(target_os = "linux")]
+    TrayMenuLaidOut(String, String, lyr_core::tray::menu::Entry),
 }
 
 /// What the bar asks of a tray item, by its bus name and object path.
@@ -102,6 +106,9 @@ pub enum TrayRequest {
         menu: String,
         id: i32,
     },
+    /// The menu now open, by the item's bus name and the menu's path, whose
+    /// changes are to be followed; `None` once none is.
+    MenuShown(Option<(String, String)>),
 }
 
 /// What the Bluetooth menu asks of BlueZ, by object path, or of WinRT on
@@ -249,6 +256,9 @@ pub struct Commands {
     notices: tokio::sync::mpsc::UnboundedSender<(String, String)>,
     #[cfg(target_os = "linux")]
     tray: tokio::sync::mpsc::UnboundedSender<TrayRequest>,
+    /// Linux: the tray menu the tray source was last told is open.
+    #[cfg(target_os = "linux")]
+    tray_menu: std::cell::RefCell<Option<(String, String)>>,
 }
 
 #[cfg(target_os = "linux")]
@@ -283,6 +293,16 @@ impl Commands {
     /// Asks a tray item what the bar wants of it.
     pub fn tray(&self, request: TrayRequest) {
         let _stopped = self.tray.send(request);
+    }
+
+    /// Tells the tray source which item's menu is open, by its bus name and
+    /// menu path, when that changed, so it follows that menu's changes.
+    pub fn tray_menu(&self, open: Option<(&str, &str)>) {
+        let open = open.map(|(bus_name, menu)| (bus_name.to_owned(), menu.to_owned()));
+        if *self.tray_menu.borrow() != open {
+            self.tray_menu.replace(open.clone());
+            self.tray(TrayRequest::MenuShown(open));
+        }
     }
 
     /// Asks NetworkManager what the Wi-Fi menu wants.
@@ -537,6 +557,7 @@ pub fn start(
                 mute_link: std::cell::Cell::default(),
                 notices,
                 tray,
+                tray_menu: std::cell::RefCell::default(),
             },
         ))
     }
@@ -1994,7 +2015,7 @@ mod linux {
         waker: Option<ShellWaker>,
     ) {
         use lyr_core::tray::Click;
-        use lyr_sources::tray::linux::{Listing, session};
+        use lyr_sources::tray::linux::{Listing, MenuChanges, session};
 
         let (host, served) = match session().await {
             Ok(tray) => tray,
@@ -2048,8 +2069,50 @@ mod linux {
             }
         };
         let act = async {
-            while let Some(request) = requests.recv().await {
+            // The open menu's changes, while one is open.
+            let mut following: Option<(String, String, MenuChanges)> = None;
+            loop {
+                let request = tokio::select! {
+                    request = requests.recv() => {
+                        let Some(request) = request else { break };
+                        request
+                    }
+                    Some(()) = async {
+                        match &mut following {
+                            Some((_, _, changes)) => changes.next().await,
+                            None => std::future::pending().await,
+                        }
+                    } => {
+                        let Some((bus_name, menu, _)) = &following else { continue };
+                        match host.menu_layout(bus_name, menu).await {
+                            Ok(root) => {
+                                let laid_out = Update::TrayMenuLaidOut(
+                                    bus_name.to_owned(),
+                                    menu.to_owned(),
+                                    root,
+                                );
+                                if !deliver(&sender, waker.as_ref(), laid_out) {
+                                    break;
+                                }
+                            }
+                            Err(error) => tracing::warn!("tray: reading {menu} again: {error}"),
+                        }
+                        continue;
+                    }
+                };
                 let done = match request {
+                    TrayRequest::MenuShown(open) => {
+                        following = None;
+                        if let Some((bus_name, menu)) = open {
+                            match host.menu_changes(&bus_name, &menu).await {
+                                Ok(changes) => following = Some((bus_name, menu, changes)),
+                                Err(error) => {
+                                    tracing::warn!("tray: following {menu}: {error}");
+                                }
+                            }
+                        }
+                        Ok(())
+                    }
                     TrayRequest::Click {
                         bus_name,
                         path,

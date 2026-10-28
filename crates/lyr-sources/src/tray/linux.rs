@@ -277,6 +277,16 @@ trait ItemControl {
     fn scroll(&self, delta: i32, orientation: &str) -> zbus::Result<()>;
 }
 
+/// An open menu's changes ([`Host::menu_changes`]).
+pub struct MenuChanges(futures_util::stream::BoxStream<'static, ()>);
+
+impl MenuChanges {
+    /// Waits for the menu's next change; `None` once its signals end.
+    pub async fn next(&mut self) -> Option<()> {
+        self.0.next().await
+    }
+}
+
 /// An item's menu (`com.canonical.dbusmenu`).
 #[zbus::proxy(interface = "com.canonical.dbusmenu")]
 trait DbusMenu {
@@ -294,6 +304,14 @@ trait DbusMenu {
         timestamp: u32,
     ) -> zbus::Result<()>;
     fn about_to_show(&self, id: i32) -> zbus::Result<bool>;
+    #[zbus(signal)]
+    fn layout_updated(&self, revision: u32, parent: i32) -> zbus::Result<()>;
+    #[zbus(signal)]
+    fn items_properties_updated(
+        &self,
+        updated: Vec<(i32, HashMap<String, OwnedVariant>)>,
+        removed: Vec<(i32, Vec<String>)>,
+    ) -> zbus::Result<()>;
 }
 
 /// A menu entry as `GetLayout` lays it out: its id, its properties, and its
@@ -497,10 +515,39 @@ impl Host {
     /// (Steam, by waybar's `Item::handleClick`): the caller falls back to
     /// `ContextMenu`.
     pub async fn menu(&self, bus_name: &str, menu: &str) -> zbus::Result<Entry> {
+        self.dbus_menu(bus_name, menu)
+            .await?
+            .about_to_show(0)
+            .await?;
+        self.menu_layout(bus_name, menu).await
+    }
+
+    /// The menu at `menu` of the item at `bus_name` as it is now, read
+    /// again after [`Host::menu_changes`] says it changed.
+    ///
+    /// # Errors
+    ///
+    /// When the item no longer serves it.
+    pub async fn menu_layout(&self, bus_name: &str, menu: &str) -> zbus::Result<Entry> {
         let proxy = self.dbus_menu(bus_name, menu).await?;
-        proxy.about_to_show(0).await?;
         let (_revision, layout) = proxy.get_layout(0, -1, &[]).await?;
         Ok(entry(&layout))
+    }
+
+    /// One item each time the menu at `menu` of the item at `bus_name`
+    /// changes: its layout (`LayoutUpdated`) or an entry's properties
+    /// (`ItemsPropertiesUpdated`), as an open menu follows them. Drop it
+    /// when the menu closes: zbus stops reading the connection while any
+    /// stream it feeds is full.
+    ///
+    /// # Errors
+    ///
+    /// When the signals cannot be subscribed to.
+    pub async fn menu_changes(&self, bus_name: &str, menu: &str) -> zbus::Result<MenuChanges> {
+        let proxy = self.dbus_menu(bus_name, menu).await?;
+        let layout = proxy.receive_layout_updated().await?.map(|_| ());
+        let properties = proxy.receive_items_properties_updated().await?.map(|_| ());
+        Ok(MenuChanges(select(layout, properties).boxed()))
     }
 
     /// Tells the menu at `menu` of the item at `bus_name` that its entry

@@ -91,6 +91,33 @@ impl App {
         Ok(())
     }
 
+    /// Shows the menu `item`'s app changed, if it is the one open.
+    #[cfg(target_os = "linux")]
+    pub(super) fn tray_menu_laid_out(
+        &mut self,
+        shell: &mut dyn Shell,
+        item: (&str, &str),
+        root: lyr_core::tray::menu::Entry,
+    ) -> anyhow::Result<()> {
+        let Some(menu) = self.tray_menu.as_mut().filter(|menu| menu.item() == item) else {
+            return Ok(());
+        };
+        let look = Look {
+            theme: &self.config.theme,
+            measure: &|s: &str| self.text.measure(s),
+            measure_in: &|s: &str, style| self.text.measure_in(s, style),
+            lay_out: &|spans, width| self.text.lay_out(spans, width),
+            line_height: self.text.line_height(),
+            calendar_line_height: self.text.calendar_line_height(),
+        };
+        if let Outcome::Closed(window_gone) = menu.relaid(shell, root, &look)?
+            && let Some(menu) = self.tray_menu.take()
+        {
+            menu.close(shell, window_gone)?;
+        }
+        Ok(())
+    }
+
     /// Applies `event`, which is for the tray menu's window.
     pub(super) fn tray_menu_event(
         &mut self,

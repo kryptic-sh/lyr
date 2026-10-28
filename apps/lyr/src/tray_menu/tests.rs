@@ -1,8 +1,8 @@
 use crcbl_shell::{
     ClipboardOffer, ClipboardRequestId, CloseReply, CursorIcon, DisplayMode, HeadlessShell,
-    KeyCode, MimeType, MonitorInfo, PhysicalPoint, PointerMode, PopupDesc, PopupInput, Shell,
-    ShellBackend, ShellCaps, ShellError, ShellEvent, SizeConstraints, SurfaceTarget, WindowDesc,
-    WindowId, WindowRole, WindowState,
+    KeyCode, LogicalRect, LogicalSize, MimeType, MonitorInfo, PhysicalPoint, PointerMode,
+    PopupDesc, PopupInput, Shell, ShellBackend, ShellCaps, ShellError, ShellEvent, SizeConstraints,
+    SurfaceTarget, WindowDesc, WindowId, WindowRole, WindowState,
 };
 use lyr_config::{Platform, Position, Theme, from_sources};
 use lyr_core::hit::Rect;
@@ -57,6 +57,8 @@ struct Grabbing {
     inner: HeadlessShell,
     /// The grabbing popups open, oldest first.
     grabs: Vec<WindowId>,
+    /// Whether it can resize a popup in place, as xdg_wm_base 3 can.
+    reposition: bool,
 }
 
 impl std::ops::Deref for Grabbing {
@@ -78,7 +80,20 @@ impl Shell for Grabbing {
         self.inner.backend()
     }
     fn caps(&self) -> ShellCaps {
-        self.inner.caps()
+        let caps = self.inner.caps();
+        if self.reposition {
+            caps
+        } else {
+            caps - ShellCaps::POPUP_REPOSITION
+        }
+    }
+    fn reposition_popup(
+        &mut self,
+        popup: WindowId,
+        anchor: LogicalRect,
+        size: LogicalSize,
+    ) -> Result<(), ShellError> {
+        self.inner.reposition_popup(popup, anchor, size)
     }
     fn create_window(&mut self, desc: &WindowDesc<'_>) -> Result<WindowId, ShellError> {
         let window = self.inner.create_window(desc)?;
@@ -184,6 +199,7 @@ fn setup() -> Setup {
     let mut shell = Grabbing {
         inner: HeadlessShell::new(),
         grabs: Vec::new(),
+        reposition: true,
     };
     let bar = shell
         .create_window(&WindowDesc {
@@ -282,4 +298,89 @@ fn a_submenu_opens_in_place_and_back_leaves_it() {
 fn escape_closes_it() {
     let mut setup = setup();
     assert_eq!(setup.key(KeyCode::Escape), Outcome::Closed(true));
+}
+
+/// `root()` with "Open" relabelled, "Quit" (7) added, or "More" gone.
+fn changed(label: &str, quit: bool, more: bool) -> Entry {
+    let mut root = root();
+    root.children[0].label = label.to_owned();
+    if quit {
+        root.children.push(Entry {
+            label: "Quit".to_owned(),
+            ..Entry::new(7)
+        });
+    }
+    if !more {
+        root.children.retain(|entry| entry.id != 4);
+    }
+    root
+}
+
+#[test]
+fn a_changed_menu_is_shown_in_the_same_popup() {
+    let mut setup = setup();
+    let window = setup.menu.popup.window();
+    let theme = setup.theme.clone();
+    let relaid = |setup: &mut Setup, root| {
+        setup
+            .menu
+            .relaid(&mut setup.shell, root, &look(&theme))
+            .expect("relaid")
+    };
+    assert_eq!(
+        relaid(&mut setup, changed("Shut", false, true)),
+        Outcome::Kept
+    );
+    assert_eq!(setup.menu.popup.window(), window, "the same size, in place");
+    assert_eq!(
+        relaid(&mut setup, changed("Open", true, true)),
+        Outcome::Kept
+    );
+    assert_eq!(setup.menu.popup.window(), window, "taller, moved in place");
+    setup.key(KeyCode::ArrowDown);
+    setup.key(KeyCode::ArrowDown);
+    assert_eq!(setup.key(KeyCode::Enter), Outcome::Clicked(7), "its rows");
+}
+
+#[test]
+fn a_change_the_shell_cannot_resize_in_place_opens_it_again() {
+    let mut setup = setup();
+    setup.shell.reposition = false;
+    let window = setup.menu.popup.window();
+    let theme = setup.theme.clone();
+    let outcome = setup
+        .menu
+        .relaid(&mut setup.shell, changed("Open", true, true), &look(&theme))
+        .expect("relaid");
+    assert_eq!(outcome, Outcome::Kept);
+    assert_ne!(setup.menu.popup.window(), window, "opened again");
+    assert!(setup.shell.title(window).is_err(), "the old popup is gone");
+}
+
+#[test]
+fn a_submenu_that_went_leaves_the_menu_on_its_parent() {
+    let mut setup = setup();
+    setup.key(KeyCode::ArrowDown);
+    assert_eq!(setup.key(KeyCode::Enter), Outcome::Kept, "into More");
+    let theme = setup.theme.clone();
+    let outcome = setup
+        .menu
+        .relaid(
+            &mut setup.shell,
+            changed("Open", false, false),
+            &look(&theme),
+        )
+        .expect("relaid");
+    assert_eq!(outcome, Outcome::Kept);
+    assert_eq!(setup.key(KeyCode::Enter), Outcome::Clicked(1), "the top");
+    let mut empty = root();
+    empty.children.clear();
+    assert_eq!(
+        setup
+            .menu
+            .relaid(&mut setup.shell, empty, &look(&theme))
+            .expect("relaid"),
+        Outcome::Closed(true),
+        "nothing left to show"
+    );
 }

@@ -189,6 +189,11 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
                 app.open_tray_menu(shell.as_mut(), read)?;
                 continue;
             }
+            #[cfg(target_os = "linux")]
+            if let Update::TrayMenuLaidOut(bus_name, menu, root) = update {
+                app.tray_menu_laid_out(shell.as_mut(), (&bus_name, &menu), root)?;
+                continue;
+            }
             app.update(update, Instant::now());
             app.refresh_bluetooth_menu(shell.as_mut())?;
             app.refresh_wifi_menu(shell.as_mut())?;
@@ -211,6 +216,9 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         }
         // The source follows the streams while the menu is open.
         app.commands.audio_menu(app.audio_menu.is_some());
+        #[cfg(target_os = "linux")]
+        app.commands
+            .tray_menu(app.tray_menu.as_ref().map(TrayMenu::item));
         #[cfg(any(target_os = "linux", windows))]
         app.commands.wifi_menu(app.wifi_menu.is_some());
         app.draw(shell.as_mut())?;

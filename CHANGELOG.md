@@ -34,6 +34,9 @@ and this project adheres to
 - The clock panel's notification centre takes the keyboard as swaync's does: the
   arrow keys move an outline through its controls, `Enter` acts on the outlined
   one and `Delete` dismisses its notification.
+- An open tray menu follows its app's changes (DBusMenu's `LayoutUpdated` and
+  `ItemsPropertiesUpdated`): it is read again and shown in the same popup,
+  resized in place where the compositor can, on the same submenu.
 - On Windows the bar hides while a full-screen app (a game, a video) is open on
   its monitor, and comes back when it closes, keeping its edge reserved.
 

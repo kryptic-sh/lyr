@@ -129,9 +129,9 @@ impl Data {
             Update::AudioNodes(nodes) => self.audio_nodes = Some(nodes),
             #[cfg(windows)]
             Update::ActiveWindow(active) => self.active_window = Some(active),
-            // The bar opens it.
+            // The bar opens it, and changes it in place.
             #[cfg(target_os = "linux")]
-            Update::TrayMenu(_) => {}
+            Update::TrayMenu(_) | Update::TrayMenuLaidOut(..) => {}
             // The toasts follow each change; the bell reads the store.
             #[cfg(target_os = "linux")]
             Update::Notification(_) => {}
