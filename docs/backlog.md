@@ -321,8 +321,37 @@ implementation follows meanwhile.
     (`IconThemes::lookup`).
 
 - **The bar's cost at rest, and what is not measured.** On the owner's bar
-  (2026-10-27): 65 context switches and under 10 ms of CPU a minute. Not
-  measured: more than one output, VRR, Windows and macOS.
+  (2026-10-27): 65 context switches and under 10 ms of CPU a minute. On the
+  owner's bar 0.4.0 after 8 h of desktop use (2026-10-29): 3.4 s of CPU in all,
+  2.0 s on the main thread over 11481 wake-ups and 1.3 s on the sources thread;
+  the wake-ups are real changes (titles, workspaces), since `lyr-wm` hands on
+  only a state that differs. An idle release build in a nested Hyprland
+  (2026-10-29): 7 wake-ups and 2 presents over 74 s. Not measured: more than one
+  output, VRR, Windows and macOS (asked of the Windows lyr session 2026-10-29).
+- **Startup and memory, measured on Linux (2026-10-29).** A release build in a
+  nested Hyprland on the owner's laptop (Intel RPL-U, Mesa, warm caches, a
+  loaded machine so the minimum of 8 runs): the first frame about 40 ms after
+  `main`, of which the font load is about 15 ms (fontconfig's first lookup 10 –
+  13 ms of it), the Vulkan instance and device about 10 ms, the swapchain about
+  5 ms and the first frame's pipelines about 11 ms; a cold first run took 177
+  ms. Resident memory at start is 34.5 MB (12.4 MB anonymous; the rest is the
+  binary's and the drivers' mapped code), down from 44.9 MB once the bar font's
+  styled faces became lazy; after the clock panel and audio menu, 36.6 MB with
+  the heap trimmed (`memory::give_back`), 43.5 MB before. Thirty clock and
+  twenty audio open-and-close cycles grew nothing. The owner's live 0.4.0 bar
+  showed a 104.8 MB high-water mark (`VmHWM`) after a day, 22.5 MB resident
+  then; what reached it is not known (toasts with images, tray icons and media
+  art were not exercised in the nested runs). Options not taken:
+  - Loading the font on a thread beside the GPU's opening would save at most the
+    font's 15 ms, but `App` uses the text everywhere, so every use would wait on
+    it; not worth it at 40 ms.
+  - The regular face (2.8 MB for Hack Nerd Font Propo) is read into the heap.
+    Mapping the file instead would share it with other programs using the font,
+    but crcbl-ui's `FontData` has no public constructor over a caller's
+    `Arc<dyn AsRef<[u8]>>`, and mapping needs a crate or `unsafe` mmap (and a
+    file truncated under it faults): a crcbl request if memory gets tighter.
+  - fontconfig's init could be skipped by remembering the resolved faces, as the
+    GPU choice is remembered, but the fallback list needs fontconfig anyway.
 - **crcbl: every lyr and pikr feature on every backend.** At the owner's request
   (2026-10-17), crcbl makes each S-row work on every backend or fail loudly. Its
   matrix is in [plan/03](plan/03-surfaces-and-input.md#backend-matrix). Since
