@@ -154,6 +154,8 @@ toast_time = "#565f89"
 toast_link = "#7aa2f7"
 toast_close = "#f7768e"
 toast_close_foreground = "#1a1b26"
+toast_progress = "#7aa2f7"
+toast_progress_critical = "#f7768e"
 # swaync's .control-center in the dotfiles.
 panel_background = "#1a1b26"
 panel_foreground = "#c0caf5"

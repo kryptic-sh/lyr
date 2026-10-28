@@ -12,6 +12,10 @@ and this project adheres to
 
 - `lyr-core`: `draw::Bar`'s zones hold `draw::Entry` values, a module or a
   spacer or separator, instead of `draw::Module`s; `Entry::from` wraps a module.
+- New public fields, which a struct literal must now set:
+  `lyr_core::notifications::Incoming::progress`,
+  `lyr_config::Volume::mute_links_mic`, and `lyr_config::Theme::toast_progress`
+  and `toast_progress_critical`.
 
 ### Added
 
@@ -20,6 +24,9 @@ and this project adheres to
   state it had, so a mic that was already muted stays muted.
 - Each bar frame logs at `debug` (`RUST_LOG=info,lyr::stats=debug`) how long
   after the wake-up that changed it it was presented.
+- A notification's `value` hint (0 – 100) is drawn as a progress bar under its
+  text, as swaync draws it: `theme.toast_progress`, or
+  `theme.toast_progress_critical` on a critical notification.
 - The clock panel's notification centre takes the keyboard as swaync's does: the
   arrow keys move an outline through its controls, `Enter` acts on the outlined
   one and `Delete` dismisses its notification.

@@ -415,7 +415,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     `Daemon::activation_token` is declared and never emitted.
   - Plan 09's toast slide in and out (`transition-time`, 200 ms; plan 12's
     frames only during the slide): toasts appear and go at once.
-  - Plan 09's progress hint (`value`), drawn red when critical: not read.
   - Plan 08: an open tray menu does not follow DBusMenu's `LayoutUpdated` or
     `ItemsPropertiesUpdated`.
   - Plan 13: `DrawList` snapshot tests, a headless render compared on the Linux

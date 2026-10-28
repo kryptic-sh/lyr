@@ -200,6 +200,11 @@ impl Daemon {
             desktop_entry,
             transient: flag("transient"),
             resident: flag("resident"),
+            // swaync clamps it, and shows the bar for any `int32`.
+            progress: hints
+                .get("value")
+                .and_then(|value| i32::try_from(value).ok())
+                .and_then(|value| u8::try_from(value.clamp(0, 100)).ok()),
             expiry: Some(Expiry::from_millis(expire_timeout)),
         };
         let id = self.store().notify(incoming, Instant::now());

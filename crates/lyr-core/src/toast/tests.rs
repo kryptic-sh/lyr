@@ -4,8 +4,8 @@ use std::time::Duration;
 use lyr_config::{Platform, Theme, from_sources};
 
 use super::{
-    Area, BORDER, INSET, PICTURE_MARGIN, PICTURE_PADDING, PICTURE_SIZE, Placed, TIME_GAP, WIDTH,
-    draw, relative_time,
+    Area, BORDER, INSET, PICTURE_MARGIN, PICTURE_PADDING, PICTURE_SIZE, PROGRESS_HEIGHT,
+    PROGRESS_ROW, Placed, TIME_GAP, WIDTH, draw, relative_time,
 };
 use crate::draw::{Item, Picture, TextStyle};
 use crate::hit::Rect;
@@ -637,4 +637,90 @@ fn a_link_is_an_area_on_every_line_it_wraps_to() {
             (Area::Link(0), line(top + 60.0, 30.0)),
         ]
     );
+}
+
+#[test]
+fn a_progress_hint_is_a_bar_under_the_text_as_long_as_the_value() {
+    let theme = theme();
+    let progress = |percent, urgency| {
+        let content = Incoming {
+            summary: "Copying".to_owned(),
+            urgency,
+            progress: Some(percent),
+            ..with_actions()
+        };
+        draw(
+            &content,
+            Duration::ZERO,
+            WIDTH,
+            measure,
+            &lay_out,
+            20.0,
+            &theme,
+        )
+    };
+    let bars = |items: &[Item]| -> Vec<(Rect, lyr_config::Colour)> {
+        items
+            .iter()
+            .filter_map(|item| match item {
+                Item::Box {
+                    rect,
+                    fill,
+                    border: None,
+                    ..
+                } => Some((*rect, *fill)),
+                _ => None,
+            })
+            .collect()
+    };
+    let top = BORDER + INSET;
+    let content_width = WIDTH - 2.0 * top;
+    let (list, size, buttons) = progress(40, Urgency::Normal);
+    let row = top + 20.0;
+    assert_eq!(
+        bars(&list.items),
+        [(
+            Rect {
+                x: top,
+                y: row + (PROGRESS_ROW - PROGRESS_HEIGHT) / 2.0,
+                width: content_width * 40.0 / 100.0,
+                height: PROGRESS_HEIGHT,
+            },
+            theme.toast_progress
+        )]
+    );
+    let (_, without, _) = draw(
+        &with_actions(),
+        Duration::ZERO,
+        WIDTH,
+        measure,
+        &lay_out,
+        20.0,
+        &theme,
+    );
+    assert_eq!(
+        size.height,
+        without.height + PROGRESS_ROW,
+        "a row of its own"
+    );
+    assert!(
+        buttons.iter().all(|(_, rect)| rect.y > row + PROGRESS_ROW),
+        "the buttons below it"
+    );
+    let (list, _, _) = progress(100, Urgency::Critical);
+    assert_eq!(
+        bars(&list.items)[0],
+        (
+            Rect {
+                x: top,
+                y: row + (PROGRESS_ROW - PROGRESS_HEIGHT) / 2.0,
+                width: content_width,
+                height: PROGRESS_HEIGHT,
+            },
+            theme.toast_progress_critical
+        )
+    );
+    let (list, size, _) = progress(0, Urgency::Normal);
+    assert!(bars(&list.items).is_empty(), "nothing filled");
+    assert_eq!(size.height, without.height + PROGRESS_ROW, "the row kept");
 }

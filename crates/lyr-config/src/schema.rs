@@ -511,6 +511,10 @@ pub struct Theme {
     /// The close button on the toast under the pointer, and its cross.
     pub toast_close: Colour,
     pub toast_close_foreground: Colour,
+    /// The filled part of a notification's progress bar (its `value` hint),
+    /// and of a critical one's.
+    pub toast_progress: Colour,
+    pub toast_progress_critical: Colour,
     /// The clock panel: swaync's `.control-center` in the dotfiles.
     pub panel_background: Colour,
     pub panel_foreground: Colour,

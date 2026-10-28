@@ -89,6 +89,9 @@ pub struct Incoming {
     pub transient: bool,
     /// Not closed when an action is invoked.
     pub resident: bool,
+    /// How far along what it reports is, 0 – 100: the `value` hint, drawn
+    /// as a progress bar.
+    pub progress: Option<u8>,
     pub expiry: Option<Expiry>,
 }
 

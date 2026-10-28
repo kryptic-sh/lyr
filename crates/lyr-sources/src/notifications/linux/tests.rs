@@ -80,6 +80,28 @@ async fn a_notification_is_stored_with_its_hints() {
     );
 }
 
+#[tokio::test]
+async fn a_value_hint_is_its_progress_held_to_0_100() {
+    let running = daemon().await;
+    let progress = |value: OwnedVariant| {
+        let client = running.client.clone();
+        let store = running.store.clone();
+        async move {
+            let hints = HashMap::from([("value", value)]);
+            let id = client
+                .notify("cp", 0, "", "Copying", "", &[], hints, -1)
+                .await
+                .expect("notified");
+            let store = store.lock().expect("store");
+            store.get(id).expect("held").content.progress
+        }
+    };
+    assert_eq!(progress(OwnedVariant::from(40_i32)).await, Some(40));
+    assert_eq!(progress(OwnedVariant::from(250_i32)).await, Some(100));
+    assert_eq!(progress(OwnedVariant::from(-3_i32)).await, Some(0));
+    assert_eq!(progress(OwnedVariant::from(40_u8)).await, None, "an int32");
+}
+
 /// An `image-data` hint: one RGBA pixel, or one RGB pixel without alpha.
 fn image_data(pixel: &[u8]) -> OwnedVariant {
     let alpha = pixel.len() == 4;

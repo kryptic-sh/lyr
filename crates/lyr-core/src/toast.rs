@@ -3,8 +3,8 @@
 //! dotfiles' `config.json` and `style.css`.
 //!
 //! Drawn: the summary over the body, the body's markup, when it arrived,
-//! the border coloured by urgency, the image and the app's icon, a button
-//! per action, and the close button.
+//! the border coloured by urgency, the image and the app's icon, the
+//! progress bar, a button per action, and the close button.
 
 pub mod stack;
 
@@ -55,6 +55,14 @@ pub const PICTURE_MARGIN: f32 = 4.0;
 /// their 14 px font. The app's icon sits at the far end of it, over the
 /// image's right side, as swaync's overlay puts it (`halign: end`).
 pub const PICTURE_PADDING: f32 = 7.0;
+
+/// The progress bar's row: swaync 0.12.6's `ProgressBar` under the text,
+/// whose bar, trough and filled part the dotfiles each pad 3 px above and
+/// below and otherwise leave unstyled (`* { all: unset }`). Read from the
+/// CSS, not measured in a running swaync.
+pub const PROGRESS_ROW: f32 = 3.0 * 2.0 * 3.0;
+/// The filled part's height, in the middle of its row: its own padding.
+pub const PROGRESS_HEIGHT: f32 = 2.0 * 3.0;
 
 /// A part of a toast a click can land on, apart from the toast itself.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -221,7 +229,8 @@ pub fn draw(
     let top = BORDER + INSET;
     let text_top = top + (row_height - text_height) / 2.0;
     let left = BORDER + INSET + picture_column;
-    let text_bottom = top + row_height;
+    let progress_top = top + row_height;
+    let text_bottom = progress_top + content.progress.map_or(0.0, |_| PROGRESS_ROW);
     let size = Size {
         width,
         height: text_bottom + buttons_height + BORDER + INSET,
@@ -294,6 +303,25 @@ pub fn draw(
                 style: text_style(span.style),
             });
         }
+    }
+    // As far across the content as it is along, red when critical as the
+    // border is.
+    if let Some(percent) = content.progress.filter(|&percent| percent > 0) {
+        items.push(Item::Box {
+            rect: Rect {
+                x: BORDER + INSET,
+                y: progress_top + (PROGRESS_ROW - PROGRESS_HEIGHT) / 2.0,
+                width: content_width * f32::from(percent.min(100)) / 100.0,
+                height: PROGRESS_HEIGHT,
+            },
+            radius: PROGRESS_HEIGHT / 2.0,
+            fill: if content.urgency == Urgency::Critical {
+                theme.toast_progress_critical
+            } else {
+                theme.toast_progress
+            },
+            border: None,
+        });
     }
     if !actions.is_empty() {
         let count = actions.len() as f32;
