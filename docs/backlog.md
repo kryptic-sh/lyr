@@ -591,15 +591,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked, and read from the owner's real one by the `system_services`
   test), so a zone change redraws the bar at once. The clock's text takes the
   new zone because chrono 0.4.45's `Local` re-reads `/etc/localtime` when its
-  mtime changes, checking at most once a second (`src/offset/local/unix.rs`); a
-  change within a second of the last draw shows on the next tick instead. Text
-  is cut at its rect's edges (`lyr_render::translate` clips each text item), so
-  a label wider than its box no longer runs over its neighbours. A format cannot
-  drop the literal text around an empty placeholder; the one case that came up,
-  a battery with no power reading, now shows 0 W as waybar 0.15.0 does
-  (`total_power / 1e6`), and UPower always reports a rate. Measuring text (the
-  widths `layout` takes) needs crcbl-ui's font atlas, so it is done by the
-  caller in `lyr-render`.
+  mtime changes, checking at most once a second (`src/offset/local/unix.rs`); so
+  a zone change also brings the clock's tick in to `ZONE_SETTLED` later
+  (`apps/lyr/src/bar.rs`), past that check (2026-10-28). Not seen working: it
+  needs the system's zone changed. Text is cut at its rect's edges
+  (`lyr_render::translate` clips each text item), so a label wider than its box
+  no longer runs over its neighbours. A format cannot drop the literal text
+  around an empty placeholder; the one case that came up, a battery with no
+  power reading, now shows 0 W as waybar 0.15.0 does (`total_power / 1e6`), and
+  UPower always reports a rate. Measuring text (the widths `layout` takes) needs
+  crcbl-ui's font atlas, so it is done by the caller in `lyr-render`.
 - **Notification daemon, M6.** Built: the store (`lyr_core::notifications`): ids
   from 1 that skip 0 and held ids, `replaces_id` kept as the id and replacing in
   place (even for an id lyr does not hold, as the spec says), swaync's timeouts

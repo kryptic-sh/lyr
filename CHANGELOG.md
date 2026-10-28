@@ -54,6 +54,9 @@ and this project adheres to
 
 ### Fixed
 
+- A time zone change made within a second of the bar's last draw showed in the
+  clock only at the next minute; the clock is now drawn again just over a second
+  after the change.
 - A panel that grew (a toast arriving, the audio menu changing tab, a menu's
   list getting longer) showed one frame of its new content cut off at the old
   size before the right one. It now draws nothing until the new size arrives.

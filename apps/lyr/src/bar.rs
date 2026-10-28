@@ -109,6 +109,13 @@ fn load_family(family: &str) -> anyhow::Result<lyr_render::fonts::Loaded> {
     Ok(font)
 }
 
+/// How long after a time zone change the clock is drawn again: chrono
+/// 0.4.45's `Local` reads `/etc/localtime` again when its mtime changed, but
+/// looks at most once a second (`src/offset/local/unix.rs`), so a draw at
+/// the change itself can still show the old zone.
+#[cfg(target_os = "linux")]
+const ZONE_SETTLED: std::time::Duration = std::time::Duration::from_millis(1100);
+
 /// When the clock's text next changes under `tick`.
 fn next_tick(tick: Tick) -> Instant {
     Instant::now() + tick.until_next(&Local::now().fixed_offset())
@@ -301,6 +308,8 @@ impl App {
                 }
                 Update::Notification(Change::Closed(id, _)) => self.toasts.closed(*id),
                 Update::WifiJoined(joined) => self.wifi_joined(joined.clone()),
+                // The tick comes early to draw the clock in the new zone.
+                Update::Zone(_) => self.next_tick = self.next_tick.min(now + ZONE_SETTLED),
                 _ => {}
             }
         }
