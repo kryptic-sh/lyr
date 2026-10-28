@@ -327,7 +327,39 @@ implementation follows meanwhile.
   the wake-ups are real changes (titles, workspaces), since `lyr-wm` hands on
   only a state that differs. An idle release build in a nested Hyprland
   (2026-10-29): 7 wake-ups and 2 presents over 74 s. Not measured: more than one
-  output, VRR, Windows and macOS (asked of the Windows lyr session 2026-10-29).
+  output, VRR and macOS; Windows is in the next entry.
+- **Startup, memory and idle on Windows (2026-10-29).** Measured by the Windows
+  lyr session on a release build of `34deef7` (AMD RX 7900 XTX with a Radeon
+  iGPU, display on the dGPU; Hack Nerd Font Propo not installed there):
+  - Startup to the first present: 1.12 s cold, with no saved GPU choice; opening
+    the D3D12 device took 860 ms of it. Warm: 612 ms, of which the device took
+    387 ms (the AMD driver's `D3D12CreateDevice`). The rest: about 45 ms to the
+    shell, 12 ms of font lookup, 39 ms for the WLAN check (its service not
+    running), 6 ms of swapchain and 33 ms for the first frame. The iGPU: 2.1 s
+    cold, 586 ms warm. WARP: 145 ms. Startup there is driver time. crcbl-dx12
+    0.12.1 enables DRED in release builds too, at a cost not measured; asked of
+    crcbl.
+  - Memory (working set / private bytes): 131.4 / 157.4 MB at start, at most
+    146.3 / 177.5 after 10 clock and 10 audio open-and-close cycles, and 135.2 /
+    160.4 five seconds after the last close. No leak, and the Windows heap gives
+    memory back by itself. On WARP: 115.7 / 125.7, so the AMD driver holds about
+    30 MB.
+  - Idle: 2 wake-ups, 1 event and 1 present a minute once settled, and 47 ms of
+    CPU over 310 s.
+- **crcbl: fallback faces are read whole to learn whether they map a
+  character.** Text that the bar font lacks a glyph for (its icons, when the
+  configured font is missing) makes crcbl-ui's layout ask each lazy fallback
+  face in turn, and each is read and parsed whole to answer. On Windows without
+  the Nerd Font, all six system fallbacks were read: 61.4 MB of private bytes
+  (`seguiemj` 12.6 MB, `msyh.ttc` 19.2 MB, `YuGothR.ttc` 13.5 MB and `malgun`
+  13.1 MB among them). Linux reads its fontconfig fallbacks the same way (not
+  measured there). lyr cannot skip private-use characters itself, since
+  fontconfig's fallbacks on Linux include Nerd Fonts that have them. Asked of
+  office-crcbl (2026-10-29): a coverage check that reads only the face's `cmap`,
+  or takes it from the system (fontconfig's charset, DirectWrite's
+  `HasCharacter`, CoreText's character set). Also asked: a `FontData`
+  constructor over a caller's `Arc<dyn AsRef<[u8]> + Send + Sync>`, so the
+  regular face could be a mapped file.
 - **Startup and memory, measured on Linux (2026-10-29).** A release build in a
   nested Hyprland on the owner's laptop (Intel RPL-U, Mesa, warm caches, a
   loaded machine so the minimum of 8 runs): the first frame about 40 ms after
@@ -356,8 +388,8 @@ implementation follows meanwhile.
   - The regular face (2.8 MB for Hack Nerd Font Propo) is read into the heap.
     Mapping the file instead would share it with other programs using the font,
     but crcbl-ui's `FontData` has no public constructor over a caller's
-    `Arc<dyn AsRef<[u8]>>`, and mapping needs a crate or `unsafe` mmap (and a
-    file truncated under it faults): a crcbl request if memory gets tighter.
+    `Arc<dyn AsRef<[u8]>>` (asked of crcbl), and mapping needs a crate or
+    `unsafe` mmap (and a file truncated under it faults).
   - fontconfig's init could be skipped by remembering the resolved faces, as the
     GPU choice is remembered, but the fallback list needs fontconfig anyway.
 - **crcbl: every lyr and pikr feature on every backend.** At the owner's request
