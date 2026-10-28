@@ -91,9 +91,9 @@ fn load_text(config: &Config) -> anyhow::Result<Text> {
         _ => bar.clone(),
     };
     let calendar =
-        Text::new(calendar.font, size * lyr_render::text::SMALL).with_faces(calendar.faces);
+        Text::new(calendar.font, size * lyr_render::text::SMALL).with_styles(calendar.styles);
     Ok(Text::new(bar.font, size)
-        .with_faces(bar.faces)
+        .with_styles(bar.styles)
         .with_calendar(calendar))
 }
 
@@ -102,9 +102,6 @@ fn load_family(family: &str) -> anyhow::Result<lyr_render::fonts::Loaded> {
     let font = lyr_render::fonts::load(family)?;
     if let Some(family) = &font.missing {
         tracing::warn!("font `{family}` is not installed; using a monospace font");
-    }
-    for (path, reason) in &font.unreadable {
-        tracing::warn!("font {} skipped: {reason}", path.display());
     }
     Ok(font)
 }

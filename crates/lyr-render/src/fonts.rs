@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use crcbl_font::{BOLD_WEIGHT, FontQuery, FontStyle, NORMAL_WEIGHT, SystemFonts};
+use crcbl_font::{BOLD_WEIGHT, FontMatch, FontQuery, FontStyle, NORMAL_WEIGHT, SystemFonts};
 use crcbl_ui::font::Font;
 
 /// The family lyr falls back to when the configured one is not installed.
@@ -15,16 +15,26 @@ pub struct Loaded {
     /// The font, carrying the system's fallback faces for characters it lacks
     /// (emoji in a notification).
     pub font: Font,
-    /// The family's bold, italic and bold italic faces the system has apart
-    /// from [`Self::font`], each carrying the same fallbacks.
-    pub faces: Vec<Font>,
+    /// The family's bold, italic and bold italic faces, each carrying the
+    /// same fallbacks.
+    pub styles: Styles,
     /// The configured family, when it was not found and [`FALLBACK_FAMILY`]
     /// was used instead.
     pub missing: Option<String>,
-    /// The family's other faces that were found but could not be read or
-    /// parsed, and why. Fallback faces are read when first needed, and crcbl
-    /// logs one that fails then.
-    pub unreadable: Vec<(PathBuf, String)>,
+}
+
+/// The face the system matched for each of bold, italic and bold italic, or
+/// `None` where that was the regular face. Each is read the first time text
+/// in its style is measured or drawn, not when the bar starts: a face is
+/// read whole, megabytes for a Nerd Font, and most bars draw no bold or
+/// italic text at all.
+/// One that cannot be read then is logged by crcbl, and its text falls
+/// through to the fallback faces.
+#[derive(Clone, Debug, Default)]
+pub struct Styles {
+    pub bold: Option<Font>,
+    pub italic: Option<Font>,
+    pub bold_italic: Option<Font>,
 }
 
 /// Why no font could be loaded at all.
@@ -64,33 +74,31 @@ pub fn load(family: &str) -> Result<Loaded, Error> {
         .into_iter()
         .map(Font::from_system_lazy)
         .collect();
-    let mut unreadable = Vec::new();
-    // The family's other faces, each once: the nearest the system has to
-    // each may be the regular face again.
-    let mut found = vec![face];
-    let mut faces = Vec::new();
-    for (weight, style) in [
-        (BOLD_WEIGHT, FontStyle::Normal),
-        (NORMAL_WEIGHT, FontStyle::Italic),
-        (BOLD_WEIGHT, FontStyle::Italic),
-    ] {
-        let Some(face) = system.find(&query.clone().weight(weight).style(style)) else {
-            continue;
-        };
-        if found.contains(&face) {
-            continue;
+    // The family's other faces, each read once however many styles the
+    // system matched it for: the nearest it has to bold italic may be the
+    // bold face, and to any of them the regular face again.
+    let mut found: Vec<(FontMatch, Font)> = Vec::new();
+    let mut style = |weight, slant| {
+        let matched = system.find(&query.clone().weight(weight).style(slant))?;
+        if matched == face {
+            return None;
         }
-        match Font::from_system(&face) {
-            Ok(font) => faces.push(font.with_fallback(&fallbacks)),
-            Err(error) => unreadable.push((face.path.clone(), error.to_string())),
+        if let Some((_, font)) = found.iter().find(|(seen, _)| *seen == matched) {
+            return Some(font.clone());
         }
-        found.push(face);
-    }
+        let font = Font::from_system_lazy(matched.clone()).with_fallback(&fallbacks);
+        found.push((matched, font.clone()));
+        Some(font)
+    };
+    let styles = Styles {
+        bold: style(BOLD_WEIGHT, FontStyle::Normal),
+        italic: style(NORMAL_WEIGHT, FontStyle::Italic),
+        bold_italic: style(BOLD_WEIGHT, FontStyle::Italic),
+    };
     Ok(Loaded {
         font: font.with_fallback(&fallbacks),
-        faces,
+        styles,
         missing,
-        unreadable,
     })
 }
 
@@ -98,6 +106,9 @@ pub fn load(family: &str) -> Result<Loaded, Error> {
 mod tests {
     use crcbl_ui::font::GlyphId;
     use lyr_config::{Platform, from_sources};
+    use lyr_core::draw::TextStyle;
+
+    use crate::text::Text;
 
     #[test]
     #[ignore = "needs the defaults' font (Hack Nerd Font Propo) installed; CI's nerd-font job installs it"]
@@ -132,6 +143,32 @@ mod tests {
             fallbacks.iter().all(|face| !face.is_loaded()),
             "a fallback face was read up front"
         );
+    }
+
+    #[test]
+    #[ignore = "needs the defaults' font (Hack Nerd Font Propo) installed; CI's nerd-font job installs it"]
+    fn a_style_s_face_is_read_when_text_in_that_style_is_first_measured() {
+        let family = from_sources(None, Platform::current())
+            .expect("the defaults")
+            .theme
+            .font;
+        let loaded = super::load(&family).expect("a font");
+        let styles = loaded.styles.clone();
+        let (Some(bold), Some(italic), Some(bold_italic)) =
+            (styles.bold, styles.italic, styles.bold_italic)
+        else {
+            panic!("{family} has all three faces: {:?}", loaded.styles);
+        };
+        let text = Text::new(loaded.font, 16.0).with_styles(loaded.styles);
+        assert!(text.measure("abc") > 0.0);
+        let read = || [&bold, &italic, &bold_italic].map(|face| face.is_loaded());
+        assert_eq!(read(), [false; 3], "read for plain text");
+        let bold_style = TextStyle {
+            bold: true,
+            ..TextStyle::PLAIN
+        };
+        assert!(text.measure_in("abc", bold_style) > 0.0);
+        assert_eq!(read(), [true, false, false]);
     }
 
     #[test]

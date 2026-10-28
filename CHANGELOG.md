@@ -20,6 +20,10 @@ and this project adheres to
   `lyr_core::notifications::Incoming::progress` and `synchronous`,
   `lyr_config::Volume::mute_links_mic`, and `lyr_config::Theme::toast_progress`
   and `toast_progress_critical`.
+- `lyr-render`: `fonts::Loaded` holds the family's other faces as
+  `fonts::Styles` (`bold`, `italic`, `bold_italic`) in place of `faces`, and has
+  no `unreadable` list, since those faces are read on first use; `Text` takes
+  them with `with_styles` in place of `with_faces`.
 
 ### Added
 
@@ -65,6 +69,11 @@ and this project adheres to
 - Opening a panel or popup (the clock panel, a menu, the power menu, a tray
   menu) closes any other one lyr has open, by click or by `lyr panel`, rather
   than leaving that to the compositor taking the old one's keyboard away.
+- The bar font's bold, italic and bold italic faces are read the first time text
+  in that style is drawn, not at start, and only the face for that style: with
+  the default Hack Nerd Font Propo, lyr starts with about 10 MB less resident
+  memory. A face that cannot be read is logged then, and its text falls back to
+  the system's fallback fonts.
 
 ### Fixed
 

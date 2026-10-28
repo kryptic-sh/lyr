@@ -11,6 +11,8 @@ use lyr_core::hit::Rect;
 use lyr_core::markup::Span;
 use lyr_core::toast::{self, Placed};
 
+use crate::fonts::Styles;
+
 /// How much smaller the calendar is: Pango's `<small>`, one step down its
 /// scale of 1.2 (`PANGO_SCALE_SMALL`).
 pub const SMALL: f32 = 1.0 / 1.2;
@@ -18,8 +20,10 @@ pub const SMALL: f32 = 1.0 / 1.2;
 /// The bar's font family at the theme's size, and the calendar's.
 #[derive(Clone, Debug)]
 pub struct Text {
-    /// Its faces, the regular one first.
-    faces: Vec<Font>,
+    /// Its regular face.
+    font: Font,
+    /// Its other faces.
+    styles: Styles,
     size: f32,
     line_height: f32,
     /// The calendar's, when it is set apart; otherwise the calendar is
@@ -33,7 +37,8 @@ impl Text {
     pub fn new(font: Font, size: f32) -> Self {
         let line_height = font.metrics().normal_line_height(size);
         Self {
-            faces: vec![font],
+            font,
+            styles: Styles::default(),
             size,
             line_height,
             calendar: None,
@@ -65,16 +70,18 @@ impl Text {
         self.in_style(calendar).line_height
     }
 
-    /// This text with the family's `faces` besides its regular one (bold,
-    /// italic), to draw bold and italic text in; crcbl-ui synthesises a
-    /// face the family lacks.
+    /// This text with the family's `styles` besides its regular face, to
+    /// draw bold and italic text in; crcbl-ui synthesises a face the family
+    /// lacks.
     #[must_use]
-    pub fn with_faces(mut self, faces: Vec<Font>) -> Self {
-        self.faces.extend(faces);
+    pub fn with_styles(mut self, styles: Styles) -> Self {
+        self.styles = styles;
         self
     }
 
-    /// The family's font for `style`: crcbl-ui's CSS face matching.
+    /// The family's font for `style`: the face the system matched for it,
+    /// synthesised by crcbl-ui where it falls short. Only that face is asked,
+    /// so a style's face is read when text in that style is first drawn.
     fn font(&self, style: TextStyle) -> Font {
         let weight = if style.bold {
             FontWeight::BOLD
@@ -86,8 +93,15 @@ impl Text {
         } else {
             FontStyle::Normal
         };
-        // There is always the regular face to choose from.
-        select_face(&self.faces, weight, slant).unwrap_or_else(|| self.faces[0].clone())
+        let matched = match (style.bold, style.italic) {
+            (false, false) => None,
+            (true, false) => self.styles.bold.as_ref(),
+            (false, true) => self.styles.italic.as_ref(),
+            (true, true) => self.styles.bold_italic.as_ref(),
+        };
+        let face = matched.unwrap_or(&self.font);
+        // One face to choose from is always chosen.
+        select_face(std::slice::from_ref(face), weight, slant).unwrap_or_else(|| face.clone())
     }
 
     /// The single-line layout of `text` in `font`, shaped with its
@@ -275,7 +289,7 @@ mod tests {
             })
             .collect();
         assert_eq!(origins.len(), 1, "one face, one run");
-        let line = text.faces[0].metrics().normal_line_height(16.0);
+        let line = text.font.metrics().normal_line_height(16.0);
         assert!((origins[0] - (100.0 + (40.0 - line) / 2.0)).abs() < 0.01);
     }
 
@@ -314,7 +328,7 @@ mod tests {
         let [(min, max)] = rects(underlined)[..] else {
             panic!("one line");
         };
-        let font = &text.faces[0];
+        let font = &text.font;
         let line = font.underline().expect("the committed font says");
         let scale = font.metrics().scale(16.0);
         let layout = text.layout("abc", font);
@@ -409,7 +423,7 @@ mod tests {
             })
             .collect();
         let small = text.calendar.as_deref().expect("a calendar text");
-        let font = &small.faces[0];
+        let font = &small.font;
         let layout = small.layout("abc", font);
         let baseline = (40.0 - layout.height()) / 2.0 + layout.lines()[0].baseline;
         let line = font.underline().expect("the committed font says");
