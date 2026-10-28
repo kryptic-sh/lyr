@@ -399,6 +399,47 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Known gaps in the design
 
+- **Plan promises neither built nor recorded (found 2026-10-28).** A read of
+  every plan file against the code; the first four were re-read in the code, the
+  rest are that read's findings, each to be confirmed when taken up:
+  - Plan 05's `{ spacer = N }` and `"separator"` pass validation but draw
+    nothing: `modules::draw` drops `Item::Spacer`, and `Module::from_name` knows
+    no `separator`.
+  - Plan 07's opt-in `audio.mute_links_mic` (plan 16, question 2): the schema
+    has no `[audio]` table.
+  - Plan 09's `ActivationToken` signal before `ActionInvoked`:
+    `Daemon::activation_token` is declared and never emitted.
+  - Plan 03's Windows appbar stepping aside for a full-screen app: crcbl raises
+    `ShellEvent::FullScreenApp`, which lyr does not match.
+  - Plan 09's toast slide in and out (`transition-time`, 200 ms; plan 12's
+    frames only during the slide): toasts appear and go at once.
+  - Plan 09's `hide-on-action`: an action invoked from the clock panel's centre
+    leaves the panel open (`App::centre_clicked`).
+  - Plan 09's keyboard in the centre: arrows, Enter and Delete; the clock panel
+    handles Escape only (`ClockPanel::event`).
+  - Plan 09's progress hint (`value`), drawn red when critical: not read.
+  - Plan 08: an open tray menu does not follow DBusMenu's `LayoutUpdated` or
+    `ItemsPropertiesUpdated`.
+  - Plan 10: opening a panel closes any other panel or popup; `lyr panel X` with
+    another panel open leaves that one up.
+  - Plan 12: event arrival and present times logged at `debug`.
+  - Plan 11: tmxr's `disallowed-methods` entry for `Command::new` in
+    `clippy.toml`, now that `apps/lyr/src/exec.rs` is the wrapper.
+  - Plan 13: `DrawList` snapshot tests, a headless render compared on the Linux
+    runner, and `docs/manual-checks.md`.
+  - Plan 14: a weekly fuzz job for the Hyprland parser and the config loader
+    (`cargo-fuzz` and `libfuzzer-sys` would be new).
+
+  Where the code and the plan differ, unrecorded until now: Windows keeps
+  `workspaces` in its default layout and draws nothing for it, where plans 07
+  and 11 want it out of the defaults and refused loudly; an unsupported module
+  is a fatal validation error without a reason (plan 05), where plans 02 and 07
+  want a logged skip with one (the plans disagree); `App::place_under` lays a
+  `lyr panel` out against the first bar in a `HashMap` that shows the module,
+  not the focused output, while `menu_panel::panel_desc` leaves the output to
+  the compositor; plan 09's `fit-to-screen` row says full height, where the code
+  follows plan 10's sized-to-content rule.
+
 - **The media player card: where it still differs from swaync's.** The card
   draws the player's art (`lyr_core::centre`, `ART_SIZE`), read from a `file://`
   `mpris:artUrl` through `lyr_sources::icons` and cached per URL until no player
