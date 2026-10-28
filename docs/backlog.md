@@ -404,8 +404,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   rest are that read's findings, each to be confirmed when taken up:
   - Plan 09's `ActivationToken` signal before `ActionInvoked`:
     `Daemon::activation_token` is declared and never emitted.
-  - Plan 03's Windows appbar stepping aside for a full-screen app: crcbl raises
-    `ShellEvent::FullScreenApp`, which lyr does not match.
   - Plan 09's toast slide in and out (`transition-time`, 200 ms; plan 12's
     frames only during the slide): toasts appear and go at once.
   - Plan 09's `hide-on-action`: an action invoked from the clock panel's centre
@@ -1577,6 +1575,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (2026-10-21), as both rules give on this laptop. Not seen: a hybrid laptop
   whose panel is wired to the discrete GPU, which is the case that tells them
   apart; that is the run that would show the display rule at work on Wayland.
+- The Windows bar hiding while an app is full screen
+  (`ShellEvent::FullScreenApp` in `App::event`, from crcbl's
+  `ABN_FULLSCREENAPP`): built 2026-10-28 and checked by clippy for
+  `x86_64-pc-windows-gnu` only; no Windows machine has run a full-screen app
+  under it.
 - The release pipeline's publish jobs (`publish-crates`, `aur-bin`, `brew-tap`,
   `scoop-bucket`, [plan/14](plan/14-ci-and-release.md)) run only on a tag; the
   `build` and `package` jobs run on every push to main. v0.1.0's tag run

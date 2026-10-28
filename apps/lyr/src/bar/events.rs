@@ -168,6 +168,17 @@ impl App {
             }
             // A bar the window system destroyed without asking.
             ShellEvent::WindowDestroyed { window } => self.drop_bar(shell, window, true)?,
+            // Windows' appbar steps aside while a game or a video is full
+            // screen on its monitor (`ABN_FULLSCREENAPP`), keeping its edge.
+            ShellEvent::FullScreenApp { window, active } if self.bars.contains(window) => {
+                if let Some(open) = self.windows.get_mut(&window) {
+                    open.tooltips.close(shell)?;
+                    open.dirty = true;
+                }
+                shell
+                    .set_visible(window, !active)
+                    .context("showing or hiding a bar")?;
+            }
             _ => {
                 let Some((id, window)) = event
                     .window()
