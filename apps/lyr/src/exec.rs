@@ -24,9 +24,30 @@ pub fn spawn(command: &str) -> io::Result<()> {
 /// When `xdg-open` cannot be started.
 #[cfg(target_os = "linux")]
 pub fn open_url(url: &str) -> io::Result<()> {
-    let mut command = Command::new("xdg-open");
+    let mut command = child("xdg-open");
     command.arg(url);
     start(command)
+}
+
+/// [`Command::new`], opening no console window for the child on Windows:
+/// the workspace's `clippy.toml` disallows the plain constructor, so a new
+/// child goes through here.
+fn child(program: &str) -> Command {
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "the one place the plain constructor is wrapped"
+    )]
+    let command = Command::new(program);
+    #[cfg(windows)]
+    let command = {
+        use std::os::windows::process::CommandExt as _;
+        /// `CREATE_NO_WINDOW` from the Win32 process creation flags.
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let mut command = command;
+        command.creation_flags(CREATE_NO_WINDOW);
+        command
+    };
+    command
 }
 
 /// Starts `command` with no input or output and returns without waiting
@@ -49,7 +70,7 @@ fn start(mut command: Command) -> io::Result<()> {
 /// `sh -c` on Unix.
 #[cfg(unix)]
 fn shell(command: &str) -> Command {
-    let mut shell = Command::new("sh");
+    let mut shell = child("sh");
     shell.arg("-c").arg(command);
     shell
 }
@@ -60,13 +81,8 @@ fn shell(command: &str) -> Command {
 #[cfg(windows)]
 fn shell(command: &str) -> Command {
     use std::os::windows::process::CommandExt as _;
-    /// `CREATE_NO_WINDOW` from the Win32 process creation flags.
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    let mut shell = Command::new("cmd");
-    shell
-        .arg("/C")
-        .raw_arg(command)
-        .creation_flags(CREATE_NO_WINDOW);
+    let mut shell = child("cmd");
+    shell.arg("/C").raw_arg(command);
     shell
 }
 

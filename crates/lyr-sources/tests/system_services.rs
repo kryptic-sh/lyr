@@ -245,6 +245,10 @@ async fn power_profiles_daemon_switches_and_back() {
 
 #[tokio::test]
 #[ignore = "adds and deletes a Wi-Fi profile in this machine's NetworkManager; run with --ignored"]
+#[expect(
+    clippy::disallowed_methods,
+    reason = "a Linux test, where a child never opens a console window"
+)]
 async fn network_manager_follows_a_profile_coming_and_going() {
     use std::process::Command;
 

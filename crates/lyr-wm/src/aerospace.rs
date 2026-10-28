@@ -132,6 +132,10 @@ mod run {
         },
     }
 
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "macOS, where a child never opens a console window"
+    )]
     fn run(args: &[&str]) -> Result<Output, Error> {
         Command::new(PROGRAM)
             .args(args)

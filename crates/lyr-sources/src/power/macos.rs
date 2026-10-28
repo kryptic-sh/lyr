@@ -25,6 +25,10 @@ pub fn carry_out(entry: Entry) -> io::Result<()> {
     else {
         return Err(io::Error::other("an empty command"));
     };
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "macOS, where a child never opens a console window"
+    )]
     let status = Command::new(program).args(args).status()?;
     if status.success() {
         Ok(())

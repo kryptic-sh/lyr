@@ -1,2 +1,8 @@
 avoid-breaking-exported-api = false
 msrv = "1.98"
+# A console child started by a process with no console of its own gets a
+# window on Windows; `apps/lyr/src/exec.rs` starts every child lyr runs with
+# none. A library crate's own children run only where no console can open.
+disallowed-methods = [
+    { path = "std::process::Command::new", reason = "use the app's exec module, which opens no console window on Windows" },
+]

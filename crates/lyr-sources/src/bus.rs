@@ -159,6 +159,10 @@ pub mod test {
         ///
         /// When `dbus-daemon` is not installed or does not say where it
         /// listens: the test cannot run, and passing would hide that.
+        #[expect(
+            clippy::disallowed_methods,
+            reason = "a Linux test's bus, where a child never opens a console window"
+        )]
         pub fn start() -> Self {
             let mut daemon = Command::new("dbus-daemon")
                 .args(["--session", "--nofork", "--print-address"])
