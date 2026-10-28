@@ -331,14 +331,19 @@ implementation follows meanwhile.
 - **Startup, memory and idle on Windows (2026-10-29).** Measured by the Windows
   lyr session on a release build of `34deef7` (AMD RX 7900 XTX with a Radeon
   iGPU, display on the dGPU; Hack Nerd Font Propo not installed there):
-  - Startup to the first present: 1.12 s cold, with no saved GPU choice; opening
-    the D3D12 device took 860 ms of it. Warm: 612 ms, of which the device took
-    387 ms (the AMD driver's `D3D12CreateDevice`). The rest: about 45 ms to the
-    shell, 12 ms of font lookup, 39 ms for the WLAN check (its service not
-    running), 6 ms of swapchain and 33 ms for the first frame. The iGPU: 2.1 s
-    cold, 586 ms warm. WARP: 145 ms. Startup there is driver time. crcbl-dx12
-    0.12.1 enables DRED in release builds too, at a cost not measured; asked of
-    crcbl.
+  - Startup to the first present, retaken in a quiet window (every local session
+    paused, total CPU 7.5 – 13.4 % before each run, the sampling shell most of
+    it; release build of `e87ef33`, warm, the default GPU and the iGPU
+    interleaved, 5 runs each): the default (dGPU) 439 – 510 ms, the device open
+    309 – 369 ms of it (the AMD driver's `D3D12CreateDevice`), the backend open
+    77 – 89 ms after process start; the iGPU 458 – 485 ms, its device 314 – 338
+    ms, but 864 ms (689 ms device) on its first run after the dGPU. Not in a
+    quiet window (other sessions building; one run each, kept only as the
+    shape): cold, with no saved GPU choice, 1.12 s, the device 860 ms; 12 ms of
+    font lookup, 39 ms for the WLAN check (its service not running), 6 ms of
+    swapchain; the iGPU cold 2.1 s; WARP 145 ms. Startup there is driver time.
+    crcbl-dx12 0.12.1 enables DRED in release builds too, at a cost not
+    measured; asked of crcbl.
   - Memory (working set / private bytes): 131.4 / 157.4 MB at start, at most
     146.3 / 177.5 after 10 clock and 10 audio open-and-close cycles, and 135.2 /
     160.4 five seconds after the last close. No leak, and the Windows heap gives
