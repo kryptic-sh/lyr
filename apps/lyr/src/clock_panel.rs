@@ -8,11 +8,14 @@
 //! It takes the keyboard. `Escape`, losing focus and the same click or
 //! binding again close it. Over the calendar a right click switches between
 //! year and month, and scrolling moves by one of either; a click in the
-//! centre is the caller's to carry out.
+//! centre is the caller's to carry out. The arrow keys move an outline
+//! through the centre's controls in the order drawn, as in the menus;
+//! `Enter` acts on the outlined one, and `Delete` dismisses its notification
+//! (swaync's `keyboard-shortcuts`).
 
 use chrono::{NaiveDate, Weekday};
 use crcbl_shell::{CloseReply, Shell, ShellEvent, WindowDesc, WindowId, WindowRole};
-use lyr_config::Theme;
+use lyr_config::{Colour, Theme};
 use std::time::Instant;
 
 use lyr_core::calendar::{self, Mode};
@@ -74,6 +77,8 @@ pub struct ClockPanel {
     scroll_max: f32,
     /// The history entry under the pointer, which shows its close button.
     hovered: Option<u32>,
+    /// The keyboard's place among the centre's targets, in the order drawn.
+    focus: Option<usize>,
     pointer: Pointer,
     surface: Option<Surface>,
     dirty: bool,
@@ -158,6 +163,7 @@ impl ClockPanel {
             scroll: 0.0,
             scroll_max: 0.0,
             hovered: None,
+            focus: None,
             pointer: Pointer::default(),
             surface: None,
             dirty: false,
@@ -218,6 +224,26 @@ impl ClockPanel {
             ShellEvent::Key { .. } if keys::pressed(event) == Some(Key::Escape) => {
                 return Ok(Outcome::Close);
             }
+            ShellEvent::Key { .. } => {
+                let key = keys::pressed(event);
+                if let Some(focus) = keys::moved(self.focus, self.centre.targets().count(), key) {
+                    self.focus = Some(focus);
+                    self.reveal_focus();
+                    self.rebuild(look, contents);
+                    return Ok(Outcome::Kept);
+                }
+                let focused = self
+                    .focus
+                    .and_then(|at| self.centre.targets().nth(at).copied());
+                let outcome = match (key, focused) {
+                    (Some(Key::Enter), Some(target)) => Some(Outcome::Centre(target, Press::Left)),
+                    (Some(Key::Delete), Some(target)) => target
+                        .entry()
+                        .map(|id| Outcome::Centre(Target::Close(id), Press::Left)),
+                    _ => None,
+                };
+                return Ok(outcome.unwrap_or(Outcome::Kept));
+            }
             _ => {
                 for press in self.pointer.handle(event, self.scale) {
                     let Some((_, y)) = self.pointer.position() else {
@@ -274,6 +300,19 @@ impl ClockPanel {
             return None;
         }
         self.centre.hit(x - ox, y - oy).copied()
+    }
+
+    /// Scrolls the centre so the keyboard's place is in view.
+    fn reveal_focus(&mut self) {
+        let Some(rect) = self.focus.and_then(|at| self.centre.rect_at(at)) else {
+            return;
+        };
+        let height = self.centre_view.height;
+        if rect.y < self.scroll {
+            self.scroll = rect.y;
+        } else if rect.y + rect.height > self.scroll + height {
+            self.scroll = rect.y + rect.height - height;
+        }
     }
 
     /// Moves the calendar by `steps` of its mode's unit. Returns whether it
@@ -357,11 +396,24 @@ impl ClockPanel {
             self.scroll_max = (centre_size.height - self.centre_view.height).max(0.0);
             self.scroll = self.scroll.clamp(0.0, self.scroll_max);
             let origin = (inset, top - self.scroll);
+            let count = regions.targets().count();
+            self.focus = self.focus.filter(|_| count > 0).map(|at| at.min(count - 1));
+            // The keyboard's place, outlined as the menus outline theirs.
+            let outline = self
+                .focus
+                .and_then(|at| regions.rect_at(at))
+                .map(|rect| Item::Box {
+                    rect,
+                    radius: look.theme.radius as f32,
+                    fill: Colour::TRANSPARENT,
+                    border: Some((look.theme.border_width as f32, look.theme.workspace_active)),
+                });
             self.list.items.push(Item::Clip {
                 rect: self.centre_view,
                 items: list
                     .items
                     .into_iter()
+                    .chain(outline)
                     .map(|item| item.offset(origin.0, origin.1))
                     .collect(),
             });

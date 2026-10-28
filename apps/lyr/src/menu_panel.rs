@@ -497,22 +497,15 @@ impl<T: Copy> MenuPanel<T> {
                 if count == 0 {
                     return Ok(Event::Kept);
                 }
-                match keys::pressed(event) {
-                    Some(Key::Down) => {
-                        self.focus = Some(self.focus.map_or(0, |at| (at + 1).min(count - 1)));
-                        self.reveal_focus();
-                        return Ok(Event::Redraw);
-                    }
-                    Some(Key::Up) => {
-                        self.focus = Some(self.focus.map_or(0, |at| at.saturating_sub(1)));
-                        self.reveal_focus();
-                        return Ok(Event::Redraw);
-                    }
-                    Some(Key::Enter) => {
-                        self.picked_at = None;
-                        return Ok(self.focused().map_or(Event::Enter, Event::Pick));
-                    }
-                    _ => {}
+                let key = keys::pressed(event);
+                if let Some(focus) = keys::moved(self.focus, count, key) {
+                    self.focus = Some(focus);
+                    self.reveal_focus();
+                    return Ok(Event::Redraw);
+                }
+                if key == Some(Key::Enter) {
+                    self.picked_at = None;
+                    return Ok(self.focused().map_or(Event::Enter, Event::Pick));
                 }
             }
             ShellEvent::Button {

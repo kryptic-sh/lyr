@@ -528,3 +528,113 @@ fn a_press_outside_the_panel_closes_it() {
         .expect("clicked");
     assert_eq!(setup.pump(), Outcome::Close);
 }
+
+#[test]
+fn the_keys_outline_the_centre_s_controls_enter_acts_and_delete_dismisses() {
+    let mut setup = setup();
+    let mut store = Store::default();
+    let id = store.notify(
+        lyr_core::notifications::Incoming {
+            summary: "hello".to_owned(),
+            ..lyr_core::notifications::Incoming::default()
+        },
+        Instant::now(),
+    );
+    setup.store = Some(store);
+    setup.lay_out(2000.0);
+    let window = setup.panel.window;
+    let targets: Vec<Target> = setup.panel.centre.targets().copied().collect();
+    let entry = targets
+        .iter()
+        .position(|target| *target == Target::Notification(id))
+        .expect("the entry is a target");
+    let key = |setup: &mut Setup, key| {
+        setup.shell.key_press(window, key).expect("a key");
+        setup.pump()
+    };
+    let outlined = |setup: &Setup| {
+        let border = Some((
+            setup.theme.border_width as f32,
+            setup.theme.workspace_active,
+        ));
+        setup.panel.list.items.iter().any(|item| match item {
+            lyr_core::draw::Item::Clip { items, .. } => items.iter().any(
+                |item| matches!(item, lyr_core::draw::Item::Box { border: b, .. } if *b == border),
+            ),
+            _ => false,
+        })
+    };
+    assert_eq!(
+        key(&mut setup, KeyCode::Enter),
+        Outcome::Kept,
+        "nothing outlined"
+    );
+    assert!(!outlined(&setup));
+    assert_eq!(key(&mut setup, KeyCode::ArrowDown), Outcome::Kept);
+    assert!(outlined(&setup), "the first control is outlined");
+    assert_eq!(
+        key(&mut setup, KeyCode::Enter),
+        Outcome::Centre(targets[0], Press::Left)
+    );
+    assert_eq!(
+        key(&mut setup, KeyCode::Delete),
+        Outcome::Kept,
+        "{:?} is no notification's",
+        targets[0]
+    );
+    for _ in 0..entry {
+        key(&mut setup, KeyCode::ArrowDown);
+    }
+    assert_eq!(
+        key(&mut setup, KeyCode::Enter),
+        Outcome::Centre(Target::Notification(id), Press::Left)
+    );
+    assert_eq!(
+        key(&mut setup, KeyCode::Delete),
+        Outcome::Centre(Target::Close(id), Press::Left)
+    );
+}
+
+#[test]
+fn the_outline_is_scrolled_into_view() {
+    let mut setup = setup();
+    let mut store = Store::default();
+    for summary in 0..20 {
+        store.notify(
+            lyr_core::notifications::Incoming {
+                app_name: format!("app {summary}"),
+                summary: summary.to_string(),
+                ..lyr_core::notifications::Incoming::default()
+            },
+            Instant::now(),
+        );
+    }
+    setup.store = Some(store);
+    setup.lay_out(1000.0);
+    assert!(setup.panel.scroll_max > 0.0, "taller than the panel");
+    let window = setup.panel.window;
+    let count = setup.panel.centre.targets().count();
+    let press = |setup: &mut Setup, key| {
+        setup.shell.key_press(window, key).expect("a key");
+        setup.pump();
+        let panel = &setup.panel;
+        let rect = panel
+            .focus
+            .and_then(|at| panel.centre.rect_at(at))
+            .expect("an outline");
+        assert!(
+            rect.y >= panel.scroll
+                && rect.y + rect.height <= panel.scroll + panel.centre_view.height,
+            "{rect:?} out of view at {}",
+            panel.scroll
+        );
+    };
+    for _ in 0..count {
+        press(&mut setup, KeyCode::ArrowDown);
+    }
+    assert_eq!(setup.panel.scroll, setup.panel.scroll_max, "at the last");
+    for _ in 0..count {
+        press(&mut setup, KeyCode::ArrowUp);
+    }
+    assert_eq!(setup.panel.scroll, 0.0, "back at the first");
+}

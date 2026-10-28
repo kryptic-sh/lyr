@@ -15,6 +15,7 @@ pub enum Key {
     Up,
     Down,
     Backspace,
+    Delete,
 }
 
 /// The key `event` presses, of those lyr answers to.
@@ -33,8 +34,21 @@ pub fn pressed(event: &ShellEvent) -> Option<Key> {
         Keysym::UP => Key::Up,
         Keysym::DOWN => Key::Down,
         Keysym::BACKSPACE => Key::Backspace,
+        Keysym::DELETE => Key::Delete,
         _ => return None,
     })
+}
+
+/// The keyboard's place among `count` targets after `key`, from `focus`:
+/// Down to the next (the first when there is none), Up to the one before,
+/// each held to the ends. `None` for any other key, or with no targets.
+pub fn moved(focus: Option<usize>, count: usize, key: Option<Key>) -> Option<usize> {
+    let last = count.checked_sub(1)?;
+    match key? {
+        Key::Down => Some(focus.map_or(0, |at| (at + 1).min(last))),
+        Key::Up => Some(focus.map_or(0, |at| at.saturating_sub(1).min(last))),
+        _ => None,
+    }
 }
 
 /// `events` without a keyboard focus that leaves a window and comes back to
@@ -67,7 +81,7 @@ pub fn settled_focus(events: Vec<ShellEvent>) -> Vec<ShellEvent> {
 mod tests {
     use crcbl_shell::{ButtonState, KeyCode, Keysym, ShellEvent};
 
-    use super::{Key, pressed, settled_focus};
+    use super::{Key, moved, pressed, settled_focus};
 
     /// A key event as a keyboard whose keymap puts `keysym` on the scancode
     /// evdev calls Escape, as `wtype`'s does.
@@ -107,6 +121,21 @@ mod tests {
         );
         assert_eq!(pressed(&key(0x61, ButtonState::Pressed)), None, "a letter");
         assert_eq!(pressed(&key(0xFF54, ButtonState::Released)), None);
+    }
+
+    #[test]
+    fn the_arrows_move_through_the_targets_and_stop_at_the_ends() {
+        let (down, up) = (Some(Key::Down), Some(Key::Up));
+        assert_eq!(moved(None, 3, down), Some(0), "onto the first");
+        assert_eq!(moved(None, 3, up), Some(0));
+        assert_eq!(moved(Some(0), 3, down), Some(1));
+        assert_eq!(moved(Some(2), 3, down), Some(2), "held at the last");
+        assert_eq!(moved(Some(0), 3, up), Some(0), "held at the first");
+        assert_eq!(moved(Some(2), 3, up), Some(1));
+        assert_eq!(moved(Some(5), 3, up), Some(2), "a place past the end");
+        assert_eq!(moved(None, 0, down), None, "nothing to move through");
+        assert_eq!(moved(Some(1), 3, Some(Key::Enter)), None);
+        assert_eq!(moved(Some(1), 3, None), None);
     }
 
     #[test]
