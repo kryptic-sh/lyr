@@ -158,6 +158,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
 
     loop {
         shell.wait_events(Some(app.wait()));
+        let woke = Instant::now();
         app.stats.wakeups += 1;
         if log_stats {
             app.stats.log_if_due(Instant::now());
@@ -167,6 +168,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             app.refresh_wifi_menu(shell.as_mut())?;
         }
         if Instant::now() >= app.next_tick {
+            app.stats.changed(woke);
             app.next_tick = next_tick(app.tick);
             app.redraw_all();
             // Its calendar's today and its history's "2 mins ago" move on.
@@ -192,11 +194,15 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             app.refresh_wifi_menu(shell.as_mut())?;
             app.refresh_audio_menu(shell.as_mut())?;
             app.stats.events += 1;
+            app.stats.changed(woke);
             app.redraw_all();
         }
         let mut events = Vec::new();
         shell.pump(&mut |event| events.push(event));
         app.stats.events += events.len() as u64;
+        if !events.is_empty() {
+            app.stats.changed(woke);
+        }
         let events = crate::keys::settled_focus(events);
         let instant = Instant::now();
         for event in &events {
@@ -615,9 +621,10 @@ impl App {
             window.dirty = !presented;
             if presented {
                 window.shown = Some(drawn.list);
-                stats.presented(window.monitor.as_deref());
+                stats.presented(window.monitor.as_deref(), Instant::now());
             }
         }
+        stats.drawn(windows.values().any(|window| window.dirty));
         Ok(())
     }
 }

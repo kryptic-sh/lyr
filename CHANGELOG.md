@@ -18,6 +18,8 @@ and this project adheres to
 - `volume.mute_links_mic` (off by default): the volume module's `toggle_mute`
   mutes the mic with the output, and unmuting the output gives the mic back the
   state it had, so a mic that was already muted stays muted.
+- Each bar frame logs at `debug` (`RUST_LOG=info,lyr::stats=debug`) how long
+  after the wake-up that changed it it was presented.
 - On Windows the bar hides while a full-screen app (a game, a video) is open on
   its monitor, and comes back when it closes, keeping its edge reserved.
 

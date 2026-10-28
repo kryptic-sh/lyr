@@ -91,7 +91,8 @@ bar:
 
 `lyr -c FILE` uses another config file, and `lyr --stats` logs the bar's
 wake-ups and redraws once a minute. Logs go to `~/.local/state/lyr/logs/lyr.log`
-and to stderr; `RUST_LOG` filters them.
+and to stderr; `RUST_LOG` filters them. `RUST_LOG=info,lyr::stats=debug` adds a
+line per bar frame saying how long after the change it shows it went out.
 
 The bar draws on the GPU driving its display when that one is discrete, and on
 the low-power one otherwise, so a laptop with an integrated and a discrete GPU

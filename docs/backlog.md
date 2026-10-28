@@ -411,7 +411,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   - Plan 09's progress hint (`value`), drawn red when critical: not read.
   - Plan 08: an open tray menu does not follow DBusMenu's `LayoutUpdated` or
     `ItemsPropertiesUpdated`.
-  - Plan 12: event arrival and present times logged at `debug`.
   - Plan 13: `DrawList` snapshot tests, a headless render compared on the Linux
     runner, and `docs/manual-checks.md`.
   - Plan 14: a weekly fuzz job for the Hyprland parser and the config loader

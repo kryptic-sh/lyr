@@ -9,7 +9,7 @@ A bar is on screen all day, so its idle cost is its real cost.
 | Wakeups while nothing changes          | the clock's one per minute, and nothing else     | Linux: `perf trace -s -p <pid>` or `powertop` over 5 minutes; Windows: ETW / Process Monitor; macOS: `powermetrics --show-process-wakeups` |
 | CPU while idle                         | 0 % at the precision `top` shows, over 5 minutes | the same run                                                                                                                               |
 | GPU while idle                         | no submissions                                   | no presents logged by lyr between events (a debug counter, see below)                                                                      |
-| Event → pixels (e.g. workspace switch) | presented in the next compositor frame           | timestamps logged at event receive and at present, at `debug` level                                                                        |
+| Event → pixels (e.g. workspace switch) | presented in the next compositor frame           | each bar's present logs, at `debug`, how long after the wake-up that changed it it went out (`lyr::stats`)                                 |
 | Resident memory                        | measured in M2 and then held; not guessed now    | `/proc/<pid>/status` `VmRSS`, Task Manager, Activity Monitor                                                                               |
 
 These are the targets the draft's open question (Q13) asked for. The memory
