@@ -245,6 +245,24 @@ pub struct Module<T> {
     pub target: T,
 }
 
+/// What a zone holds, in order: a module, or the config's `{ spacer = N }`
+/// and `"separator"`.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Entry<T> {
+    Module(Module<T>),
+    /// An empty gap this many logical pixels wide.
+    Spacer(f32),
+    /// A thin rule: as wide as the module boxes' border, in its colour, as
+    /// tall as the boxes, and a module's left margin from what is before it.
+    Separator,
+}
+
+impl<T> From<Module<T>> for Entry<T> {
+    fn from(module: Module<T>) -> Self {
+        Self::Module(module)
+    }
+}
+
 /// What the pointer hit.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Target<T> {
@@ -253,19 +271,19 @@ pub enum Target<T> {
     Button(T, usize),
 }
 
-/// The modules of one bar, by zone.
+/// What one bar holds, by zone.
 #[derive(Clone, Copy, Debug)]
 pub struct Bar<'a, T> {
     pub width: f32,
     pub height: f32,
-    pub left: &'a [Module<T>],
-    pub center: &'a [Module<T>],
-    pub right: &'a [Module<T>],
+    pub left: &'a [Entry<T>],
+    pub center: &'a [Entry<T>],
+    pub right: &'a [Entry<T>],
 }
 
-/// One module's box size, before placement.
+/// One entry's size, before placement.
 struct ModuleSize {
-    /// The box's own width, without margins.
+    /// The entry's own width, without margins.
     full: f32,
     compact: Option<f32>,
     /// The margins outside the box: the left one always, and the right one
@@ -285,7 +303,32 @@ pub fn build<T: Clone>(
     let min_width = px(theme.module_min_width);
     let border_width = px(theme.border_width);
 
-    let size = |module: &Module<T>, last: bool| {
+    let size = |entry: &Entry<T>, last: bool| {
+        let margin_left = px(theme.module_margin_left);
+        let margin_right = if last {
+            px(theme.last_module_margin_right)
+        } else {
+            0.0
+        };
+        let module = match entry {
+            Entry::Module(module) => module,
+            &Entry::Spacer(width) => {
+                return ModuleSize {
+                    full: width,
+                    compact: None,
+                    margin_left: 0.0,
+                    margin_right: 0.0,
+                };
+            }
+            Entry::Separator => {
+                return ModuleSize {
+                    full: border_width,
+                    compact: None,
+                    margin_left,
+                    margin_right,
+                };
+            }
+        };
         // The CSS box model waybar's style.css is written for: `min-width`
         // bounds the content, and the padding and border sit outside it.
         let box_width =
@@ -313,19 +356,15 @@ pub fn build<T: Clone>(
         ModuleSize {
             full,
             compact,
-            margin_left: px(theme.module_margin_left),
-            margin_right: if last {
-                px(theme.last_module_margin_right)
-            } else {
-                0.0
-            },
+            margin_left,
+            margin_right,
         }
     };
-    let sizes = |modules: &[Module<T>], is_last_zone: bool| -> Vec<ModuleSize> {
-        modules
+    let sizes = |entries: &[Entry<T>], is_last_zone: bool| -> Vec<ModuleSize> {
+        entries
             .iter()
             .enumerate()
-            .map(|(i, module)| size(module, is_last_zone && i + 1 == modules.len()))
+            .map(|(i, entry)| size(entry, is_last_zone && i + 1 == entries.len()))
             .collect()
     };
     let (left, center, right) = (
@@ -367,14 +406,30 @@ pub fn build<T: Clone>(
         (bar.center, &center, &zones.center),
         (bar.right, &right, &zones.right),
     ];
-    for (modules, sized, placed) in placed_zones {
-        for ((module, size), placed) in modules.iter().zip(sized).zip(placed) {
+    for (entries, sized, placed) in placed_zones {
+        for ((entry, size), placed) in entries.iter().zip(sized).zip(placed) {
             let Some(placed) = placed else { continue };
             let rect = Rect {
                 x: placed.x + size.margin_left,
                 y: top,
                 width: placed.width - size.margin_left - size.margin_right,
                 height: box_height,
+            };
+            let module = match entry {
+                Entry::Module(module) => module,
+                Entry::Spacer(_) => continue,
+                Entry::Separator => {
+                    list.items.push(Item::Group {
+                        opacity: theme.module_opacity,
+                        items: vec![Item::Box {
+                            rect,
+                            radius: 0.0,
+                            fill: theme.border,
+                            border: None,
+                        }],
+                    });
+                    continue;
+                }
             };
             let mut items = vec![Item::Box {
                 rect,

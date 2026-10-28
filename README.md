@@ -113,7 +113,7 @@ The defaults are the reference for every key and value:
 | Table             | Keys                                                                                                                              |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | `[bar]`           | `position` (`top`, `bottom`), `height`, `output` (names; empty is every output), `layer`                                          |
-| `[layout]`        | `left`, `center`, `right`: module names in order                                                                                  |
+| `[layout]`        | `left`, `center`, `right`: module names in order, `"separator"` for a thin rule, `{ spacer = N }` for an N px gap                 |
 | `[workspaces]`    | `all_outputs`, `format` (`{name}`), `scroll`                                                                                      |
 | `[power]`         | `format`, `tooltip_format`, `[power.menu]` (`lock`, `sleep`, `hibernate`, `shutdown`, `logout`, `reboot` as `{ exec = "…" }`)     |
 | `[clock]`         | `format` (strftime)                                                                                                               |

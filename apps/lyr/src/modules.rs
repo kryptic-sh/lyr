@@ -9,7 +9,7 @@ use chrono::{DateTime, FixedOffset};
 use lyr_config::{Config, Item, Module};
 use lyr_core::battery::{self, Level, Reading};
 use lyr_core::clock;
-use lyr_core::draw::{self, Bar, Content, DrawList, Target};
+use lyr_core::draw::{self, Bar, Content, DrawList, Entry, Target};
 use lyr_core::hit::Regions;
 use lyr_render::text::Text;
 
@@ -147,6 +147,34 @@ pub struct Drawn {
     pub workspaces: Vec<i64>,
 }
 
+/// A zone's `items` as the bar draws them, leaving out each module that has
+/// nothing to show.
+fn entries(
+    items: &[Item],
+    config: &Config,
+    data: &Data,
+    now: &DateTime<FixedOffset>,
+    monitor: Option<&str>,
+    hovered: Option<usize>,
+) -> Vec<Entry<Module>> {
+    items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Named(name) if name == "separator" => Some(Entry::Separator),
+            Item::Named(name) => {
+                let module = Module::from_name(name)?;
+                content(module, config, data, now, monitor, hovered).map(|content| {
+                    Entry::Module(draw::Module {
+                        content,
+                        target: module,
+                    })
+                })
+            }
+            &Item::Spacer { spacer } => Some(Entry::Spacer(spacer as f32)),
+        })
+        .collect()
+}
+
 /// Lays out one bar `width` logical pixels wide, on the output named
 /// `monitor`, with the pointer over workspace button `hovered`.
 pub fn draw(
@@ -158,21 +186,7 @@ pub fn draw(
     data: &Data,
     now: &DateTime<FixedOffset>,
 ) -> Drawn {
-    let modules = |items: &[Item]| -> Vec<draw::Module<Module>> {
-        items
-            .iter()
-            .filter_map(|item| match item {
-                Item::Named(name) => Module::from_name(name),
-                Item::Spacer { .. } => None,
-            })
-            .filter_map(|module| {
-                content(module, config, data, now, monitor, hovered).map(|content| draw::Module {
-                    content,
-                    target: module,
-                })
-            })
-            .collect()
-    };
+    let modules = |items: &[Item]| entries(items, config, data, now, monitor, hovered);
     let (left, center, right) = (
         modules(&config.layout.left),
         modules(&config.layout.center),
@@ -452,11 +466,11 @@ pub fn shown_workspaces<'a>(
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;
-    use lyr_config::{Module, Platform, from_sources};
-    use lyr_core::draw::{Content, Target};
+    use lyr_config::{Item as LayoutItem, Module, Platform, from_sources};
+    use lyr_core::draw::{Content, Entry, Target};
     use lyr_core::tray::{Item, Status};
 
-    use super::{Data, content, tooltip, zone_name};
+    use super::{Data, content, entries, tooltip, zone_name};
 
     #[test]
     fn the_power_button_is_its_glyph_with_its_tooltip() {
@@ -476,6 +490,27 @@ mod tests {
             tooltip(&Target::Module(Module::Power), &config, &data, &now).as_deref(),
             Some("Power Button")
         );
+    }
+
+    #[test]
+    fn a_zone_s_separators_and_spacers_are_kept_in_place() {
+        let config = from_sources(None, Platform::current()).expect("the defaults");
+        let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+        let items = [
+            LayoutItem::Named("power".to_owned()),
+            LayoutItem::Named("separator".to_owned()),
+            LayoutItem::Spacer { spacer: 20 },
+            LayoutItem::Named("power".to_owned()),
+        ];
+        let shown: Vec<String> = entries(&items, &config, &Data::default(), &now, None, None)
+            .into_iter()
+            .map(|entry| match entry {
+                Entry::Module(module) => module.target.name().to_owned(),
+                Entry::Separator => "|".to_owned(),
+                Entry::Spacer(width) => format!("{width} px"),
+            })
+            .collect();
+        assert_eq!(shown, ["power", "|", "20 px", "power"]);
     }
 
     #[test]

@@ -8,6 +8,17 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Breaking
+
+- `lyr-core`: `draw::Bar`'s zones hold `draw::Entry` values, a module or a
+  spacer or separator, instead of `draw::Module`s; `Entry::from` wraps a module.
+
+### Fixed
+
+- A layout's `"separator"` and `{ spacer = N }` entries were accepted and drew
+  nothing. A separator now draws a thin rule in the module border's colour and
+  width, and a spacer leaves a gap of N logical pixels.
+
 ## [0.4.0] - 2026-10-28
 
 ### Breaking

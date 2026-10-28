@@ -400,11 +400,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 ## Known gaps in the design
 
 - **Plan promises neither built nor recorded (found 2026-10-28).** A read of
-  every plan file against the code; the first four were re-read in the code, the
-  rest are that read's findings, each to be confirmed when taken up:
-  - Plan 05's `{ spacer = N }` and `"separator"` pass validation but draw
-    nothing: `modules::draw` drops `Item::Spacer`, and `Module::from_name` knows
-    no `separator`.
+  every plan file against the code; the first three were re-read in the code,
+  the rest are that read's findings, each to be confirmed when taken up:
   - Plan 07's opt-in `audio.mute_links_mic` (plan 16, question 2): the schema
     has no `[audio]` table.
   - Plan 09's `ActivationToken` signal before `ActionInvoked`:

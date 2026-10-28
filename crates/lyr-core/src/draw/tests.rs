@@ -1,6 +1,8 @@
 use lyr_config::{Colour, Platform, Theme, from_sources};
 
-use super::{Bar, Button, Content, DrawList, Item, Module, Picture, Target, TextStyle, build};
+use super::{
+    Bar, Button, Content, DrawList, Entry, Item, Module, Picture, Target, TextStyle, build,
+};
 use crate::hit::Rect;
 
 /// Every character is 10 px wide.
@@ -12,21 +14,21 @@ fn theme() -> Theme {
     from_sources(None, Platform::Linux).expect("defaults").theme
 }
 
-fn label(text: &str, target: &'static str) -> Module<&'static str> {
-    Module {
+fn label(text: &str, target: &'static str) -> Entry<&'static str> {
+    Entry::Module(Module {
         content: Content::Label {
             text: text.to_owned(),
             compact: None,
             colour: theme().foreground,
         },
         target,
-    }
+    })
 }
 
 fn bar<'a>(
-    left: &'a [Module<&'static str>],
-    center: &'a [Module<&'static str>],
-    right: &'a [Module<&'static str>],
+    left: &'a [Entry<&'static str>],
+    center: &'a [Entry<&'static str>],
+    right: &'a [Entry<&'static str>],
 ) -> Bar<'a, &'static str> {
     Bar {
         width: 1000.0,
@@ -118,6 +120,50 @@ fn the_last_module_keeps_its_right_margin() {
 }
 
 #[test]
+fn a_spacer_is_a_gap_of_its_width_with_nothing_drawn() {
+    let left = [label("a", "x"), Entry::Spacer(20.0), label("b", "y")];
+    let (list, regions) = build(&bar(&left, &[], &[]), &theme(), measure);
+    // The first box ends at 10 + 48; the spacer takes 20, then the second
+    // box's 10 px margin.
+    let [first, second] = boxes(&list)[..] else {
+        panic!("two boxes: {:?}", boxes(&list));
+    };
+    assert!((first.x + first.width - 58.0).abs() < f32::EPSILON);
+    assert!((second.x - 88.0).abs() < f32::EPSILON, "{second:?}");
+    assert_eq!(regions.hit(70.0, 20.0), None, "the gap is not clickable");
+}
+
+#[test]
+fn a_separator_is_a_rule_in_the_border_colour_a_margin_after_the_module() {
+    let theme = theme();
+    let left = [label("a", "x"), Entry::Separator, label("b", "y")];
+    let (list, regions) = build(&bar(&left, &[], &[]), &theme, measure);
+    let rule = Rect {
+        x: 68.0,
+        y: 10.0,
+        width: 2.0,
+        height: 38.0,
+    };
+    let Item::Group { items, .. } = &list.items[2] else {
+        panic!("the rule after the first module: {:?}", list.items[2]);
+    };
+    assert_eq!(
+        items[..],
+        [Item::Box {
+            rect: rule,
+            radius: 0.0,
+            fill: theme.border,
+            border: None,
+        }]
+    );
+    assert!(
+        (boxes(&list)[2].x - 80.0).abs() < f32::EPSILON,
+        "then a margin"
+    );
+    assert_eq!(regions.hit(69.0, 20.0), None, "the rule is not clickable");
+}
+
+#[test]
 fn each_box_is_faded_as_a_group_over_the_bar_background() {
     let left = [label("a", "x")];
     let (list, _) = build(&bar(&left, &[], &[]), &theme(), measure);
@@ -134,7 +180,7 @@ fn each_box_is_faded_as_a_group_over_the_bar_background() {
 #[test]
 fn buttons_keep_their_gap_apart_and_the_gap_is_the_modules() {
     let row = |gap| {
-        [Module {
+        [Entry::Module(Module {
             content: Content::Buttons {
                 buttons: vec![
                     Button {
@@ -157,7 +203,7 @@ fn buttons_keep_their_gap_apart_and_the_gap_is_the_modules() {
                 gap,
             },
             target: "tray",
-        }]
+        })]
     };
     let (list, _) = build(&bar(&[], &row(0.0), &[]), &theme(), measure);
     let tight = boxes(&list)[0];
@@ -184,7 +230,7 @@ fn buttons_keep_their_gap_apart_and_the_gap_is_the_modules() {
 #[test]
 fn a_click_on_a_workspace_button_names_the_button() {
     let active = Colour::parse("#2bc5e3").expect("colour");
-    let center = [Module {
+    let center = [Entry::Module(Module {
         content: Content::Buttons {
             buttons: vec![
                 Button {
@@ -202,7 +248,7 @@ fn a_click_on_a_workspace_button_names_the_button() {
             gap: 0.0,
         },
         target: "workspaces",
-    }];
+    })];
     let (list, regions) = build(&bar(&[], &center, &[]), &theme(), measure);
     // Box: 2 + 12 + (10 + 10 + 10) * 2 + 12 + 2 = 88 wide.
     let rect = boxes(&list)[0];
@@ -236,14 +282,15 @@ fn a_click_on_a_workspace_button_names_the_button() {
 
 #[test]
 fn a_crowded_module_falls_back_to_its_icon() {
-    let wide = Module {
+    let wide: Entry<_> = Module {
         content: Content::Label {
             text: "x".repeat(60),
             compact: Some("i".to_owned()),
             colour: theme().foreground,
         },
         target: "network",
-    };
+    }
+    .into();
     // The centre's 218 px slot starts at 391. Power takes 328 of that, which
     // leaves room for the network module's 58 px icon form, not its text.
     let left = [label(&"y".repeat(29), "power"), wide];
@@ -394,7 +441,7 @@ fn an_offset_moves_a_clip_with_what_it_holds() {
 #[test]
 fn a_picture_button_is_as_wide_as_its_picture_and_centred() {
     let picture = Picture::new(2, 1, vec![0; 8]).expect("a picture");
-    let row = [Module {
+    let row = [Entry::Module(Module {
         content: Content::Buttons {
             buttons: vec![Button {
                 text: "W".to_owned(),
@@ -405,7 +452,7 @@ fn a_picture_button_is_as_wide_as_its_picture_and_centred() {
             gap: 0.0,
         },
         target: "tray",
-    }];
+    })];
     let (list, _) = build(&bar(&[], &[], &row), &theme(), measure);
     let rect = boxes(&list)[0];
     // 36 px wide for a 2:1 picture 18 tall, plus 10 px of padding each side
@@ -446,14 +493,14 @@ fn buttons_without_padding_are_their_gap_apart() {
                 .sized(18.0),
         ),
     };
-    let row = [Module {
+    let row = [Entry::Module(Module {
         content: Content::Buttons {
             buttons: vec![button.clone(), button],
             padding: 0.0,
             gap: 10.0,
         },
         target: "tray",
-    }];
+    })];
     let (list, _) = build(&bar(&[], &[], &row), &theme(), measure);
     let rect = boxes(&list)[0];
     assert!(
