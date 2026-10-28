@@ -178,21 +178,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         }
         if quit {
             app.toasts.close(shell.as_mut())?;
-            if let Some(panel) = app.clock_panel.take() {
-                panel.close(shell.as_mut(), false)?;
-            }
-            if let Some(menu) = app.bluetooth_menu.take() {
-                menu.close(shell.as_mut(), false)?;
-            }
-            if let Some(menu) = app.wifi_menu.take() {
-                menu.close(shell.as_mut(), false)?;
-            }
-            if let Some(menu) = app.audio_menu.take() {
-                menu.close(shell.as_mut(), false)?;
-            }
-            if let Some(menu) = app.tray_menu.take() {
-                menu.close(shell.as_mut(), false)?;
-            }
+            app.close_menus(shell.as_mut())?;
             return app.close_all(shell.as_mut());
         }
         while let Ok(update) = updates.try_recv() {
@@ -343,6 +329,7 @@ impl App {
         if let Some(panel) = self.clock_panel.take() {
             return panel.close(shell, false);
         }
+        self.close_menus(shell)?;
         let look = Look {
             theme: &self.config.theme,
             measure: &|s: &str| self.text.measure(s),
@@ -369,6 +356,9 @@ impl App {
         if let Some(menu) = self.bluetooth_menu.take() {
             menu.close(shell, false)?;
             return Ok(Ok(()));
+        }
+        if self.data.bluetooth_adapter.is_some() {
+            self.close_menus(shell)?;
         }
         let Some(adapter) = &self.data.bluetooth_adapter else {
             // Windows and macOS have no Bluetooth menu yet (its actions are
@@ -445,6 +435,31 @@ impl App {
         self.windows
             .values_mut()
             .for_each(|window| window.dirty = true);
+    }
+
+    /// Closes every panel and popup that is open: the clock panel, the
+    /// Bluetooth, Wi-Fi and audio menus, the power menu and a tray menu.
+    /// Opening one closes the rest (`docs/plan/10-popups-and-menus.md`).
+    fn close_menus(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {
+        if let Some(panel) = self.clock_panel.take() {
+            panel.close(shell, false)?;
+        }
+        if let Some(menu) = self.bluetooth_menu.take() {
+            menu.close(shell, false)?;
+        }
+        if let Some(menu) = self.wifi_menu.take() {
+            menu.close(shell, false)?;
+        }
+        if let Some(menu) = self.audio_menu.take() {
+            menu.close(shell, false)?;
+        }
+        if let Some(menu) = self.power_menu.take() {
+            menu.close(shell, false)?;
+        }
+        if let Some(menu) = self.tray_menu.take() {
+            menu.close(shell, false)?;
+        }
+        Ok(())
     }
 
     /// Closes the power menu and every bar: their tooltips and surfaces

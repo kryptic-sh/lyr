@@ -204,6 +204,8 @@ impl App {
                 let mut bluetooth_at = None;
                 let mut wifi_at = None;
                 let mut audio_at = None;
+                // The power menu's anchor, when there is room for it.
+                let mut power_at = None;
                 let mut tray_press = None;
                 for press in presses {
                     let Some(target) = window.pointer.target(&window.regions) else {
@@ -260,15 +262,18 @@ impl App {
                         wifi_at = window.place_under(target, self.config.bar.position);
                         continue;
                     }
-                    if opens != Some(Builtin::OpenPowerMenu) {
-                        continue;
+                    if opens == Some(Builtin::OpenPowerMenu) {
+                        power_at = Some(window.popup_anchor(target, self.config.bar.position));
                     }
-                    // A second click closes it.
+                }
+                // A second click closes it.
+                if let Some(anchor) = power_at {
                     if let Some(menu) = self.power_menu.take() {
                         menu.close(shell, false)?;
                     } else if self.menu_dismissed_at != Some(instant)
-                        && let Some(anchor) = window.popup_anchor(target, self.config.bar.position)
+                        && let Some(anchor) = anchor
                     {
+                        self.close_menus(shell)?;
                         let look = Look {
                             theme: &self.config.theme,
                             measure: &|s: &str| self.text.measure(s),

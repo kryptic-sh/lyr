@@ -77,9 +77,7 @@ impl App {
         shell: &mut dyn Shell,
         read: crate::tray_menu::Read,
     ) -> anyhow::Result<()> {
-        if let Some(menu) = self.tray_menu.take() {
-            menu.close(shell, false)?;
-        }
+        self.close_menus(shell)?;
         let look = Look {
             theme: &self.config.theme,
             measure: &|s: &str| self.text.measure(s),

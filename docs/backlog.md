@@ -411,8 +411,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   - Plan 09's progress hint (`value`), drawn red when critical: not read.
   - Plan 08: an open tray menu does not follow DBusMenu's `LayoutUpdated` or
     `ItemsPropertiesUpdated`.
-  - Plan 10: opening a panel closes any other panel or popup; `lyr panel X` with
-    another panel open leaves that one up.
   - Plan 12: event arrival and present times logged at `debug`.
   - Plan 11: tmxr's `disallowed-methods` entry for `Command::new` in
     `clippy.toml`, now that `apps/lyr/src/exec.rs` is the wrapper.
@@ -1573,6 +1571,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (2026-10-21), as both rules give on this laptop. Not seen: a hybrid laptop
   whose panel is wired to the discrete GPU, which is the case that tells them
   apart; that is the run that would show the display rule at work on Wayland.
+- Opening a panel or popup closes the others (`App::close_menus`, plan 10),
+  built 2026-10-28. On a nested Hyprland 0.56 the released 0.4.0 did the same
+  already: each panel takes the keyboard, and the one that loses it closes
+  (`lyr panel clock`, then `audio`, then `wifi` left one panel; the power menu
+  went when the clock panel opened). So no run has shown the difference; it
+  would show where focus does not move, which no compositor tried has done.
 - The Windows bar hiding while an app is full screen
   (`ShellEvent::FullScreenApp` in `App::event`, from crcbl's
   `ABN_FULLSCREENAPP`): built 2026-10-28 and checked by clippy for

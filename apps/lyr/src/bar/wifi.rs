@@ -32,7 +32,11 @@ impl App {
             }
             return Ok(Ok(()));
         }
-        let Some(wifi) = self.data.wifi.as_ref().filter(|wifi| wifi.device.is_some()) else {
+        let usable = |wifi: &&lyr_core::wifi_menu::Wifi| wifi.device.is_some();
+        if self.data.wifi.as_ref().is_some_and(|wifi| usable(&wifi)) {
+            self.close_menus(shell)?;
+        }
+        let Some(wifi) = self.data.wifi.as_ref().filter(usable) else {
             // macOS has no Wi-Fi menu yet, and Windows none without a
             // wireless interface: their Settings page stands in.
             #[cfg(any(windows, target_os = "macos"))]

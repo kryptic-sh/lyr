@@ -25,6 +25,9 @@ impl App {
             menu.close(shell, false)?;
             return Ok(Ok(()));
         }
+        if self.data.audio_nodes.is_some() {
+            self.close_menus(shell)?;
+        }
         let Some(nodes) = &self.data.audio_nodes else {
             return Ok(Err("there is no audio source"));
         };
