@@ -1,0 +1,25 @@
+box 0,0 1920x50 radius 0 fill #00000000 border none
+group 0.8
+  box 10,10 48x38 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 29,10 10x38 #cdd6f4ff "\u{f011}"
+group 0.8
+  box 68,10 48x38 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 87,10 10x38 #cdd6f4ff "\u{f241}"
+group 0.8
+  box 126,10 48x38 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 145,10 10x38 #cdd6f4ff "\u{f24e}"
+group 0.8
+  box 184,10 48x38 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 203,10 10x38 #cdd6f4ff "\u{f1eb}"
+group 0.8
+  box 242,10 128x38 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 256,10 100x38 #cdd6f4ff "\u{f00af} Buds 80%"
+group 0.8
+  box 1546,10 78x38 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 1560,10 50x38 #89b4faff "\u{f025} 40%"
+group 0.8
+  box 1634,10 78x38 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 1648,10 50x38 #cba6f7ff "\u{f131} 65%"
+group 0.8
+  box 1722,10 188x38 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 1736,10 160x38 #cdd6f4ff "2026/10/19 09:05"

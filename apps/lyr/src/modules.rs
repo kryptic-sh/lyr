@@ -463,6 +463,9 @@ pub fn shown_workspaces<'a>(
         .collect()
 }
 
+#[cfg(all(test, target_os = "linux"))]
+mod snapshots;
+
 #[cfg(test)]
 mod tests {
     use chrono::DateTime;

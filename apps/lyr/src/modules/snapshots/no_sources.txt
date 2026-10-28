@@ -1,0 +1,7 @@
+box 0,0 1920x50 radius 0 fill #00000000 border none
+group 0.8
+  box 10,10 48x38 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 29,10 10x38 #cdd6f4ff "\u{f011}"
+group 0.8
+  box 1722,10 188x38 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 1736,10 160x38 #cdd6f4ff "2026/10/19 09:05"
