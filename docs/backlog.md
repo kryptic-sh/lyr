@@ -177,11 +177,11 @@ implementation follows meanwhile.
   the lowercase essence, `text/plain` when missing), for a player's `data:` art.
   And for plan 13's headless render compared as an image on the Linux runner:
   `Presenter::open_offscreen((w, h), &PresenterDesc { backend: Some(GpuBackend::Vulkan), .. })`,
-  `acquire`, the same UI pass, then `submit_present_and_read_back` in place of
-  `submit_and_present`, which blocks and returns an `Rgba8Frame` (R, G, B, A,
-  top row first; sRGB-encoded when `format` is an sRGB one, as lavapipe's is;
-  alpha premultiplied as the UI pass leaves it). crcbl checks one frame drawn
-  twice comes out byte-identical on lavapipe. On CI,
+  `acquire`, the same UI pass, then `submit_present_and_read_back` (crcbl
+  `3d0edf3a`) in place of `submit_and_present`, which blocks and returns an
+  `Rgba8Frame` (R, G, B, A, top row first; sRGB-encoded when `format` is an sRGB
+  one, as lavapipe's is; alpha premultiplied as the UI pass leaves it). crcbl
+  checks one frame drawn twice comes out byte-identical on lavapipe. On CI,
   `VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json` selects
   lavapipe; `CRCBL_ADAPTER` reaches a Presenter only through
   `PresenterDesc::adapter_pin`.
