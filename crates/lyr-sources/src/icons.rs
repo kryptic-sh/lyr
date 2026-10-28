@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::ffi::OsString;
 use std::os::unix::ffi::OsStringExt;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use crcbl_image::theme::{FileVersion, HICOLOR, IconThemes, SearchPath};
@@ -39,9 +40,76 @@ pub struct Icons {
 }
 
 impl Default for Icons {
+    /// Lookups in the user's icon theme: GTK's `settings.ini`'s, else the
+    /// one GNOME keeps in GSettings ([`learn_icon_theme`]), else `hicolor`.
     fn default() -> Self {
-        Self::new(gtk_icon_theme().unwrap_or_else(|| HICOLOR.to_owned()))
+        Self::new(
+            gtk_icon_theme()
+                .or_else(|| GSETTINGS_THEME.get().cloned().flatten())
+                .unwrap_or_else(|| HICOLOR.to_owned()),
+        )
     }
+}
+
+/// The icon theme GNOME keeps in GSettings, once [`learn_icon_theme`] has
+/// read it: `None` inside when there was none to read.
+static GSETTINGS_THEME: OnceLock<Option<String>> = OnceLock::new();
+
+/// How long the desktop portal is given to answer.
+const PORTAL_TIMEOUT: Duration = Duration::from_secs(1);
+
+/// Reads the icon theme GNOME keeps in GSettings (`org.gnome.desktop.interface`
+/// `icon-theme`), where GTK's `settings.ini` names none, for every
+/// [`Icons::default`] after it. GNOME's GTK applications take their theme
+/// from there, and writes no `settings.ini`. It is read through the desktop
+/// portal's `Settings` on the session bus, so no program is run; a desktop
+/// without the portal keeps `hicolor`. Returns the theme it read, if any.
+pub async fn learn_icon_theme() -> Option<String> {
+    if gtk_icon_theme().is_some() {
+        return None;
+    }
+    if let Some(theme) = GSETTINGS_THEME.get() {
+        return theme.clone();
+    }
+    let connection = zbus::connection::Builder::session()
+        .method_timeout(PORTAL_TIMEOUT)
+        .build()
+        .await;
+    let theme = match connection {
+        Ok(connection) => portal_icon_theme(&connection).await,
+        Err(_) => None,
+    };
+    GSETTINGS_THEME.get_or_init(|| theme).clone()
+}
+
+/// The desktop portal's settings.
+#[zbus::proxy(
+    interface = "org.freedesktop.portal.Settings",
+    default_service = "org.freedesktop.portal.Desktop",
+    default_path = "/org/freedesktop/portal/desktop"
+)]
+trait PortalSettings {
+    fn read_one(&self, namespace: &str, key: &str) -> zbus::Result<zbus::OwnedVariant>;
+    /// The older form, before `ReadOne`: the value in a variant of its own.
+    fn read(&self, namespace: &str, key: &str) -> zbus::Result<zbus::OwnedVariant>;
+}
+
+/// GNOME's icon theme as the portal on `connection` reads it.
+async fn portal_icon_theme(connection: &zbus::Connection) -> Option<String> {
+    const NAMESPACE: &str = "org.gnome.desktop.interface";
+    const KEY: &str = "icon-theme";
+    let portal = PortalSettingsProxy::new(connection).await.ok()?;
+    let value = match portal.read_one(NAMESPACE, KEY).await {
+        Ok(value) => value,
+        Err(_) => portal.read(NAMESPACE, KEY).await.ok()?,
+    };
+    // `Read` nests the value in one more variant.
+    let value: &zbus::Variant<'_> = match &*value {
+        zbus::Variant::Variant(inner) => inner,
+        value => value,
+    };
+    let theme = String::try_from(value.try_clone().ok()?).ok()?;
+    (!theme.is_empty()).then_some(theme)
 }
 
 impl Icons {

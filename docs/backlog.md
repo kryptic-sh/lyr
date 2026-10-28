@@ -1339,8 +1339,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   mutation-checked; a test item's `emblem-important` from Papirus-Dark seen over
   its icon in a nested Hyprland, 2026-10-26). waybar 0.15.0 reads both and draws
   neither. An SVG icon with text is drawn in the system's fonts (crcbl-image's
-  `svg-text`, 2026-10-28). Not done: reading the theme from GSettings, which
-  GNOME keeps there rather than in `settings.ini`. Not seen: an output at a
+  `svg-text`, 2026-10-28). Where `settings.ini` names no theme, the one GNOME
+  keeps in GSettings is read through the desktop portal before the sources start
+  (`learn_icon_theme`, 2026-10-28; seen reading Papirus-Dark here with
+  `XDG_CONFIG_HOME` pointed at an empty directory). Not seen: an output at a
   scale above 1, a theme icon given by file path, Steam's or Spotify's own icons
   (neither was showing).
 - **Clicking lyr in tests.** The owner installed `wlrctl` (2026-10-20), which

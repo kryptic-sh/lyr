@@ -45,6 +45,9 @@ and this project adheres to
 - An open tray menu follows its app's changes (DBusMenu's `LayoutUpdated` and
   `ItemsPropertiesUpdated`): it is read again and shown in the same popup,
   resized in place where the compositor can, on the same submenu.
+- Where GTK's `settings.ini` names no icon theme, as on GNOME, icons come from
+  the theme GNOME keeps in GSettings, read through the desktop portal, rather
+  than from `hicolor` alone.
 - WebP pictures: a media player's art, an icon, a notification's image. An SVG
   icon with text (a tray badge, say) is drawn in the system's fonts rather than
   refused for the next icon source.

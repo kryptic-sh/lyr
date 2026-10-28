@@ -27,6 +27,8 @@ mod desktop_entry;
 #[cfg(target_os = "linux")]
 mod icons;
 #[cfg(target_os = "linux")]
+pub use icons::learn_icon_theme;
+#[cfg(target_os = "linux")]
 mod ini;
 pub mod locale;
 #[cfg(target_os = "macos")]

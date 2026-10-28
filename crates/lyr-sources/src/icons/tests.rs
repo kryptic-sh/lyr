@@ -169,3 +169,62 @@ fn a_file_with_no_extension_is_read_by_its_contents() {
         .expect("decoded as JPEG");
     assert_eq!((jpeg.width(), jpeg.height()), (8, 8));
 }
+
+/// A desktop portal's settings answering `icon-theme` with `theme`; an old
+/// one has only `Read`, which nests the value in another variant.
+struct FakePortal {
+    theme: &'static str,
+    old: bool,
+}
+
+#[zbus::interface(name = "org.freedesktop.portal.Settings")]
+impl FakePortal {
+    fn read_one(&self, namespace: &str, key: &str) -> zbus::fdo::Result<zbus::OwnedVariant> {
+        if self.old {
+            return Err(zbus::fdo::Error::UnknownMethod("ReadOne".to_owned()));
+        }
+        self.value(namespace, key)
+    }
+
+    fn read(&self, namespace: &str, key: &str) -> zbus::fdo::Result<zbus::OwnedVariant> {
+        self.value(namespace, key)?;
+        let nested = zbus::Variant::Variant(Box::new(zbus::Variant::from(self.theme)));
+        zbus::OwnedVariant::try_from(nested)
+            .map_err(|error| zbus::fdo::Error::Failed(error.to_string()))
+    }
+}
+
+impl FakePortal {
+    fn value(&self, namespace: &str, key: &str) -> zbus::fdo::Result<zbus::OwnedVariant> {
+        if (namespace, key) != ("org.gnome.desktop.interface", "icon-theme") {
+            return Err(zbus::fdo::Error::Failed(format!("{namespace} {key}")));
+        }
+        zbus::OwnedVariant::try_from(zbus::Variant::from(self.theme))
+            .map_err(|error| zbus::fdo::Error::Failed(error.to_string()))
+    }
+}
+
+/// The portal read through a client connected to `portal`.
+async fn read_through(portal: FakePortal) -> Option<String> {
+    let (server, client) = std::os::unix::net::UnixStream::pair().expect("socket pair");
+    let server = zbus::connection::Builder::unix_stream(server)
+        .server(zbus::Guid::generate())
+        .p2p()
+        .serve_at("/org/freedesktop/portal/desktop", portal)
+        .build();
+    let client = zbus::connection::Builder::unix_stream(client).p2p().build();
+    let (_server, client) = tokio::try_join!(server, client).expect("connected");
+    super::portal_icon_theme(&client).await
+}
+
+#[tokio::test]
+async fn gnome_s_icon_theme_is_read_through_the_portal() {
+    let read = |theme, old| read_through(FakePortal { theme, old });
+    assert_eq!(read("Papirus", false).await.as_deref(), Some("Papirus"));
+    assert_eq!(
+        read("Adwaita", true).await.as_deref(),
+        Some("Adwaita"),
+        "an older portal's Read"
+    );
+    assert_eq!(read("", false).await, None, "an empty name is none");
+}

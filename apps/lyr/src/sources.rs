@@ -1802,6 +1802,11 @@ mod linux {
             .name("lyr sources".to_owned())
             .spawn(move || {
                 runtime.block_on(async move {
+                    // Before the tray, the notifications and the players
+                    // look icons up in it.
+                    if let Some(theme) = lyr_sources::learn_icon_theme().await {
+                        tracing::info!("icons: GNOME's icon theme, {theme}");
+                    }
                     tokio::join!(
                         battery(sender.clone(), waker.clone()),
                         network(sender.clone(), wifi, wifi_menu, waker.clone()),
