@@ -72,7 +72,9 @@ impl Platform {
     const fn supports(self, module: Module) -> bool {
         !matches!(
             (self, module),
-            (Self::Windows | Self::Macos, Module::Tray) | (Self::Macos, Module::Notifications)
+            (Self::Windows | Self::Macos, Module::Tray)
+                | (Self::Windows, Module::Workspaces)
+                | (Self::Macos, Module::Notifications)
         )
     }
 }

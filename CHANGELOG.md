@@ -28,6 +28,9 @@ and this project adheres to
 - Invoking a notification's action from the clock panel (a button, or a click on
   a notification with a default action) closes the panel, as swaync's
   `hide-on-action` does.
+- Windows: the `workspaces` module is refused in a config, as the tray is, and
+  is gone from the default layout's centre. It was accepted and drew nothing,
+  since Windows has no workspaces lyr reads.
 - Opening a panel or popup (the clock panel, a menu, the power menu, a tray
   menu) closes any other one lyr has open, by click or by `lyr panel`, rather
   than leaving that to the compositor taking the old one's keyboard away.

@@ -416,15 +416,13 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   - Plan 14: a weekly fuzz job for the Hyprland parser and the config loader
     (`cargo-fuzz` and `libfuzzer-sys` would be new).
 
-  Where the code and the plan differ, unrecorded until now: Windows keeps
-  `workspaces` in its default layout and draws nothing for it, where plans 07
-  and 11 want it out of the defaults and refused loudly; an unsupported module
-  is a fatal validation error without a reason (plan 05), where plans 02 and 07
-  want a logged skip with one (the plans disagree); `App::place_under` lays a
-  `lyr panel` out against the first bar in a `HashMap` that shows the module,
-  not the focused output, while `menu_panel::panel_desc` leaves the output to
-  the compositor; plan 09's `fit-to-screen` row says full height, where the code
-  follows plan 10's sized-to-content rule.
+  Where the code and the plan differ, unrecorded until now: an unsupported
+  module is a fatal validation error without a reason (plan 05), where plans 02
+  and 07 want a logged skip with one (the plans disagree); `App::place_under`
+  lays a `lyr panel` out against the first bar in a `HashMap` that shows the
+  module, not the focused output, while `menu_panel::panel_desc` leaves the
+  output to the compositor; plan 09's `fit-to-screen` row says full height,
+  where the code follows plan 10's sized-to-content rule.
 
 - **The media player card: where it still differs from swaync's.** The card
   draws the player's art (`lyr_core::centre`, `ART_SIZE`), read from a `file://`

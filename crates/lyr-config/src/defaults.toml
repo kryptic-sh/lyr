@@ -170,7 +170,9 @@ calendar_today = "#ff6699"
 
 # The tray belongs to Explorer on Windows and to the menu bar on macOS, and
 # macOS has no notification API, so those modules are left out there.
+# Windows has no workspaces lyr can read (plan 06), and no tray (plan 08).
 [platform.windows.layout]
+center = []
 right = ["volume", "mic", "clock", "notifications"]
 
 # Windows has no API for its notifications or do-not-disturb: either click

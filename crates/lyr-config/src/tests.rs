@@ -58,6 +58,7 @@ fn the_defaults_are_the_waybar_port() {
 #[test]
 fn modules_a_platform_cannot_run_are_left_out_of_its_defaults() {
     let windows = from_sources(None, Platform::Windows).expect("defaults");
+    assert!(windows.layout.center.is_empty(), "no workspaces");
     assert_eq!(
         names(&windows.layout.right),
         ["volume", "mic", "clock", "notifications"]
@@ -127,6 +128,14 @@ fn a_module_the_platform_cannot_run_is_an_error() {
         "layout.right[0]: the `tray` module is not supported on windows"
     );
     assert!(user("[layout]\nright = [\"tray\"]\n", Platform::Linux).is_ok());
+    let message = invalid(user(
+        "[layout]\ncenter = [\"workspaces\"]\n",
+        Platform::Windows,
+    ));
+    assert_eq!(
+        message,
+        "layout.center[0]: the `workspaces` module is not supported on windows"
+    );
 }
 
 #[test]
