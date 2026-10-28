@@ -124,11 +124,12 @@ impl App {
                 let scale = scale_factor as f32;
                 let width = size.width as f32 / scale;
                 let height = size.height as f32 / scale;
-                let info = self
+                let output = self
                     .bars
                     .windows()
                     .find(|&(_, bar)| bar == window)
-                    .and_then(|(monitor, _)| shell.monitor(monitor));
+                    .map(|(monitor, _)| monitor);
+                let info = output.and_then(|monitor| shell.monitor(monitor));
                 // Unknown, a menu beside it is not held short of the far edge.
                 let output_height = info.map_or(f32::INFINITY, |info| {
                     (f64::from(info.bounds.height) / info.scale_factor) as f32
@@ -155,6 +156,7 @@ impl App {
                             output_height,
                             scale,
                             monitor,
+                            output,
                             pointer: Pointer::default(),
                             regions: Regions::default(),
                             workspaces: Vec::new(),

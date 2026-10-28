@@ -37,6 +37,10 @@ and this project adheres to
 
 ### Fixed
 
+- `lyr panel` with outputs of different widths could lay a panel out for another
+  output's width and open it partly off screen. It now opens on the focused
+  output, under that output's module, and a panel opened by a click opens on the
+  clicked bar's output.
 - A layout's `"separator"` and `{ spacer = N }` entries were accepted and drew
   nothing. A separator now draws a thin rule in the module border's colour and
   width, and a spacer leaves a gap of N logical pixels.

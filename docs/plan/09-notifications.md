@@ -15,23 +15,23 @@ The baseline is `dotfiles/.config/swaync/config.json`, the waybar
 toggles do-not-disturb, `mod+alt+N` clears everything, each through
 `apps.notify`, which is `swaync-client`).
 
-| swaync setting                                      | Value                                       | In lyr                                                                               |
-| --------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `positionX`, `positionY`                            | right, top                                  | toasts and the clock panel at the top right                                          |
-| `control-center-margin-*`                           | 16 px on every side                         | the same margins                                                                     |
-| `control-center-width`, `notification-window-width` | 500 px                                      | panel and toast width                                                                |
-| `fit-to-screen`                                     | true                                        | the panel runs the output's height, less the margins                                 |
-| `timeout`, `timeout-low`, `timeout-critical`        | 10 s, 5 s, never                            | the same, unless the app sends its own `expire_timeout`                              |
-| `notification-body-image-width`, `-height`          | 200 × 100 px                                | the largest a body image is drawn                                                    |
-| `image-visibility`                                  | `when-available`                            | an image is shown only when the notification has one                                 |
-| `transition-time`                                   | 200 ms                                      | toasts slide in and out over 200 ms; frames are drawn only during it                 |
-| `hide-on-clear`                                     | false                                       | Clear All leaves the panel open                                                      |
-| `hide-on-action`                                    | true                                        | invoking an action closes the panel                                                  |
-| `keyboard-shortcuts`                                | true                                        | the panel takes keys: `Escape` closes, arrows move, `Enter` acts, `Delete` dismisses |
-| `widgets`                                           | `title`, `dnd`, `mpris`, `notifications`    | the same widgets, in that order, below the calendar                                  |
-| `widget-config.title`                               | "Notification Center", a "Clear All" button | the same text                                                                        |
-| `widget-config.dnd`                                 | "Do Not Disturb"                            | the same text, as a switch                                                           |
-| `script-fail-notify`                                | true                                        | not carried: the config defines no scripts                                           |
+| swaync setting                                      | Value                                       | In lyr                                                                                                                 |
+| --------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `positionX`, `positionY`                            | right, top                                  | toasts and the clock panel at the top right                                                                            |
+| `control-center-margin-*`                           | 16 px on every side                         | the same margins                                                                                                       |
+| `control-center-width`, `notification-window-width` | 500 px                                      | panel and toast width                                                                                                  |
+| `fit-to-screen`                                     | true                                        | the panel is as tall as it holds, held 16 px short of the output's far edge ([10](10-popups-and-menus.md#clock-panel)) |
+| `timeout`, `timeout-low`, `timeout-critical`        | 10 s, 5 s, never                            | the same, unless the app sends its own `expire_timeout`                                                                |
+| `notification-body-image-width`, `-height`          | 200 × 100 px                                | the largest a body image is drawn                                                                                      |
+| `image-visibility`                                  | `when-available`                            | an image is shown only when the notification has one                                                                   |
+| `transition-time`                                   | 200 ms                                      | toasts slide in and out over 200 ms; frames are drawn only during it                                                   |
+| `hide-on-clear`                                     | false                                       | Clear All leaves the panel open                                                                                        |
+| `hide-on-action`                                    | true                                        | invoking an action closes the panel                                                                                    |
+| `keyboard-shortcuts`                                | true                                        | the panel takes keys: `Escape` closes, arrows move, `Enter` acts, `Delete` dismisses                                   |
+| `widgets`                                           | `title`, `dnd`, `mpris`, `notifications`    | the same widgets, in that order, below the calendar                                                                    |
+| `widget-config.title`                               | "Notification Center", a "Clear All" button | the same text                                                                                                          |
+| `widget-config.dnd`                                 | "Do Not Disturb"                            | the same text, as a switch                                                                                             |
+| `script-fail-notify`                                | true                                        | not carried: the config defines no scripts                                                                             |
 
 The look comes from `dotfiles/.config/swaync/style.css` (349 lines, read on
 2026-10-18). M6 ports these values into the theme the way

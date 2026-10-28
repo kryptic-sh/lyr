@@ -125,6 +125,15 @@ implementation follows meanwhile.
   pane, where the mode is set (another undocumented pane id), build a
   click-triggered tooltip, or leave the hover tooltip as the whole module?
 
+- **A module the platform cannot run: refuse the config, or skip it?** **Q:**
+  The plans disagree. Plan 05 has validation refuse it, which is what lyr does
+  (``the `tray` module is not supported on windows``), and the bar does not
+  start. Plans 02 and 07 have lyr log that the module is not supported and why,
+  and leave it out, with sources returning a typed `Unsupported { reason }`.
+  Refusing makes one config file fail on a second platform unless it uses
+  `[platform.*]`; skipping lets one file serve every platform but hides a typo'd
+  platform table. Keep refusing (and fix plans 02 and 07), or skip with a logged
+  reason?
 - **Reload: start and stop sources by the layout?** (M3.) **Q:** Plan 05 says a
   layout or module change on reload starts and stops only the affected sources.
   Today every source the platform has starts at launch and runs whatever the
@@ -415,14 +424,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     runner, and `docs/manual-checks.md`.
   - Plan 14: a weekly fuzz job for the Hyprland parser and the config loader
     (`cargo-fuzz` and `libfuzzer-sys` would be new).
-
-  Where the code and the plan differ, unrecorded until now: an unsupported
-  module is a fatal validation error without a reason (plan 05), where plans 02
-  and 07 want a logged skip with one (the plans disagree); `App::place_under`
-  lays a `lyr panel` out against the first bar in a `HashMap` that shows the
-  module, not the focused output, while `menu_panel::panel_desc` leaves the
-  output to the compositor; plan 09's `fit-to-screen` row says full height,
-  where the code follows plan 10's sized-to-content rule.
 
 - **The media player card: where it still differs from swaync's.** The card
   draws the player's art (`lyr_core::centre`, `ART_SIZE`), read from a `file://`

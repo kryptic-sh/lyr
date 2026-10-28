@@ -1,5 +1,6 @@
 //! One bar window's state.
 
+use crcbl_shell::MonitorId;
 use lyr_config::{Module, Position};
 use lyr_core::draw::{DrawList, Target};
 use lyr_core::hit::{Rect, Regions};
@@ -21,6 +22,8 @@ pub(super) struct Window {
     pub(super) scale: f32,
     /// The output it is on, by name, for a per-output workspace list.
     pub(super) monitor: Option<String>,
+    /// The output it is on, for a menu opened from it.
+    pub(super) output: Option<MonitorId>,
     pub(super) pointer: Pointer,
     /// The input regions of the last frame.
     pub(super) regions: Regions<Target<Module>>,
@@ -62,6 +65,7 @@ impl Window {
             width: f64::from(self.width),
             room: f64::from(self.output_height - self.height),
             edge,
+            monitor: self.output,
         })
     }
 

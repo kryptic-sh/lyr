@@ -58,6 +58,18 @@ impl State {
         self.active
     }
 
+    /// The focused output, by the compositor's name for it: the active
+    /// workspace's, once the backend has said where that is.
+    #[must_use]
+    pub fn focused_output(&self) -> Option<&str> {
+        let active = self.active?;
+        self.workspaces
+            .iter()
+            .find(|workspace| workspace.id == active)?
+            .monitor
+            .as_deref()
+    }
+
     /// The workspace a scroll over the module moves to: the button after (or
     /// before) the active one, wrapping at the ends.
     ///
@@ -113,6 +125,15 @@ mod tests {
 
     fn id(workspace: Option<&Workspace>) -> Option<WorkspaceId> {
         workspace.map(|workspace| workspace.id)
+    }
+
+    #[test]
+    fn the_focused_output_is_the_active_workspace_s() {
+        let ids = [(1, "DP-1"), (2, "HDMI-A-1")];
+        assert_eq!(state(&ids, Some(2)).focused_output(), Some("HDMI-A-1"));
+        assert_eq!(state(&ids, Some(1)).focused_output(), Some("DP-1"));
+        assert_eq!(state(&ids, None).focused_output(), None);
+        assert_eq!(state(&ids, Some(3)).focused_output(), None, "not listed");
     }
 
     #[test]

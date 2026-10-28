@@ -83,11 +83,22 @@ impl App {
         Ok(false)
     }
 
-    /// Where `lyr panel` opens a menu: under `module` where a bar shows it,
-    /// else at the output's edge.
+    /// Where `lyr panel` opens a menu: on the focused output, under `module`
+    /// where its bar shows it, else at that output's edge
+    /// (`docs/plan/10-popups-and-menus.md`). With no window manager to say
+    /// which output is focused, under the first bar that shows it.
     fn place_under(&self, module: Module) -> Place {
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
+        let focused = self
+            .data
+            .workspaces
+            .as_ref()
+            .and_then(lyr_wm::State::focused_output);
+        #[cfg(windows)]
+        let focused: Option<&str> = None;
         self.windows
             .values()
+            .filter(|window| focused.is_none() || window.monitor.as_deref() == focused)
             .find_map(|window| {
                 window.place_under(
                     &lyr_core::draw::Target::Module(module),

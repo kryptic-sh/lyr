@@ -10,9 +10,9 @@
 //! follows its content's size in place (`Shell::set_panel`).
 
 use crcbl_shell::{
-    ButtonState, CloseReply, LogicalSize, Margins, PanelAnchor, PanelDesc, PanelKeyboard,
-    PanelLayer, PointerButton, Reserve, Shell, ShellEvent, TextPurpose, WindowDesc, WindowId,
-    WindowRole,
+    ButtonState, CloseReply, LogicalSize, Margins, MonitorId, PanelAnchor, PanelDesc,
+    PanelKeyboard, PanelLayer, PointerButton, Reserve, Shell, ShellEvent, TextPurpose, WindowDesc,
+    WindowId, WindowRole,
 };
 use lyr_config::Position;
 use lyr_core::draw::{DrawList, Item, Size};
@@ -86,6 +86,9 @@ pub struct Place {
     pub room: f64,
     /// The bar's edge of the output, which the menu opens away from.
     pub edge: Position,
+    /// The output it opens on; `None` leaves that to the compositor, which
+    /// puts it on the focused output.
+    pub monitor: Option<MonitorId>,
 }
 
 /// Lines a wheel step scrolls a menu taller than its room, as the clock
@@ -104,6 +107,7 @@ impl Place {
         width: f64::INFINITY,
         room: f64::INFINITY,
         edge: Position::Top,
+        monitor: None,
     };
 
     /// The left margin of a panel `size` big: `left`, moved left as far as
@@ -166,7 +170,7 @@ pub fn panel_desc(size: Size, place: Place) -> PanelDesc<'static> {
     };
     PanelDesc {
         namespace: NAMESPACE,
-        monitor: None,
+        monitor: place.monitor,
         layer: PanelLayer::Overlay,
         anchor: edge | PanelAnchor::LEFT,
         reserve: Reserve::None,
@@ -575,7 +579,7 @@ impl<T: Copy> MenuPanel<T> {
 #[cfg(test)]
 mod tests {
     use crcbl_shell::{
-        ButtonState, HeadlessShell, KeyCode, PanelAnchor, PhysicalPoint, PointerButton,
+        ButtonState, HeadlessShell, KeyCode, MonitorId, PanelAnchor, PhysicalPoint, PointerButton,
         ScrollDelta, Shell, ShellEvent,
     };
     use lyr_config::{Platform, Position, from_sources};
@@ -641,6 +645,20 @@ mod tests {
             ..Place::EDGE
         };
         assert!((room.max_height() - (1000.0 - 2.0 * GAP as f32)).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn a_panel_opens_on_its_place_s_output() {
+        let size = Size {
+            width: 300.0,
+            height: 200.0,
+        };
+        assert_eq!(panel_desc(size, Place::EDGE).monitor, None);
+        let second = Place {
+            monitor: Some(MonitorId(2)),
+            ..Place::EDGE
+        };
+        assert_eq!(panel_desc(size, second).monitor, Some(MonitorId(2)));
     }
 
     /// Ten 60 px rows in a 600 px menu, with room for 200 px of it.
