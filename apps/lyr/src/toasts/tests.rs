@@ -6,6 +6,7 @@ use crcbl_shell::{
 };
 use lyr_config::{Platform, Theme, from_sources};
 use lyr_core::notifications::{Incoming, NORMAL_TIMEOUT, Store};
+use lyr_core::toast::stack::ANIMATION;
 
 use super::{Clicked, Toasts};
 use crate::tooltips::Look;
@@ -105,7 +106,9 @@ fn a_toast_opens_a_panel_that_closes_when_its_time_is_up() {
     let window = setup.sync(start).expect("a panel");
     assert!(setup.toasts.owns(window) && setup.shell.title(window).is_ok());
     assert_eq!(setup.toasts.next_wake(), Some(start + NORMAL_TIMEOUT));
-    assert_eq!(setup.sync(start + NORMAL_TIMEOUT), None);
+    let gone = start + NORMAL_TIMEOUT;
+    assert_eq!(setup.sync(gone), Some(window), "up while it fades out");
+    assert_eq!(setup.sync(gone + ANIMATION), None);
     assert!(setup.shell.title(window).is_err(), "its window is gone");
     assert!(
         setup.store.lock().expect("store").get(id).is_some(),
@@ -158,15 +161,20 @@ fn a_click_invokes_and_a_middle_click_dismisses() {
     let start = Instant::now();
     let first = setup.notify("first", start);
     let window = setup.sync(start).expect("a panel");
+    let up = start + ANIMATION;
+    setup.sync(up);
     assert_eq!(
-        setup.click(window, PointerButton::Left, start),
+        setup.click(window, PointerButton::Left, up),
         Some(Clicked::Invoke(first))
     );
-    assert_eq!(setup.sync(start), None, "the toast went with the click");
-    let second = setup.notify("second", start);
-    let window = setup.sync(start).expect("a panel");
+    let gone = up + ANIMATION;
+    assert_eq!(setup.sync(gone), None, "the toast went with the click");
+    let second = setup.notify("second", gone);
+    let window = setup.sync(gone).expect("a panel");
+    let up = gone + ANIMATION;
+    setup.sync(up);
     assert_eq!(
-        setup.click(window, PointerButton::Middle, start),
+        setup.click(window, PointerButton::Middle, up),
         Some(Clicked::Dismiss(second))
     );
 }
@@ -177,6 +185,7 @@ fn the_pointer_over_a_toast_holds_it_up() {
     let start = Instant::now();
     setup.notify("hello", start);
     let window = setup.sync(start).expect("a panel");
+    setup.sync(start + ANIMATION);
     setup
         .shell
         .move_pointer(window, PhysicalPoint { x: 20.0, y: 20.0 }, (0.0, 0.0))
@@ -254,6 +263,8 @@ fn a_click_on_an_action_button_asks_for_that_action() {
     );
     setup.toasts.notified(id, false, start);
     let window = setup.sync(start).expect("a panel");
+    let up = start + ANIMATION;
+    setup.sync(up);
     // Below the summary line, inside the button.
     let at = PhysicalPoint { x: 30.0, y: 50.0 };
     setup
@@ -264,7 +275,7 @@ fn a_click_on_an_action_button_asks_for_that_action() {
         .shell
         .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
         .expect("clicked");
-    assert_eq!(setup.pump(start), Some(Clicked::Action(id, 0)));
+    assert_eq!(setup.pump(up), Some(Clicked::Action(id, 0)));
 }
 
 #[test]
@@ -274,6 +285,8 @@ fn the_close_button_shows_under_the_pointer_and_dismisses() {
     let start = Instant::now();
     let id = setup.notify("hello", start);
     let window = setup.sync(start).expect("a panel");
+    let up = start + ANIMATION;
+    setup.sync(up);
     let at = PhysicalPoint {
         x: f64::from(WIDTH - CLOSE_INSET - CLOSE_SIZE / 2.0),
         y: f64::from(CLOSE_INSET + CLOSE_SIZE / 2.0),
@@ -282,12 +295,12 @@ fn the_close_button_shows_under_the_pointer_and_dismisses() {
         .shell
         .move_pointer(window, at, (0.0, 0.0))
         .expect("moved");
-    assert_eq!(setup.pump(start), None);
+    assert_eq!(setup.pump(up), None);
     assert!(setup.toasts.changed, "the close button is to be drawn");
-    assert_eq!(setup.sync(start), Some(window), "the same size");
+    assert_eq!(setup.sync(up), Some(window), "the same size");
     setup
         .shell
         .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
         .expect("clicked");
-    assert_eq!(setup.pump(start), Some(Clicked::Dismiss(id)));
+    assert_eq!(setup.pump(up), Some(Clicked::Dismiss(id)));
 }

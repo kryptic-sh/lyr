@@ -34,7 +34,7 @@ differs per driver.
 - **Coalescing:** events that arrive together are applied together, then each
   dirty window repaints once.
 - **Panels cost nothing while closed.** A toast's timeout is a timer that exists
-  only while the toast is shown, its 200 ms slide draws frames only during the
+  only while the toast is shown, its 400 ms slide draws frames only during the
   slide, and the Wi-Fi menu scans only while it is open.
 
 ## Checking it

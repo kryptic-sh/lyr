@@ -12,6 +12,10 @@ and this project adheres to
 
 - `lyr-core`: `draw::Bar`'s zones hold `draw::Entry` values, a module or a
   spacer or separator, instead of `draw::Module`s; `Entry::from` wraps a module.
+- `lyr-core`: `toast::stack::Stack::closed` takes the time it closed, and
+  `Stack::draw` and `Stack::next_label_change` no longer take the store: the
+  stack keeps what each toast shows, to draw it while it leaves. New:
+  `Stack::settle`, `Stack::moving` and `toast::stack::ANIMATION`.
 - New public fields, which a struct literal must now set:
   `lyr_core::notifications::Incoming::progress` and `synchronous`,
   `lyr_config::Volume::mute_links_mic`, and `lyr_config::Theme::toast_progress`
@@ -34,6 +38,10 @@ and this project adheres to
 - The clock panel's notification centre takes the keyboard as swaync's does: the
   arrow keys move an outline through its controls, `Enter` acts on the outlined
   one and `Delete` dismisses its notification.
+- Toasts come and go as swaync 0.12.6's do: over 400 ms, eased, an arriving
+  toast's place grows as it slides in from the right and fades in, and a leaving
+  one's shrinks as it fades out. The panel keeps one size meanwhile and draws
+  frames only while a toast moves.
 - An open tray menu follows its app's changes (DBusMenu's `LayoutUpdated` and
   `ItemsPropertiesUpdated`): it is read again and shown in the same popup,
   resized in place where the compositor can, on the same submenu.

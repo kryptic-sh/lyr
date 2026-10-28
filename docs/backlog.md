@@ -413,8 +413,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   rest are that read's findings, each to be confirmed when taken up:
   - Plan 09's `ActivationToken` signal before `ActionInvoked`:
     `Daemon::activation_token` is declared and never emitted.
-  - Plan 09's toast slide in and out (`transition-time`, 200 ms; plan 12's
-    frames only during the slide): toasts appear and go at once.
   - Plan 13: `DrawList` snapshot tests, a headless render compared on the Linux
     runner, and `docs/manual-checks.md`.
   - Plan 14: a weekly fuzz job for the Hyprland parser and the config loader

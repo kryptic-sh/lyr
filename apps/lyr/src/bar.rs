@@ -306,7 +306,7 @@ impl App {
                 Update::Notification(Change::Notified(id)) => {
                     self.toasts.notified(*id, self.clock_panel.is_some(), now);
                 }
-                Update::Notification(Change::Closed(id, _)) => self.toasts.closed(*id),
+                Update::Notification(Change::Closed(id, _)) => self.toasts.closed(*id, now),
                 Update::WifiJoined(joined) => self.wifi_joined(joined.clone()),
                 // The tick comes early to draw the clock in the new zone.
                 Update::Zone(_) => self.next_tick = self.next_tick.min(now + ZONE_SETTLED),

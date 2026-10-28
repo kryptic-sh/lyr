@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use lyr_config::{Platform, from_sources};
 
-use super::{Part, Stack};
+use super::{ANIMATION, Part, Stack};
 use crate::draw::Item;
 use crate::notifications::{Expiry, Incoming, LOW_TIMEOUT, NORMAL_TIMEOUT, Store, Urgency};
 use crate::toast::tests::lay_out;
@@ -137,7 +137,7 @@ fn no_toast_while_the_panel_is_open_or_under_do_not_disturb() {
     let critical = notify(&mut store, "critical", Urgency::Critical, start);
     stack.notified(&store, critical, false, start);
     assert_eq!(stack.ids().collect::<Vec<_>>(), [critical]);
-    stack.closed(critical);
+    stack.closed(critical, start);
     assert_eq!(stack.ids().count(), 0);
 }
 
@@ -154,7 +154,8 @@ fn the_stack_draws_each_toast_below_the_last() {
     stack.notified(&store, older, false, start);
     let newer = notify(&mut store, "newer", Urgency::Normal, start);
     stack.notified(&store, newer, false, start);
-    let (list, size, regions) = stack.draw(&store, start, measure, &lay_out, 20.0, &theme);
+    stack.settle(start + ANIMATION);
+    let (list, size, regions) = stack.draw(start + ANIMATION, measure, &lay_out, 20.0, &theme);
     let toast = 2.0 * (BORDER + INSET) + 20.0;
     assert_eq!(size.height, 2.0 * toast + MARGIN);
     let tops: Vec<(&str, f32)> = list
@@ -178,7 +179,7 @@ fn the_stack_draws_each_toast_below_the_last() {
         Some(&Part::Body(older))
     );
     assert_eq!(regions.hit(10.0, toast + 1.0), None, "between them");
-    let empty = Stack::default().draw(&store, start, measure, &lay_out, 20.0, &theme);
+    let empty = Stack::default().draw(start, measure, &lay_out, 20.0, &theme);
     assert!(empty.0.items.is_empty() && empty.1.height == 0.0);
 }
 
@@ -187,18 +188,18 @@ fn a_label_changes_a_whole_minute_after_its_toast_arrived() {
     let start = Instant::now();
     let mut store = Store::default();
     let mut stack = Stack::default();
-    assert_eq!(stack.next_label_change(&store, start), None);
+    assert_eq!(stack.next_label_change(start), None);
     let id = notify(&mut store, "critical", Urgency::Critical, start);
     stack.notified(&store, id, false, start);
     let minute = Duration::from_secs(60);
-    assert_eq!(stack.next_label_change(&store, start), Some(start + minute));
+    assert_eq!(stack.next_label_change(start), Some(start + minute));
     assert_eq!(
-        stack.next_label_change(&store, start + minute),
+        stack.next_label_change(start + minute),
         Some(start + 2 * minute),
         "on the boundary, the next one"
     );
     assert_eq!(
-        stack.next_label_change(&store, start + minute * 3 / 2),
+        stack.next_label_change(start + minute * 3 / 2),
         Some(start + 2 * minute)
     );
 }
@@ -221,7 +222,8 @@ fn an_action_button_is_its_own_region_on_top_of_the_toast() {
         start,
     );
     stack.notified(&store, id, false, start);
-    let (_, _, regions) = stack.draw(&store, start, measure, &lay_out, 20.0, &theme);
+    stack.settle(start + ANIMATION);
+    let (_, _, regions) = stack.draw(start + ANIMATION, measure, &lay_out, 20.0, &theme);
     let button_y = BORDER + INSET + 20.0 + 4.0 + 1.0;
     assert_eq!(
         regions.hit(BORDER + INSET + 1.0, button_y),
@@ -243,11 +245,13 @@ fn the_toast_under_the_pointer_shows_its_close_button() {
     stack.notified(&store, first, false, start);
     let second = notify(&mut store, "second", Urgency::Normal, start);
     stack.notified(&store, second, false, start);
-    let (plain, _, regions) = stack.draw(&store, start, measure, &lay_out, 20.0, &theme);
+    stack.settle(start + ANIMATION);
+    let (plain, _, regions) = stack.draw(start + ANIMATION, measure, &lay_out, 20.0, &theme);
     assert!(!regions.targets().any(|part| matches!(part, Part::Close(_))));
     assert!(stack.hover(Some(first), start), "moved onto a toast");
     assert!(!stack.hover(Some(first), start), "still on it");
-    let (list, size, regions) = stack.draw(&store, start, measure, &lay_out, 20.0, &theme);
+    stack.settle(start + ANIMATION);
+    let (list, size, regions) = stack.draw(start + ANIMATION, measure, &lay_out, 20.0, &theme);
     // The first is now the lower toast.
     let top = (size.height + MARGIN) / 2.0;
     let x = WIDTH - CLOSE_INSET - CLOSE_SIZE + 1.0;
@@ -295,7 +299,8 @@ fn a_link_is_its_own_region_on_top_of_the_toast() {
         start,
     );
     stack.notified(&store, id, false, start);
-    let (_, _, regions) = stack.draw(&store, start, measure, &lay_out, 20.0, &theme);
+    stack.settle(start + ANIMATION);
+    let (_, _, regions) = stack.draw(start + ANIMATION, measure, &lay_out, 20.0, &theme);
     let body_y = BORDER + INSET + 20.0 + 1.0;
     // "go " is 30 px; the link starts after it.
     assert_eq!(
@@ -306,4 +311,147 @@ fn a_link_is_its_own_region_on_top_of_the_toast() {
         regions.hit(BORDER + INSET + 1.0, body_y),
         Some(&Part::Body(id))
     );
+}
+
+/// The clips a moving toast is drawn in, with each one's opacity and how
+/// far right its first item sits.
+fn moving(list: &crate::draw::DrawList) -> Vec<(crate::hit::Rect, f32, f32)> {
+    list.items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Clip { rect, items } => match &items[..] {
+                [Item::Group { opacity, items }] => match items.first() {
+                    Some(Item::Box { rect: first, .. }) => Some((*rect, *opacity, first.x)),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_toast_grows_in_from_the_right_and_shrinks_away() {
+    let theme = from_sources(None, Platform::Linux)
+        .expect("the defaults")
+        .theme;
+    let measure = |text: &str, _| text.chars().count() as f32 * 10.0;
+    let start = Instant::now();
+    let mut store = Store::default();
+    let mut stack = Stack::default();
+    let id = notify(&mut store, "hello", Urgency::Normal, start);
+    stack.notified(&store, id, false, start);
+    let toast = 2.0 * (BORDER + INSET) + 20.0;
+    let draw = |stack: &Stack, at| stack.draw(at, measure, &lay_out, 20.0, &theme);
+
+    assert!(stack.moving());
+    let (list, size, regions) = draw(&stack, start);
+    assert_eq!(size.height, toast, "the window takes its full size at once");
+    assert_eq!(moving(&list)[0].0.height, 0.0, "no room yet");
+    assert_eq!(regions.hit(10.0, 1.0), None, "nothing drawn to click yet");
+
+    // Halfway, eased out quintically: 1 - 0.5^5 of the way.
+    let half = 1.0 - 0.5_f32.powi(5);
+    let (list, _, _) = draw(&stack, start + ANIMATION / 2);
+    let [(clip, opacity, x)] = moving(&list)[..] else {
+        panic!("one moving toast: {:?}", list.items);
+    };
+    assert!((clip.height - toast * half).abs() < 0.01, "{clip:?}");
+    assert!((opacity - half).abs() < 0.001);
+    assert!(
+        (x - WIDTH * (1.0 - half)).abs() < 0.01,
+        "sliding in from the right"
+    );
+    let (_, _, regions) = draw(&stack, start + ANIMATION / 2);
+    assert_eq!(
+        regions.hit(x + 1.0, 1.0),
+        Some(&Part::Body(id)),
+        "clickable where it is drawn"
+    );
+    assert_eq!(
+        regions.hit(x - 1.0, 1.0),
+        None,
+        "not where it has yet to slide"
+    );
+
+    assert!(!stack.settle(start + ANIMATION - MS), "not yet");
+    assert!(stack.settle(start + ANIMATION), "it arrived");
+    assert!(!stack.moving());
+    let (list, _, regions) = draw(&stack, start + ANIMATION);
+    assert!(moving(&list).is_empty(), "drawn as it is");
+    assert_eq!(regions.hit(10.0, 1.0), Some(&Part::Body(id)));
+
+    // It closes: gone from the ids at once, drawn while it shrinks away.
+    let left = start + ANIMATION * 2;
+    store.close(id);
+    stack.closed(id, left);
+    assert_eq!(stack.ids().count(), 0);
+    let (list, size, regions) = draw(&stack, left + ANIMATION / 2);
+    let [(clip, opacity, x)] = moving(&list)[..] else {
+        panic!("one leaving toast: {:?}", list.items);
+    };
+    assert_eq!(
+        regions.hit(10.0, 1.0),
+        None,
+        "a leaving toast takes no clicks"
+    );
+    assert!(
+        (clip.height - toast * (1.0 - half)).abs() < 0.01,
+        "{clip:?}"
+    );
+    assert!((opacity - (1.0 - half)).abs() < 0.001);
+    assert_eq!(x, 0.0, "fading where it was");
+    assert_eq!(size.height, toast, "the window keeps its size meanwhile");
+    assert!(stack.settle(left + ANIMATION), "it left");
+    let (list, size, _) = draw(&stack, left + ANIMATION);
+    assert!(list.items.is_empty() && size.height == 0.0);
+}
+
+#[test]
+fn a_replaced_toast_does_not_come_up_again() {
+    let start = Instant::now();
+    let mut store = Store::default();
+    let mut stack = Stack::default();
+    let id = notify(&mut store, "40%", Urgency::Normal, start);
+    stack.notified(&store, id, false, start);
+    stack.settle(start + ANIMATION);
+    store.notify(
+        Incoming {
+            replaces_id: id,
+            summary: "45%".to_owned(),
+            ..Incoming::default()
+        },
+        start + ANIMATION,
+    );
+    stack.notified(&store, id, false, start + ANIMATION);
+    assert!(!stack.moving(), "replaced in place");
+}
+
+#[test]
+fn an_arriving_toast_pushes_the_others_down_as_it_grows() {
+    let theme = from_sources(None, Platform::Linux)
+        .expect("the defaults")
+        .theme;
+    let measure = |text: &str, _| text.chars().count() as f32 * 10.0;
+    let start = Instant::now();
+    let mut store = Store::default();
+    let mut stack = Stack::default();
+    let older = notify(&mut store, "older", Urgency::Normal, start);
+    stack.notified(&store, older, false, start);
+    stack.settle(start + ANIMATION);
+    let later = start + ANIMATION;
+    let newer = notify(&mut store, "newer", Urgency::Normal, later);
+    stack.notified(&store, newer, false, later);
+    let toast = 2.0 * (BORDER + INSET) + 20.0;
+    let half = 1.0 - 0.5_f32.powi(5);
+    let (_, size, regions) = stack.draw(later + ANIMATION / 2, measure, &lay_out, 20.0, &theme);
+    assert_eq!(size.height, 2.0 * toast + MARGIN, "both at full size");
+    let older_top = (toast + MARGIN) * half;
+    assert_eq!(
+        regions.hit(10.0, older_top + 1.0),
+        Some(&Part::Body(older)),
+        "below the newer one's place so far"
+    );
+    assert_eq!(regions.hit(10.0, older_top - 1.0), None);
 }

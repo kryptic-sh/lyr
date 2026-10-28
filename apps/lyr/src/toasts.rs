@@ -120,9 +120,9 @@ impl Toasts {
         }
     }
 
-    /// The notification `id` closed.
-    pub fn closed(&mut self, id: u32) {
-        self.stack.closed(id);
+    /// The notification `id` closed at `now`: its toast goes.
+    pub fn closed(&mut self, id: u32, now: Instant) {
+        self.stack.closed(id, now);
         self.changed = true;
     }
 
@@ -191,27 +191,21 @@ impl Toasts {
         if self.relabel_at.is_some_and(|at| at <= now) {
             self.changed = true;
         }
-        if !std::mem::take(&mut self.changed) {
+        // Each frame of a toast coming or going differs from the last.
+        if self.stack.settle(now) || self.stack.moving() {
+            self.changed = true;
+        }
+        if !std::mem::take(&mut self.changed) || self.store.is_none() {
             return Ok(());
         }
-        let Some(store) = &self.store else {
-            return Ok(());
-        };
-        let (list, size, regions) = {
-            let store = store.lock().unwrap_or_else(PoisonError::into_inner);
-            self.stack.draw(
-                &store,
-                now,
-                look.measure_in,
-                look.lay_out,
-                look.line_height,
-                look.theme,
-            )
-        };
-        self.relabel_at = {
-            let store = store.lock().unwrap_or_else(PoisonError::into_inner);
-            self.stack.next_label_change(&store, now)
-        };
+        let (list, size, regions) = self.stack.draw(
+            now,
+            look.measure_in,
+            look.lay_out,
+            look.line_height,
+            look.theme,
+        );
+        self.relabel_at = self.stack.next_label_change(now);
         if size.height == 0.0 {
             return self.close(shell);
         }
@@ -312,7 +306,7 @@ impl Toasts {
                     .as_ref()
                     .is_some_and(|clicked| !matches!(clicked, Clicked::Link(..)))
                 {
-                    self.closed(id);
+                    self.closed(id, now);
                 }
                 Ok(clicked)
             }
