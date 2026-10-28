@@ -413,8 +413,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   rest are that read's findings, each to be confirmed when taken up:
   - Plan 09's `ActivationToken` signal before `ActionInvoked`:
     `Daemon::activation_token` is declared and never emitted.
-  - Plan 13: `DrawList` snapshot tests, a headless render compared on the Linux
-    runner, and `docs/manual-checks.md`.
+  - Plan 13: `DrawList` snapshot tests, and a headless render compared on the
+    Linux runner. The render waits on crcbl: its headless shell's null backend
+    draws no pixels, and a read-back of a real backend's frame (on CI's
+    lavapipe) is still open in crcbl ("the scripted resize and read-back as CI
+    jobs", the parity entry above).
   - Plan 14: a weekly fuzz job for the Hyprland parser and the config loader
     (`cargo-fuzz` and `libfuzzer-sys` would be new).
 
