@@ -175,9 +175,16 @@ implementation follows meanwhile.
   declared and never sent); and `crcbl_image::data_url::parse(&str)` giving a
   `DataUrl { media_type, bytes }` (crcbl `be2f9a18`, no feature; `media_type` is
   the lowercase essence, `text/plain` when missing), for a player's `data:` art.
-  Being designed in crcbl: an offscreen render of a draw list read back as RGBA,
-  for plan 13's headless render compared as an image on the Linux runner (lyr
-  answered that an offscreen render through the same UI pass is enough).
+  And for plan 13's headless render compared as an image on the Linux runner:
+  `Presenter::open_offscreen((w, h), &PresenterDesc { backend: Some(GpuBackend::Vulkan), .. })`,
+  `acquire`, the same UI pass, then `submit_present_and_read_back` in place of
+  `submit_and_present`, which blocks and returns an `Rgba8Frame` (R, G, B, A,
+  top row first; sRGB-encoded when `format` is an sRGB one, as lavapipe's is;
+  alpha premultiplied as the UI pass leaves it). crcbl checks one frame drawn
+  twice comes out byte-identical on lavapipe. On CI,
+  `VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.x86_64.json` selects
+  lavapipe; `CRCBL_ADAPTER` reaches a Presenter only through
+  `PresenterDesc::adapter_pin`.
 - **crcbl: an audio-control seam, and lyr's audio on it.** The owner decided
   (2026-10-22), answering whether lyr's audio should stay on `pactl` or move to
   `libpulse-binding` or native PipeWire: neither. crcbl gains a proper audio
