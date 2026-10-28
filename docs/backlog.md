@@ -351,20 +351,28 @@ implementation follows meanwhile.
     30 MB.
   - Idle: 2 wake-ups, 1 event and 1 present a minute once settled, and 47 ms of
     CPU over 310 s.
-- **crcbl: fallback faces are read whole to learn whether they map a
-  character.** Text that the bar font lacks a glyph for (its icons, when the
-  configured font is missing) makes crcbl-ui's layout ask each lazy fallback
-  face in turn, and each is read and parsed whole to answer. On Windows without
-  the Nerd Font, all six system fallbacks were read: 61.4 MB of private bytes
-  (`seguiemj` 12.6 MB, `msyh.ttc` 19.2 MB, `YuGothR.ttc` 13.5 MB and `malgun`
-  13.1 MB among them). Linux reads its fontconfig fallbacks the same way (not
-  measured there). lyr cannot skip private-use characters itself, since
-  fontconfig's fallbacks on Linux include Nerd Fonts that have them. Asked of
-  office-crcbl (2026-10-29): a coverage check that reads only the face's `cmap`,
-  or takes it from the system (fontconfig's charset, DirectWrite's
-  `HasCharacter`, CoreText's character set). Also asked: a `FontData`
-  constructor over a caller's `Arc<dyn AsRef<[u8]> + Send + Sync>`, so the
-  regular face could be a mapped file.
+- **crcbl: fallback faces read whole, fixed on crcbl main; adopt at its next
+  release.** Text the bar font lacks a glyph for (its icons, when the configured
+  font is missing) makes crcbl-ui's layout ask each lazy fallback face in turn,
+  and in crcbl 0.12.1 each is read and parsed whole to answer. On Windows
+  without the Nerd Font all six system fallbacks were read: 61.4 MB of private
+  bytes (`seguiemj` 12.6 MB, `msyh.ttc` 19.2 MB, `YuGothR.ttc` 13.5 MB and
+  `malgun` 13.1 MB among them). crcbl's answers (2026-10-29, unreleased):
+  - `2a4dfe57`: a `Font::from_system_lazy` face answers whether it maps a char
+    from its `cmap` alone (`crcbl_font::FontMatch::read_cmap`), and is read
+    whole only when it does, on every platform. On crcbl's laptop a Nerd Font
+    icon read one face whole where it had read six. Needs nothing from lyr
+    beyond the version bump; then check, on a machine without the Nerd Font,
+    that only the face mapping each icon is read.
+  - `62f9e3f5`: `FontData: From<Arc<dyn AsRef<[u8]> + Send + Sync>>`, sharing
+    the caller's bytes with the shaper. With it the regular face (2.8 MB of heap
+    for Hack Nerd Font Propo) could be a mapped file, but mapping needs a new
+    crate (`memmap2`) or `unsafe` mmap, and a file truncated under the map
+    faults: the owner's call.
+  - DRED in crcbl-dx12 is on in every build by design, to locate a device loss;
+    an earlier pikr measurement found device creation the same without it, and
+    crcbl's Windows session is timing it on the RX 7900 XTX. Turning it off
+    would need a new crcbl switch.
 - **Startup and memory, measured on Linux (2026-10-29).** A release build in a
   nested Hyprland on the owner's laptop (Intel RPL-U, Mesa, warm caches; not in
   a quiet window: load average 16.7 on 12 cores while other sessions built, so
@@ -394,9 +402,7 @@ implementation follows meanwhile.
     it; not worth it at 40 ms.
   - The regular face (2.8 MB for Hack Nerd Font Propo) is read into the heap.
     Mapping the file instead would share it with other programs using the font,
-    but crcbl-ui's `FontData` has no public constructor over a caller's
-    `Arc<dyn AsRef<[u8]>>` (asked of crcbl), and mapping needs a crate or
-    `unsafe` mmap (and a file truncated under it faults).
+    which crcbl's next release allows (see the entry above).
   - fontconfig's init could be skipped by remembering the resolved faces, as the
     GPU choice is remembered, but the fallback list needs fontconfig anyway.
 - **crcbl: every lyr and pikr feature on every backend.** At the owner's request
