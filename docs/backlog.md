@@ -1091,22 +1091,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   passthrough popup below the module (above it on a bottom bar) drawn by
   `lyr_core::draw::tooltip`, for every module that has one; tested on crcbl's
   headless shell and mutation-checked. Seen on Windows: the clock's `UTC+08:00`
-  and the power button's "Power Button" tooltips opened below them. **Known
-  issue on Windows:** the tooltip stays up after the pointer leaves the bar,
-  until something else wakes the bar (a clock tick, a control request). Traced
-  on crcbl 0.8.1 (2026-10-22, scripted `SetCursorPos`,
-  `RUST_LOG=crcbl_shell=trace` and a temporary probe of the events the bar
-  receives): crcbl reported the bar's `WM_MOUSELEAVE` 8 ms after the warp, the
-  tooltip window never took a pointer move, but the leave reached lyr only 2.3 s
-  later, when `lyr event workspace` woke the loop, and the tooltip then closed.
-  The cause is crcbl-shell's Win32 `wait`: it drains the message queue first,
-  and a message that drain dispatches (the leave, posted just after the warp's
-  raw input already woke and pumped the loop) records an event that `wait` then
-  sleeps on. Reported to crcbl with the trace; crcbl confirmed it and fixes it
-  on its branch `win32-wait-recorded` (`Win32Shell::wait` returns
-  `Wake::Recorded` when its drain recorded an event, with a desktop test of
-  exactly this leave), for its next release. On that release: run the
-  hover-then-warp check again, with no wake-up step. crcbl's traces reach lyr's
+  and the power button's "Power Button" tooltips opened below them. On Windows
+  the tooltip closes when the pointer leaves the bar: crcbl-shell 0.12.1's
+  `Win32Shell::wait` returns `Wake::Recorded` when its queue drain recorded an
+  event (before it, on 0.8.1, the drained `WM_MOUSELEAVE` waited for the next
+  wake-up, a clock tick or a control request). Run on Windows (2026-10-29, a
+  release build, scripted `SetCursorPos` onto the clock and then off the bar,
+  nothing else waking the loop): in each of three runs the tooltip's window was
+  listed while hovering and gone 0.8 s after leaving. crcbl's traces reach lyr's
   log only since lyr bridges `log` into its subscriber (`tracing-subscriber`'s
   `tracing-log`); before that every crcbl record was dropped, on every platform.
   A tooltip follows its module when the module moves (repositioned where the

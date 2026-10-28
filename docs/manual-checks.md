@@ -51,8 +51,6 @@ check out of "Not yet verified" there.
 
 ## Windows
 
-- [ ] **Tooltips.** Hover a module, then move the pointer off the bar. The
-      tooltip closes at once (needs crcbl's `win32-wait-recorded` fix).
 - [ ] **Full screen.** Play a video full screen, or a game. The bar hides on
       that monitor and comes back after.
 - [ ] **Battery.** On a laptop, unplug and plug in the charger; the module
