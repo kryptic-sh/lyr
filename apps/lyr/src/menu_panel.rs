@@ -351,6 +351,9 @@ impl<T: Copy> MenuPanel<T> {
         if size != self.size {
             shell.set_panel(self.window, logical(size), &panel_desc(size, self.place))?;
             self.size = size;
+            if let Some(surface) = &mut self.surface {
+                surface.awaiting_size(size);
+            }
         }
         self.content = content;
         self.list = list;

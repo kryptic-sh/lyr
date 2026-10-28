@@ -220,6 +220,9 @@ impl Toasts {
             if panel.size != size {
                 shell.set_panel(panel.window, logical(size), &panel_desc())?;
                 panel.size = size;
+                if let Some(surface) = &mut panel.surface {
+                    surface.awaiting_size(size);
+                }
             }
             panel.list = list;
             panel.regions = regions;

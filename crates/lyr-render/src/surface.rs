@@ -14,7 +14,7 @@ use crcbl_shell::{Shell, ShellError, ShellEvent, WindowId};
 use crcbl_ui::DrawList;
 use crcbl_ui::image::ImageAtlas;
 use crcbl_ui::text::FontAtlas;
-use lyr_core::draw::DrawList as Bar;
+use lyr_core::draw::{DrawList as Bar, Size};
 
 use crate::pictures::Pictures;
 use crate::text::Text;
@@ -67,9 +67,14 @@ pub struct Surface {
     pictures: Pictures,
     /// Device pixels per logical pixel.
     scale: f32,
+    /// The window's size in device pixels, as last opened or resized.
+    size: (u32, u32),
     /// The backend asked for and accepted, or `None` when crcbl's own order
     /// chose (the preferred backend refused, or there is none).
     asked: Option<GpuBackend>,
+    /// The window was asked for a new size that has not come yet
+    /// ([`Surface::awaiting_size`]).
+    awaiting_size: bool,
 }
 
 impl Surface {
@@ -157,7 +162,9 @@ impl Surface {
             atlas: FontAtlas::built_in(),
             pictures: Pictures::default(),
             scale,
+            size,
             asked,
+            awaiting_size: false,
         })
     }
 
@@ -192,8 +199,25 @@ impl Surface {
     /// When the swapchain cannot be rebuilt.
     pub fn resize(&mut self, size: (u32, u32), scale: f32) -> Result<(), Error> {
         self.scale = scale;
+        self.size = size;
         self.presenter.resize(size)?;
+        self.awaiting_size = false;
         Ok(())
+    }
+
+    /// Notes that the window was asked for `size`, in logical pixels
+    /// (`Shell::set_panel`): nothing is presented until it comes, through
+    /// [`Surface::resize`]. A frame drawn before then would go into the old
+    /// swapchain, so a panel growing for a new row showed it cut off at the
+    /// old size. crcbl delivers a changed size as the window's next
+    /// `Resized` and an unchanged one not at all, so a request back to the
+    /// window's own size (a toast that came and went before the compositor
+    /// answered) waits for nothing.
+    pub fn awaiting_size(&mut self, size: Size) {
+        let device = |logical: f32| (logical * self.scale).round();
+        let (width, height) = self.size;
+        self.awaiting_size =
+            (device(size.width), device(size.height)) != (width as f32, height as f32);
     }
 
     /// Draws `bar`, lyr's list, as the window's next frame, its text in `text`
@@ -231,6 +255,9 @@ impl Surface {
     ///
     /// When acquiring, recording or presenting fails, or the window has gone.
     pub fn draw(&mut self, shell: &mut dyn Shell, list: &DrawList) -> Result<bool, Error> {
+        if self.awaiting_size {
+            return Ok(false);
+        }
         let Some(frame) = self.presenter.acquire()? else {
             return Ok(false);
         };
@@ -277,10 +304,11 @@ impl Surface {
     }
 
     /// Whether [`Surface::draw`] would present now: `false` from a present
-    /// until its answer is observed, while the bar has no reason to wake.
+    /// until its answer is observed, and while a new size is awaited, when
+    /// the bar has no reason to wake.
     #[must_use]
     pub const fn frame_due(&self) -> bool {
-        self.presenter.frame_due()
+        !self.awaiting_size && self.presenter.frame_due()
     }
 
     /// Waits for the device and releases everything, in the order the example
@@ -307,6 +335,8 @@ mod tests {
     use crcbl_shell::{HeadlessShell, Shell, WindowDesc};
     use crcbl_ui::DrawList;
 
+    use lyr_core::draw::Size;
+
     use super::Surface;
 
     #[test]
@@ -330,6 +360,43 @@ mod tests {
         shell.pump(&mut |event| surface.observe(&event));
         assert!(surface.frame_due(), "the answer came at the pump");
         assert!(surface.draw(&mut shell, &list).expect("drawn"));
+
+        surface.destroy().expect("released");
+        shell.destroy_window(window).expect("closed");
+    }
+
+    #[test]
+    fn nothing_is_presented_while_a_new_size_is_awaited() {
+        let mut shell = HeadlessShell::new();
+        let window = open_window(&mut shell, Duration::ZERO, &WindowDesc::default())
+            .expect("a headless window");
+        let size = wait_for_configure(&mut shell, window, &mut |_| {}).expect("configured");
+        let mut surface = Surface::open_on(&shell, window, size, 1.0, Some(GpuBackend::Null))
+            .expect("a surface on the null backend");
+        let list = DrawList::default();
+
+        let logical = |(width, height): (u32, u32)| Size {
+            width: width as f32,
+            height: height as f32,
+        };
+        let taller = (size.0, size.1 + 40);
+        surface.awaiting_size(logical(taller));
+        assert!(!surface.frame_due(), "not due while the size is awaited");
+        assert!(
+            !surface.draw(&mut shell, &list).expect("skipped"),
+            "nothing presented into the old swapchain"
+        );
+        surface.awaiting_size(logical(size));
+        assert!(
+            surface.frame_due(),
+            "asked back to its own size: none comes"
+        );
+        surface.awaiting_size(logical(taller));
+        surface.resize(taller, 1.0).expect("resized");
+        assert!(surface.frame_due(), "due once the size came");
+        surface.awaiting_size(logical(taller));
+        assert!(surface.frame_due(), "the size it has now");
+        assert!(surface.draw(&mut shell, &list).expect("drawn"), "presented");
 
         surface.destroy().expect("released");
         shell.destroy_window(window).expect("closed");

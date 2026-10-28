@@ -692,11 +692,16 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   It did not happen again (2026-10-26, nested Hyprland): two plain toasts sent
   0, 0.3 and 1 s apart were both up in every screenshot, taken each half second
   from 0.5 s to 4 s after the second. If it comes back, the difference from that
-  run was the link bodies and a pointer moved by `wlrctl`. Each action but
-  `default` gets a button under the body (swaync's style, at the bar's text size
-  until the owner rules on swaync's `0.2rem`), in toasts and the panel's
-  history; a click invokes it. A transient notification, kept in no history,
-  closes as expired when its toast times out.
+  run was the link bodies and a pointer moved by `wlrctl`. Seen once more
+  (2026-10-28): three volume notices replacing one another 0.5 s apart, then
+  another toast, left the older toast missing 1.5 s on and up 2 s later. Not
+  seen in ten runs of the same sequence since, captured every 100 ms. The frame
+  drawn at the old size while the panel grew (fixed the same day) would explain
+  a missing older toast, but not for that long. Each action but `default` gets a
+  button under the body (swaync's style, at the bar's text size until the owner
+  rules on swaync's `0.2rem`), in toasts and the panel's history; a click
+  invokes it. A transient notification, kept in no history, closes as expired
+  when its toast times out.
 - **Sources, M4.** Built: the battery source. UPower's display device is read
   over D-Bus (`lyr_sources::battery::linux::UPower`, zbus 6) once and again on
   each `PropertiesChanged`, with no polling, and turned into the view's reading
@@ -1372,16 +1377,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `leave` and the popup `enter` right after `xdg_popup.grab`, and `wtype` keys
   moved the dropdown's selection. The audio menu hands the panel's keys to the
   dropdown anyway, in case a compositor leaves them there.
-- **A panel that grows shows one cropped frame.** crcbl 0.12.1 fixed the
-  squeezed frame a resized panel showed (crcbl `f2b3bb5b`: a surface's new
-  viewport rides its next present). Switching the audio menu between Output
-  devices and Configuration in a nested Hyprland (2026-10-27), with screenshots
-  every 80 ms: no squeezed frame either way; shrinking showed nothing amiss, and
-  growing showed one frame of the new content at the old size, cut off rather
-  than scaled. That frame is lyr's own: `MenuPanel::show` presents once into the
-  old swapchain between `set_panel` and `Resized`. Holding it until `Resized` is
-  not done, since a configure that keeps the size brings no `Resized` and the
-  panel would never draw; holding it only when the size changes would.
+- **A bar reshaped by a reload can show one frame at its old size.** Panels hold
+  their frames while a new size is awaited (`Surface::awaiting_size`, after
+  `set_panel`), which ended the one cropped frame a growing panel showed: in a
+  nested Hyprland (2026-10-28) the Wayland trace had one buffer attached between
+  a toast panel's `set_size` and its `configure` per run before, and none after,
+  nor across six audio-menu resizes. `Bars::reshape` resizes the bars in place
+  on `lyr reload` without that hold, so a reload that changes `bar.height` can
+  still draw once at the old size. Not seen; a reload is rare.
 
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,
