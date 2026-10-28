@@ -77,6 +77,11 @@ and this project adheres to
 - On Linux with glibc, the heap's free pages go back to the system when the last
   open panel, menu or toast closes (`malloc_trim`). The clock panel and the
   audio menu had left the bar about 7 MB larger after they closed.
+- On Linux with glibc, lyr fixes the allocator's thresholds at start
+  (`mallopt`), so a large buffer it frees goes back to the system at once. glibc
+  otherwise raises them after each large free and keeps later large buffers in a
+  thread's heap for good: five notifications with a wallpaper as their image
+  left the bar at 59 MB, against 31 MB now.
 
 ### Fixed
 

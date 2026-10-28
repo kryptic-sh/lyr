@@ -164,6 +164,7 @@ fn import_waybar(config: &std::path::Path) -> ExitCode {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let Some(command) = cli.command else {
+        memory::configure();
         if let Err(error) = log::init() {
             eprintln!("lyr: logging to stderr only: {error}");
         }
