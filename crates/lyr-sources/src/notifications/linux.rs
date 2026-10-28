@@ -27,13 +27,16 @@ pub const PATH: &str = "/org/freedesktop/Notifications";
 /// The bus name the spec gives the daemon.
 pub const NAME: &str = "org.freedesktop.Notifications";
 /// What `GetCapabilities` answers.
-pub const CAPABILITIES: [&str; 6] = [
+pub const CAPABILITIES: [&str; 9] = [
     "actions",
     "body",
     "body-hyperlinks",
     "body-markup",
     "icon-static",
     "persistence",
+    "synchronous",
+    "private-synchronous",
+    "x-canonical-private-synchronous",
 ];
 
 /// The size an icon from the theme is found and drawn at: more than a
@@ -201,6 +204,10 @@ impl Daemon {
             transient: flag("transient"),
             resident: flag("resident"),
             // swaync clamps it, and shows the bar for any `int32`.
+            // Each name swaync reads it under.
+            synchronous: text("synchronous")
+                .or_else(|| text("private-synchronous"))
+                .or_else(|| text("x-canonical-private-synchronous")),
             progress: hints
                 .get("value")
                 .and_then(|value| i32::try_from(value).ok())

@@ -63,6 +63,44 @@ fn a_replacement_keeps_the_id_and_takes_the_place() {
 }
 
 #[test]
+fn a_notification_with_a_held_one_s_synchronous_value_replaces_it() {
+    let mut store = Store::default();
+    let volume = |summary: &str, key: &str| Incoming {
+        synchronous: Some(key.to_owned()),
+        ..from("osd", summary)
+    };
+    let id = store.notify(volume("Volume 40%", "volume"), Instant::now());
+    let other = store.notify(volume("Brightness 70%", "brightness"), Instant::now());
+    assert_ne!(other, id, "another value is another notification");
+    assert_eq!(
+        store.notify(volume("Volume 45%", "volume"), Instant::now()),
+        id
+    );
+    assert_eq!(
+        store.get(id).map(|n| n.content.summary.as_str()),
+        Some("Volume 45%")
+    );
+    assert_eq!(
+        store.get(other).map(|n| n.content.summary.as_str()),
+        Some("Brightness 70%"),
+        "the other kept"
+    );
+    // An empty value is none, and replaces_id still wins.
+    let empty = store.notify(volume("a", ""), Instant::now());
+    assert_ne!(store.notify(volume("b", ""), Instant::now()), empty);
+    assert_eq!(
+        store.notify(
+            Incoming {
+                replaces_id: other,
+                ..volume("Volume 50%", "volume")
+            },
+            Instant::now()
+        ),
+        other
+    );
+}
+
+#[test]
 fn replacing_an_unknown_id_uses_that_id_as_the_spec_says() {
     let mut store = Store::default();
     assert_eq!(

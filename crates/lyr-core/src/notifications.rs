@@ -92,6 +92,10 @@ pub struct Incoming {
     /// How far along what it reports is, 0 – 100: the `value` hint, drawn
     /// as a progress bar.
     pub progress: Option<u8>,
+    /// The `synchronous` hint: a later notification with the same value
+    /// replaces this one, as `replaces_id` would (a volume or brightness
+    /// notice sent again on each change).
+    pub synchronous: Option<String>,
     pub expiry: Option<Expiry>,
 }
 
@@ -136,13 +140,26 @@ pub struct Store {
 impl Store {
     /// Takes a notification that arrived at `now` and returns its id:
     /// `replaces_id` when that is set, as the spec requires, replacing the
-    /// notification in place; otherwise the next id, never 0.
+    /// notification in place; else the id of one held with the same
+    /// `synchronous` value, replaced as swaync replaces it (swaync gives the
+    /// new one an id of its own; lyr keeps the old one's, as `replaces_id`
+    /// does); otherwise the next id, never 0.
     pub fn notify(&mut self, incoming: Incoming, now: Instant) -> u32 {
         self.arrivals += 1;
-        let id = if incoming.replaces_id == 0 {
-            self.next_id()
-        } else {
-            incoming.replaces_id
+        let synchronous = incoming
+            .synchronous
+            .as_deref()
+            .filter(|key| !key.is_empty())
+            .and_then(|key| {
+                self.notifications
+                    .iter()
+                    .find(|held| held.content.synchronous.as_deref() == Some(key))
+            })
+            .map(|held| held.id);
+        let id = match (incoming.replaces_id, synchronous) {
+            (0, Some(id)) => id,
+            (0, None) => self.next_id(),
+            (id, _) => id,
         };
         let notification = Notification {
             id,

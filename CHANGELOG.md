@@ -13,7 +13,7 @@ and this project adheres to
 - `lyr-core`: `draw::Bar`'s zones hold `draw::Entry` values, a module or a
   spacer or separator, instead of `draw::Module`s; `Entry::from` wraps a module.
 - New public fields, which a struct literal must now set:
-  `lyr_core::notifications::Incoming::progress`,
+  `lyr_core::notifications::Incoming::progress` and `synchronous`,
   `lyr_config::Volume::mute_links_mic`, and `lyr_config::Theme::toast_progress`
   and `toast_progress_critical`.
 
@@ -27,6 +27,10 @@ and this project adheres to
 - A notification's `value` hint (0 – 100) is drawn as a progress bar under its
   text, as swaync draws it: `theme.toast_progress`, or
   `theme.toast_progress_critical` on a critical notification.
+- A notification with the `synchronous` hint (or `private-synchronous`,
+  `x-canonical-private-synchronous`) replaces a held one with the same value in
+  place, as swaync does, so a volume or brightness notice sent on each change
+  shows once; the three names are among the daemon's capabilities.
 - The clock panel's notification centre takes the keyboard as swaync's does: the
   arrow keys move an outline through its controls, `Enter` acts on the outlined
   one and `Delete` dismisses its notification.

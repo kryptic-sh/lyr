@@ -102,6 +102,33 @@ async fn a_value_hint_is_its_progress_held_to_0_100() {
     assert_eq!(progress(OwnedVariant::from(40_u8)).await, None, "an int32");
 }
 
+#[tokio::test]
+async fn each_synchronous_hint_name_replaces_a_notification() {
+    let running = daemon().await;
+    for name in [
+        "synchronous",
+        "private-synchronous",
+        "x-canonical-private-synchronous",
+    ] {
+        let send = |summary: &'static str| {
+            let client = running.client.clone();
+            async move {
+                let hints = HashMap::from([(name, OwnedVariant::from(zbus::Str::from("volume")))]);
+                client
+                    .notify("osd", 0, "", summary, "", &[], hints, -1)
+                    .await
+                    .expect("notified")
+            }
+        };
+        let first = send("40%").await;
+        assert_eq!(send("45%").await, first, "{name}");
+        let store = running.store.lock().expect("store");
+        assert_eq!(store.get(first).expect("held").content.summary, "45%");
+        drop(store);
+        running.store.lock().expect("store").close(first);
+    }
+}
+
 /// An `image-data` hint: one RGBA pixel, or one RGB pixel without alpha.
 fn image_data(pixel: &[u8]) -> OwnedVariant {
     let alpha = pixel.len() == 4;
@@ -251,7 +278,10 @@ async fn the_server_says_what_it_is_and_what_it_can_do() {
             "body-hyperlinks",
             "body-markup",
             "icon-static",
-            "persistence"
+            "persistence",
+            "synchronous",
+            "private-synchronous",
+            "x-canonical-private-synchronous"
         ]
     );
 }
