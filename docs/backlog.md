@@ -361,8 +361,10 @@ implementation follows meanwhile.
   constructor over a caller's `Arc<dyn AsRef<[u8]> + Send + Sync>`, so the
   regular face could be a mapped file.
 - **Startup and memory, measured on Linux (2026-10-29).** A release build in a
-  nested Hyprland on the owner's laptop (Intel RPL-U, Mesa, warm caches, a
-  loaded machine so the minimum of 8 runs): the first frame about 40 ms after
+  nested Hyprland on the owner's laptop (Intel RPL-U, Mesa, warm caches; not in
+  a quiet window: load average 16.7 on 12 cores while other sessions built, so
+  the timings are the typical of 8 runs and retaking them in a quiet window is
+  owed before comparing them with anything): the first frame about 40 ms after
   `main`, of which the font load is about 15 ms (fontconfig's first lookup 10 –
   13 ms of it), the Vulkan instance and device about 10 ms, the swapchain about
   5 ms and the first frame's pipelines about 11 ms; a cold first run took 177
