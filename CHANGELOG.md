@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-28
+
 ### Breaking
 
 - `lyr-core`: `toast::wrap` is gone. `toast::draw`, `toast::stack::Stack::draw`
@@ -322,7 +324,8 @@ and this project adheres to
   tables. An invalid config is an error naming the key, such as
   ``theme.border: `teal` is not a colour``.
 
-[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/kryptic-sh/lyr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kryptic-sh/lyr/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kryptic-sh/lyr/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kryptic-sh/lyr/releases/tag/v0.1.0
