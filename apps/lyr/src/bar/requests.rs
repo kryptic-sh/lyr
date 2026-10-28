@@ -141,6 +141,13 @@ impl App {
                     self.bars
                         .reshape(shell, &new.bar)
                         .context("reshaping the bars")?;
+                    // Nothing is drawn at the old height meanwhile.
+                    for window in self.windows.values_mut() {
+                        window.surface.awaiting_size(lyr_core::draw::Size {
+                            width: window.width,
+                            height: new.bar.height as f32,
+                        });
+                    }
                     self.keep_bars(shell, &new.bar, None)
                         .context("creating the bars")?;
                 }

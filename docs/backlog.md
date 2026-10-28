@@ -1379,15 +1379,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `leave` and the popup `enter` right after `xdg_popup.grab`, and `wtype` keys
   moved the dropdown's selection. The audio menu hands the panel's keys to the
   dropdown anyway, in case a compositor leaves them there.
-- **A bar reshaped by a reload can show one frame at its old size.** Panels hold
-  their frames while a new size is awaited (`Surface::awaiting_size`, after
-  `set_panel`), which ended the one cropped frame a growing panel showed: in a
-  nested Hyprland (2026-10-28) the Wayland trace had one buffer attached between
-  a toast panel's `set_size` and its `configure` per run before, and none after,
-  nor across six audio-menu resizes. `Bars::reshape` resizes the bars in place
-  on `lyr reload` without that hold, so a reload that changes `bar.height` can
-  still draw once at the old size. Not seen; a reload is rare.
-
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,
   `%U` otherwise, the first row numbered by the 1st), the header order and

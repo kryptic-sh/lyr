@@ -73,7 +73,8 @@ and this project adheres to
   after the change.
 - A panel that grew (a toast arriving, the audio menu changing tab, a menu's
   list getting longer) showed one frame of its new content cut off at the old
-  size before the right one. It now draws nothing until the new size arrives.
+  size before the right one. It now draws nothing until the new size arrives; so
+  do the bars when `lyr reload` changes their height.
 - `lyr panel` with outputs of different widths could lay a panel out for another
   output's width and open it partly off screen. It now opens on the focused
   output, under that output's module, and a panel opened by a click opens on the
