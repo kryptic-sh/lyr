@@ -406,8 +406,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     `Daemon::activation_token` is declared and never emitted.
   - Plan 09's toast slide in and out (`transition-time`, 200 ms; plan 12's
     frames only during the slide): toasts appear and go at once.
-  - Plan 09's `hide-on-action`: an action invoked from the clock panel's centre
-    leaves the panel open (`App::centre_clicked`).
   - Plan 09's keyboard in the centre: arrows, Enter and Delete; the clock panel
     handles Escape only (`ClockPanel::event`).
   - Plan 09's progress hint (`value`), drawn red when critical: not read.

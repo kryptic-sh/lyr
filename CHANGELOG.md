@@ -21,6 +21,12 @@ and this project adheres to
 - On Windows the bar hides while a full-screen app (a game, a video) is open on
   its monitor, and comes back when it closes, keeping its edge reserved.
 
+### Changed
+
+- Invoking a notification's action from the clock panel (a button, or a click on
+  a notification with a default action) closes the panel, as swaync's
+  `hide-on-action` does.
+
 ### Fixed
 
 - A layout's `"separator"` and `{ spacer = N }` entries were accepted and drew

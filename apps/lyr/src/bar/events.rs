@@ -468,35 +468,39 @@ impl App {
                     panel.close(shell, outcome == ClockOutcome::Closed)?;
                 }
             }
-            ClockOutcome::Centre(target, press) => self.centre_clicked(target, press),
+            ClockOutcome::Centre(target, press) => {
+                // swaync's `hide-on-action`.
+                if self.centre_clicked(target, press)
+                    && let Some(panel) = self.clock_panel.take()
+                {
+                    panel.close(shell, false)?;
+                }
+            }
         }
         Ok(())
     }
 
     /// Carries out a click in the clock panel's notification centre: Clear
     /// All and the switch as `lyr clear` and `lyr dnd` do, and an entry as a
-    /// toast does.
-    fn centre_clicked(&mut self, target: Target, press: Press) {
+    /// toast does. Returns whether it invoked a notification's action.
+    fn centre_clicked(&mut self, target: Target, press: Press) -> bool {
         let reply = match (target, press) {
             (Target::ClearAll, Press::Left) => self.notifications(Request::Clear),
             (Target::Dnd, Press::Left) => self.notifications(Request::Dnd),
             (Target::Notification(id), Press::Left) => {
-                self.toast_clicked(Some(Clicked::Invoke(id)));
-                return;
+                return self.toast_clicked(Some(Clicked::Invoke(id)));
             }
             (Target::Media(index, control), Press::Left) => {
                 if let Some(player) = self.data.players.get(index) {
                     self.commands.media(player.bus_name.clone(), control);
                 }
-                return;
+                return false;
             }
             (Target::Action(id, index), Press::Left) => {
-                self.toast_clicked(Some(Clicked::Action(id, index)));
-                return;
+                return self.toast_clicked(Some(Clicked::Action(id, index)));
             }
             (Target::Link(id, index), Press::Left) => {
-                self.toast_clicked(Some(Clicked::Link(id, index)));
-                return;
+                return self.toast_clicked(Some(Clicked::Link(id, index)));
             }
             (Target::Close(id), Press::Left)
             | (
@@ -506,14 +510,14 @@ impl App {
                 | Target::Close(id),
                 Press::Middle,
             ) => {
-                self.toast_clicked(Some(Clicked::Dismiss(id)));
-                return;
+                return self.toast_clicked(Some(Clicked::Dismiss(id)));
             }
-            _ => return,
+            _ => return false,
         };
         if reply != control::OK {
             tracing::warn!("clock panel: {reply}");
         }
+        false
     }
 
     /// Applies `event`, which is for the power menu's window.
@@ -566,9 +570,10 @@ impl App {
     }
 
     /// Carries out a click on a toast: its `default` action when it has one,
-    /// another action, opening a link, or dismissing it.
+    /// another action, opening a link, or dismissing it. Returns whether it
+    /// invoked an action.
     #[cfg(target_os = "linux")]
-    fn toast_clicked(&self, clicked: Option<Clicked>) {
+    fn toast_clicked(&self, clicked: Option<Clicked>) -> bool {
         use lyr_core::notifications::CloseReason;
         use lyr_core::toast::DEFAULT_ACTION;
         // The action's key, as the notification's store holds it.
@@ -590,11 +595,13 @@ impl App {
             Some(Clicked::Invoke(id)) => {
                 if let Some(key) = key(id, &|_, key| key == DEFAULT_ACTION) {
                     self.commands.invoke(id, key);
+                    return true;
                 }
             }
             Some(Clicked::Action(id, wanted)) => {
                 if let Some(key) = key(id, &|index, _| index == wanted) {
                     self.commands.invoke(id, key);
+                    return true;
                 }
             }
             Some(Clicked::Link(id, index)) => {
@@ -623,10 +630,13 @@ impl App {
             }
             None => {}
         }
+        false
     }
 
     /// Windows and macOS have no toasts: lyr is not their notification
     /// daemon.
     #[cfg(not(target_os = "linux"))]
-    fn toast_clicked(&self, _clicked: Option<Clicked>) {}
+    const fn toast_clicked(&self, _clicked: Option<Clicked>) -> bool {
+        false
+    }
 }
