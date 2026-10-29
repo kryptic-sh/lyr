@@ -78,6 +78,8 @@ const ART_SIZE: u32 = 256;
 #[derive(Debug)]
 pub struct Art {
     read: HashMap<String, (FileVersion, Option<Picture>)>,
+    /// The art carried in `data:` URLs, decoded once each.
+    carried: HashMap<String, Option<Picture>>,
     /// The URLs asked for since the last [`Self::sweep`].
     asked: HashSet<String>,
     icons: Icons,
@@ -97,6 +99,7 @@ impl Art {
     pub fn new(icons: Icons, entry_dirs: Vec<PathBuf>) -> Self {
         Self {
             read: HashMap::new(),
+            carried: HashMap::new(),
             asked: HashSet::new(),
             icons,
             entry_dirs,
@@ -129,9 +132,21 @@ impl Art {
             })
     }
 
-    /// The picture `url` names. Only a `file://` URI is read: lyr fetches
-    /// nothing over the network (plan 09).
+    /// The picture `url` names: a `file://` URI, or a `data:` URL carrying
+    /// it. Nothing else is read: lyr fetches nothing over the network
+    /// (plan 09).
     fn picture(&mut self, url: &str) -> Option<Picture> {
+        if url
+            .get(..5)
+            .is_some_and(|scheme| scheme.eq_ignore_ascii_case("data:"))
+        {
+            self.asked.insert(url.to_owned());
+            return self
+                .carried
+                .entry(url.to_owned())
+                .or_insert_with(|| icons::data_url(url, ART_SIZE))
+                .clone();
+        }
         let path = icons::file_uri(url)?;
         let version = FileVersion::of(&path)?;
         self.asked.insert(url.to_owned());
@@ -150,6 +165,7 @@ impl Art {
     fn sweep(&mut self) {
         let asked = std::mem::take(&mut self.asked);
         self.read.retain(|url, _| asked.contains(url));
+        self.carried.retain(|url, _| asked.contains(url));
     }
 }
 

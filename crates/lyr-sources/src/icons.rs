@@ -192,7 +192,30 @@ pub fn read(path: &Path, size: u32) -> Option<Picture> {
     if bytes.len() as u64 > MAX_FILE_BYTES {
         return None;
     }
-    decode(path, &bytes, size)
+    let extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .map(str::to_ascii_lowercase);
+    decode(extension.as_deref(), &bytes, size)
+}
+
+/// The picture a `data:` URL carries, an SVG drawn `size` pixels square;
+/// `None` for another kind of URL, or a payload larger than
+/// [`MAX_FILE_BYTES`], as a file's would be. Its media type picks the
+/// decoder as a file's extension does.
+pub fn data_url(url: &str, size: u32) -> Option<Picture> {
+    let data = crcbl_image::data_url::parse(url).ok()?;
+    if data.bytes.len() as u64 > MAX_FILE_BYTES {
+        return None;
+    }
+    let format = match data.media_type.as_str() {
+        "image/png" => Some("png"),
+        "image/jpeg" => Some("jpg"),
+        "image/svg+xml" => Some("svg"),
+        "image/x-xpixmap" => Some("xpm"),
+        _ => None,
+    };
+    decode(format, &data.bytes, size)
 }
 
 /// The path the `file://` URI `uri` names; `None` for another scheme
@@ -237,17 +260,13 @@ fn percent_decode(text: &str) -> Option<Vec<u8>> {
     Some(bytes)
 }
 
-/// An icon file's bytes as a picture, by its extension; an SVG is drawn
-/// `size` pixels square, its text in the system's fonts. A file with any
-/// other extension, or none, is tried as PNG, JPEG and then WebP, whose
-/// decoders check the format's signature: browsers write a player's art to
-/// files with no extension.
-fn decode(path: &Path, bytes: &[u8], size: u32) -> Option<Picture> {
-    let extension = path
-        .extension()
-        .and_then(|extension| extension.to_str())
-        .map(str::to_ascii_lowercase);
-    let image = match extension.as_deref() {
+/// An icon's bytes as a picture, by `format`, its file's extension in lower
+/// case; an SVG is drawn `size` pixels square, its text in the system's
+/// fonts. Any other format, or none, is tried as PNG, JPEG and then WebP,
+/// whose decoders check the format's signature: browsers write a player's
+/// art to files with no extension.
+fn decode(format: Option<&str>, bytes: &[u8], size: u32) -> Option<Picture> {
+    let image = match format {
         Some("png") => png::decode(bytes, &LIMITS),
         Some("jpg" | "jpeg") => jpeg::decode(bytes, &LIMITS),
         Some("svg") => svg::decode(bytes, size, 1, &LIMITS),
@@ -284,4 +303,4 @@ pub fn icon_theme_setting(text: &str) -> Option<String> {
 }
 
 #[cfg(test)]
-mod tests;
+pub mod tests;

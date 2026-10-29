@@ -27,6 +27,10 @@ and this project adheres to
 
 ### Added
 
+- A media player's art sent as a `data:` URL (`mpris:artUrl` of
+  `data:image/png;base64,…`, as some browsers and players send it) is shown, its
+  media type picking the decoder; before, only `file://` art was read and such a
+  player showed its desktop entry's icon.
 - `volume.mute_links_mic` (off by default): the volume module's `toggle_mute`
   mutes the mic with the output, and unmuting the output gives the mic back the
   state it had, so a mic that was already muted stays muted.

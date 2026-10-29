@@ -204,6 +204,36 @@ async fn art_over_the_network_is_not_fetched_and_the_entry_s_icon_shows() {
     assert_eq!(icon.pixels(), GREEN);
 }
 
+#[tokio::test]
+async fn a_player_s_art_is_read_from_a_data_url() {
+    let image = Rgba8Image::new(1, 1, vec![7, 8, 9, 255]).expect("an image");
+    let url = crate::icons::tests::data_url_of("image/png", &png::encode(&image).expect("encoded"));
+    let (_server, client, _) = with_art("Playing", &[], &url).await;
+    let dir = tempfile::tempdir().expect("a temporary directory");
+    let read = read(&client, NAME, &with_entry(dir.path()))
+        .await
+        .expect("read");
+    let Some(Artwork::Picture(art)) = read.art else {
+        panic!("the art carried: {:?}", read.art)
+    };
+    assert_eq!(art.pixels(), [7, 8, 9, 255], "before the entry's icon");
+}
+
+#[test]
+fn art_carried_in_a_data_url_is_kept_until_swept_once_unasked() {
+    let image = Rgba8Image::new(1, 1, vec![1, 1, 1, 255]).expect("an image");
+    let url = crate::icons::tests::data_url_of("image/png", &png::encode(&image).expect("encoded"));
+    let mut art = Art::new(Icons::new("lyr-test-theme".to_owned()), Vec::new());
+    assert!(art.picture(&url).is_some());
+    art.sweep();
+    assert!(
+        art.carried.contains_key(&url),
+        "asked for since the last sweep"
+    );
+    art.sweep();
+    assert!(art.carried.is_empty(), "not asked for since");
+}
+
 #[test]
 fn with_no_art_and_no_entry_it_is_the_generic_icon() {
     // What the generic icon is depends on the themes installed, so this

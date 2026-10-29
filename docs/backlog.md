@@ -172,10 +172,8 @@ implementation follows meanwhile.
   (crcbl `277bd79a`; ask right after the click's `Button` event, before
   `ActionInvoked`; `None` without xdg-activation and on every non-Wayland
   backend), for plan 09's `ActivationToken` (`Daemon::activation_token` is
-  declared and never sent); and `crcbl_image::data_url::parse(&str)` giving a
-  `DataUrl { media_type, bytes }` (crcbl `be2f9a18`, no feature; `media_type` is
-  the lowercase essence, `text/plain` when missing), for a player's `data:` art.
-  And for plan 13's headless render compared as an image on the Linux runner:
+  declared and never sent). And for plan 13's headless render compared as an
+  image on the Linux runner:
   `Presenter::open_offscreen((w, h), &PresenterDesc { backend: Some(GpuBackend::Vulkan), .. })`,
   `acquire`, the same UI pass, then `submit_present_and_read_back` (crcbl
   `3d0edf3a`) in place of `submit_and_present`, which blocks and returns an
@@ -527,9 +525,7 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   subtitle for an artist without an album, where lyr shows the artist
   (`lyr_core::media::subtitle`). Not carried from swaync 0.12.6
   (`data/ui/mpris_player.blp`, `mpris_player.vala`): `http(s)` art (no HTTP
-  client, plan 09) and `data:` URIs (base64, which lyr has no decoder for;
-  crcbl-image has one, private to its SVG reader in `svg::data_url`, which could
-  be asked for); the art's rounded corners (`Item::Image` has no radius); the
+  client, plan 09); the art's rounded corners (`Item::Image` has no radius); the
   blurred art behind the card (`mpris-background`); and swaync's layout, with
   the controls centred in a row under the art and text, and shuffle and repeat
   buttons. lyr keeps previous, play/pause and next at the card's right. swaync

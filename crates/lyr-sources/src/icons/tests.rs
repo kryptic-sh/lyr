@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use crcbl_image::{Rgba8Image, png};
 
-use super::{Icons, MAX_FILE_BYTES, file_uri_path, icon_theme_setting, percent_decode};
+use super::{Icons, MAX_FILE_BYTES, data_url, file_uri_path, icon_theme_setting, percent_decode};
 
 fn write_png(path: &Path, rgba: [u8; 4]) {
     let image = Rgba8Image::new(1, 1, rgba.to_vec()).expect("an image");
@@ -185,6 +185,45 @@ fn a_file_too_large_to_hold_a_picture_within_the_limits_is_not_read() {
         super::read(&path, 16)
     };
     assert!(padded(MAX_FILE_BYTES).is_some(), "the largest file read");
+    assert!(padded(MAX_FILE_BYTES + 1).is_none());
+}
+
+/// `bytes` as a `data:` URL of `media_type`, every byte percent-escaped.
+pub fn data_url_of(media_type: &str, bytes: &[u8]) -> String {
+    let escaped: String = bytes.iter().map(|byte| format!("%{byte:02X}")).collect();
+    format!("data:{media_type},{escaped}")
+}
+
+#[test]
+fn a_data_url_s_picture_is_decoded_by_its_media_type() {
+    let image = Rgba8Image::new(1, 1, vec![4, 5, 6, 255]).expect("an image");
+    let png = png::encode(&image).expect("encoded");
+    let picture = data_url(&data_url_of("image/png", &png), 16).expect("decoded");
+    assert_eq!(picture.pixels(), [4, 5, 6, 255]);
+    let svg = br##"<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"><rect width="4" height="4" fill="red"/></svg>"##;
+    let drawn = data_url(&data_url_of("image/svg+xml", svg), 16).expect("drawn");
+    assert_eq!(
+        (drawn.width(), drawn.height()),
+        (16, 16),
+        "an SVG at the size asked"
+    );
+    assert!(
+        data_url(&data_url_of("application/octet-stream", &png), 16).is_some(),
+        "another type is read by its contents"
+    );
+    assert_eq!(data_url("data:image/png,not a picture", 16), None);
+    assert_eq!(
+        data_url("https://example.com/a.png", 16),
+        None,
+        "not fetched"
+    );
+    // A PNG ends at its `IEND` chunk; what follows is not read by a decoder.
+    let padded = |len: u64| {
+        let mut bytes = png.clone();
+        bytes.resize(usize::try_from(len).expect("fits"), 0);
+        data_url(&data_url_of("image/png", &bytes), 16)
+    };
+    assert!(padded(MAX_FILE_BYTES).is_some(), "the largest payload read");
     assert!(padded(MAX_FILE_BYTES + 1).is_none());
 }
 
