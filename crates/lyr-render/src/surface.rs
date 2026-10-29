@@ -9,7 +9,7 @@ use crcbl_app::present::{FrameOutcome, PresentError, Presenter, PresenterDesc, S
 use crcbl_frame::{
     GraphError, ImportedImage, InitialClaim, RenderGraph, TransientPool, UiRenderer,
 };
-use crcbl_hal::{CommandEncoderDesc, HalError, ResourceState};
+use crcbl_hal::{AcquiredFrame, CommandBufferHandle, CommandEncoderDesc, HalError, ResourceState};
 use crcbl_shell::{Shell, ShellError, ShellEvent, WindowId};
 use crcbl_ui::DrawList;
 use crcbl_ui::image::ImageAtlas;
@@ -148,6 +148,17 @@ impl Surface {
             }
         };
         drop(shared);
+        Self::on(presenter, size, scale, asked)
+    }
+
+    /// A surface presenting through `presenter`, opened at `size` with the
+    /// backend `asked`.
+    fn on(
+        presenter: Presenter,
+        size: (u32, u32),
+        scale: f32,
+        asked: Option<GpuBackend>,
+    ) -> Result<Self, Error> {
         let ui = UiRenderer::with_ring(
             presenter.device(),
             presenter.queue(),
@@ -258,8 +269,23 @@ impl Surface {
         if self.awaiting_size {
             return Ok(false);
         }
-        let Some(frame) = self.presenter.acquire()? else {
+        let Some((frame, commands)) = self.record(list)? else {
             return Ok(false);
+        };
+        // Before the present: on Wayland the request rides its commit.
+        self.presenter.request_frame(shell)?;
+        let outcome = self.presenter.submit_and_present(&frame, commands)?;
+        Ok(outcome == FrameOutcome::Presented)
+    }
+
+    /// Records `list` into the next swapchain image: the frame and its
+    /// commands, or `None` when no image could be acquired.
+    fn record(
+        &mut self,
+        list: &DrawList,
+    ) -> Result<Option<(AcquiredFrame, CommandBufferHandle)>, Error> {
+        let Some(frame) = self.presenter.acquire()? else {
+            return Ok(None);
         };
         let device = self.presenter.device();
         // The list is in window pixels already (`translate`'s scale), text
@@ -290,10 +316,7 @@ impl Surface {
         });
         compiled.execute(device, &mut self.pool, encoder.as_mut(), None)?;
         let commands = encoder.finish()?;
-        // Before the present: on Wayland the request rides its commit.
-        self.presenter.request_frame(shell)?;
-        let outcome = self.presenter.submit_and_present(&frame, commands)?;
-        Ok(outcome == FrameOutcome::Presented)
+        Ok(Some((frame, commands)))
     }
 
     /// Reads one shell event for the answer to the last frame's request.
@@ -328,6 +351,7 @@ impl Surface {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
     use std::time::Duration;
 
     use crcbl_app::backend::GpuBackend;
@@ -335,9 +359,18 @@ mod tests {
     use crcbl_shell::{HeadlessShell, Shell, WindowDesc};
     use crcbl_ui::DrawList;
 
-    use lyr_core::draw::Size;
+    use crcbl_app::present::{Presenter, PresenterDesc};
+    use crcbl_app::readback::Rgba8Frame;
+    use crcbl_image::{Limits, Rgba8Image, png};
+    use crcbl_ui::font::Font;
+    use lyr_config::Colour;
+    use lyr_core::draw::{DrawList as Bar, Item, Picture, Size, TextStyle};
+    use lyr_core::hit::Rect;
 
-    use super::Surface;
+    use crate::text::Text;
+    use crate::translate::translate;
+
+    use super::{Error, Surface};
 
     #[test]
     fn each_present_waits_for_the_shells_answer() {
@@ -400,5 +433,131 @@ mod tests {
 
         surface.destroy().expect("released");
         shell.destroy_window(window).expect("closed");
+    }
+
+    impl Surface {
+        /// A surface on Vulkan with no window behind it, `size` device
+        /// pixels at `scale`.
+        fn offscreen(size: (u32, u32), scale: f32) -> Result<Self, Error> {
+            let desc = PresenterDesc {
+                label: "lyr test",
+                backend: Some(GpuBackend::Vulkan),
+                ..PresenterDesc::default()
+            };
+            Self::on(
+                Presenter::open_offscreen(size, &desc)?,
+                size,
+                scale,
+                Some(GpuBackend::Vulkan),
+            )
+        }
+
+        /// Draws `bar` as [`Surface::draw_bar`] does and reads the frame
+        /// back.
+        fn read_back(&mut self, bar: &Bar, text: &Text) -> Rgba8Frame {
+            let (ui, pictures) = (&mut self.ui, &mut self.pictures);
+            let list = translate(bar, text, self.scale, &mut |picture, width, height| {
+                pictures.image(ui.images_mut(), picture, width, height)
+            });
+            let (frame, commands) = self
+                .record(&list)
+                .expect("recorded")
+                .expect("an image acquired");
+            self.presenter
+                .submit_present_and_read_back(&frame, commands)
+                .expect("read back")
+        }
+    }
+
+    /// A bar of each kind of item: boxes with and without a border, text in
+    /// crcbl's own sans, a picture, a faded group and a clipped one, over a
+    /// background that leaves the bottom rows clear.
+    fn a_bar() -> Bar {
+        let colour = |hex| Colour::parse(hex).expect("a colour");
+        let rect = |x, y, width, height| Rect {
+            x,
+            y,
+            width,
+            height,
+        };
+        let picture = Picture::new(
+            2,
+            2,
+            [
+                [255, 0, 0, 255],
+                [0, 255, 0, 255],
+                [0, 0, 255, 255],
+                [255, 255, 255, 128],
+            ]
+            .concat(),
+        )
+        .expect("a picture");
+        Bar {
+            items: vec![
+                Item::Box {
+                    rect: rect(0.0, 0.0, 240.0, 37.0),
+                    radius: 0.0,
+                    fill: colour("#1e1e2e"),
+                    border: None,
+                },
+                Item::Box {
+                    rect: rect(6.0, 6.0, 90.0, 28.0),
+                    radius: 8.0,
+                    fill: colour("#313244"),
+                    border: Some((2.0, colour("#f38ba8"))),
+                },
+                Item::Text {
+                    rect: rect(14.0, 6.0, 80.0, 28.0),
+                    text: "lyr 12:34".to_owned(),
+                    colour: colour("#cdd6f4"),
+                    style: TextStyle::default(),
+                },
+                Item::Image {
+                    rect: rect(104.0, 8.0, 24.0, 24.0),
+                    picture,
+                },
+                Item::Group {
+                    opacity: 0.5,
+                    items: vec![Item::Box {
+                        rect: rect(136.0, 6.0, 40.0, 28.0),
+                        radius: 14.0,
+                        fill: colour("#a6e3a1"),
+                        border: None,
+                    }],
+                },
+                Item::Clip {
+                    rect: rect(184.0, 10.0, 30.0, 20.0),
+                    items: vec![Item::Box {
+                        rect: rect(176.0, 0.0, 60.0, 40.0),
+                        radius: 4.0,
+                        fill: colour("#89b4fa"),
+                        border: None,
+                    }],
+                },
+            ],
+        }
+    }
+
+    #[test]
+    #[ignore = "needs a Vulkan driver; CI's render job runs it on lavapipe"]
+    fn a_bar_draws_as_its_reference_image() {
+        let reference = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surface/a_bar.png");
+        let mut surface = Surface::offscreen((240, 40), 1.0).expect("an offscreen surface");
+        let frame = surface.read_back(&a_bar(), &Text::new(Font::sans().clone(), 14.0));
+        surface.destroy().expect("released");
+        let drawn = Rgba8Image::new(frame.width, frame.height, frame.pixels).expect("an image");
+        let expected = std::fs::read(&reference)
+            .ok()
+            .and_then(|bytes| png::decode(&bytes, &Limits::default()).ok());
+        if expected.as_ref() != Some(&drawn) {
+            let written = std::env::temp_dir().join("lyr-render-a_bar.png");
+            std::fs::write(&written, png::encode(&drawn).expect("encoded")).expect("written");
+            panic!(
+                "the bar drawn ({:?}) differs from {}: it is at {}",
+                frame.format,
+                reference.display(),
+                written.display()
+            );
+        }
     }
 }

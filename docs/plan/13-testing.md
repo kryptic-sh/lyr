@@ -33,10 +33,11 @@ tested with no display and no GPU, on every CI runner.
   `.swaync-test` sends (urgencies, actions, images, long bodies, `replaces_id`)
   and assert on the history, the signals lyr emits, and the toasts in the
   `DrawList`.
-- **Headless render:** crcbl's headless shell backend (which crcbl's own CI runs
-  everything through) renders a bar to an image. Image comparisons are limited
-  to the Linux runner, because GPU and software rasterisation differ per
-  platform.
+- **Headless render:** a bar drawn through lyr's own path (`translate` and
+  crcbl's UI pass) on an offscreen crcbl presenter, read back and compared with
+  a reference image (`lyr-render`'s `a_bar_draws_as_its_reference_image`). It
+  runs on lavapipe, Mesa's CPU Vulkan driver, and only on the Linux runner,
+  because GPU and software rasterisation differ per platform.
 
 ## 3. Manual checklists
 

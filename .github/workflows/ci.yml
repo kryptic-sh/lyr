@@ -202,10 +202,41 @@ jobs:
           fc-cache -f "$fonts"
           fc-list | grep -q 'Hack Nerd Font Propo'
       - run:
-          cargo test --locked -p lyr-render --lib
-          -- --ignored --exact
+          cargo test --locked -p lyr-render --lib -- --ignored --exact
           fonts::tests::the_bar_font_has_every_glyph_the_defaults_draw
           fonts::tests::no_fallback_face_is_read_until_text_needs_it
+
+  # A bar drawn offscreen on lavapipe, Mesa's CPU Vulkan driver, and read
+  # back, against the reference image in lyr-render. Linux only: GPU and
+  # software rasterisation differ per platform (docs/plan/13-testing.md).
+  # The test is #[ignore]d everywhere else, since it needs a Vulkan driver.
+  render:
+    name: render on lavapipe
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions-rust-lang/setup-rust-toolchain@v2
+        with:
+          toolchain: stable
+          cache: false
+      - run: rustup update --no-self-update stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install lavapipe
+        run:
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends
+          mesa-vulkan-drivers libvulkan1
+      - run:
+          cargo test --locked -p lyr-render --lib -- --ignored --exact
+          surface::tests::a_bar_draws_as_its_reference_image
+        env:
+          VK_DRIVER_FILES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+      - name: Keep the bar drawn
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: a_bar-drawn
+          path: /tmp/lyr-render-a_bar.png
+          if-no-files-found: ignore
 
   # lyr_wm::sway against a real sway: headless (wlroots' headless backend,
   # two virtual outputs, no GPU or input devices), in a private
@@ -460,6 +491,7 @@ jobs:
         test,
         leak-guard,
         nerd-font,
+        render,
         sway-e2e,
       ]
     # A tag's push, or a re-run dispatched on the tag: never a branch.
@@ -796,6 +828,7 @@ jobs:
         leak-guard,
         smoke,
         nerd-font,
+        render,
         sway-e2e,
         build,
         smoke-cross,
