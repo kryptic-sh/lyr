@@ -166,10 +166,10 @@ implementation follows meanwhile.
   as the owner's call. When it lands: move lyr's daemon and `notify_session`
   onto it, and the Windows bell from `ms-actioncenter:` to real state where the
   seam can read it.
-- **crcbl: what lyr asked for next (2026-10-28), and where each stands.** On
-  crcbl's main, unreleased, to take with its next release: an activation token,
-  `Shell::activation_token(window) -> Result<Option<String>, ShellError>` (crcbl
-  `277bd79a`; ask right after the click's `Button` event, before
+- **crcbl: what lyr asked for next (2026-10-28), and where each stands.** In
+  crcbl 0.13.0, which lyr now pins, and not yet used by lyr: an activation
+  token, `Shell::activation_token(window) -> Result<Option<String>, ShellError>`
+  (crcbl `277bd79a`; ask right after the click's `Button` event, before
   `ActionInvoked`; `None` without xdg-activation and on every non-Wayland
   backend), for plan 09's `ActivationToken` (`Daemon::activation_token` is
   declared and never sent); and `crcbl_image::data_url::parse(&str)` giving a
@@ -256,32 +256,34 @@ implementation follows meanwhile.
   `display_adapter`, and the scripted resize and read-back as CI jobs.
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
-  `=0.12.1` (2026-10-27). It brought lazy fallback faces (`lyr_render::fonts`:
-  124 to 43 MB resident on the owner's laptop, whose bar font has 17 fallback
-  faces), a first start on the display's Vulkan driver alone (in a nested
-  Hyprland there: no `/dev/nvidia*` handle, 94 ms from the shell to the first
-  frame, where 0.12.0 held 12 handles for the process's life and took 408 ms),
-  the viewport fix for a resized panel (its own entry under the audio menu
-  below) and `RichLayout`. 0.12.0 (2026-10-26) brought `GpuChoice`, which lyr
-  saves between runs (`lyr_render::gpu`, the file `gpu-choice` in lyr's state
-  directory, `apps/lyr/src/gpu.rs`). With 0.12.1 the choice names its driver
-  from the first start, so `lyr_render::gpu`'s locate thread no longer runs
-  (seen: one save, no search); it is kept for a choice crcbl opened without
-  naming a driver (a pin, a loader variable, or the display's device refusing
-  the window), where without it every start would load every driver. 0.11.0
-  (0.10.0 was skipped, since its crates.io publish stopped halfway) brought icon
-  theme lookups that take the nearest size from a per-theme index. 0.9.0 came
-  2026-10-23 for `SharedGpu` (that bump needed no change in lyr's code; 0.8.0's
-  `Presenter` drains before a reconfigure, so lyr no longer does; 0.7.0 brought
-  `set_panel`, frame pacing and `font::breaks`; crcbl's `rust-version` is 1.98,
-  and lyr's follows). 0.8.1 ran on Windows. crcbl 0.4.0 (2026-10-18) brought
-  `crcbl-app`, the window-plus-device crate lyr asked for so that it links no
-  engine, audio (cpal, ALSA) or physics; 0.5.0's only breaking change is in
-  crcbl-phys. M1 adds `crcbl-app`, `crcbl-hal`, `crcbl-ui` (with
-  `system-fonts`), `crcbl-frame`, `crcbl-font` and the backend per platform
-  (Vulkan on Linux, D3D12 on Windows, Metal on macOS), each pinned exactly, and
-  `crcbl-image` with M6. The GPU path, as crcbl reported it (not read yet at
-  0.4.0 or later; read before M1 relies on it):
+  `=0.13.0` (2026-10-29), which reads a fallback face whole only once its `cmap`
+  maps a character drawn (the Windows memory entry below). 0.12.1 (2026-10-27)
+  brought lazy fallback faces (`lyr_render::fonts`: 124 to 43 MB resident on the
+  owner's laptop, whose bar font has 17 fallback faces), a first start on the
+  display's Vulkan driver alone (in a nested Hyprland there: no `/dev/nvidia*`
+  handle, 94 ms from the shell to the first frame, where 0.12.0 held 12 handles
+  for the process's life and took 408 ms), the viewport fix for a resized panel
+  (its own entry under the audio menu below) and `RichLayout`. 0.12.0
+  (2026-10-26) brought `GpuChoice`, which lyr saves between runs
+  (`lyr_render::gpu`, the file `gpu-choice` in lyr's state directory,
+  `apps/lyr/src/gpu.rs`). With 0.12.1 the choice names its driver from the first
+  start, so `lyr_render::gpu`'s locate thread no longer runs (seen: one save, no
+  search); it is kept for a choice crcbl opened without naming a driver (a pin,
+  a loader variable, or the display's device refusing the window), where without
+  it every start would load every driver. 0.11.0 (0.10.0 was skipped, since its
+  crates.io publish stopped halfway) brought icon theme lookups that take the
+  nearest size from a per-theme index. 0.9.0 came 2026-10-23 for `SharedGpu`
+  (that bump needed no change in lyr's code; 0.8.0's `Presenter` drains before a
+  reconfigure, so lyr no longer does; 0.7.0 brought `set_panel`, frame pacing
+  and `font::breaks`; crcbl's `rust-version` is 1.98, and lyr's follows). 0.8.1
+  ran on Windows. crcbl 0.4.0 (2026-10-18) brought `crcbl-app`, the
+  window-plus-device crate lyr asked for so that it links no engine, audio
+  (cpal, ALSA) or physics; 0.5.0's only breaking change is in crcbl-phys. M1
+  adds `crcbl-app`, `crcbl-hal`, `crcbl-ui` (with `system-fonts`),
+  `crcbl-frame`, `crcbl-font` and the backend per platform (Vulkan on Linux,
+  D3D12 on Windows, Metal on macOS), each pinned exactly, and `crcbl-image` with
+  M6. The GPU path, as crcbl reported it (not read yet at 0.4.0 or later; read
+  before M1 relies on it):
   `crcbl_app::window::open_window(shell, elapsed, desc)`, `wait_for_configure`
   for the extent, then
   `crcbl_app::present::Presenter::open(&shell, window, extent, &PresenterDesc)`
@@ -342,37 +344,29 @@ implementation follows meanwhile.
     shape): cold, with no saved GPU choice, 1.12 s, the device 860 ms; 12 ms of
     font lookup, 39 ms for the WLAN check (its service not running), 6 ms of
     swapchain; the iGPU cold 2.1 s; WARP 145 ms. Startup there is driver time.
-    DRED, which crcbl-dx12 enables in every build, costs none of it (next
-    entry).
-  - Memory (working set / private bytes): 131.4 / 157.4 MB at start, at most
-    146.3 / 177.5 after 10 clock and 10 audio open-and-close cycles, and 135.2 /
-    160.4 five seconds after the last close. No leak, and the Windows heap gives
-    memory back by itself. On WARP: 115.7 / 125.7, so the AMD driver holds about
-    30 MB.
+    DRED, which crcbl-dx12 enables in every build, costs none of it (below).
+  - Memory (working set / private bytes), crcbl 0.12.1: 131.4 / 157.4 MB at
+    start, at most 146.3 / 177.5 after 10 clock and 10 audio open-and-close
+    cycles, and 135.2 / 160.4 five seconds after the last close. No leak, and
+    the Windows heap gives memory back by itself. On WARP: 115.7 / 125.7, so the
+    AMD driver holds about 30 MB. With crcbl 0.13.0 (release builds of `546cac5`
+    with each crcbl, 3 interleaved pairs, 5 s after the first present): 76.7 –
+    81.6 / 76.4 – 76.9 MB and 5.4 MB of files read, against 131.6 – 134.5 /
+    157.4 – 160.1 and 62.9 – 63.2 MB on 0.12.1. 0.12.1 read all six system
+    fallback faces whole to learn none drew the bar's icons; 0.13.0 asks each
+    face's `cmap` first. The bar's pixels were identical on both. The cycles
+    were not rerun on 0.13.0.
   - Idle: 2 wake-ups, 1 event and 1 present a minute once settled, and 47 ms of
     CPU over 310 s.
-- **crcbl: fallback faces read whole, fixed on crcbl main; adopt at its next
-  release.** Text the bar font lacks a glyph for (its icons, when the configured
-  font is missing) makes crcbl-ui's layout ask each lazy fallback face in turn,
-  and in crcbl 0.12.1 each is read and parsed whole to answer. On Windows
-  without the Nerd Font all six system fallbacks were read: 61.4 MB of private
-  bytes (`seguiemj` 12.6 MB, `msyh.ttc` 19.2 MB, `YuGothR.ttc` 13.5 MB and
-  `malgun` 13.1 MB among them). crcbl's answers (2026-10-29, unreleased):
-  - `2a4dfe57`: a `Font::from_system_lazy` face answers whether it maps a char
-    from its `cmap` alone (`crcbl_font::FontMatch::read_cmap`), and is read
-    whole only when it does, on every platform. On crcbl's laptop a Nerd Font
-    icon read one face whole where it had read six. Needs nothing from lyr
-    beyond the version bump; then check, on a machine without the Nerd Font,
-    that only the face mapping each icon is read.
-  - `62f9e3f5`: `FontData: From<Arc<dyn AsRef<[u8]> + Send + Sync>>`, sharing
-    the caller's bytes with the shaper. With it the regular face (2.8 MB of heap
-    for Hack Nerd Font Propo) could be a mapped file, but mapping needs a new
-    crate (`memmap2`) or `unsafe` mmap, and a file truncated under the map
-    faults: the owner's call.
   - DRED in crcbl-dx12 is on in every build by design, to locate a device loss,
     and stays on: crcbl's Windows session timed `D3D12CreateDevice` on the RX
     7900 XTX in a quiet window (20 mirrored pairs, 2 – 10 % CPU) at a median of
     287.6 ms without it and 284.4 ms with crcbl's `dred::enable` settings.
+- **Mapping the bar font instead of reading it: the owner's call.** crcbl 0.13.0
+  has `FontData: From<Arc<dyn AsRef<[u8]> + Send + Sync>>`, sharing the caller's
+  bytes with the shaper, so the regular face (2.8 MB of heap for Hack Nerd Font
+  Propo) could be a mapped file. Mapping needs a new crate (`memmap2`) or
+  `unsafe` mmap, and a file truncated under the map faults.
 - **Startup and memory, measured on Linux (2026-10-29).** A release build in a
   nested Hyprland on the owner's laptop (Intel RPL-U, Mesa, warm caches; not in
   a quiet window: load average 16.7 on 12 cores while other sessions built, so
@@ -402,7 +396,7 @@ implementation follows meanwhile.
     it; not worth it at 40 ms.
   - The regular face (2.8 MB for Hack Nerd Font Propo) is read into the heap.
     Mapping the file instead would share it with other programs using the font,
-    which crcbl's next release allows (see the entry above).
+    which crcbl 0.13.0 allows (the entry on mapping the bar font).
   - fontconfig's init could be skipped by remembering the resolved faces, as the
     GPU choice is remembered, but the fallback list needs fontconfig anyway.
 - **crcbl: every lyr and pikr feature on every backend.** At the owner's request

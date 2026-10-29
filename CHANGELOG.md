@@ -87,6 +87,11 @@ and this project adheres to
   picture over 1024 pixels a side, which was read whole only to be refused, so a
   wallpaper sent as a notification's image no longer briefly costs its size in
   memory.
+- Built on crcbl 0.13.0 (from 0.12.1). A system fallback font is read whole only
+  once it maps a character the bar draws, found from its character map alone. On
+  Windows without the bar font, where every icon falls back, lyr had read all
+  six system fallbacks at start: it now starts with 76 MB of private memory,
+  against 157 MB, and reads 5.4 MB of files, against 63 MB.
 
 ### Fixed
 
