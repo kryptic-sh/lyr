@@ -11,8 +11,8 @@ use tokio::net::UnixStream;
 
 use super::{
     EXIT_COMMAND, GET_TREE, GET_WORKSPACES, HEADER_LENGTH, Header, OUTPUT_EVENT, RUN_COMMAND,
-    SHUTDOWN_EVENT, SUBSCRIBE, SUBSCRIPTION, Unquotable, WINDOW_EVENT, WORKSPACE_EVENT,
-    focus_command, frame, state, window_event_moves_focus,
+    SHUTDOWN_EVENT, SUBSCRIBE, SUBSCRIPTION, Unquotable, WINDOW_EVENT, WORKSPACE_EVENT, app_window,
+    focus_command, focus_window_command, frame, state, window_event_moves_focus,
 };
 use crate::{State, Workspace};
 
@@ -118,6 +118,26 @@ impl Sway {
     /// would read as something else ([`Unquotable`]), which is never sent.
     pub async fn focus(&self, workspace: &Workspace) -> Result<(), Error> {
         self.command(&focus_command(workspace)?).await
+    }
+
+    /// Focuses the window of the application `names` name that had focus
+    /// most recently, switching to its workspace. Returns whether it has a
+    /// window.
+    ///
+    /// # Errors
+    ///
+    /// When sway cannot be reached or refuses.
+    pub async fn focus_app(&self, names: &[&str]) -> Result<bool, Error> {
+        let tree = self.request(GET_TREE, "").await?;
+        let window = app_window(&tree, names).map_err(|source| Error::Json {
+            request: "GET_TREE".to_owned(),
+            source,
+        })?;
+        let Some(window) = window else {
+            return Ok(false);
+        };
+        self.command(&focus_window_command(window)).await?;
+        Ok(true)
     }
 
     /// Ends the sway session: the power menu's Log out.
@@ -352,7 +372,12 @@ mod tests {
         {"id": 4, "name": "1", "num": 1, "output": "eDP-1", "focused": false, "urgent": false},
         {"id": 6, "name": "2", "num": 2, "output": "eDP-1", "focused": true, "urgent": false}
     ]"#;
-    const TREE: &str = r#"{"id": 1, "type": "root", "focused": false, "nodes": []}"#;
+    /// A tree with one window, not focused.
+    const TREE: &str = r#"{"id": 1, "type": "root", "focused": false, "nodes": [
+        {"id": 6, "type": "workspace", "name": "2", "focused": false, "nodes": [
+            {"id": 9, "type": "con", "focused": false, "app_id": "thunderbird", "nodes": []}
+        ]}
+    ]}"#;
 
     async fn read_message(stream: &mut UnixStream) -> Option<(u32, String)> {
         let mut header = [0; HEADER_LENGTH];
@@ -552,6 +577,30 @@ mod tests {
             last: State::default(),
         };
         assert!(matches!(events.next().await, Ok(None)));
+    }
+
+    #[tokio::test]
+    async fn an_app_s_window_is_found_in_the_tree_and_focused_by_id() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("sway.sock");
+        let mut requests = fake_sway(&path, true, Vec::new(), r#"[{"success": true}]"#);
+        assert!(
+            at(&path)
+                .focus_app(&["Thunderbird"])
+                .await
+                .expect("focused")
+        );
+        assert_eq!(requests.recv().await, Some((GET_TREE, String::new())));
+        assert_eq!(
+            requests.recv().await,
+            Some((RUN_COMMAND, "[con_id=9] focus".to_owned()))
+        );
+        assert!(
+            !at(&path).focus_app(&["firefox"]).await.expect("answered"),
+            "no window of that app"
+        );
+        assert_eq!(requests.recv().await, Some((GET_TREE, String::new())));
+        assert!(requests.try_recv().is_err(), "and no command");
     }
 
     #[tokio::test]

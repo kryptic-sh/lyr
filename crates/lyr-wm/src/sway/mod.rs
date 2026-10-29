@@ -20,7 +20,7 @@ mod reply;
 #[cfg(unix)]
 pub use ipc::{Error, Events, Sway};
 #[cfg(unix)]
-pub use reply::{state, window_event_moves_focus};
+pub use reply::{app_window, state, window_event_moves_focus};
 
 use crate::Workspace;
 
@@ -137,6 +137,13 @@ pub fn focus_command(workspace: &Workspace) -> Result<String, Unquotable> {
         return Err(Unquotable::Keyword(name.clone()));
     }
     Ok(format!(r#"workspace --no-auto-back-and-forth "{name}""#))
+}
+
+/// The command that focuses the window sway gave `id`, switching to the
+/// workspace it is on.
+#[must_use]
+pub fn focus_window_command(id: i64) -> String {
+    format!("[con_id={id}] focus")
 }
 
 /// The command that ends the session: the power menu's Log out.

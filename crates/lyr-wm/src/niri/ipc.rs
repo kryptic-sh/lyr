@@ -5,10 +5,14 @@ use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use serde::Deserialize;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, Lines};
 use tokio::net::UnixStream;
 
-use super::{EVENT_STREAM_REQUEST, QUIT_REQUEST, Tracker, focus_request};
+use super::{
+    EVENT_STREAM_REQUEST, QUIT_REQUEST, Tracker, WINDOWS_REQUEST, focus_request,
+    focus_window_request,
+};
 use crate::{State, Workspace};
 
 /// How long a request, or the event stream's first state, may take before
@@ -105,7 +109,27 @@ impl Niri {
     ///
     /// When niri cannot be reached or refuses.
     pub async fn focus(&self, workspace: &Workspace) -> Result<(), Error> {
-        self.request(&focus_request(workspace)).await
+        self.request(&focus_request(workspace)).await.map(drop)
+    }
+
+    /// Focuses the window of the application `names` name that had focus
+    /// most recently, switching to its workspace. Returns whether it has a
+    /// window.
+    ///
+    /// # Errors
+    ///
+    /// When niri cannot be reached or refuses.
+    pub async fn focus_app(&self, names: &[&str]) -> Result<bool, Error> {
+        let windows = self.request(WINDOWS_REQUEST).await?;
+        let window = app_window(windows, names).map_err(|source| Error::Json {
+            request: WINDOWS_REQUEST.to_owned(),
+            source,
+        })?;
+        let Some(window) = window else {
+            return Ok(false);
+        };
+        self.request(&focus_window_request(window)).await?;
+        Ok(true)
     }
 
     /// Ends the niri session: the power menu's Log out.
@@ -121,12 +145,13 @@ impl Niri {
     pub async fn exit(&self) -> Result<(), Error> {
         match self.request(QUIT_REQUEST).await {
             Err(Error::Closed { .. }) => Ok(()),
-            outcome => outcome,
+            outcome => outcome.map(drop),
         }
     }
 
-    /// Sends one request on a connection of its own and checks the reply.
-    async fn request(&self, request: &str) -> Result<(), Error> {
+    /// Sends one request on a connection of its own and returns what its
+    /// `Ok` reply holds.
+    async fn request(&self, request: &str) -> Result<serde_json::Value, Error> {
         let exchange = async {
             let stream = self.connect().await?;
             let mut lines = BufReader::new(stream).lines();
@@ -140,12 +165,12 @@ impl Niri {
     }
 
     /// Writes `request` as one line and reads its reply, which must be
-    /// `{"Ok": …}`.
+    /// `{"Ok": …}`, and returns what it holds.
     async fn exchange(
         &self,
         lines: &mut Lines<BufReader<UnixStream>>,
         request: &str,
-    ) -> Result<(), Error> {
+    ) -> Result<serde_json::Value, Error> {
         let stream = lines.get_mut().get_mut();
         stream
             .write_all(format!("{request}\n").as_bytes())
@@ -157,7 +182,7 @@ impl Niri {
                 request: request.to_owned(),
                 source,
             })?;
-        outcome.map(drop).map_err(|_| Error::Refused {
+        outcome.map_err(|_| Error::Refused {
             request: request.to_owned(),
             reply,
         })
@@ -187,6 +212,42 @@ impl Niri {
             source,
         }
     }
+}
+
+/// The id of the window of the application `names` name
+/// ([`crate::app::is_app`]) that had focus most recently, from what the
+/// reply to [`WINDOWS_REQUEST`] holds; `None` when it has no window.
+fn app_window(windows: serde_json::Value, names: &[&str]) -> serde_json::Result<Option<u64>> {
+    #[derive(Deserialize)]
+    struct Reply {
+        #[serde(rename = "Windows")]
+        windows: Vec<Window>,
+    }
+    #[derive(Deserialize)]
+    struct Window {
+        id: u64,
+        app_id: Option<String>,
+        /// When it last had focus; `None` if it never had. Ordered by its
+        /// fields, seconds first.
+        focus_timestamp: Option<Timestamp>,
+    }
+    #[derive(Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+    struct Timestamp {
+        secs: u64,
+        nanos: u32,
+    }
+    let reply: Reply = serde_json::from_value(windows)?;
+    Ok(reply
+        .windows
+        .into_iter()
+        .filter(|window| {
+            window
+                .app_id
+                .as_deref()
+                .is_some_and(|app_id| crate::app::is_app(app_id, names))
+        })
+        .max_by(|one, other| one.focus_timestamp.cmp(&other.focus_timestamp))
+        .map(|window| window.id))
 }
 
 /// The event stream, read for changes.
@@ -250,11 +311,11 @@ mod tests {
     const QUITS: &str = "";
 
     /// A niri on `path`: each connection's requests are handed out and
-    /// answered with `reply`, and once one asks for the event stream it is
+    /// answered with `reply`'s answer to them, and once one asks for the event stream it is
     /// sent `events`, each followed by a newline, and held open.
     fn fake_niri(
         path: &Path,
-        reply: &'static str,
+        reply: fn(&str) -> &'static str,
         events: Vec<String>,
     ) -> tokio::sync::mpsc::UnboundedReceiver<String> {
         let listener = UnixListener::bind(path).expect("bind");
@@ -268,6 +329,7 @@ mod tests {
                     let mut lines = BufReader::new(stream).lines();
                     while let Ok(Some(request)) = lines.next_line().await {
                         tx.send(request.clone()).expect("send");
+                        let reply = reply(&request);
                         if reply == QUITS {
                             return;
                         }
@@ -309,7 +371,7 @@ mod tests {
         let path = dir.path().join("niri.sock");
         let mut requests = fake_niri(
             &path,
-            r#"{"Ok":"Handled"}"#,
+            |_| r#"{"Ok":"Handled"}"#,
             vec![
                 line(WORKSPACES),
                 r#"{"ConfigLoaded":{"failed":false}}"#.to_owned(),
@@ -341,7 +403,7 @@ mod tests {
     async fn focus_and_quit_send_their_actions_and_check_the_reply() {
         let dir = tempfile::tempdir().expect("tempdir");
         let ok = dir.path().join("ok.sock");
-        let mut requests = fake_niri(&ok, r#"{"Ok":"Handled"}"#, Vec::new());
+        let mut requests = fake_niri(&ok, |_| r#"{"Ok":"Handled"}"#, Vec::new());
         let two = Workspace {
             id: 2,
             name: "2".into(),
@@ -360,7 +422,7 @@ mod tests {
         );
 
         let refused = dir.path().join("refused.sock");
-        let _requests = fake_niri(&refused, r#"{"Err":"workspace not found"}"#, Vec::new());
+        let _requests = fake_niri(&refused, |_| r#"{"Err":"workspace not found"}"#, Vec::new());
         assert!(matches!(
             at(&refused).focus(&two).await,
             Err(Error::Refused { reply, .. }) if reply.contains("not found")
@@ -372,10 +434,55 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_app_s_most_recently_focused_window_is_focused_by_id() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("niri.sock");
+        // As niri 26.04 answers, on one line, less the fields lyr does not
+        // read.
+        let reply = |request: &str| match request {
+            r#""Windows""# => concat!(
+                r#"{"Ok":{"Windows":["#,
+                r#"{"id":2,"app_id":"thunderbird","workspace_id":1,"#,
+                r#""focus_timestamp":{"secs":95260,"nanos":41562270}},"#,
+                r#"{"id":3,"app_id":"thunderbird","workspace_id":2,"#,
+                r#""focus_timestamp":{"secs":95260,"nanos":48393329}},"#,
+                r#"{"id":4,"app_id":"thunderbird","workspace_id":3,"focus_timestamp":null},"#,
+                r#"{"id":5,"app_id":null,"workspace_id":3,"#,
+                r#""focus_timestamp":{"secs":99999,"nanos":0}}]}}"#,
+            ),
+            _ => r#"{"Ok":"Handled"}"#,
+        };
+        let mut requests = fake_niri(&path, reply, Vec::new());
+        assert!(
+            at(&path)
+                .focus_app(&["Thunderbird"])
+                .await
+                .expect("focused")
+        );
+        assert_eq!(requests.recv().await.as_deref(), Some(r#""Windows""#));
+        assert_eq!(
+            requests.recv().await.as_deref(),
+            Some(r#"{"Action":{"FocusWindow":{"id":3}}}"#),
+            "the latest focus, by its nanoseconds"
+        );
+        assert!(
+            !at(&path).focus_app(&["firefox"]).await.expect("answered"),
+            "no window of that app"
+        );
+        assert_eq!(requests.recv().await.as_deref(), Some(r#""Windows""#));
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), requests.recv())
+                .await
+                .is_err(),
+            "and nothing sent"
+        );
+    }
+
+    #[tokio::test]
     async fn quit_is_done_when_niri_closes_unanswered_and_only_quit_is() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("niri.sock");
-        let _requests = fake_niri(&path, QUITS, Vec::new());
+        let _requests = fake_niri(&path, |_| QUITS, Vec::new());
         at(&path).exit().await.expect("closing is the answer");
         let two = Workspace {
             id: 2,

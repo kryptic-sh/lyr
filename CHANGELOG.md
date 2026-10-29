@@ -27,6 +27,14 @@ and this project adheres to
 
 ### Added
 
+- On Hyprland, sway and niri, a click on a notification's body focuses the
+  window of the application that sent it, switching to the workspace it is on,
+  whether or not the notification has a `default` action. The window is matched
+  by the `desktop-entry` hint or the application's name. New in `lyr-wm`:
+  `Compositor::focus_app`, the backends' `focus_app`, `app::is_app`,
+  `hyprland::focus_window_request`, `sway::focus_window_command` and
+  `sway::app_window`, and `niri::focus_window_request` and
+  `niri::WINDOWS_REQUEST`.
 - A click on a notification's action, in a toast or in the clock panel, sends
   the application an xdg-activation token (`ActivationToken`, just before
   `ActionInvoked`), so under Wayland the window it raises can take focus.

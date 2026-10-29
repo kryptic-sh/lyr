@@ -34,6 +34,14 @@ struct ClientReply {
     workspace: ClientWorkspace,
     #[serde(default)]
     class: String,
+    /// How recently it had focus: 0 for the focused window, counting up,
+    /// and -1 for one that never had it.
+    #[serde(rename = "focusHistoryID", default = "never_focused")]
+    focus_history: i64,
+}
+
+const fn never_focused() -> i64 {
+    -1
 }
 
 #[derive(Deserialize)]
@@ -43,6 +51,18 @@ struct ClientWorkspace {
 
 /// What Hyprland writes for a workspace with no monitor.
 const NO_MONITOR: &str = "?";
+
+/// The address of the window of the application `names` name
+/// ([`crate::app::is_app`]) that had focus most recently, from a
+/// `j/clients` reply; `None` when it has no window.
+pub(super) fn app_window(clients: &str, names: &[&str]) -> serde_json::Result<Option<String>> {
+    let clients: Vec<ClientReply> = serde_json::from_str(clients)?;
+    Ok(clients
+        .into_iter()
+        .filter(|client| crate::app::is_app(&client.class, names))
+        .min_by_key(|client| (client.focus_history < 0, client.focus_history))
+        .map(|client| client.address))
+}
 
 /// Builds the state the three replies describe.
 pub(super) fn parse(workspaces: &str, active: &str, clients: &str) -> serde_json::Result<Tracker> {
@@ -82,7 +102,7 @@ pub(super) fn parse(workspaces: &str, active: &str, clients: &str) -> serde_json
 
 #[cfg(test)]
 mod tests {
-    use super::parse;
+    use super::{app_window, parse};
     use crate::hyprland::{Event, Workspace};
 
     const WORKSPACES: &str = r#"[
@@ -103,6 +123,29 @@ mod tests {
         {"address": "0x55d0c8a4b1e0", "mapped": true,
          "workspace": {"id": -1337, "name": "mail"}, "class": "kitty"}
     ]"#;
+
+    #[test]
+    fn an_app_s_most_recently_focused_window_is_chosen() {
+        let clients = r#"[
+            {"address": "0x1", "workspace": {"id": 1}, "class": "kitty", "focusHistoryID": 0},
+            {"address": "0x2", "workspace": {"id": 2}, "class": "thunderbird", "focusHistoryID": -1},
+            {"address": "0x3", "workspace": {"id": 3}, "class": "thunderbird", "focusHistoryID": 4},
+            {"address": "0x4", "workspace": {"id": 4}, "class": "thunderbird", "focusHistoryID": 2}
+        ]"#;
+        let names = ["Thunderbird", "org.mozilla.Thunderbird"];
+        assert_eq!(
+            app_window(clients, &names).expect("valid").as_deref(),
+            Some("0x4"),
+            "the lowest history, before one never focused"
+        );
+        let never = r#"[{"address": "0x2", "workspace": {"id": 2}, "class": "thunderbird"}]"#;
+        assert_eq!(
+            app_window(never, &names).expect("valid").as_deref(),
+            Some("0x2")
+        );
+        assert_eq!(app_window(clients, &["firefox"]).expect("valid"), None);
+        assert!(app_window("{}", &names).is_err());
+    }
 
     #[test]
     fn the_replies_seed_workspaces_active_and_windows() {

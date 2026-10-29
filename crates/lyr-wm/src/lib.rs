@@ -11,6 +11,7 @@
 
 #[cfg(unix)]
 pub mod aerospace;
+pub mod app;
 #[cfg(unix)]
 mod compositor;
 pub mod hyprland;

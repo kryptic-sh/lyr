@@ -21,7 +21,7 @@ mod state;
 pub use event::{Event, ParseError, parse_line};
 #[cfg(unix)]
 pub use ipc::{Error, Events, Hyprland};
-pub use request::{Dialect, exit_request, focus_request};
+pub use request::{Dialect, exit_request, focus_request, focus_window_request};
 pub use state::Tracker;
 
 pub use crate::{State, Step, Workspace, WorkspaceId};

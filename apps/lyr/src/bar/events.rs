@@ -584,7 +584,8 @@ impl App {
     }
 
     /// Carries out a click on a toast: its `default` action when it has one,
-    /// another action, opening a link, or dismissing it. An action is sent
+    /// another action, opening a link, or dismissing it. A click on the body
+    /// also focuses the sender's window, on the workspace it is on. An action is sent
     /// with an activation token made from the click in `window`, so the
     /// application can raise its window. Returns whether it invoked an
     /// action.
@@ -614,6 +615,12 @@ impl App {
         };
         match clicked {
             Some(Clicked::Invoke(id)) => {
+                // The window comes forward whether or not the application
+                // raises it for the token: Hyprland only marks a window
+                // urgent for one unless `misc:focus_on_activate` is set.
+                if let Some(names) = self.sender_names(id) {
+                    self.commands.focus_app(names);
+                }
                 if let Some(key) = key(id, &|_, key| key == DEFAULT_ACTION) {
                     self.commands
                         .invoke(id, key, activation_token(shell, window));
@@ -654,6 +661,26 @@ impl App {
             None => {}
         }
         false
+    }
+
+    /// The names the application that sent notification `id` goes by, its
+    /// `desktop-entry` hint and its name, for finding its window; `None`
+    /// when it gave neither or the notification is gone.
+    #[cfg(target_os = "linux")]
+    fn sender_names(&self, id: u32) -> Option<Vec<String>> {
+        let store = self.toasts.store()?;
+        let store = store
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let content = &store.get(id)?.content;
+        let names: Vec<String> = content
+            .desktop_entry
+            .iter()
+            .chain([&content.app_name])
+            .filter(|name| !name.trim().is_empty())
+            .cloned()
+            .collect();
+        (!names.is_empty()).then_some(names)
     }
 
     /// Windows and macOS have no toasts: lyr is not their notification

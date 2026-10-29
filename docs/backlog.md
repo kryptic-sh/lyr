@@ -504,19 +504,28 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   Thunderbird notification on Hyprland switches to Thunderbird's workspace).
   Split by the owner: the Linux lyr session (office-lyr) builds it on Linux, the
   Windows session on Windows.
-  - Linux today: a left click on a toast's or clock-panel entry's body
-    (`Clicked::Invoke`, `toasts.rs`) invokes the notification's `default`
-    action, and since `9070007` sends an `ActivationToken` just before
-    `ActionInvoked` (`toast_clicked`, `apps/lyr/src/bar/events.rs`). Raising the
-    window is then the application's and the compositor's. A notification with
-    no `default` action invokes nothing. Not verified: whether Thunderbird
-    raises itself with the token, and whether Hyprland, sway and niri each move
-    to the window's workspace for it. Where either does not, or there is no
-    `default` action, a fallback could focus the sender's window through the
-    compositor, matching the `desktop-entry` hint (`Incoming::desktop_entry`) or
-    the application's name against the window's class or app id: Hyprland's
-    `focuswindow` dispatcher, sway's `[app_id=…] focus`, niri's `focus-window`
-    action, and `_NET_ACTIVE_WINDOW` on X11.
+  - Linux: a left click on a toast's or clock-panel entry's body
+    (`Clicked::Invoke`) asks the compositor to focus the sender's window,
+    switching to its workspace (`toast_clicked` and `sender_names`,
+    `apps/lyr/src/bar/events.rs`; `lyr_wm::Compositor::focus_app`), and then
+    invokes the `default` action, if any, after an `ActivationToken`. The window
+    is the one that had focus most recently among those whose class or app id
+    matches the `desktop-entry` hint or the application's name
+    (`lyr_wm::app::is_app`). The token alone is not enough on Hyprland: with
+    `misc:focus_on_activate` off, its default, an activation only marks the
+    window urgent. Verified in a nested Hyprland 0.56.2 (2026-10-29): a click on
+    a `notify-send -a lyrtest-a` notification with no actions moved from
+    workspace 3 to the `lyrtest-a` window on workspace 2, and with the request
+    stubbed out it did not. sway and niri are covered by unit tests against fake
+    sockets only; niri's `Windows` reply and `FocusWindow` action were tried by
+    hand on niri 26.04, sway's `[con_id=N] focus` was not tried on a real sway.
+    Not done: X11, where lyr-wm has no backend at all (no workspaces either), so
+    focusing would need an X11 client for `_NET_ACTIVE_WINDOW` and `WM_CLASS`, a
+    new dependency (the owner's call) or crcbl-shell's X11 connection. Not
+    tried: Thunderbird itself, whose window class has to match its
+    notifications' names; an app whose class matches neither its name nor its
+    desktop entry is not found. An action button's click does not focus the
+    sender, only the body's.
   - Windows today: lyr is not the notification daemon and draws no
     notifications; Windows' own toasts and Notification Center activate the
     sending application when clicked. lyr's one notification surface is the

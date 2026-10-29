@@ -9,8 +9,8 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader, Lines};
 use tokio::net::UnixStream;
 
 use super::{
-    Dialect, Event, ParseError, Tracker, Workspace, exit_request, focus_request, parse_line,
-    snapshot,
+    Dialect, Event, ParseError, Tracker, Workspace, exit_request, focus_request,
+    focus_window_request, parse_line, snapshot,
 };
 
 /// How long a request may take before lyr gives up on it. `hyprctl` uses
@@ -153,6 +153,28 @@ impl Hyprland {
         }
     }
 
+    /// Focuses the window of the application `names` name that had focus
+    /// most recently, switching to its workspace. Returns whether it has a
+    /// window.
+    pub async fn focus_app(&self, names: &[&str]) -> Result<bool, Error> {
+        const CLIENTS: &str = "j/clients";
+        let clients = self.request(CLIENTS).await?;
+        let address = snapshot::app_window(&clients, names).map_err(|source| Error::Json {
+            request: CLIENTS.to_owned(),
+            source,
+        })?;
+        let Some(address) = address else {
+            return Ok(false);
+        };
+        let request = focus_window_request(&address, self.dialect);
+        let reply = self.request(&request).await?;
+        if reply.trim() == OK_REPLY {
+            Ok(true)
+        } else {
+            Err(Error::Refused { request, reply })
+        }
+    }
+
     /// Ends the Hyprland session: the power menu's Log out.
     pub async fn exit(&self) -> Result<(), Error> {
         let request = exit_request(self.dialect);
@@ -230,6 +252,7 @@ impl Events {
 mod tests {
     use std::ffi::OsString;
     use std::path::Path;
+    use std::time::Duration;
 
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::UnixListener;
@@ -423,6 +446,40 @@ mod tests {
             hyprlang.focus(&two).await,
             Err(Error::Refused { reply, .. }) if reply == "unknown request"
         ));
+    }
+
+    #[tokio::test]
+    async fn an_app_s_window_is_found_in_the_clients_and_focused_by_address() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let reply = |request: &str| match request {
+            "j/clients" => {
+                r#"[{"address": "0xa1", "workspace": {"id": 2}, "class": "thunderbird",
+                     "focusHistoryID": 1}]"#
+            }
+            _ => "ok",
+        };
+        let mut requests = fake_hyprland(dir.path(), reply, "").await;
+        let lua = Hyprland {
+            socket_dir: dir.path().to_owned(),
+            dialect: Dialect::Lua,
+        };
+        assert!(lua.focus_app(&["Thunderbird"]).await.expect("focused"));
+        assert_eq!(requests.recv().await.as_deref(), Some("j/clients"));
+        assert_eq!(
+            requests.recv().await.as_deref(),
+            Some("/dispatch hl.dsp.focus({ window = [[address:0xa1]] })")
+        );
+        assert!(
+            !lua.focus_app(&["firefox"]).await.expect("answered"),
+            "no window of that app"
+        );
+        assert_eq!(requests.recv().await.as_deref(), Some("j/clients"));
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), requests.recv())
+                .await
+                .is_err(),
+            "and nothing dispatched"
+        );
     }
 
     #[tokio::test]

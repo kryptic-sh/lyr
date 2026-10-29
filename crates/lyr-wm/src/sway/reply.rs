@@ -6,6 +6,7 @@
 
 use serde::Deserialize;
 
+use crate::app::is_app;
 use crate::{State, Workspace, WorkspaceId};
 
 /// One entry of the `GET_WORKSPACES` reply.
@@ -23,6 +24,8 @@ struct WorkspaceReply {
 /// window needs.
 #[derive(Deserialize)]
 struct Node {
+    #[serde(default)]
+    id: i64,
     #[serde(rename = "type")]
     kind: String,
     #[serde(default)]
@@ -36,6 +39,9 @@ struct Node {
     nodes: Vec<Self>,
     #[serde(default)]
     floating_nodes: Vec<Self>,
+    /// The ids of its children, the most recently focused first.
+    #[serde(default)]
+    focus: Vec<i64>,
 }
 
 #[derive(Deserialize)]
@@ -53,6 +59,34 @@ impl Node {
             .iter()
             .chain(&self.floating_nodes)
             .find_map(Self::focused)
+    }
+
+    /// Its app id, or under Xwayland its class.
+    fn class(&self) -> Option<&str> {
+        self.app_id
+            .as_deref()
+            .or_else(|| self.window_properties.as_ref()?.class.as_deref())
+    }
+
+    /// The window of the application `names` name at or under this one
+    /// that had focus most recently: children are searched in their focus
+    /// order, which runs from the outputs down.
+    fn app_window(&self, names: &[&str]) -> Option<i64> {
+        if WINDOW_TYPES.contains(&self.kind.as_str())
+            && self.class().is_some_and(|class| is_app(class, names))
+        {
+            return Some(self.id);
+        }
+        let mut children: Vec<&Self> = self.nodes.iter().chain(&self.floating_nodes).collect();
+        children.sort_by_key(|child| {
+            self.focus
+                .iter()
+                .position(|id| *id == child.id)
+                .unwrap_or(usize::MAX)
+        });
+        children
+            .into_iter()
+            .find_map(|child| child.app_window(names))
     }
 }
 
@@ -76,11 +110,7 @@ pub fn state(workspaces: &str, tree: &str) -> serde_json::Result<State> {
         .focused()
         .filter(|node| WINDOW_TYPES.contains(&node.kind.as_str()))
         .and_then(|node| {
-            let class = node
-                .app_id
-                .clone()
-                .or_else(|| node.window_properties.as_ref()?.class.clone())
-                .unwrap_or_default();
+            let class = node.class().unwrap_or_default().to_owned();
             let title = node.name.clone().unwrap_or_default();
             (!class.is_empty() || !title.is_empty()).then_some((class, title))
         });
@@ -100,6 +130,18 @@ pub fn state(workspaces: &str, tree: &str) -> serde_json::Result<State> {
             .collect(),
         window,
     })
+}
+
+/// The id of the window of the application `names` name
+/// ([`crate::app::is_app`]) that had focus most recently, from a `GET_TREE`
+/// reply; `None` when it has no window.
+///
+/// # Errors
+///
+/// When the reply is not the JSON sway sends.
+pub fn app_window(tree: &str, names: &[&str]) -> serde_json::Result<Option<i64>> {
+    let tree: Node = serde_json::from_str(tree)?;
+    Ok(tree.app_window(names))
 }
 
 /// Whether a `window` event can change which window has focus or what its
@@ -123,7 +165,7 @@ pub fn window_event_moves_focus(event: &str) -> serde_json::Result<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::{state, window_event_moves_focus};
+    use super::{app_window, state, window_event_moves_focus};
     use crate::Workspace;
 
     /// Two outputs, as `GET_WORKSPACES` lists them: by output, numbered
@@ -231,5 +273,35 @@ mod tests {
             );
         }
         assert!(window_event_moves_focus("[]").is_err());
+    }
+
+    #[test]
+    fn an_app_s_most_recently_focused_window_is_found_by_focus_order() {
+        let tree = r#"{"id": 1, "type": "root", "focus": [3, 4], "nodes": [
+            {"id": 3, "type": "output", "focus": [7, 6], "nodes": [
+                {"id": 6, "type": "workspace", "name": "1", "focus": [10], "nodes": [
+                    {"id": 10, "type": "con", "app_id": "thunderbird", "nodes": []}
+                ]},
+                {"id": 7, "type": "workspace", "name": "2", "focus": [12, 11], "nodes": [
+                    {"id": 11, "type": "con", "app_id": "kitty", "nodes": []}
+                ], "floating_nodes": [
+                    {"id": 12, "type": "floating_con", "app_id": null,
+                     "window_properties": {"class": "Thunderbird"}, "nodes": []}
+                ]}
+            ]},
+            {"id": 4, "type": "output", "focus": [8], "nodes": [
+                {"id": 8, "type": "workspace", "name": "3", "focus": [13], "nodes": [
+                    {"id": 13, "type": "con", "app_id": "thunderbird", "nodes": []}
+                ]}
+            ]}
+        ]}"#;
+        assert_eq!(
+            app_window(tree, &["thunderbird"]).expect("valid"),
+            Some(12),
+            "the floating Xwayland window, focused last on the output focused last"
+        );
+        assert_eq!(app_window(tree, &["kitty"]).expect("valid"), Some(11));
+        assert_eq!(app_window(tree, &["firefox"]).expect("valid"), None);
+        assert!(app_window("[]", &["kitty"]).is_err());
     }
 }

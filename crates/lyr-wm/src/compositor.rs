@@ -103,6 +103,21 @@ impl Compositor {
         Ok(())
     }
 
+    /// Focuses the window of the application `names` name
+    /// ([`crate::app::is_app`]) that had focus most recently, switching to
+    /// the workspace it is on. Returns whether it has a window.
+    ///
+    /// # Errors
+    ///
+    /// When the compositor cannot be reached or refuses.
+    pub async fn focus_app(&self, names: &[&str]) -> Result<bool, Error> {
+        Ok(match self {
+            Self::Hyprland(hyprland) => hyprland.focus_app(names).await?,
+            Self::Sway(sway) => sway.focus_app(names).await?,
+            Self::Niri(niri) => niri.focus_app(names).await?,
+        })
+    }
+
     /// Ends the session: the power menu's Log out.
     ///
     /// # Errors

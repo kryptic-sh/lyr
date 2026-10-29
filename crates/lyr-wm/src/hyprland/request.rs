@@ -48,7 +48,8 @@ pub fn focus_request(workspace: &Workspace, dialect: Dialect) -> String {
 /// level is the least whose closing bracket first appears where it is put,
 /// so neither a `]]` in the text nor a `]` at its end can close it early.
 /// A long string skips a line break straight after its opening bracket, so
-/// `text` must not start with one; lyr's always starts with `name:`.
+/// `text` must not start with one; lyr's always starts with `name:` or
+/// `address:`.
 fn lua_long_string(text: &str) -> String {
     let mut equals = String::new();
     loop {
@@ -57,6 +58,23 @@ fn lua_long_string(text: &str) -> String {
             return format!("[{equals}[{text}{close}");
         }
         equals.push('=');
+    }
+}
+
+/// The request that focuses the window at `address`, as Hyprland names it in
+/// `j/clients`, switching to the workspace it is on. Lua's `hl.dsp.focus`
+/// takes the same `address:` selector hyprlang's `focuswindow` does (tried on
+/// Hyprland 0.56.2, 2026-10-29); the selector goes in a long string, as a
+/// workspace's name does.
+#[must_use]
+pub fn focus_window_request(address: &str, dialect: Dialect) -> String {
+    let window = format!("address:{address}");
+    match dialect {
+        Dialect::Lua => format!(
+            "/dispatch hl.dsp.focus({{ window = {} }})",
+            lua_long_string(&window)
+        ),
+        Dialect::Hyprlang => format!("/dispatch focuswindow {window}"),
     }
 }
 
@@ -72,7 +90,7 @@ pub const fn exit_request(dialect: Dialect) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{Dialect, exit_request, focus_request, lua_long_string};
+    use super::{Dialect, exit_request, focus_request, focus_window_request, lua_long_string};
 
     #[test]
     fn exit_is_spelled_for_each_dialect() {
@@ -130,5 +148,17 @@ mod tests {
             "a bracket at the end would join the close"
         );
         assert_eq!(lua_long_string("name:]=]]"), "[==[name:]=]]]==]");
+    }
+
+    #[test]
+    fn a_window_is_focused_by_its_address_in_either_dialect() {
+        assert_eq!(
+            focus_window_request("0x56044ba5f780", Dialect::Lua),
+            "/dispatch hl.dsp.focus({ window = [[address:0x56044ba5f780]] })"
+        );
+        assert_eq!(
+            focus_window_request("0x56044ba5f780", Dialect::Hyprlang),
+            "/dispatch focuswindow address:0x56044ba5f780"
+        );
     }
 }

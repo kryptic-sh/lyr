@@ -178,6 +178,17 @@ pub struct JoinRequest {
     pub new_password: Option<String>,
 }
 
+/// What the bar asks of the compositor.
+#[cfg(target_os = "linux")]
+#[derive(Debug)]
+enum WmRequest {
+    /// Switch to this workspace.
+    Workspace(lyr_wm::Workspace),
+    /// Focus the window of the application these name
+    /// (`lyr_wm::app::is_app`).
+    App(Vec<String>),
+}
+
 /// What the bar asks of the notification daemon.
 #[cfg(target_os = "linux")]
 #[derive(Debug)]
@@ -233,7 +244,7 @@ pub struct Commands {
     /// What `volume.mute_links_mic` gives back to the mic.
     pub mute_link: std::cell::Cell<lyr_core::audio::MuteLink>,
     #[cfg(target_os = "linux")]
-    focus: tokio::sync::mpsc::UnboundedSender<lyr_wm::Workspace>,
+    focus: tokio::sync::mpsc::UnboundedSender<WmRequest>,
     #[cfg(target_os = "linux")]
     profile: tokio::sync::mpsc::UnboundedSender<String>,
     #[cfg(target_os = "linux")]
@@ -266,7 +277,13 @@ pub struct Commands {
 impl Commands {
     /// Switches to `workspace`.
     pub fn focus(&self, workspace: lyr_wm::Workspace) {
-        let _stopped = self.focus.send(workspace);
+        let _stopped = self.focus.send(WmRequest::Workspace(workspace));
+    }
+
+    /// Focuses the window of the application `names` name, switching to
+    /// its workspace.
+    pub fn focus_app(&self, names: Vec<String>) {
+        let _stopped = self.focus.send(WmRequest::App(names));
     }
 
     /// Switches to the power profile `name`.
@@ -1731,7 +1748,7 @@ mod linux {
     use lyr_sources::network::linux::NetworkManager;
     use lyr_sources::power::linux::Logind;
     use lyr_sources::power_profile::linux::PowerProfiles;
-    use lyr_wm::{Compositor, Workspace};
+    use lyr_wm::Compositor;
     use tokio::sync::mpsc::UnboundedReceiver;
     use tokio::sync::watch;
 
@@ -1742,7 +1759,7 @@ mod linux {
 
     use super::{
         AUDIO_BACK, AUDIO_GONE, AUDIO_RETRY_FIRST, AudioRequest, BluetoothRequest, JoinRequest,
-        NotificationRequest, TrayRequest, Update, WifiRequest, audio_retry_after,
+        NotificationRequest, TrayRequest, Update, WifiRequest, WmRequest, audio_retry_after,
     };
     use crate::wifi_menu::Joined;
 
@@ -1765,7 +1782,7 @@ mod linux {
 
     /// Where each task reads what the bar asks of it.
     pub(super) struct Requests {
-        pub(super) focus: UnboundedReceiver<Workspace>,
+        pub(super) focus: UnboundedReceiver<WmRequest>,
         pub(super) profile: UnboundedReceiver<String>,
         pub(super) power: UnboundedReceiver<Entry>,
         pub(super) notifications: UnboundedReceiver<NotificationRequest>,
@@ -2391,7 +2408,7 @@ mod linux {
 
     async fn workspaces(
         sender: mpsc::Sender<Update>,
-        mut focus: UnboundedReceiver<Workspace>,
+        mut focus: UnboundedReceiver<WmRequest>,
         waker: Option<ShellWaker>,
     ) {
         let run = async {
@@ -2409,10 +2426,23 @@ mod linux {
                             break;
                         }
                     }
-                    Some(workspace) = focus.recv() => {
+                    Some(request) = focus.recv() => {
                         // A refused switch changes nothing on screen, which
                         // is the truth; it is only logged.
-                        if let Err(error) = compositor.focus(&workspace).await {
+                        let done = match request {
+                            WmRequest::Workspace(workspace) => {
+                                compositor.focus(&workspace).await
+                            }
+                            WmRequest::App(names) => {
+                                let names: Vec<&str> = names.iter().map(String::as_str).collect();
+                                compositor.focus_app(&names).await.map(|found| {
+                                    if !found {
+                                        tracing::debug!("workspaces: no window of {names:?}");
+                                    }
+                                })
+                            }
+                        };
+                        if let Err(error) = done {
                             tracing::warn!("workspaces: {error}");
                         }
                     }
