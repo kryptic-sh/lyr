@@ -225,15 +225,17 @@ jobs:
         run:
           sudo apt-get update && sudo apt-get install -y --no-install-recommends
           mesa-vulkan-drivers libvulkan1
-      - run: ls -l /usr/share/vulkan/icd.d/
-      - run:
-          cargo test --locked -p lyr-render --lib -- --ignored --exact
-          surface::tests::a_bar_draws_as_its_reference_image
+      # Found rather than named: distributions disagree about the file, and
+      # Mesa 25.2 on Ubuntu 24.04 ships lvp_icd.json, not
+      # lvp_icd.x86_64.json. The loader reports a missing driver and a
+      # refused one alike, as ERROR_INCOMPATIBLE_DRIVER; its log says which.
+      - run: |
+          icd=$(ls /usr/share/vulkan/icd.d/lvp_icd*.json)
+          test -f "$icd"
+          VK_DRIVER_FILES="$icd" cargo test --locked -p lyr-render --lib \
+            -- --ignored --exact surface::tests::a_bar_draws_as_its_reference_image
         env:
-          VK_DRIVER_FILES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
-          # The loader reports a missing driver and a refused one alike, as
-          # ERROR_INCOMPATIBLE_DRIVER; its log says which.
-          VK_LOADER_DEBUG: error,warn,driver
+          VK_LOADER_DEBUG: error,warn
       - name: Keep the bar drawn
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
