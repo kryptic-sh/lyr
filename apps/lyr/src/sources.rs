@@ -183,7 +183,8 @@ pub struct JoinRequest {
 #[derive(Debug)]
 enum NotificationRequest {
     Close(u32, lyr_core::notifications::CloseReason),
-    Invoke(u32, String),
+    /// An action's key, and the activation token made from its click.
+    Invoke(u32, String, Option<String>),
     Clear,
 }
 
@@ -331,11 +332,12 @@ impl Commands {
         let _stopped = self.notifications.send(NotificationRequest::Clear);
     }
 
-    /// Invokes the action `key` of the notification `id`.
-    pub fn invoke(&self, id: u32, key: String) {
+    /// Invokes the action `key` of the notification `id`, sending `token`
+    /// so the application can raise its window.
+    pub fn invoke(&self, id: u32, key: String, token: Option<String>) {
         let _stopped = self
             .notifications
-            .send(NotificationRequest::Invoke(id, key));
+            .send(NotificationRequest::Invoke(id, key, token));
     }
 }
 
@@ -2480,7 +2482,9 @@ mod linux {
                     NotificationRequest::Close(id, reason) => {
                         served.close(id, reason).await.map(|_held| ())
                     }
-                    NotificationRequest::Invoke(id, key) => served.invoke(id, &key).await,
+                    NotificationRequest::Invoke(id, key, token) => {
+                        served.invoke(id, &key, token.as_deref()).await
+                    }
                     NotificationRequest::Clear => served.clear().await.map(|_cleared| ()),
                 };
                 if let Err(error) = done {

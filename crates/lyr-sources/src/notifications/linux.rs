@@ -401,12 +401,14 @@ impl Served {
     }
 
     /// Invokes the action `key` of `id`, as a click does, then closes it
-    /// unless it is `resident`, as the spec's hint asks.
+    /// unless it is `resident`, as the spec's hint asks. `token`, the
+    /// xdg-activation token made from the click, is sent just before, so
+    /// the application can raise its window.
     ///
     /// # Errors
     ///
     /// When a signal cannot be sent.
-    pub async fn invoke(&self, id: u32, key: &str) -> zbus::Result<()> {
+    pub async fn invoke(&self, id: u32, key: &str, token: Option<&str>) -> zbus::Result<()> {
         let resident = self
             .store
             .lock()
@@ -416,7 +418,11 @@ impl Served {
         let Some(resident) = resident else {
             return Ok(());
         };
-        Daemon::action_invoked(&self.emitter()?, id, key.to_owned()).await?;
+        let emitter = self.emitter()?;
+        if let Some(token) = token {
+            Daemon::activation_token(&emitter, id, token.to_owned()).await?;
+        }
+        Daemon::action_invoked(&emitter, id, key.to_owned()).await?;
         if !resident {
             self.close(id, CloseReason::Dismissed).await?;
         }
@@ -451,6 +457,8 @@ trait Notifications {
     fn notification_closed(&self, id: u32, reason: u32) -> zbus::Result<()>;
     #[zbus(signal)]
     fn action_invoked(&self, id: u32, action_key: String) -> zbus::Result<()>;
+    #[zbus(signal)]
+    fn activation_token(&self, id: u32, activation_token: String) -> zbus::Result<()>;
 }
 
 /// Sends a notice from lyr itself to whichever daemon holds the name on

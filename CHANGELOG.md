@@ -27,6 +27,9 @@ and this project adheres to
 
 ### Added
 
+- A click on a notification's action, in a toast or in the clock panel, sends
+  the application an xdg-activation token (`ActivationToken`, just before
+  `ActionInvoked`), so under Wayland the window it raises can take focus.
 - A media player's art sent as a `data:` URL (`mpris:artUrl` of
   `data:image/png;base64,…`, as some browsers and players send it) is shown, its
   media type picking the decoder; before, only `file://` art was read and such a

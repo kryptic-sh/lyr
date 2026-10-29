@@ -379,8 +379,8 @@ async fn invoking_an_action_signals_it_and_closes_unless_resident() {
         .await
         .expect("notified");
     let within = Duration::from_secs(5);
-    served.invoke(kept, "default").await.expect("invoked");
-    served.invoke(gone, "default").await.expect("invoked");
+    served.invoke(kept, "default", None).await.expect("invoked");
+    served.invoke(gone, "default", None).await.expect("invoked");
     for id in [kept, gone] {
         let signal = tokio::time::timeout(within, invoked.next())
             .await
@@ -410,6 +410,65 @@ async fn invoking_an_action_signals_it_and_closes_unless_resident() {
             .await
             .expect("answered"),
         "resident"
+    );
+}
+
+#[tokio::test]
+async fn a_click_s_activation_token_is_sent_just_before_its_action() {
+    let (served, client, _server, _changes) = served().await;
+    let mut signals = zbus::MessageStream::from(client.inner().connection());
+    let actions = ["default", "Open"];
+    let raised = client
+        .notify("app", 0, "", "raised", "", &actions, HashMap::new(), -1)
+        .await
+        .expect("notified");
+    let plain = client
+        .notify("app", 0, "", "plain", "", &actions, HashMap::new(), -1)
+        .await
+        .expect("notified");
+    served
+        .invoke(raised, "default", Some("a-token"))
+        .await
+        .expect("invoked");
+    served.invoke(plain, "Open", None).await.expect("invoked");
+    let mut seen = Vec::new();
+    while seen.len() < 5 {
+        let message = tokio::time::timeout(Duration::from_secs(5), signals.next())
+            .await
+            .expect("a message within 5 s")
+            .expect("open")
+            .expect("a message");
+        let header = message.header();
+        let Some(member) = header.member() else {
+            continue;
+        };
+        let body = message.body();
+        seen.push(match member.as_str() {
+            "ActivationToken" => {
+                let (id, token): (u32, String) = body.deserialize().expect("arguments");
+                format!("token {id} {token}")
+            }
+            "ActionInvoked" => {
+                let (id, key): (u32, String) = body.deserialize().expect("arguments");
+                format!("invoked {id} {key}")
+            }
+            "NotificationClosed" => {
+                let (id, _reason): (u32, u32) = body.deserialize().expect("arguments");
+                format!("closed {id}")
+            }
+            _ => continue,
+        });
+    }
+    assert_eq!(
+        seen,
+        [
+            format!("token {raised} a-token"),
+            format!("invoked {raised} default"),
+            format!("closed {raised}"),
+            format!("invoked {plain} Open"),
+            format!("closed {plain}"),
+        ],
+        "no token for an action invoked without one"
     );
 }
 

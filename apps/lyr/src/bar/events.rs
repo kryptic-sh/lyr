@@ -4,7 +4,7 @@
 use std::time::Instant;
 
 use anyhow::Context as _;
-use crcbl_shell::{Shell, ShellEvent};
+use crcbl_shell::{Shell, ShellEvent, WindowId};
 use lyr_core::hit::Regions;
 use lyr_render::surface::Surface;
 
@@ -78,7 +78,7 @@ impl App {
             .is_some_and(|window| self.toasts.owns(window))
         {
             let clicked = self.toasts.event(shell, event, instant)?;
-            self.toast_clicked(clicked);
+            self.toast_clicked(shell, event.window(), clicked);
             return Ok(());
         }
         if self
@@ -477,7 +477,7 @@ impl App {
             }
             ClockOutcome::Centre(target, press) => {
                 // swaync's `hide-on-action`.
-                if self.centre_clicked(target, press)
+                if self.centre_clicked(shell, event.window(), target, press)
                     && let Some(panel) = self.clock_panel.take()
                 {
                     panel.close(shell, false)?;
@@ -489,13 +489,20 @@ impl App {
 
     /// Carries out a click in the clock panel's notification centre: Clear
     /// All and the switch as `lyr clear` and `lyr dnd` do, and an entry as a
-    /// toast does. Returns whether it invoked a notification's action.
-    fn centre_clicked(&mut self, target: Target, press: Press) -> bool {
+    /// toast does, `window` being the panel's. Returns whether it invoked a
+    /// notification's action.
+    fn centre_clicked(
+        &mut self,
+        shell: &mut dyn Shell,
+        window: Option<WindowId>,
+        target: Target,
+        press: Press,
+    ) -> bool {
         let reply = match (target, press) {
             (Target::ClearAll, Press::Left) => self.notifications(Request::Clear),
             (Target::Dnd, Press::Left) => self.notifications(Request::Dnd),
             (Target::Notification(id), Press::Left) => {
-                return self.toast_clicked(Some(Clicked::Invoke(id)));
+                return self.toast_clicked(shell, window, Some(Clicked::Invoke(id)));
             }
             (Target::Media(index, control), Press::Left) => {
                 if let Some(player) = self.data.players.get(index) {
@@ -504,10 +511,10 @@ impl App {
                 return false;
             }
             (Target::Action(id, index), Press::Left) => {
-                return self.toast_clicked(Some(Clicked::Action(id, index)));
+                return self.toast_clicked(shell, window, Some(Clicked::Action(id, index)));
             }
             (Target::Link(id, index), Press::Left) => {
-                return self.toast_clicked(Some(Clicked::Link(id, index)));
+                return self.toast_clicked(shell, window, Some(Clicked::Link(id, index)));
             }
             (Target::Close(id), Press::Left)
             | (
@@ -517,7 +524,7 @@ impl App {
                 | Target::Close(id),
                 Press::Middle,
             ) => {
-                return self.toast_clicked(Some(Clicked::Dismiss(id)));
+                return self.toast_clicked(shell, window, Some(Clicked::Dismiss(id)));
             }
             _ => return false,
         };
@@ -577,10 +584,17 @@ impl App {
     }
 
     /// Carries out a click on a toast: its `default` action when it has one,
-    /// another action, opening a link, or dismissing it. Returns whether it
-    /// invoked an action.
+    /// another action, opening a link, or dismissing it. An action is sent
+    /// with an activation token made from the click in `window`, so the
+    /// application can raise its window. Returns whether it invoked an
+    /// action.
     #[cfg(target_os = "linux")]
-    fn toast_clicked(&self, clicked: Option<Clicked>) -> bool {
+    fn toast_clicked(
+        &self,
+        shell: &mut dyn Shell,
+        window: Option<WindowId>,
+        clicked: Option<Clicked>,
+    ) -> bool {
         use lyr_core::notifications::CloseReason;
         use lyr_core::toast::DEFAULT_ACTION;
         // The action's key, as the notification's store holds it.
@@ -601,13 +615,15 @@ impl App {
         match clicked {
             Some(Clicked::Invoke(id)) => {
                 if let Some(key) = key(id, &|_, key| key == DEFAULT_ACTION) {
-                    self.commands.invoke(id, key);
+                    self.commands
+                        .invoke(id, key, activation_token(shell, window));
                     return true;
                 }
             }
             Some(Clicked::Action(id, wanted)) => {
                 if let Some(key) = key(id, &|index, _| index == wanted) {
-                    self.commands.invoke(id, key);
+                    self.commands
+                        .invoke(id, key, activation_token(shell, window));
                     return true;
                 }
             }
@@ -643,7 +659,26 @@ impl App {
     /// Windows and macOS have no toasts: lyr is not their notification
     /// daemon.
     #[cfg(not(target_os = "linux"))]
-    const fn toast_clicked(&self, _clicked: Option<Clicked>) -> bool {
+    const fn toast_clicked(
+        &self,
+        _shell: &mut dyn Shell,
+        _window: Option<WindowId>,
+        _clicked: Option<Clicked>,
+    ) -> bool {
         false
+    }
+}
+
+/// The token the window system makes from the click just received in
+/// `window`, for the application whose action it invokes; `None` where it
+/// has none (Wayland without xdg-activation, X11) or gave none.
+#[cfg(target_os = "linux")]
+fn activation_token(shell: &mut dyn Shell, window: Option<WindowId>) -> Option<String> {
+    match shell.activation_token(window?) {
+        Ok(token) => token,
+        Err(error) => {
+            tracing::warn!("activation token: {error}");
+            None
+        }
     }
 }

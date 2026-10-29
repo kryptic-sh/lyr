@@ -166,14 +166,17 @@ implementation follows meanwhile.
   as the owner's call. When it lands: move lyr's daemon and `notify_session`
   onto it, and the Windows bell from `ms-actioncenter:` to real state where the
   seam can read it.
-- **crcbl: what lyr asked for next (2026-10-28), and where each stands.** In
-  crcbl 0.13.0, which lyr now pins, and not yet used by lyr: an activation
-  token, `Shell::activation_token(window) -> Result<Option<String>, ShellError>`
-  (crcbl `277bd79a`; ask right after the click's `Button` event, before
-  `ActionInvoked`; `None` without xdg-activation and on every non-Wayland
-  backend), for plan 09's `ActivationToken` (`Daemon::activation_token` is
-  declared and never sent). And for plan 13's headless render compared as an
-  image on the Linux runner:
+- **Activation tokens: what checks the bar's half.** The daemon's half
+  (`Served::invoke` sending `ActivationToken` just before `ActionInvoked`, and
+  none without a token) has a mutation-checked unit test. The bar's half, asking
+  `Shell::activation_token` for the clicked toast's or clock panel's window, was
+  checked by hand only: in a nested Hyprland 0.56 (2026-10-29), a click on a
+  toast from `notify-send -A default=Open` sent a token and then `default`, and
+  with the request stubbed out no token was sent. No automated test clicks a
+  toast, and the clock panel's entries, X11 and sway were not tried.
+- **crcbl: an offscreen render read back, for plan 13's headless render compared
+  as an image on the Linux runner (asked 2026-10-28).** In crcbl 0.13.0, which
+  lyr now pins, and not yet used by lyr:
   `Presenter::open_offscreen((w, h), &PresenterDesc { backend: Some(GpuBackend::Vulkan), .. })`,
   `acquire`, the same UI pass, then `submit_present_and_read_back` (crcbl
   `3d0edf3a`) in place of `submit_and_present`, which blocks and returns an
