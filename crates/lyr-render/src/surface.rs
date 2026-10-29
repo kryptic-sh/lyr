@@ -538,6 +538,13 @@ mod tests {
         }
     }
 
+    /// How far a channel may be from the reference's: lavapipe rounds a
+    /// little differently from one Mesa to the next. Between Mesa 26.2.5
+    /// (Arch, where the reference was drawn) and 25.2.8 (Ubuntu 24.04, CI),
+    /// 20 of the bar's pixels differed, each by 1 in one channel
+    /// (2026-10-29).
+    const ROUNDING: u8 = 1;
+
     #[test]
     #[ignore = "needs a Vulkan driver; CI's render job runs it on lavapipe"]
     fn a_bar_draws_as_its_reference_image() {
@@ -549,7 +556,15 @@ mod tests {
         let expected = std::fs::read(&reference)
             .ok()
             .and_then(|bytes| png::decode(&bytes, &Limits::default()).ok());
-        if expected.as_ref() != Some(&drawn) {
+        let alike = expected.as_ref().is_some_and(|expected| {
+            (expected.width(), expected.height()) == (drawn.width(), drawn.height())
+                && expected
+                    .pixels()
+                    .iter()
+                    .zip(drawn.pixels())
+                    .all(|(want, got)| want.abs_diff(*got) <= ROUNDING)
+        });
+        if !alike {
             let written = std::env::temp_dir().join("lyr-render-a_bar.png");
             std::fs::write(&written, png::encode(&drawn).expect("encoded")).expect("written");
             panic!(
