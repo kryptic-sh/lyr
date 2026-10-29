@@ -498,6 +498,37 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Known gaps in the design
 
+- **A click on a notification brings its application forward, on every
+  platform.** The owner asked (2026-10-29): clicking a notification focuses the
+  application that sent it, moving to the workspace its window is on (a
+  Thunderbird notification on Hyprland switches to Thunderbird's workspace).
+  Split by the owner: the Linux lyr session (office-lyr) builds it on Linux, the
+  Windows session on Windows.
+  - Linux today: a left click on a toast's or clock-panel entry's body
+    (`Clicked::Invoke`, `toasts.rs`) invokes the notification's `default`
+    action, and since `9070007` sends an `ActivationToken` just before
+    `ActionInvoked` (`toast_clicked`, `apps/lyr/src/bar/events.rs`). Raising the
+    window is then the application's and the compositor's. A notification with
+    no `default` action invokes nothing. Not verified: whether Thunderbird
+    raises itself with the token, and whether Hyprland, sway and niri each move
+    to the window's workspace for it. Where either does not, or there is no
+    `default` action, a fallback could focus the sender's window through the
+    compositor, matching the `desktop-entry` hint (`Incoming::desktop_entry`) or
+    the application's name against the window's class or app id: Hyprland's
+    `focuswindow` dispatcher, sway's `[app_id=…] focus`, niri's `focus-window`
+    action, and `_NET_ACTIVE_WINDOW` on X11.
+  - Windows today: lyr is not the notification daemon and draws no
+    notifications; Windows' own toasts and Notification Center activate the
+    sending application when clicked. lyr's one notification surface is the
+    clock's bell, which opens `ms-actioncenter:`. For a click in lyr to focus
+    the sender, lyr first has to list the notifications (WinRT's
+    `UserNotificationListener`, the shape the crcbl notification seam above
+    names), then find a window of the notification's application and bring it
+    forward from lyr's own click (`SetForegroundWindow`). Not yet checked:
+    whether `UserNotificationListener` grants access to a process without
+    package identity, as lyr is.
+  - macOS: as on Windows, lyr draws no notifications.
+
 - **The media player card: where it still differs from swaync's.** The card
   draws the player's art (`lyr_core::centre`, `ART_SIZE`), read from a `file://`
   `mpris:artUrl` through `lyr_sources::icons` and cached per URL until no player
