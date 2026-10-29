@@ -342,8 +342,8 @@ implementation follows meanwhile.
     shape): cold, with no saved GPU choice, 1.12 s, the device 860 ms; 12 ms of
     font lookup, 39 ms for the WLAN check (its service not running), 6 ms of
     swapchain; the iGPU cold 2.1 s; WARP 145 ms. Startup there is driver time.
-    crcbl-dx12 0.12.1 enables DRED in release builds too, at a cost not
-    measured; asked of crcbl.
+    DRED, which crcbl-dx12 enables in every build, costs none of it (next
+    entry).
   - Memory (working set / private bytes): 131.4 / 157.4 MB at start, at most
     146.3 / 177.5 after 10 clock and 10 audio open-and-close cycles, and 135.2 /
     160.4 five seconds after the last close. No leak, and the Windows heap gives
@@ -369,10 +369,10 @@ implementation follows meanwhile.
     for Hack Nerd Font Propo) could be a mapped file, but mapping needs a new
     crate (`memmap2`) or `unsafe` mmap, and a file truncated under the map
     faults: the owner's call.
-  - DRED in crcbl-dx12 is on in every build by design, to locate a device loss;
-    an earlier pikr measurement found device creation the same without it, and
-    crcbl's Windows session is timing it on the RX 7900 XTX. Turning it off
-    would need a new crcbl switch.
+  - DRED in crcbl-dx12 is on in every build by design, to locate a device loss,
+    and stays on: crcbl's Windows session timed `D3D12CreateDevice` on the RX
+    7900 XTX in a quiet window (20 mirrored pairs, 2 – 10 % CPU) at a median of
+    287.6 ms without it and 284.4 ms with crcbl's `dred::enable` settings.
 - **Startup and memory, measured on Linux (2026-10-29).** A release build in a
   nested Hyprland on the owner's laptop (Intel RPL-U, Mesa, warm caches; not in
   a quiet window: load average 16.7 on 12 cores while other sessions built, so
