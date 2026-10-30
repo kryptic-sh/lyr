@@ -526,16 +526,23 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     notifications' names; an app whose class matches neither its name nor its
     desktop entry is not found. An action button's click does not focus the
     sender, only the body's.
-  - Windows today: lyr is not the notification daemon and draws no
-    notifications; Windows' own toasts and Notification Center activate the
-    sending application when clicked. lyr's one notification surface is the
-    clock's bell, which opens `ms-actioncenter:`. For a click in lyr to focus
-    the sender, lyr first has to list the notifications (WinRT's
-    `UserNotificationListener`, the shape the crcbl notification seam above
-    names), then find a window of the notification's application and bring it
-    forward from lyr's own click (`SetForegroundWindow`). Not yet checked:
-    whether `UserNotificationListener` grants access to a process without
-    package identity, as lyr is.
+  - Windows: lyr is not the notification daemon and draws no notifications;
+    Windows' own toasts and Notification Center activate the sending application
+    when clicked. lyr's one notification surface is the clock's bell, which
+    opens `ms-actioncenter:`. The owner decided (2026-10-30): lyr lists Windows'
+    notifications in the clock panel, read through crcbl's notification seam
+    (the cross-repo entry above), and a click brings the sender's window forward
+    from lyr's own click (`SetForegroundWindow`), or starts the application by
+    its AppUserModelID when it has no window. The click cannot do what the
+    toast's own click does (open that email, say): the listener has no way to
+    activate a toast. Seen on this machine (Windows 11 26300, from an unpackaged
+    Windows PowerShell, 2026-10-30): `UserNotificationListener` gives access
+    without package identity (`GetAccessStatus` returned `Allowed`) and lists
+    toasts with their app's AppUserModelID and display name, but subscribing to
+    `NotificationChanged` fails with `0x80070490` (element not found), so the
+    list has to be polled. Asked of crcbl's Windows session the same day; lyr's
+    side waits on it. Matching an app's windows could reuse
+    `lyr_wm::app::is_app` on the window's executable or AppUserModelID.
   - macOS: as on Windows, lyr draws no notifications.
 
 - **The media player card: where it still differs from swaync's.** The card
