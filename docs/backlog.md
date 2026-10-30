@@ -540,9 +540,18 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     without package identity (`GetAccessStatus` returned `Allowed`) and lists
     toasts with their app's AppUserModelID and display name, but subscribing to
     `NotificationChanged` fails with `0x80070490` (element not found), so the
-    list has to be polled. Asked of crcbl's Windows session the same day; lyr's
-    side waits on it. Matching an app's windows could reuse
-    `lyr_wm::app::is_app` on the window's executable or AppUserModelID.
+    list has to be polled. crcbl's Windows session took the read side the same
+    day, in a shape lyr agreed to: `crcbl_shell::notifications::Notifications`
+    (`open`, `caps` with `READ` and `DISMISS`, `list` as one blocking snapshot
+    for a worker thread to poll, `dismiss`), each `Notification` carrying an id,
+    the app's AppUserModelID and name, its arrival time, title and body; no app
+    icon in that slice (`GetLogo`, on crcbl's backlog). lyr asked that the id
+    stay the same across snapshots and that `list` set up its own WinRT
+    apartment. Next for lyr: when crcbl has it on main, review it against this
+    use; it reaches lyr only in a crcbl release, which waits for the owner to
+    ask for one. Then poll it on a worker, show the entries in the clock panel
+    on Windows, and on a click focus the sender, matching its windows with
+    `lyr_wm::app::is_app` on the executable or AppUserModelID.
   - macOS: as on Windows, lyr draws no notifications.
 
 - **The media player card: where it still differs from swaync's.** The card
