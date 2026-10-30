@@ -551,12 +551,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     needs no apartment of its own: the `windows` crate joins the process's MTA).
     Read against this use (2026-10-30), two points sent to crcbl: one toast
     whose details fail to read fails the whole `list`, so the panel would lose
-    every entry; and `NotificationId` has no public value, so lyr keys its own
-    entries by it through a map rather than by lyr's `u32` ids. It reaches lyr
-    only in a crcbl release, which waits for the owner to ask for one. Then poll
-    it on a worker, show the entries in the clock panel on Windows, and on a
-    click focus the sender, matching its windows with `lyr_wm::app::is_app` on
-    the executable or AppUserModelID.
+    every entry (crcbl agreed, and put skipping and counting it on its backlog
+    to fix before lyr ships on it); and `NotificationId` has no public value, so
+    lyr keys its own entries by it through a map rather than by lyr's `u32` ids
+    (deliberate, crcbl says: the id belongs to the store that issued it; ask
+    crcbl if lyr ever needs to keep ids across runs). It reaches lyr only in a
+    crcbl release, which waits for the owner to ask for one. Then poll it on a
+    worker, show the entries in the clock panel on Windows, and on a click focus
+    the sender, matching its windows with `lyr_wm::app::is_app` on the
+    executable or AppUserModelID.
   - macOS: as on Windows, lyr draws no notifications.
 
 - **The media player card: where it still differs from swaync's.** The card
