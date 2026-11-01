@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-01
+
 ### Breaking
 
 - `lyr-core`: `draw::Bar`'s zones hold `draw::Entry` values, a module or a
@@ -441,7 +443,8 @@ and this project adheres to
   tables. An invalid config is an error naming the key, such as
   ``theme.border: `teal` is not a colour``.
 
-[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/kryptic-sh/lyr/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kryptic-sh/lyr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kryptic-sh/lyr/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kryptic-sh/lyr/compare/v0.1.0...v0.2.0
