@@ -530,10 +530,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     were tried by hand on niri 26.04. Not done: X11, where lyr-wm has no backend
     at all (no workspaces either), so focusing would need an X11 client for
     `_NET_ACTIVE_WINDOW` and `WM_CLASS`, a new dependency (the owner's call) or
-    crcbl-shell's X11 connection. Not tried: Thunderbird itself, whose window
-    class has to match its notifications' names; an app whose class matches
-    neither its name nor its desktop entry is not found. An action button's
-    click does not focus the sender, only the body's.
+    crcbl-shell's X11 connection. Thunderbird 158 (Arch, on the owner's desktop,
+    2026-11-01) sends `app_name` `Thunderbird` and `desktop-entry`
+    `org.mozilla.Thunderbird`, read off the session bus, and its Hyprland window
+    class is `org.mozilla.Thunderbird`, so `is_app` matches it; a click on a
+    real Thunderbird toast was not made (`wlrctl` is not installed on that
+    machine). An app whose class matches neither its name nor its desktop entry
+    is not found. An action button's click does not focus the sender, only the
+    body's.
   - Windows: lyr is not the notification daemon and draws no notifications;
     Windows' own toasts and Notification Center activate the sending application
     when clicked. lyr's one notification surface is the clock's bell, which
@@ -1504,7 +1508,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   pointer on its seat. Before crcbl 0.8.1, clicks reached lyr late (a Wayland
   wait slept through events Mesa had read off the shared connection), so a
   toggle test was erratic; on 0.8.1 ten rounds of opening and closing the clock
-  panel by clicks all toggled (2026-10-21).
+  panel by clicks all toggled (2026-10-21). Still no automated test clicks a
+  toast: `wlrctl` is on the owner's laptop, not on the owner's desktop (checked
+  2026-11-01), and headless sway in CI has no pointer, so such a test needs
+  either `wlrctl` installed there or a virtual pointer of lyr's own.
 - **How Hyprland treats a panel's keyboard and pointer (surprising, not a
   bug).** A panel takes the exclusive keyboard so its keys work from the moment
   it opens, and Hyprland 0.56 then holds it there while the panel is mapped and
