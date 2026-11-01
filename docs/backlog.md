@@ -521,16 +521,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     window urgent. Verified in a nested Hyprland 0.56.2 (2026-10-29): a click on
     a `notify-send -a lyrtest-a` notification with no actions moved from
     workspace 3 to the `lyrtest-a` window on workspace 2, and with the request
-    stubbed out it did not. sway and niri are covered by unit tests against fake
-    sockets only; niri's `Windows` reply and `FocusWindow` action were tried by
-    hand on niri 26.04, sway's `[con_id=N] focus` was not tried on a real sway.
-    Not done: X11, where lyr-wm has no backend at all (no workspaces either), so
-    focusing would need an X11 client for `_NET_ACTIVE_WINDOW` and `WM_CLASS`, a
-    new dependency (the owner's call) or crcbl-shell's X11 connection. Not
-    tried: Thunderbird itself, whose window class has to match its
-    notifications' names; an app whose class matches neither its name nor its
-    desktop entry is not found. An action button's click does not focus the
-    sender, only the body's.
+    stubbed out it did not. On sway, CI's `sway e2e` job opens a foot window on
+    workspace 2, shows workspace 1, and checks that `Sway::focus_app` brings
+    workspace 2 and the window back (run on sway 1.12 on the owner's desktop
+    with an mpv window standing in for foot, 2026-11-01; with
+    `focus_window_command` stubbed to `nop` it failed). niri is covered by unit
+    tests against fake sockets, and its `Windows` reply and `FocusWindow` action
+    were tried by hand on niri 26.04. Not done: X11, where lyr-wm has no backend
+    at all (no workspaces either), so focusing would need an X11 client for
+    `_NET_ACTIVE_WINDOW` and `WM_CLASS`, a new dependency (the owner's call) or
+    crcbl-shell's X11 connection. Not tried: Thunderbird itself, whose window
+    class has to match its notifications' names; an app whose class matches
+    neither its name nor its desktop entry is not found. An action button's
+    click does not focus the sender, only the body's.
   - Windows: lyr is not the notification daemon and draws no notifications;
     Windows' own toasts and Notification Center activate the sending application
     when clicked. lyr's one notification surface is the clock's bell, which
@@ -1675,20 +1678,21 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   state with a workspace on each output, a switch to a name with a space and a
   `;`, a refused `$` name, and Log out. Its first runs found that sway quits
   without answering `exit` and sends events after its socket is gone, both
-  handled since. Not exercised there: the focused window's title (a headless
-  sway has no window open) and urgency. The niri backend is tested against a
-  fake socket written from niri v26.04's `niri-ipc`, and against a real niri
-  26.04 by `a_real_niri_switches_and_quits` (ignored; `LYR_E2E_NIRI` names the
-  socket of a niri started for it, which it quits): run on the owner's laptop
-  (2026-10-21) with niri nested in a nested Hyprland, where a niri on a hidden
-  special workspace stalls without frame callbacks. It switched workspace, saw
-  the switch, and quit niri, which closed the socket without answering, as read
-  from its source (mutation-checked: without that handling the quit fails with
-  `Closed`). The bar ran in that niri too, the workspace module following
-  switches made with `niri msg`, its panel reserving its height. The sway
-  backend ran on a desktop too, sway 1.12 nested on the owner's laptop
-  (2026-10-21): the bar showed its workspaces and followed a switch to a name
-  with a space made with `swaymsg`.
+  handled since. Since 2026-11-01 the job also opens a foot window and focuses
+  it by its app id (the notification-click entry), which checks the focused
+  window's app id; its title and urgency are still not exercised. The niri
+  backend is tested against a fake socket written from niri v26.04's `niri-ipc`,
+  and against a real niri 26.04 by `a_real_niri_switches_and_quits` (ignored;
+  `LYR_E2E_NIRI` names the socket of a niri started for it, which it quits): run
+  on the owner's laptop (2026-10-21) with niri nested in a nested Hyprland,
+  where a niri on a hidden special workspace stalls without frame callbacks. It
+  switched workspace, saw the switch, and quit niri, which closed the socket
+  without answering, as read from its source (mutation-checked: without that
+  handling the quit fails with `Closed`). The bar ran in that niri too, the
+  workspace module following switches made with `niri msg`, its panel reserving
+  its height. The sway backend ran on a desktop too, sway 1.12 nested on the
+  owner's laptop (2026-10-21): the bar showed its workspaces and followed a
+  switch to a name with a space made with `swaymsg`.
 - The GPU choice (the owner's rule: `CRCBL_ADAPTER`, else the adapter driving
   the bar's display when it is discrete, else low power) is crcbl-app's
   `adapter::choose` inside the `Presenter`, with `PowerPreference::LowPower`

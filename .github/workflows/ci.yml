@@ -248,7 +248,7 @@ jobs:
   # two virtual outputs, no GPU or input devices), in a private
   # XDG_RUNTIME_DIR, as crcbl's Wayland suite starts one. The test is
   # #[ignore]d everywhere else; here it runs, and fails without a sway rather
-  # than skipping.
+  # than skipping. foot is the window the test focuses by its app id.
   sway-e2e:
     name: sway e2e
     runs-on: ubuntu-latest
@@ -260,11 +260,11 @@ jobs:
           cache: false
       - run: rustup update --no-self-update stable
       - uses: Swatinem/rust-cache@v2
-      - name: Install sway
+      - name: Install sway and foot
         timeout-minutes: 10
         run:
           sudo apt-get update && sudo apt-get install -y --no-install-recommends
-          sway
+          sway foot
       - name: Build the test
         run: cargo test --locked -p lyr-wm --test sway_e2e --no-run
       - name: Run it against a headless sway
