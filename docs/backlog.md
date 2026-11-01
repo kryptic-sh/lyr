@@ -245,34 +245,39 @@ implementation follows meanwhile.
   `display_adapter`, and the scripted resize and read-back as CI jobs.
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
-  `=0.13.0` (2026-10-29), which reads a fallback face whole only once its `cmap`
-  maps a character drawn (the Windows memory entry below). 0.12.1 (2026-10-27)
-  brought lazy fallback faces (`lyr_render::fonts`: 124 to 43 MB resident on the
-  owner's laptop, whose bar font has 17 fallback faces), a first start on the
-  display's Vulkan driver alone (in a nested Hyprland there: no `/dev/nvidia*`
-  handle, 94 ms from the shell to the first frame, where 0.12.0 held 12 handles
-  for the process's life and took 408 ms), the viewport fix for a resized panel
-  (its own entry under the audio menu below) and `RichLayout`. 0.12.0
-  (2026-10-26) brought `GpuChoice`, which lyr saves between runs
-  (`lyr_render::gpu`, the file `gpu-choice` in lyr's state directory,
-  `apps/lyr/src/gpu.rs`). With 0.12.1 the choice names its driver from the first
-  start, so `lyr_render::gpu`'s locate thread no longer runs (seen: one save, no
-  search); it is kept for a choice crcbl opened without naming a driver (a pin,
-  a loader variable, or the display's device refusing the window), where without
-  it every start would load every driver. 0.11.0 (0.10.0 was skipped, since its
-  crates.io publish stopped halfway) brought icon theme lookups that take the
-  nearest size from a per-theme index. 0.9.0 came 2026-10-23 for `SharedGpu`
-  (that bump needed no change in lyr's code; 0.8.0's `Presenter` drains before a
-  reconfigure, so lyr no longer does; 0.7.0 brought `set_panel`, frame pacing
-  and `font::breaks`; crcbl's `rust-version` is 1.98, and lyr's follows). 0.8.1
-  ran on Windows. crcbl 0.4.0 (2026-10-18) brought `crcbl-app`, the
-  window-plus-device crate lyr asked for so that it links no engine, audio
-  (cpal, ALSA) or physics; 0.5.0's only breaking change is in crcbl-phys. M1
-  adds `crcbl-app`, `crcbl-hal`, `crcbl-ui` (with `system-fonts`),
-  `crcbl-frame`, `crcbl-font` and the backend per platform (Vulkan on Linux,
-  D3D12 on Windows, Metal on macOS), each pinned exactly, and `crcbl-image` with
-  M6. The GPU path, as crcbl reported it (not read yet at 0.4.0 or later; read
-  before M1 relies on it):
+  `=0.15.0` (2026-11-01). Neither 0.14.0 nor 0.15.0 broke anything lyr uses
+  (their breaking changes are in crcbl's renderer, animation, profiler, console
+  and text-edit types); 0.14.0 added `crcbl-notify`, which lyr does not depend
+  on yet (the Windows notifications entry). Checked on the owner's desktop (RX
+  7900 XTX, Mesa): the workspace's tests, the font tests that need the Nerd Font
+  and a CJK font, and the reference-image render test on both RADV and lavapipe.
+  0.13.0 (2026-10-29) reads a fallback face whole only once its `cmap` maps a
+  character drawn (the Windows memory entry below). 0.12.1 (2026-10-27) brought
+  lazy fallback faces (`lyr_render::fonts`: 124 to 43 MB resident on the owner's
+  laptop, whose bar font has 17 fallback faces), a first start on the display's
+  Vulkan driver alone (in a nested Hyprland there: no `/dev/nvidia*` handle, 94
+  ms from the shell to the first frame, where 0.12.0 held 12 handles for the
+  process's life and took 408 ms), the viewport fix for a resized panel (its own
+  entry under the audio menu below) and `RichLayout`. 0.12.0 (2026-10-26)
+  brought `GpuChoice`, which lyr saves between runs (`lyr_render::gpu`, the file
+  `gpu-choice` in lyr's state directory, `apps/lyr/src/gpu.rs`). With 0.12.1 the
+  choice names its driver from the first start, so `lyr_render::gpu`'s locate
+  thread no longer runs (seen: one save, no search); it is kept for a choice
+  crcbl opened without naming a driver (a pin, a loader variable, or the
+  display's device refusing the window), where without it every start would load
+  every driver. 0.11.0 (0.10.0 was skipped, since its crates.io publish stopped
+  halfway) brought icon theme lookups that take the nearest size from a
+  per-theme index. 0.9.0 came 2026-10-23 for `SharedGpu` (that bump needed no
+  change in lyr's code; 0.8.0's `Presenter` drains before a reconfigure, so lyr
+  no longer does; 0.7.0 brought `set_panel`, frame pacing and `font::breaks`;
+  crcbl's `rust-version` is 1.98, and lyr's follows). 0.8.1 ran on Windows.
+  crcbl 0.4.0 (2026-10-18) brought `crcbl-app`, the window-plus-device crate lyr
+  asked for so that it links no engine, audio (cpal, ALSA) or physics; 0.5.0's
+  only breaking change is in crcbl-phys. M1 adds `crcbl-app`, `crcbl-hal`,
+  `crcbl-ui` (with `system-fonts`), `crcbl-frame`, `crcbl-font` and the backend
+  per platform (Vulkan on Linux, D3D12 on Windows, Metal on macOS), each pinned
+  exactly, and `crcbl-image` with M6. The GPU path, as crcbl reported it (not
+  read yet at 0.4.0 or later; read before M1 relies on it):
   `crcbl_app::window::open_window(shell, elapsed, desc)`, `wait_for_configure`
   for the extent, then
   `crcbl_app::present::Presenter::open(&shell, window, extent, &PresenterDesc)`
@@ -555,11 +560,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     to fix before lyr ships on it); and `NotificationId` has no public value, so
     lyr keys its own entries by it through a map rather than by lyr's `u32` ids
     (deliberate, crcbl says: the id belongs to the store that issued it; ask
-    crcbl if lyr ever needs to keep ids across runs). It reaches lyr only in a
-    crcbl release, which waits for the owner to ask for one. Then poll it on a
-    worker, show the entries in the clock panel on Windows, and on a click focus
-    the sender, matching its windows with `lyr_wm::app::is_app` on the
-    executable or AppUserModelID.
+    crcbl if lyr ever needs to keep ids across runs). crcbl released it in
+    0.14.0 (2026-10-31), but without the skip: read in 0.15.0's
+    `crates/crcbl-notify/src/windows.rs` (2026-11-01), `list` still returns on
+    the first toast that fails, and the fix is still open on crcbl's backlog
+    ("One unreadable toast fails the whole `list`"). It is also the Windows
+    session's to build. Once the skip ships: poll it on a worker, show the
+    entries in the clock panel on Windows, and on a click focus the sender,
+    matching its windows with `lyr_wm::app::is_app` on the executable or
+    AppUserModelID.
   - macOS: as on Windows, lyr draws no notifications.
 
 - **The media player card: where it still differs from swaync's.** The card
