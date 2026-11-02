@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-02
+
 ### Changed
 
 - Built on crcbl 0.16.0 (from 0.15.0) and zbus 6.2.1 (from 6.1.0).
@@ -455,7 +457,8 @@ and this project adheres to
   tables. An invalid config is an error naming the key, such as
   ``theme.border: `teal` is not a colour``.
 
-[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/kryptic-sh/lyr/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/kryptic-sh/lyr/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/kryptic-sh/lyr/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kryptic-sh/lyr/compare/v0.3.0...v0.4.0
