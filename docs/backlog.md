@@ -488,6 +488,42 @@ implementation follows meanwhile.
   ([plan/05](plan/05-layout-and-config.md#migration-from-waybar)). What happens
   to `wiremix`, `bluetui` and the `krypt menu` names is a question above.
 
+  **Half done on the owner's desktop, and it hides lyr's notifications
+  (2026-11-02).** Hyprland starts lyr, but the dotfiles still install swaync
+  (`.krypt/deps.toml`) and deploy `.config/swaync`. swaync ships a D-Bus
+  activation file (`/usr/share/dbus-1/services/org.erikreider.swaync.service`,
+  `Name=org.freedesktop.Notifications`), so the first notification sent while no
+  one holds the name (lyr killed or restarted, or one sent at login before lyr
+  starts) starts swaync, which keeps the name. lyr then starts, finds it owned
+  and steps aside, as plan 09 says it should without `notifications.replace`
+  (the owner has no `config.toml`): its log reads
+  "`:1.9146 (pid 2671293) owns org.freedesktop.Notifications, so lyr leaves notifications to it`"
+  on both restarts that day, and the same with swaync's earlier pid on
+  2026-10-30. The owner saw it as notifications missing from lyr after a restart
+  on 0.5.1; it is not a regression. Fixes, all outside lyr and the owner's call:
+  drop `swaync` from the dotfiles' deps, its config and its `swaync-test`
+  command, and uninstall it; or `systemctl --user mask swaync.service`, which
+  stops the activation (its `SystemdService=`); or set
+  `notifications.replace = true`. Then `systemctl --user stop swaync` and
+  restart lyr. A lyr-side improvement, not built: lyr claims the name with
+  `DO_NOT_QUEUE`, so it never gets it back when the other daemon exits; queueing
+  for it (watching `NameOwnerChanged`) would let lyr take over once swaync goes,
+  though not while swaync stays up.
+
+- **crcbl 0.16.0 is out; lyr is on 0.15.0** (2026-11-02). Not adopted: the owner
+  has not yet said to. Read crcbl's changelog for breaking changes in the crates
+  lyr uses (`crcbl-app`, `-font`, `-frame`, `-hal`, `-image`, `-shell`, `-ui`,
+  `-mixer`) before bumping.
+
+## Dependency updates that cannot land alone
+
+- **Dependabot's `windows-core` and `windows-collections` 0.100.0 (PRs #2 and
+  #5).** Both fail CI on Windows, and #2 also fails clippy on macOS: lyr's
+  `windows` crate is at 0.62.2, still the latest `windows` release on
+  2026-11-02, and it depends on `windows-core` 0.62, so the two lyr pins must
+  move together with `windows`. Close them, or leave them until a `windows`
+  release on 0.100 exists and move all three at once.
+
 ## The fallback stack, if crcbl declines
 
 wayr would be the Linux backend again. Its gaps, read in its source on
