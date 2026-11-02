@@ -8,6 +8,12 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- Built on hjkl 0.44.0 (from 0.43.4) for `hjkl-config` and `hjkl-xdg`; their
+  behaviour is unchanged, since 0.44.0's breaking changes are in hjkl's editor
+  crates.
+
 ## [0.5.0] - 2026-11-01
 
 ### Breaking
