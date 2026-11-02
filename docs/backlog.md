@@ -504,12 +504,13 @@ implementation follows meanwhile.
 
 ## Dependency updates that cannot land alone
 
-- **Dependabot's `windows-core` and `windows-collections` 0.100.0 (PRs #2 and
-  #5).** Both fail CI on Windows, and #2 also fails clippy on macOS: lyr's
+- **`windows-core` and `windows-collections` 0.100.0 wait for `windows`.** lyr's
   `windows` crate is at 0.62.2, still the latest `windows` release on
-  2026-11-02, and it depends on `windows-core` 0.62, so the two lyr pins must
-  move together with `windows`. Close them, or leave them until a `windows`
-  release on 0.100 exists and move all three at once.
+  2026-11-02, and it depends on `windows-core` 0.62, so the three move together
+  once a `windows` release on 0.100 exists. Dependabot's PRs bumping the two
+  alone (#2 and #5) failed CI on Windows and were closed on 2026-11-02;
+  Dependabot will reopen such PRs for each new release, and they can be closed
+  the same way.
 
 ## The fallback stack, if crcbl declines
 
