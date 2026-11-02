@@ -153,6 +153,17 @@ implementation follows meanwhile.
   planned, take the smaller step, or leave every source running (a source whose
   module is hidden still wakes the bar on its changes)?
 
+## Release in progress
+
+- **0.5.2 is bumped but not tagged.** The version bump (`chore: bump version`,
+  `d5ad774`, 2026-11-02) is on main, with `CHANGELOG.md`'s `[0.5.2]` section
+  (crcbl 0.16.0, zbus 6.2.1) and its compare link, but no `v0.5.2` tag exists
+  yet: the owner paused before the tag. CI on the code it ships (`c1fa318`, the
+  crcbl 0.16.0 move) was green on every job. To finish: check CI on `d5ad774` is
+  green, tag `d5ad774` as `v0.5.2`, push the tag, and watch its run publish to
+  GitHub, crates.io, the AUR, Homebrew and Scoop. Delete this entry once
+  released.
+
 ## Cross-repo work
 
 - **crcbl: a native notification seam, and lyr's notifications on it.** The
