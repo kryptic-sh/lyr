@@ -245,21 +245,23 @@ implementation follows meanwhile.
   `display_adapter`, and the scripted resize and read-back as CI jobs.
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
-  `=0.15.0` (2026-11-01). Neither 0.14.0 nor 0.15.0 broke anything lyr uses
-  (their breaking changes are in crcbl's renderer, animation, profiler, console
-  and text-edit types); 0.14.0 added `crcbl-notify`, which lyr does not depend
-  on yet (the Windows notifications entry). Checked on the owner's desktop (RX
-  7900 XTX, Mesa): the workspace's tests, the font tests that need the Nerd Font
-  and a CJK font, and the reference-image render test on both RADV and lavapipe.
-  0.13.0 (2026-10-29) reads a fallback face whole only once its `cmap` maps a
-  character drawn (the Windows memory entry below). 0.12.1 (2026-10-27) brought
-  lazy fallback faces (`lyr_render::fonts`: 124 to 43 MB resident on the owner's
-  laptop, whose bar font has 17 fallback faces), a first start on the display's
-  Vulkan driver alone (in a nested Hyprland there: no `/dev/nvidia*` handle, 94
-  ms from the shell to the first frame, where 0.12.0 held 12 handles for the
-  process's life and took 408 ms), the viewport fix for a resized panel (its own
-  entry under the audio menu below) and `RichLayout`. 0.12.0 (2026-10-26)
-  brought `GpuChoice`, which lyr saves between runs (`lyr_render::gpu`, the file
+  `=0.16.0` (2026-11-02), which has no breaking changes; its changes are in
+  crcbl's animation, ragdoll and render crates, none of which lyr uses. Neither
+  0.14.0 nor 0.15.0 broke anything lyr uses (their breaking changes are in
+  crcbl's renderer, animation, profiler, console and text-edit types); 0.14.0
+  added `crcbl-notify`, which lyr does not depend on yet (the Windows
+  notifications entry). Checked on the owner's desktop (RX 7900 XTX, Mesa): the
+  workspace's tests, the font tests that need the Nerd Font and a CJK font, and
+  the reference-image render test on both RADV and lavapipe. 0.13.0 (2026-10-29)
+  reads a fallback face whole only once its `cmap` maps a character drawn (the
+  Windows memory entry below). 0.12.1 (2026-10-27) brought lazy fallback faces
+  (`lyr_render::fonts`: 124 to 43 MB resident on the owner's laptop, whose bar
+  font has 17 fallback faces), a first start on the display's Vulkan driver
+  alone (in a nested Hyprland there: no `/dev/nvidia*` handle, 94 ms from the
+  shell to the first frame, where 0.12.0 held 12 handles for the process's life
+  and took 408 ms), the viewport fix for a resized panel (its own entry under
+  the audio menu below) and `RichLayout`. 0.12.0 (2026-10-26) brought
+  `GpuChoice`, which lyr saves between runs (`lyr_render::gpu`, the file
   `gpu-choice` in lyr's state directory, `apps/lyr/src/gpu.rs`). With 0.12.1 the
   choice names its driver from the first start, so `lyr_render::gpu`'s locate
   thread no longer runs (seen: one save, no search); it is kept for a choice
@@ -509,11 +511,6 @@ implementation follows meanwhile.
   `DO_NOT_QUEUE`, so it never gets it back when the other daemon exits; queueing
   for it (watching `NameOwnerChanged`) would let lyr take over once swaync goes,
   though not while swaync stays up.
-
-- **crcbl 0.16.0 is out; lyr is on 0.15.0** (2026-11-02). Not adopted: the owner
-  has not yet said to. Read crcbl's changelog for breaking changes in the crates
-  lyr uses (`crcbl-app`, `-font`, `-frame`, `-hal`, `-image`, `-shell`, `-ui`,
-  `-mixer`) before bumping.
 
 ## Dependency updates that cannot land alone
 

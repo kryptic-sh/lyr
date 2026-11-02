@@ -17,19 +17,19 @@ lyr-core.workspace = true
 workspace = true
 
 [target.'cfg(any(target_os = "linux", windows))'.dependencies]
-crcbl-mixer = "=0.15.0"
+crcbl-mixer = "=0.16.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-crcbl-image = { version = "=0.15.0", features = ["png", "svg", "xpm", "theme", "jpeg", "webp", "svg-text"] }
+crcbl-image = { version = "=0.16.0", features = ["png", "svg", "xpm", "theme", "jpeg", "webp", "svg-text"] }
 futures-util = { version = "0.3.34", default-features = false, features = ["alloc"] }
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["sync"] }
-zbus = { version = "6.1.0", default-features = false, features = ["tokio", "proxy", "service"] }
+zbus = { version = "6.2.1", default-features = false, features = ["tokio", "proxy", "service"] }
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 tempfile = "3.27.0"
 tokio = { version = "1.54.1", features = ["rt", "macros", "sync", "time"] }
-zbus = { version = "6.1.0", default-features = false, features = ["tokio", "proxy", "service", "p2p", "object-manager"] }
+zbus = { version = "6.2.1", default-features = false, features = ["tokio", "proxy", "service", "p2p", "object-manager"] }
 
 [target."cfg(windows)".dependencies]
 windows = { version = "0.62.2", features = ["Win32_System_Com", "Win32_Foundation", "Devices_Bluetooth", "Devices_Enumeration", "Devices_Radios", "Foundation", "Foundation_Collections"] }

@@ -8,6 +8,10 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- Built on crcbl 0.16.0 (from 0.15.0) and zbus 6.2.1 (from 6.1.0).
+
 ## [0.5.1] - 2026-11-02
 
 ### Changed
