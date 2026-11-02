@@ -504,13 +504,37 @@ implementation follows meanwhile.
 
 ## Dependency updates that cannot land alone
 
-- **`windows-core` and `windows-collections` 0.100.0 wait for `windows`.** lyr's
-  `windows` crate is at 0.62.2, still the latest `windows` release on
-  2026-11-02, and it depends on `windows-core` 0.62, so the three move together
-  once a `windows` release on 0.100 exists. Dependabot's PRs bumping the two
-  alone (#2 and #5) failed CI on Windows and were closed on 2026-11-02;
-  Dependabot will reopen such PRs for each new release, and they can be closed
-  the same way.
+- **Windows crates 0.100: move lyr's Bluetooth to `windows-bindgen`** (the owner
+  chose this on 2026-11-02, to be done later). Microsoft moved its Windows
+  crates to a common 0.100.0 on 2026-09-03 (windows-rs release 74; plan in
+  windows-rs issue 4867, the August 2026 newsletter) but did not publish the
+  umbrella `windows` crate or `windows-sys` at 0.100, and may not for a while:
+  libraries are meant to depend on the small crates (`windows-core`,
+  `windows-collections`, `windows-future`, …) and generate other APIs locally
+  with `windows-bindgen`. 0.100's native APIs also come from new metadata parsed
+  from the SDK headers, so their signatures differ from 0.62's. lyr's `windows`
+  crate (0.62.2, its latest) depends on `windows-core` 0.62, so Dependabot's PRs
+  bumping `windows-core` (#2) and `windows-collections` (#5) to 0.100 alone
+  failed CI on Windows; both were closed on 2026-11-02 (#5's branch is deleted),
+  and Dependabot will reopen such PRs for each new release.
+
+  The only user of the `windows` crate is `lyr_sources::bluetooth::windows`
+  (`crates/lyr-sources/src/bluetooth/windows.rs`): `Devices::Bluetooth`
+  (`BluetoothAdapter`, `BluetoothDevice`, `BluetoothLEDevice`),
+  `Devices::Enumeration`, `Devices::Radios`,
+  `Foundation::{IReference, TypedEventHandler}` and
+  `Win32::System::Com::CoInitializeEx`. The plan the owner picked: add
+  `windows-bindgen` 0.100 as a dev-dependency (a new dependency, approved),
+  generate those types into a checked-in bindings module beside the source, with
+  a test that regenerates them and fails when the checked-in file is stale; drop
+  the `windows` crate from `lyr-sources`; move `windows-core` and
+  `windows-collections` (and `windows-future`, if the bindings need it) to 0.100
+  in one commit on main rather than reopening the PRs. `windows-sys` stays at
+  0.61 until it has a 0.100. Check that crcbl-mixer's own `windows` 0.62
+  coexisting in the tree causes no trouble (no types cross between them). It can
+  be type-checked on Linux (`cargo check --target x86_64-pc-windows-msvc` after
+  `rustup target add`), but only CI on Windows runs it, and the Bluetooth menu
+  itself only a Windows machine with Bluetooth.
 
 ## The fallback stack, if crcbl declines
 
