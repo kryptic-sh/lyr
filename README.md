@@ -60,7 +60,8 @@ yay -S lyr-bin
 # Homebrew (macOS)
 brew install kryptic-sh/tap/lyr
 
-# Scoop (Windows)
+# Scoop (Windows); nerd-fonts carries the bar's font, Hack Nerd Font Propo
+scoop bucket add nerd-fonts
 scoop bucket add kryptic-sh https://github.com/kryptic-sh/scoop-bucket
 scoop install lyr
 
@@ -74,7 +75,10 @@ Or download the archive for your platform from
 There are builds for Linux (x86_64 and aarch64, glibc 2.28+), macOS 11+ (Apple
 silicon and Intel) and Windows (x86_64). On Linux, lyr opens the Wayland client
 library, a Vulkan driver through its loader, xkbcommon and fontconfig at run
-time, so those must be installed.
+time, so those must be installed. The default config draws its icons with
+[Hack Nerd Font Propo](https://www.nerdfonts.com/font-downloads), which Scoop
+installs with lyr; elsewhere, install it (or set `[theme] font` to another Nerd
+Font), or the icons draw as empty boxes in a monospace fallback.
 
 ## Using it
 

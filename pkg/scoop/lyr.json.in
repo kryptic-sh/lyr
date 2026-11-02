@@ -9,6 +9,7 @@
       "hash": "{SHA256_X86_64_WINDOWS}"
     }
   },
+  "depends": "nerd-fonts/Hack-NF-Propo",
   "bin": "lyr.exe",
   "checkver": {
     "github": "https://github.com/kryptic-sh/lyr"

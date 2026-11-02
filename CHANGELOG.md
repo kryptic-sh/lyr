@@ -8,6 +8,13 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- Scoop installs the bar's font: the manifest depends on
+  `nerd-fonts/Hack-NF-Propo`, so the default config's icons no longer draw as
+  empty boxes in a monospace fallback on Windows. Scoop needs the `nerd-fonts`
+  bucket added (`scoop bucket add nerd-fonts`) and says so when it is not.
+
 ## [0.5.2] - 2026-11-02
 
 ### Changed
