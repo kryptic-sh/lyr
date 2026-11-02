@@ -1,0 +1,27 @@
+// windows-bindgen's filter for `bindings.rs`, generated in its minimal style
+// and flat (`tests/windows_bindings.rs` sets both): the WinRT APIs the
+// Bluetooth source calls, each member named so nothing else is generated.
+// After an edit, regenerate with
+// `LYR_BLESS_BINDINGS=1 cargo test -p lyr-sources --test windows_bindings`.
+Windows.Devices.Bluetooth.BluetoothAdapter::{GetDefaultAsync, BluetoothAddress, GetRadioAsync, GetDeviceSelector}
+Windows.Devices.Bluetooth.BluetoothDevice::GetDeviceSelectorFromPairingState
+Windows.Devices.Bluetooth.BluetoothLEDevice::GetDeviceSelectorFromPairingState
+Windows.Devices.Enumeration.DeviceInformation::{FindAllAsyncWithKindAqsFilterAndAdditionalProperties, CreateWatcherWithKindAqsFilterAndAdditionalProperties, CreateFromIdAsync, Properties, Id, Name, Pairing}
+Windows.Devices.Enumeration.DeviceInformationPairing::{Custom, UnpairAsync}
+Windows.Devices.Enumeration.DeviceInformationCustomPairing::{PairingRequested, PairAsync}
+Windows.Devices.Enumeration.DevicePairingRequestedEventArgs::{PairingKind, Pin, Accept, AcceptWithPin}
+Windows.Devices.Enumeration.DevicePairingResult::Status
+Windows.Devices.Enumeration.DeviceUnpairingResult::Status
+Windows.Devices.Enumeration.DeviceInformationUpdate::Id
+Windows.Devices.Enumeration.DeviceWatcher::{Added, Updated, Removed, EnumerationCompleted, Start, Stop}
+Windows.Devices.Enumeration.DeviceInformationKind
+Windows.Devices.Enumeration.DevicePairingKinds
+Windows.Devices.Enumeration.DevicePairingResultStatus
+Windows.Devices.Enumeration.DeviceUnpairingResultStatus
+Windows.Devices.Radios.Radio::{RequestAccessAsync, State, SetStateAsync, StateChanged}
+Windows.Devices.Radios.RadioAccessStatus
+Windows.Devices.Radios.RadioState
+Windows.Foundation.IReference
+// The events' delegate, which the minimal style boxes each handler in but
+// does not select on its own.
+Windows.Foundation.TypedEventHandler
