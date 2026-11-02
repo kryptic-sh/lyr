@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-02
+
 ### Changed
 
 - Built on hjkl 0.44.0 (from 0.43.4) for `hjkl-config` and `hjkl-xdg`; their
@@ -449,7 +451,8 @@ and this project adheres to
   tables. An invalid config is an error naming the key, such as
   ``theme.border: `teal` is not a colour``.
 
-[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/kryptic-sh/lyr/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/kryptic-sh/lyr/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kryptic-sh/lyr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kryptic-sh/lyr/compare/v0.2.0...v0.3.0

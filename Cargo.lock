@@ -252,9 +252,9 @@ checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
 name = "crc32fast"
-version = "1.5.3"
+version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ba106e844045ddc02c20768ac4b0b7cb45f2cc2ecbd833ac9f5dacb183c2055"
+checksum = "5f97d3416d5337d15c4b0d78c8c91df922ca143f57ec20e2d1c188333047ef04"
 dependencies = [
  "cfg-if",
 ]
@@ -897,7 +897,7 @@ checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "lyr-bin"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -920,7 +920,7 @@ dependencies = [
 
 [[package]]
 name = "lyr-config"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "chrono",
  "hjkl-config",
@@ -932,7 +932,7 @@ dependencies = [
 
 [[package]]
 name = "lyr-core"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "chrono",
  "lyr-config",
@@ -940,7 +940,7 @@ dependencies = [
 
 [[package]]
 name = "lyr-render"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "crcbl-app",
  "crcbl-font",
@@ -957,7 +957,7 @@ dependencies = [
 
 [[package]]
 name = "lyr-shell"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "crcbl-shell",
  "lyr-config",
@@ -965,7 +965,7 @@ dependencies = [
 
 [[package]]
 name = "lyr-sources"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "block2",
  "crcbl-image",
@@ -992,7 +992,7 @@ dependencies = [
 
 [[package]]
 name = "lyr-wm"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -1995,9 +1995,9 @@ dependencies = [
 
 [[package]]
 name = "zbus"
-version = "6.2.0"
+version = "6.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3666b126b788c05de810dd9e4e8dc84b21f87f7ad70a29a09b9db093f0102891"
+checksum = "0ddb2961d9587ef9f24ad14cde1c3bc4c5edc9f1525932a8cffdd5bd98886eb9"
 dependencies = [
  "async-trait",
  "bitflags",
@@ -2023,9 +2023,9 @@ dependencies = [
 
 [[package]]
 name = "zbus_macros"
-version = "6.2.0"
+version = "6.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20e0bfa90f7877d308d09bdac3586a45c5f5986e58ebf6ec5c3b809c21ad8e22"
+checksum = "083b38add47c340fc12ec560124fb1d9c23acb584f7021099f85ec6587a03c54"
 dependencies = [
  "proc-macro2",
  "quote",
