@@ -490,27 +490,17 @@ implementation follows meanwhile.
   ([plan/05](plan/05-layout-and-config.md#migration-from-waybar)). What happens
   to `wiremix`, `bluetui` and the `krypt menu` names is a question above.
 
-  **Half done on the owner's desktop, and it hides lyr's notifications
-  (2026-11-02).** Hyprland starts lyr, but the dotfiles still install swaync
-  (`.krypt/deps.toml`) and deploy `.config/swaync`. swaync ships a D-Bus
-  activation file (`/usr/share/dbus-1/services/org.erikreider.swaync.service`,
-  `Name=org.freedesktop.Notifications`), so the first notification sent while no
-  one holds the name (lyr killed or restarted, or one sent at login before lyr
-  starts) starts swaync, which keeps the name. lyr then starts, finds it owned
-  and steps aside, as plan 09 says it should without `notifications.replace`
-  (the owner has no `config.toml`): its log reads
-  "`:1.9146 (pid 2671293) owns org.freedesktop.Notifications, so lyr leaves notifications to it`"
-  on both restarts that day, and the same with swaync's earlier pid on
-  2026-10-30. The owner saw it as notifications missing from lyr after a restart
-  on 0.5.1; it is not a regression. Fixes, all outside lyr and the owner's call:
-  drop `swaync` from the dotfiles' deps, its config and its `swaync-test`
-  command, and uninstall it; or `systemctl --user mask swaync.service`, which
-  stops the activation (its `SystemdService=`); or set
-  `notifications.replace = true`. Then `systemctl --user stop swaync` and
-  restart lyr. A lyr-side improvement, not built: lyr claims the name with
-  `DO_NOT_QUEUE`, so it never gets it back when the other daemon exits; queueing
-  for it (watching `NameOwnerChanged`) would let lyr take over once swaync goes,
-  though not while swaync stays up.
+  **swaync is out of the dotfiles** (dotfiles `d7c574f`, 2026-11-02) and
+  uninstalled on the owner's desktop, where it had held
+  `org.freedesktop.Notifications`: its D-Bus activation file started it whenever
+  no one held the name (lyr restarting, or a notification at login before lyr
+  was up), and lyr then stepped aside as plan 09 says, so no notification
+  reached lyr. Any other machine that still has swaync installed has the same
+  problem until it is uninstalled (`sudo pacman -Rns swaync`). waybar stays in
+  the dotfiles as a fallback, the owner's call. A lyr-side improvement, not
+  built: lyr claims the name with `DO_NOT_QUEUE`, so it never gets it back when
+  another daemon exits; queueing for it (watching `NameOwnerChanged`) would let
+  lyr take over once that daemon goes, though not while it stays up.
 
 ## Dependency updates that cannot land alone
 
