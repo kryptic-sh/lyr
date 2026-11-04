@@ -25,13 +25,13 @@ Nothing is needed from crcbl (read at crcbl-shell 0.17.1):
 [bar]
 position = "left"   # top | bottom | left | right
 height = 50         # a top or bottom bar's height
-width = 50          # a left or right bar's width (new)
+width = 140         # a left or right bar's width (new)
 ```
 
 - **`width` is new.** It is a side bar's thickness in logical pixels, and is
   ignored on a top or bottom bar, as `height` is on a side bar. This follows
-  waybar, which sizes a vertical bar with `width`. Its default matches
-  `height`'s.
+  waybar, which sizes a vertical bar with `width`. Its default is 140, wide
+  enough for the default clock's date and time on a line each.
 - **A side bar spans its output's whole height**, as a top bar spans its width.
   On a waybar side bar, `height` sets the bar's length; lyr has no such key, so
   `import-waybar` lists that `height` as not carried.
@@ -150,9 +150,10 @@ Each slice is pushed once its gate is green.
   space is where it wraps). At the default `width` of 50 the box has 26 px
   inside its border, narrower than "100%" or "21:52" at the default 16 px font,
   so the mic shows its glyph over "1…" and the clock "2…" over "2…"; the volume
-  while muted (`format_muted` has no `{icon}`) is cut the same way. Whether a
-  side bar's default `width` should be wider is the owner's call; the default is
-  unchanged.
+  while muted (`format_muted` has no `{icon}`) is cut the same way. The owner
+  set the default `width` to 140 (2026-11-04), where every default module reads
+  whole, confirmed on niri; a wrap whose every line would be cut is shown as one
+  cut line instead, so a narrow bar's boxes stay one line tall.
 - **Zones meeting drop modules rather than compacting them.** Compacting saves
   no length on a side bar, so the modules nearest the centre are dropped, unlike
   the horizontal rule above.

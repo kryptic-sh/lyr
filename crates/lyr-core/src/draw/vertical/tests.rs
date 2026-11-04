@@ -320,6 +320,16 @@ fn a_word_too_wide_shows_the_compact_form_else_is_cut_on_its_line() {
 }
 
 #[test]
+fn a_wrap_that_keeps_no_whole_word_is_one_cut_line() {
+    // Each word is wider than the box, so wrapping would show only cuts.
+    let left = [label("abc defg", None)];
+    let (list, _) = build(&bar(1000.0, &left, &[], &[]), &theme(), measure);
+    let shown: Vec<String> = texts(&list).into_iter().map(|(text, _)| text).collect();
+    assert_eq!(shown, ["a\u{2026}"]);
+    assert_eq!(boxes(&list), [box_at(10.0)], "one line tall");
+}
+
+#[test]
 fn a_picture_wider_than_the_bar_is_shrunk_to_it() {
     // 40 by 20 px, in the 26 px inside the box's border.
     let picture = Picture::new(2, 1, vec![0; 8]).expect("pixels").sized(20.0);

@@ -1,27 +1,26 @@
-box 0,0 50x1080 radius 0 fill #00000000 border none
+box 0,0 140x1080 radius 0 fill #00000000 border none
 group 0.8
-  box 10,10 30x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
-  text 20,10 10x24 #cdd6f4ff "\u{f011}"
+  box 10,10 120x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 65,10 10x24 #cdd6f4ff "\u{f011}"
 group 0.8
-  box 10,46 30x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
-  text 20,46 10x24 #cdd6f4ff "\u{f241}"
+  box 10,46 120x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 65,46 10x24 #cdd6f4ff "\u{f241}"
 group 0.8
-  box 10,82 30x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
-  text 20,82 10x24 #cdd6f4ff "\u{f24e}"
+  box 10,82 120x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 65,82 10x24 #cdd6f4ff "\u{f24e}"
 group 0.8
-  box 10,118 30x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
-  text 20,118 10x24 #cdd6f4ff "\u{f1eb}"
+  box 10,118 120x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 65,118 10x24 #cdd6f4ff "\u{f1eb}"
 group 0.8
-  box 10,154 30x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
-  text 20,154 10x24 #cdd6f4ff "\u{f00af}"
+  box 10,154 120x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 20,154 100x24 #cdd6f4ff "\u{f00af} Buds 80%"
 group 0.8
-  box 10,942 30x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
-  text 20,942 10x24 #89b4faff "\u{f025}"
+  box 10,962 120x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 45,962 50x24 #89b4faff "\u{f025} 40%"
 group 0.8
-  box 10,978 30x44 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
-  text 20,978 10x24 #cba6f7ff "\u{f131}"
-  text 15,998 20x24 #cba6f7ff "6…"
+  box 10,998 120x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 45,998 50x24 #cba6f7ff "\u{f131} 65%"
 group 0.8
-  box 10,1034 30x44 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
-  text 15,1034 20x24 #cdd6f4ff "2…"
-  text 15,1054 20x24 #cdd6f4ff "0…"
+  box 10,1034 120x44 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 20,1034 100x24 #cdd6f4ff "2026/10/19"
+  text 45,1054 50x24 #cdd6f4ff "09:05"

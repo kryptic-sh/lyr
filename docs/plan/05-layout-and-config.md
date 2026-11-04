@@ -34,7 +34,7 @@ machine.
 [bar]
 position = "top"        # top | bottom | left | right
 height = 50             # a top or bottom bar's height
-width = 50              # a left or right bar's width
+width = 140             # a left or right bar's width
 output = []             # empty = every output
 layer = "top"           # Wayland only: background | bottom | top | overlay
 

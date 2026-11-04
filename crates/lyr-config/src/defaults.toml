@@ -8,9 +8,10 @@
 [bar]
 # top | bottom | left | right
 position = "top"
-# A top or bottom bar's height, and a left or right bar's width.
+# A top or bottom bar's height, and a left or right bar's width: wide enough
+# for the default clock's date and time on a line each.
 height = 50
-width = 50
+width = 140
 output = []
 layer = "top"
 

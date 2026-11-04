@@ -21,24 +21,24 @@ and this project adheres to
 - A bar on the left or right edge: `[bar] position = "left"` or `"right"` runs
   the bar down that side of each output, reserving its width (an AppBar on
   Windows, an exclusive zone on Wayland). The new `[bar] width` sets a side
-  bar's width, as `height` sets a top or bottom bar's, and defaults to the same
-  value. Zones run top to bottom with the centre centred; each module is one
-  line of text tall, its text level and centred. A label too wide for one line
-  wraps at its spaces, each line centred and the box a line taller for each;
-  where a word is still too wide, the label shows its compact form, or else each
-  line too wide is cut with an ellipsis. The workspaces and tray stack one
-  button a row, the whole row the button's to click, a name too wide cut with an
-  ellipsis and a tray picture too wide shrunk to the bar; a separator lies
-  across the bar. The volume, battery, network, Bluetooth and power-profile
-  modules have a compact form, their icon alone, wherever their format shows
-  `{icon}` beside more. Menus open beside a side bar, away from its edge: the
-  clock panel and the Wi-Fi, Bluetooth and audio menus a gap past the bar, level
-  with their module and moved up to stay on the output, and the power menu, tray
-  menus and tooltips to its right or left. A reload moves the bars between any
-  two edges in place, closing any menu, panel or tooltip open beside them.
-  `lyr import-waybar` carries a side bar's `position` and its `width`, and lists
-  its `height` (in waybar, the bar's length) as not carried, as it does a top or
-  bottom bar's `width`.
+  bar's width, as `height` sets a top or bottom bar's, and defaults to 140, wide
+  enough for the default clock's date and time on a line each. Zones run top to
+  bottom with the centre centred; each module is one line of text tall, its text
+  level and centred. A label too wide for one line wraps at its spaces, each
+  line centred and the box a line taller for each; where a word is still too
+  wide, the label shows its compact form, or else each line too wide is cut with
+  an ellipsis. The workspaces and tray stack one button a row, the whole row the
+  button's to click, a name too wide cut with an ellipsis and a tray picture too
+  wide shrunk to the bar; a separator lies across the bar. The volume, battery,
+  network, Bluetooth and power-profile modules have a compact form, their icon
+  alone, wherever their format shows `{icon}` beside more. Menus open beside a
+  side bar, away from its edge: the clock panel and the Wi-Fi, Bluetooth and
+  audio menus a gap past the bar, level with their module and moved up to stay
+  on the output, and the power menu, tray menus and tooltips to its right or
+  left. A reload moves the bars between any two edges in place, closing any
+  menu, panel or tooltip open beside them. `lyr import-waybar` carries a side
+  bar's `position` and its `width`, and lists its `height` (in waybar, the bar's
+  length) as not carried, as it does a top or bottom bar's `width`.
 
 ### Changed
 

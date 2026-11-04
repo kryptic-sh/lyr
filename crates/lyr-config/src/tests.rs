@@ -36,7 +36,7 @@ fn the_defaults_are_the_waybar_port() {
     let config = from_sources(None, Platform::Linux).expect("defaults");
     assert_eq!(config.bar.position, Position::Top);
     assert_eq!(config.bar.height, 50);
-    assert_eq!(config.bar.width, 50, "a side bar as thick as a top one");
+    assert_eq!(config.bar.width, 140, "wide enough for the clock's date");
     assert_eq!(
         names(&config.layout.left),
         ["power", "battery", "power_profile", "network", "bluetooth"]

@@ -223,7 +223,9 @@ fn picture_size(picture: &SizedPicture, room: f32) -> (f32, f32) {
 /// line then fits, as that still shows all of it; else its compact form,
 /// whose icon reads whole where cut text loses part of what it says; else
 /// its text wrapped with each line too wide cut, so a cut costs that word
-/// rather than everything after it. A compact form too wide is cut.
+/// rather than everything after it, unless no line keeps a whole word: then
+/// more lines would show nothing more, so the text is cut on one. A compact
+/// form too wide is cut.
 fn fitted(
     text: &str,
     compact: Option<&str>,
@@ -239,7 +241,10 @@ fn fitted(
     }
     match compact {
         Some(compact) => vec![cut(compact, room, &measure)],
-        None => lines.iter().map(|line| cut(line, room, &measure)).collect(),
+        None if lines.iter().any(|line| measure(line) <= room) => {
+            lines.iter().map(|line| cut(line, room, &measure)).collect()
+        }
+        None => vec![cut(text, room, &measure)],
     }
 }
 
