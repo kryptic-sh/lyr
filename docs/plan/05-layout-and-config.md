@@ -16,6 +16,39 @@ padding, border and margins ([04](04-rendering-and-theme.md#theme)). A `spacer`
 pseudo-module takes fixed width (`spacer = 20`) and `separator` draws a thin
 rule, so that gaps and separators are config rather than code.
 
+### Side bars
+
+`position = "left"` or `"right"` runs the bar down that edge, as wide as
+`[bar] width`, anchored to the edge with the two beside it, so it spans the
+output's height and reserves its width (an AppBar on Windows, an exclusive zone
+on Wayland, a strut on X11; macOS reserves nothing). `height` sizes only a top
+or bottom bar and `width` only a side bar, as waybar's do. A reload moves the
+bar between any two edges in place and closes whatever menu, panel or tooltip
+was open. `lyr_core::draw::vertical` draws it:
+
+- **Zones run top to bottom**: `left` is the top zone and `right` the bottom
+  one, as waybar's `modules-left` and `modules-right` are on a vertical bar, and
+  the centre is centred on the bar's length. The same `layout` places them along
+  the length; where zones meet, the modules nearest the centre are dropped,
+  since an icon-only form saves no length.
+- **Each box spans the bar's width** less the theme's margins, and is as tall as
+  its lines of text plus its border. The theme's padding is horizontal only, so
+  it adds nothing to the height.
+- **Text stays horizontal** (waybar's `rotate` is declined: backlog). A label
+  shows the first of these that fits: its text on one line; its text wrapped at
+  its spaces, every line fitting, the box a line taller for each; its icon-only
+  form, where it has one; its text wrapped with each line too wide cut with an
+  ellipsis, measured in pixels, unless no line keeps a whole word, when it is
+  one cut line. The default `width`, 140, fits the default clock's date and time
+  on a line each.
+- **Buttons stack one a row**, `gap` apart and centred, each row its hit region
+  across the box; a name too wide is cut as a label is, and a picture too wide
+  is shrunk to the box. A separator lies across the bar, and a spacer is a
+  vertical gap.
+
+Menus, panels and tooltips open beside a side bar
+([10](10-popups-and-menus.md)).
+
 ## Config file
 
 TOML, loaded with `hjkl-config` from `~/.config/lyr/config.toml` (paths via

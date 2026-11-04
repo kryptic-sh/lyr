@@ -280,7 +280,7 @@ pub enum Orientation {
     /// Along the top or bottom edge, its zones left to right.
     Horizontal,
     /// Down a side, its zones top to bottom, each module's box one line of
-    /// text `line_height` tall (`docs/plan/17-bar-placement.md`).
+    /// text `line_height` tall (`docs/plan/05-layout-and-config.md#side-bars`).
     Vertical { line_height: f32 },
 }
 

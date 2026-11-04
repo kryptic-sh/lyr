@@ -1,4 +1,4 @@
-//! A side bar's layout (`docs/plan/17-bar-placement.md`): the horizontal
+//! A side bar's layout (`docs/plan/05-layout-and-config.md#side-bars`): the horizontal
 //! bar's boxes stacked down the bar.
 //!
 //! The zones run top to bottom, placed by [`layout`] along the bar's length

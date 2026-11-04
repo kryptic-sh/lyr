@@ -546,6 +546,36 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Known gaps in the design
 
+- **Side bars: what is left** (plan 17, closed 2026-11-04;
+  [05](plan/05-layout-and-config.md#side-bars) describes what shipped).
+  - **Where zones meet, modules are dropped, not shrunk.** An icon-only form
+    saves no length on a side bar, so the modules nearest the centre go whole,
+    unlike a horizontal bar's.
+  - **A tray menu opens at the tray's top** (the module's box), not beside the
+    item clicked; on a long tray column that is far from the item.
+  - **Narrow side bars.** The mic has no icon-only form (its default format has
+    a literal glyph, not `{icon}`), so below about 100 px it shows its glyph
+    over a cut percentage, and its glyph line keeps the box two lines; the
+    volume while muted (`format_muted` has no `{icon}`) is cut the same way.
+    Network's glyph needs more than 40 px. Seen on niri at widths 40 and 50
+    (office-lyr, 31d06e2).
+  - **Wayland arrangement order, reasoned and not seen:** if another client's
+    top bar is arranged after lyr's side bar, the side bar may start at the
+    output's top while a panel's area starts below that bar, so a panel opens
+    lower than its module by that bar's height.
+  - **sway keeps a moved layer surface's last frame** until the client draws
+    again: not a bug, but why the sway e2e sets a different `bar_background`
+    each reload. With one colour, a bar that stopped drawing passed on the right
+    edge.
+  - **Coverage.** Checked on screen: Windows (left and right, panels, the power
+    menu, tooltips, reload with a panel open); sway 1.12 headless and niri 26.04
+    headless nested in sway through 31d06e2 (zones reserved, every menu beside
+    the bar, reloads, wrapping, row hit areas, the tray picture clamp); Hyprland
+    nested headless in KWin only through 7df9b87, so wrapping, the row hit area
+    and the tray clamp are unchecked there. Not tried: X11. macOS: CI builds and
+    starts it only, and there a panel lies over the bar, since AppKit reserves
+    nothing.
+
 - **Only Scoop installs the bar's font.** The defaults draw their icons with
   Hack Nerd Font Propo; without it lyr falls back to a monospace font and logs
   that, and every icon is an empty box (seen on Windows, 2026-11-02, before
@@ -1774,7 +1804,8 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   module had it.
 
   **Declined, unless the owner wants it.**
-  - `rotate`: lyr's bars are horizontal only.
+  - `rotate`: a side bar's text stays horizontal, wrapping or shrinking to its
+    icon to fit ([05](plan/05-layout-and-config.md#side-bars)).
   - `menu`, `menu_file` and `menu_actions`: they would mean parsing GtkBuilder
     XML.
 

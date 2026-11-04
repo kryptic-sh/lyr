@@ -34,13 +34,13 @@ starting along the bar where the module that opened it starts, moved back along
 the bar only as far as it takes to end 16 px short of the bar's end
 (`menu_panel::Place`). Under a top or bottom bar that is its left edge on the
 module's, kept 16 px from the output's right edge; beside a side bar
-([17](17-bar-placement.md)), its top level with the module's, moved up to stay
-on the output. A panel's margins are measured from the area clear of every
-reserved edge (the work area, or the layer shell's usable area), which begins
-where the bar ends. A popup gets there through its anchor, the module's box
-stretched 16 px past the bar (`menu_panel::popup_anchor`), and opens on the side
-away from the bar (`menu_panel::placement`); `lyr panel …` with no bar showing
-the module opens at the output's left edge.
+([05](05-layout-and-config.md#side-bars)), its top level with the module's,
+moved up to stay on the output. A panel's margins are measured from the area
+clear of every reserved edge (the work area, or the layer shell's usable area),
+which begins where the bar ends. A popup gets there through its anchor, the
+module's box stretched 16 px past the bar (`menu_panel::popup_anchor`), and
+opens on the side away from the bar (`menu_panel::placement`); `lyr panel …`
+with no bar showing the module opens at the output's left edge.
 
 All of them share one renderer and theme, and draw the same `DrawList`
 ([04](04-rendering-and-theme.md)) as the bar.

@@ -26,4 +26,4 @@ Section numbers are document identity. Build order is
 | 14  | [14-ci-and-release.md](14-ci-and-release.md)               | CI checks now, release pipeline later                                                               |
 | 15  | [15-milestones.md](15-milestones.md)                       | Build order, crcbl dependencies, exit checks                                                        |
 | 16  | [16-open-questions.md](16-open-questions.md)               | Provisional decisions awaiting the owner's call                                                     |
-| 17  | [17-bar-placement.md](17-bar-placement.md)                 | In progress: bars on the left and right edges as well as top and bottom                             |
+| 17  | Bar placement (done)                                       | Bars on every edge; now in [05](05-layout-and-config.md#side-bars) and the backlog                  |
