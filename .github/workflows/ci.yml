@@ -249,6 +249,8 @@ jobs:
   # XDG_RUNTIME_DIR, as crcbl's Wayland suite starts one. The test is
   # #[ignore]d everywhere else; here it runs, and fails without a sway rather
   # than skipping. foot is the window the test focuses by its app id.
+  # Then lyr itself as a side bar on lavapipe: a headless sway's workspace
+  # area shows the edge the bar reserves, through reloads to every edge.
   sway-e2e:
     name: sway e2e
     runs-on: ubuntu-latest
@@ -264,9 +266,11 @@ jobs:
         timeout-minutes: 10
         run:
           sudo apt-get update && sudo apt-get install -y --no-install-recommends
-          sway foot
-      - name: Build the test
-        run: cargo test --locked -p lyr-wm --test sway_e2e --no-run
+          sway foot jq mesa-vulkan-drivers libvulkan1
+      - name: Build the test and lyr
+        run: |
+          cargo test --locked -p lyr-wm --test sway_e2e --no-run
+          cargo build --locked -p lyr-bin
       - name: Run it against a headless sway
         run: |
           runtime="$(mktemp -d)"
@@ -298,6 +302,61 @@ jobs:
           kill "$sway_pid" 2>/dev/null || true
           if [ "$status" -ne 0 ]; then cat "$runtime/sway.log"; fi
           exit "$status"
+      - name: Run lyr as a side bar on a headless sway
+        run: |
+          runtime="$(mktemp -d)"
+          chmod 700 "$runtime"
+          export XDG_RUNTIME_DIR="$runtime"
+          export XDG_CONFIG_HOME="$runtime/config" XDG_DATA_HOME="$runtime/data"
+          export XDG_STATE_HOME="$runtime/state" XDG_CACHE_HOME="$runtime/cache"
+          export WLR_BACKENDS=headless WLR_LIBINPUT_NO_DEVICES=1
+          export WLR_RENDERER_ALLOW_SOFTWARE=1 WLR_HEADLESS_OUTPUTS=1
+          lyr="$PWD/target/debug/lyr"
+          export VK_DRIVER_FILES="$(ls /usr/share/vulkan/icd.d/lvp_icd*.json)"
+          test -f "$VK_DRIVER_FILES"
+          unset WAYLAND_DISPLAY DISPLAY SWAYSOCK
+          echo 'output HEADLESS-1 mode 1280x720@60Hz position 0 0' > "$runtime/sway.conf"
+          sway --config "$runtime/sway.conf" > "$runtime/sway.log" 2>&1 &
+          sway_pid=$!
+          lyr_pid="$sway_pid"
+          # dbus-run-session does not pass a kill on to lyr, so ask lyr.
+          trap '"$lyr" quit 2>/dev/null || true; kill "$lyr_pid" "$sway_pid" 2>/dev/null || true' EXIT
+          deadline=$(( $(date +%s) + 20 ))
+          until SWAYSOCK="$(ls "$runtime"/sway-ipc.*.sock 2>/dev/null | head -n 1)" && [ -n "$SWAYSOCK" ]; do
+            if ! kill -0 "$sway_pid" 2>/dev/null || [ "$(date +%s)" -ge "$deadline" ]; then
+              echo "sway did not start"; cat "$runtime/sway.log"; exit 1
+            fi
+            sleep 0.1
+          done
+          export SWAYSOCK WAYLAND_DISPLAY="$(cd "$runtime" && ls wayland-* | grep -v lock | head -n 1)"
+          cfg="$runtime/lyr.toml"
+          printf '[bar]\nposition = "left"\nwidth = 40\nheight = 30\n[layout]\nleft = ["workspaces"]\ncenter = ["clock"]\nright = []\n' > "$cfg"
+          # The workspace's area, as "x y width height".
+          area() {
+            swaymsg -t get_workspaces -r | jq -r '.[0].rect | "\(.x) \(.y) \(.width) \(.height)"'
+          }
+          # Waits for the area to be $1, failing with both logs at a deadline.
+          expect() {
+            deadline=$(( $(date +%s) + 30 ))
+            until [ "$(area)" = "$1" ]; do
+              if ! kill -0 "$lyr_pid" 2>/dev/null || [ "$(date +%s)" -ge "$deadline" ]; then
+                echo "expected '$1', the area is '$(area)'"
+                cat "$runtime/lyr.log" "$runtime/sway.log"; exit 1
+              fi
+              sleep 0.2
+            done
+            echo "$2: $1"
+          }
+          expect '0 0 1280 720' 'no bar'
+          dbus-run-session -- "$lyr" -c "$cfg" > "$runtime/lyr.log" 2>&1 &
+          lyr_pid=$!
+          expect '40 0 1240 720' left
+          for edge in 'right:0 0 1240 720' 'top:0 30 1280 690' 'bottom:0 0 1280 690' 'left:40 0 1240 720'; do
+            sed -i "s/^position = .*/position = \"${edge%%:*}\"/" "$cfg"
+            "$lyr" reload
+            expect "${edge#*:}" "${edge%%:*}"
+          done
+          "$lyr" quit
 
   build:
     name: Build ${{ matrix.target }}
