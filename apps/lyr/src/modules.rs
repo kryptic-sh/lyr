@@ -569,6 +569,123 @@ mod tests {
     }
 
     #[test]
+    fn a_crowded_top_bar_shows_these_modules_icon_alone_rather_than_none() {
+        use lyr_core::draw::{Bar, Orientation, build};
+
+        // Each format shows its icon beside more.
+        let config = from_sources(
+            Some((
+                std::path::Path::new("config.toml"),
+                "[battery]\nformat = \"{icon} {capacity}%\"\n\
+                 [power_profile]\nformat = \"{icon} {profile}\"\n\
+                 [network]\nformat = \"{icon} {ifname}\"\n",
+            )),
+            Platform::current(),
+        )
+        .expect("valid");
+        let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+        let data = Data {
+            battery: Some(lyr_core::battery::Reading {
+                capacity: 64,
+                status: lyr_core::battery::Status::Discharging,
+                power: None,
+                time_to: lyr_core::battery::TimeTo::Unknown,
+            }),
+            power_profile: Some(lyr_sources::power_profile::Profiles {
+                active: lyr_core::power_profile::Profile {
+                    name: "balanced".to_owned(),
+                    driver: "intel_pstate".to_owned(),
+                },
+                available: Vec::new(),
+            }),
+            network: Some(lyr_core::network::Reading {
+                link: Some(lyr_core::network::Link {
+                    ifname: "eth0".to_owned(),
+                    ipaddr: "192.168.1.20".to_owned(),
+                    cidr: "24".to_owned(),
+                    gwaddr: "192.168.1.1".to_owned(),
+                    essid: String::new(),
+                    signal_strength: 0,
+                    wireless: false,
+                }),
+                radio_blocked: false,
+            }),
+            bluetooth: Some(lyr_core::bluetooth::Reading {
+                state: lyr_core::bluetooth::State::Connected,
+                connections: 1,
+                device: Some(lyr_core::bluetooth::Device {
+                    alias: "Buds".to_owned(),
+                    battery: Some(80),
+                }),
+            }),
+            sink: Some(lyr_core::audio::Sink {
+                volume: 40,
+                ..lyr_core::audio::Sink::default()
+            }),
+            ..Data::default()
+        };
+        for name in ["battery", "power_profile", "network", "bluetooth", "volume"] {
+            let left = entries(
+                &[LayoutItem::Named(name.to_owned())],
+                &config,
+                &data,
+                &now,
+                None,
+                None,
+            );
+            // With every character 10 px wide, the left zone's 60 px holds
+            // the icon's box (20 px of content, a 2 px border and 12 px of
+            // padding each side, and a 10 px margin) but not the text's.
+            let bar = Bar {
+                width: 120.0,
+                height: 50.0,
+                orientation: Orientation::Horizontal,
+                left: &left,
+                center: &[],
+                right: &[],
+            };
+            let (list, regions) = build(&bar, &config.theme, |text| {
+                text.chars().count() as f32 * 10.0
+            });
+            let shown: Vec<String> = list
+                .items
+                .iter()
+                .filter_map(|item| match item {
+                    lyr_core::draw::Item::Group { items, .. } => Some(items),
+                    _ => None,
+                })
+                .flatten()
+                .filter_map(|item| match item {
+                    lyr_core::draw::Item::Text { text, .. } => Some(text.clone()),
+                    _ => None,
+                })
+                .collect();
+            let Some(Entry::Module(lyr_core::draw::Module {
+                content:
+                    Content::Label {
+                        text,
+                        compact: Some(icon),
+                        ..
+                    },
+                ..
+            })) = left.first()
+            else {
+                panic!("{name} has a compact form: {left:?}");
+            };
+            assert_eq!(icon.chars().count(), 1, "{name}'s icon alone, not {text:?}");
+            assert_eq!(
+                shown,
+                std::slice::from_ref(icon),
+                "{name} is drawn as its icon"
+            );
+            assert!(
+                regions.hit(20.0, 20.0).is_some(),
+                "{name} still takes clicks"
+            );
+        }
+    }
+
+    #[test]
     fn a_zone_s_separators_and_spacers_are_kept_in_place() {
         let config = from_sources(None, Platform::current()).expect("the defaults");
         let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");

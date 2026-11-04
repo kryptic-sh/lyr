@@ -49,14 +49,28 @@ width = 50          # a left or right bar's width (new)
   the existing rule applies: modules nearest the centre go compact first, then
   are dropped.
 - **Module boxes span the bar's width**, less the theme's margins. Each box is
-  one line tall: the font's line height plus the theme's vertical padding, the
-  same box a horizontal bar draws, but stacked.
+  as tall as its lines of text plus its border: the font's line height a line.
+  The theme's padding is horizontal only (waybar's `padding: 0 12px`), so it
+  adds nothing to the height, and the top and bottom margins sit outside the
+  box.
 - **Text stays horizontal.** waybar's `rotate` is declined (backlog). A label
-  wider than its box shows its compact, icon-only form. If even that does not
-  fit, it is cut with an ellipsis, measured in pixels.
+  shows the most readable form that fits, in this order:
+  1. its text on one line;
+  2. its text wrapped at its spaces, a line under another, each centred, where
+     every line fits: the box grows a line for each, and layout along the bar
+     uses that height, so nothing is cut that wrapping would show;
+  3. its compact, icon-only form, where it has one: a whole icon reads better
+     than text with part of it cut;
+  4. its text wrapped with each line too wide cut with an ellipsis, measured in
+     pixels, so a cut costs that word rather than all that follows it.
+
+  A compact form too wide is cut the same way. The whole box, however many
+  lines, is the module's hit region.
+
 - **Button rows become columns.** The workspaces and the tray stack one button
   per row, `gap` apart, each centred across the bar; a name too wide is cut as a
-  label is.
+  label is, and a picture too wide is shrunk to the box, its aspect kept. Each
+  button's hit region is its whole row across the box, not just its face.
 - **A separator becomes a horizontal rule**, and a `{ spacer = N }` becomes a
   vertical gap.
 - **Hit-testing needs no change:** regions are rectangles. Wheel steps work as
@@ -129,13 +143,16 @@ Each slice is pushed once its gate is green.
 
 ## Left after slice 2
 
-- **Labels with no icon form still lose their text.** The volume, battery,
-  network, Bluetooth and power-profile modules show their icon alone where their
-  format has `{icon}` and more. At the default `width` of 50 on Windows, the
-  clock shows a cut "2…", and the mic, whose format has a literal glyph and no
-  `{icon}`, a cut glyph and ellipsis; the volume while muted (`format_muted` has
-  no `{icon}`) is cut too. Whether a side bar's default `width` should be wider
-  is the owner's call; the default is unchanged.
+- **A word wider than the bar is still cut.** Wrapping at spaces shows the clock
+  and the mic whole wherever each word fits: on Windows (2026-11-04) at
+  `width = 140` the clock reads "2026/11/04" over "21:52", and at 80 the mic its
+  glyph over "100%" (its format has a literal glyph and no `{icon}`, so the
+  space is where it wraps). At the default `width` of 50 the box has 26 px
+  inside its border, narrower than "100%" or "21:52" at the default 16 px font,
+  so the mic shows its glyph over "1…" and the clock "2…" over "2…"; the volume
+  while muted (`format_muted` has no `{icon}`) is cut the same way. Whether a
+  side bar's default `width` should be wider is the owner's call; the default is
+  unchanged.
 - **Zones meeting drop modules rather than compacting them.** Compacting saves
   no length on a side bar, so the modules nearest the centre are dropped, unlike
   the horizontal rule above.
@@ -147,15 +164,20 @@ Each slice is pushed once its gate is green.
   lyr's side bar, the side bar may start at the output's top while a panel's
   area starts below that bar, putting a panel lower than its module by that
   bar's height. Not seen; reasoned from the protocol.
-- **The clock's tooltip stays over its open panel**, on every edge (seen on
-  Hyprland and sway); not side-bar specific.
 - **Checked on screen:** Windows, left and right bars (2026-11-04): the clock
   panel, the power menu and a tooltip open beside the bar, the panel moved up
   clear of the taskbar; a reload from top to left with the clock panel open
   closes it, and the next `lyr panel clock` opens it beside the left bar.
   Hyprland and sway (office-lyr, slice 1): the exclusive zone on every edge, the
   power menu beside its button on both sides, a reload moving the bar in place.
-  niri is not checked (nested niri stopped answering IPC); macOS is CI-only.
+  niri (office-lyr, niri 26.04 headless nested in a headless sway, 1920 by 1080,
+  lavapipe, `width` 50, on 7df9b87, 2026-11-04): left and right bars drew and
+  reserved their zones, the audio, clock, Wi-Fi and tray menus opened beside the
+  bar, and a reload with the Wi-Fi menu open closed it. CI's sway e2e (5cb35c7)
+  checks that the bar drew on each edge, sampling with `grim` a pixel of the
+  `bar_background` colour each step sets. macOS is CI-only. A module's tooltip
+  staying over its own open popup or panel, on every edge, is in the backlog, as
+  it is not side-bar specific.
 
 ## Not in this phase
 
@@ -169,7 +191,9 @@ Each slice is pushed once its gate is green.
   - `lyr-config`: `left` and `right` and `width` read; unknown positions are
     refused.
   - `lyr-core`: a side bar's layout (zones top to bottom, the centre centred,
-    compact then drop where zones meet, buttons stacked, a separator as a rule).
+    compact then drop where zones meet, a label wrapped at its spaces, buttons
+    stacked with whole-row hit regions, a picture shrunk to the box, a separator
+    as a rule).
   - `lyr-shell`: the anchor and size for each edge.
   - `apps/lyr`: popup and panel placement for each edge.
 

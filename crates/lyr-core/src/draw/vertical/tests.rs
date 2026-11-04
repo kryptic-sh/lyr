@@ -1,9 +1,9 @@
 use lyr_config::{Platform, Theme, from_sources};
 
 use super::super::{
-    Bar, Button, Content, DrawList, Entry, Item, Module, Orientation, Target, build,
+    Bar, Button, Content, DrawList, Entry, Item, Module, Orientation, Picture, Target, build,
 };
-use super::cut;
+use super::{cut, wrap};
 use crate::hit::Rect;
 
 /// Every character is 10 px wide.
@@ -178,11 +178,12 @@ fn buttons_stack_one_a_row_centred_across_the_bar() {
     assert_eq!(
         regions.rect(&Target::Button("workspaces", 0)),
         Some(Rect {
-            x: 15.0,
+            x: 10.0,
             y: 12.0,
-            width: 20.0,
+            width: 30.0,
             height: 20.0
-        })
+        }),
+        "the whole row across the box, however narrow its face"
     );
     assert_eq!(
         regions.rect(&Target::Button("workspaces", 1)),
@@ -265,4 +266,112 @@ fn a_cut_keeps_what_fits_before_its_ellipsis() {
     assert_eq!(cut("hello", 49.0, measure), "hel\u{2026}");
     assert_eq!(cut("hello", 10.0, measure), "\u{2026}");
     assert_eq!(cut("hello", 9.0, measure), "", "not even the ellipsis");
+}
+
+#[test]
+fn a_label_too_wide_wraps_at_its_spaces_and_its_box_grows_a_line_each() {
+    // 26 px inside the box's border: "ab cd" is 50 px, each word 20.
+    let left = [label("ab cd", Some("x")), label("ef", None)];
+    let (list, regions) = build(&bar(1000.0, &left, &[], &[]), &theme(), measure);
+    let line = |text: &str, y| {
+        (
+            text.to_owned(),
+            Rect {
+                x: 15.0,
+                width: 20.0,
+                ..box_at(y)
+            },
+        )
+    };
+    assert_eq!(
+        texts(&list),
+        [line("ab", 10.0), line("cd", 30.0), line("ef", 66.0)],
+        "all of it rather than its compact form, each line centred"
+    );
+    // Two 20 px lines in the border; the next box starts after it and the
+    // margins between.
+    assert_eq!(
+        boxes(&list),
+        [
+            Rect {
+                height: 44.0,
+                ..box_at(10.0)
+            },
+            box_at(66.0)
+        ]
+    );
+    assert_eq!(
+        regions.hit(12.0, 52.0),
+        Some(&Target::Module("label")),
+        "the whole taller box is the module's"
+    );
+}
+
+#[test]
+fn a_word_too_wide_shows_the_compact_form_else_is_cut_on_its_line() {
+    let left = [
+        label("ab cdef", Some("x")),
+        label("ab cdef", None),
+        label("abcd ef", Some("wxyz")),
+    ];
+    let (list, _) = build(&bar(1000.0, &left, &[], &[]), &theme(), measure);
+    let shown: Vec<String> = texts(&list).into_iter().map(|(text, _)| text).collect();
+    assert_eq!(shown, ["x", "ab", "c\u{2026}", "w\u{2026}"]);
+}
+
+#[test]
+fn a_picture_wider_than_the_bar_is_shrunk_to_it() {
+    // 40 by 20 px, in the 26 px inside the box's border.
+    let picture = Picture::new(2, 1, vec![0; 8]).expect("pixels").sized(20.0);
+    let left = [Entry::Module(Module {
+        content: Content::Buttons {
+            buttons: vec![Button {
+                text: "t".to_owned(),
+                colour: theme().foreground,
+                picture: Some(picture),
+            }],
+            padding: 0.0,
+            gap: 4.0,
+        },
+        target: "tray",
+    })];
+    let (list, regions) = build(&bar(1000.0, &left, &[], &[]), &theme(), measure);
+    let images: Vec<Rect> = list
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Group { items, .. } => Some(items),
+            _ => None,
+        })
+        .flatten()
+        .filter_map(|item| match item {
+            Item::Image { rect, .. } => Some(*rect),
+            _ => None,
+        })
+        .collect();
+    // Its aspect kept, centred in its 20 px row.
+    assert_eq!(
+        images,
+        [Rect {
+            x: 12.0,
+            y: 15.5,
+            width: 26.0,
+            height: 13.0
+        }]
+    );
+    assert_eq!(
+        regions.rect(&Target::Button("tray", 0)),
+        Some(Rect {
+            x: 10.0,
+            y: 12.0,
+            width: 30.0,
+            height: 20.0
+        })
+    );
+}
+
+#[test]
+fn a_wrap_fills_each_line_with_the_words_that_fit() {
+    assert_eq!(wrap("a b  cdef g", 30.0, measure), ["a b", "cdef", "g"]);
+    assert_eq!(wrap("  ", 30.0, measure), [""], "one empty line");
 }

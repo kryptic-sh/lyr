@@ -15,11 +15,13 @@ group 0.8
   box 10,154 30x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
   text 20,154 10x24 #cdd6f4ff "\u{f00af}"
 group 0.8
-  box 10,982 30x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
-  text 20,982 10x24 #89b4faff "\u{f025}"
+  box 10,942 30x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 20,942 10x24 #89b4faff "\u{f025}"
 group 0.8
-  box 10,1018 30x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
-  text 15,1018 20x24 #cba6f7ff "\u{f131}…"
+  box 10,978 30x44 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 20,978 10x24 #cba6f7ff "\u{f131}"
+  text 15,998 20x24 #cba6f7ff "6…"
 group 0.8
-  box 10,1054 30x24 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
-  text 15,1054 20x24 #cdd6f4ff "2…"
+  box 10,1034 30x44 radius 8 fill #1a1b26ff border 2 #2bc5e3ff
+  text 15,1034 20x24 #cdd6f4ff "2…"
+  text 15,1054 20x24 #cdd6f4ff "0…"

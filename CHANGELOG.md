@@ -23,10 +23,13 @@ and this project adheres to
   Windows, an exclusive zone on Wayland). The new `[bar] width` sets a side
   bar's width, as `height` sets a top or bottom bar's, and defaults to the same
   value. Zones run top to bottom with the centre centred; each module is one
-  line tall, its text level and centred, showing its compact form when the label
-  is too wide and cut with an ellipsis when even that is; the workspaces and
-  tray stack one button a row, a name too wide cut the same way; a separator
-  lies across the bar. The volume, battery, network, Bluetooth and power-profile
+  line of text tall, its text level and centred. A label too wide for one line
+  wraps at its spaces, each line centred and the box a line taller for each;
+  where a word is still too wide, the label shows its compact form, or else each
+  line too wide is cut with an ellipsis. The workspaces and tray stack one
+  button a row, the whole row the button's to click, a name too wide cut with an
+  ellipsis and a tray picture too wide shrunk to the bar; a separator lies
+  across the bar. The volume, battery, network, Bluetooth and power-profile
   modules have a compact form, their icon alone, wherever their format shows
   `{icon}` beside more. Menus open beside a side bar, away from its edge: the
   clock panel and the Wi-Fi, Bluetooth and audio menus a gap past the bar, level
@@ -36,6 +39,13 @@ and this project adheres to
   `lyr import-waybar` carries a side bar's `position` and its `width`, and lists
   its `height` (in waybar, the bar's length) as not carried, as it does a top or
   bottom bar's `width`.
+
+### Changed
+
+- On a top or bottom bar, the battery, power-profile, network, Bluetooth and
+  volume modules now show their icon alone where zones meet and their whole
+  label does not fit, instead of being dropped, wherever their format shows
+  `{icon}` beside more.
 
 ## [0.6.0] - 2026-11-04
 

@@ -253,10 +253,12 @@ fn each_edge_anchors_the_bar_along_it_and_sizes_it_across() {
 
 #[test]
 fn a_reshape_moves_a_top_bar_to_a_side_in_place() {
-    let mut shell = two_monitors();
+    let mut shell = two_monitors().with_configure_delay(0);
     let mut bars = Bars::default();
     bars.sync(&mut shell, &bar(&[]), retire_into(&mut Vec::new()))
         .expect("sync");
+    // Sized as a top bar first.
+    shell.pump(&mut |_| ());
     let before: Vec<_> = bars.windows().collect();
     let mut config = bar(&[]);
     config.position = Position::Left;
@@ -266,11 +268,24 @@ fn a_reshape_moves_a_top_bar_to_a_side_in_place() {
         before,
         "the same windows"
     );
+    let mut events = Vec::new();
+    shell.pump(&mut |event| events.push(event));
     for (_, window) in bars.windows() {
         let panel = shell.panel(window).expect("live").expect("a panel");
         assert_eq!(
             panel.anchor,
             PanelAnchor::LEFT | PanelAnchor::TOP | PanelAnchor::BOTTOM
         );
+        // Resized to the side bar's width across; along the edge the
+        // compositor stretches it, which the headless shell does not.
+        let width = events.iter().rev().find_map(|event| match *event {
+            ShellEvent::Resized {
+                window: resized,
+                size,
+                ..
+            } if resized == window => Some(size.width),
+            _ => None,
+        });
+        assert_eq!(width, Some(40), "{window:?}");
     }
 }

@@ -90,31 +90,84 @@ impl Window {
         ))
     }
 
-    /// The size it is to get when the bar moves from `from` to `bar`'s edge:
-    /// `bar`'s thickness across it, and along it its own length on the same
-    /// axis, or its output's length on the other. The window system may
-    /// give it less (a work area's), but a size other than its current one
-    /// only waits for the size it does get, which a move between axes
-    /// always changes.
+    /// The size it is to get when the bar moves from `from` to `bar`'s edge,
+    /// as [`size_on`] gives it for this window on its output.
     pub(super) fn size_on(&self, from: Position, bar: &Bar) -> Size {
-        let thickness = bar.thickness() as f32;
-        match (from.is_vertical(), bar.position.is_vertical()) {
-            (false, false) => Size {
+        size_on(
+            Size {
                 width: self.width,
-                height: thickness,
-            },
-            (true, false) => Size {
-                width: self.output_width,
-                height: thickness,
-            },
-            (true, true) => Size {
-                width: thickness,
                 height: self.height,
             },
-            (false, true) => Size {
-                width: thickness,
+            Size {
+                width: self.output_width,
                 height: self.output_height,
             },
+            from,
+            bar,
+        )
+    }
+}
+
+/// The size a bar window `window` big on an output `output` big is to get
+/// when the bar moves from `from` to `bar`'s edge: `bar`'s thickness across
+/// it, and along it its own length on the same axis, or its output's length
+/// on the other. The window system may give it less (a work area's), but a
+/// size other than its current one only waits for the size it does get,
+/// which a move between axes always changes.
+fn size_on(window: Size, output: Size, from: Position, bar: &Bar) -> Size {
+    let thickness = bar.thickness() as f32;
+    match (from.is_vertical(), bar.position.is_vertical()) {
+        (false, false) => Size {
+            width: window.width,
+            height: thickness,
+        },
+        (true, false) => Size {
+            width: output.width,
+            height: thickness,
+        },
+        (true, true) => Size {
+            width: thickness,
+            height: window.height,
+        },
+        (false, true) => Size {
+            width: thickness,
+            height: output.height,
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lyr_config::{Platform, Position, from_sources};
+    use lyr_core::draw::Size;
+
+    use super::size_on;
+
+    #[test]
+    fn a_moved_bar_keeps_its_length_on_its_axis_and_takes_the_outputs_across() {
+        let mut bar = from_sources(None, Platform::current())
+            .expect("the defaults")
+            .bar;
+        bar.height = 40;
+        bar.width = 60;
+        let size = |width, height| Size { width, height };
+        // A top bar 1800 long in a 1920 by 1080 output, and a side bar 1000
+        // long in it.
+        let top = size(1800.0, 50.0);
+        let side = size(50.0, 1000.0);
+        let output = size(1920.0, 1080.0);
+        for (window, from, to, expected) in [
+            (top, Position::Top, Position::Bottom, size(1800.0, 40.0)),
+            (side, Position::Left, Position::Top, size(1920.0, 40.0)),
+            (side, Position::Left, Position::Right, size(60.0, 1000.0)),
+            (top, Position::Top, Position::Left, size(60.0, 1080.0)),
+        ] {
+            bar.position = to;
+            assert_eq!(
+                size_on(window, output, from, &bar),
+                expected,
+                "{from:?} to {to:?}"
+            );
         }
     }
 }

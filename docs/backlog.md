@@ -1642,6 +1642,39 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   locale question above), Hyprland's click on the bare desktop while it is open
   closes it (nested, `wlrctl`, 2026-10-21; "How Hyprland treats a panel's
   keyboard and pointer").
+- **A cut can split a grapheme cluster.** Both cuts that end text with an
+  ellipsis walk it by `char`: `cut` in `lyr_core::draw::vertical` (a side bar's
+  label or button name, by pixels) and `cut` in `lyr_core::window` (the window
+  title at `max_length`, by characters). A cluster of several chars, such as a
+  letter and a combining accent or a ZWJ or flag emoji, can be cut inside, so
+  the text before the ellipsis ends in half of it: a bare letter without its
+  accent, or one person of a family emoji. Reasoned from the code, not seen.
+  Cutting at cluster boundaries needs `unicode-segmentation` as a direct
+  dependency (it is in the tree only through other crates): the owner's call.
+- **An edge-changing reload hit-tests over the old window size for a moment.**
+  When a reload moves the bar between a top or bottom edge and a side, each bar
+  window waits for its new size (`Window::size_on`, `awaiting_size`) and draws
+  nothing meanwhile, but its hit regions and `menu_panel::Place` are still those
+  of the last frame, laid out for the old edge and size. A click or hover in
+  that moment is matched against the old layout, so it may land on a module that
+  is no longer there, or open a menu placed for the old edge. Transient, until
+  the size arrives and the bar is drawn again; reasoned from the code, not seen.
+  A fix would skip hit-testing and menu placement while a window awaits its
+  size.
+- **A module's tooltip stays over its own open popup or panel.** Network's
+  tooltip stays over the Wi-Fi menu, Bluetooth's over its menu, the output
+  device's name over the audio menu, and the clock's time zone over the clock
+  panel's Do Not Disturb row. Seen by the Linux session (office-lyr) on Hyprland
+  0.57.1 nested, with a top bar and a side bar alike (2026-11-04); sway 1.12
+  headless showed no tooltips at all, and the clock's case on Windows earlier.
+  Not side-bar specific. Opening a popup or panel from a module should hide that
+  module's tooltip.
+- **The clock panel can be taller than the room below a top bar.** On a 720-tall
+  output with a top bar, the panel does not fit below the bar and its bottom row
+  (Do Not Disturb) is cut at the output's edge (office-lyr, Hyprland 0.57.1
+  nested, 2026-11-04). On a side bar it fits, since there the panel is held to
+  the bar's length. The panel needs a maximum height of the room below the bar,
+  scrolling or shrinking within it.
 - **macOS cannot reserve screen space.** The bar overlaps windows unless the
   menu bar is set to auto-hide.
 - **No tray and no notification state on Windows or macOS.** Neither platform
