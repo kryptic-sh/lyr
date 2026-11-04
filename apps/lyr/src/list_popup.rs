@@ -6,8 +6,8 @@
 //! click outside it closes it (both reported by crcbl as a close request).
 
 use crcbl_shell::{
-    CloseReply, LogicalPoint, LogicalRect, LogicalSize, PopupDesc, PopupInput, PopupPlacement,
-    Shell, ShellCaps, ShellEvent, WindowDesc, WindowId, WindowRole,
+    CloseReply, LogicalPoint, LogicalRect, LogicalSize, PopupDesc, PopupInput, Shell, ShellCaps,
+    ShellEvent, WindowDesc, WindowId, WindowRole,
 };
 use lyr_config::Position;
 use lyr_core::draw::{DrawList, Size};
@@ -75,10 +75,7 @@ impl<T: Clone + PartialEq> ListPopup<T> {
             role: WindowRole::Popup(PopupDesc {
                 parent: bar,
                 anchor: logical_rect(anchor),
-                placement: match position {
-                    Position::Top => PopupPlacement::Below,
-                    Position::Bottom => PopupPlacement::Above,
-                },
+                placement: crate::menu_panel::placement(position),
                 input: PopupInput::Grab,
             }),
             ..WindowDesc::default()

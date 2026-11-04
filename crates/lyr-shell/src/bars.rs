@@ -12,7 +12,7 @@ use lyr_config::{Bar, Layer, Position};
 pub const NAMESPACE: &str = "lyr";
 
 /// The window for a bar on `monitor`: a panel along the configured edge,
-/// stretched across the output and reserving its own height.
+/// stretched along it and reserving its own thickness.
 #[must_use]
 pub fn window_desc(bar: &Bar, monitor: MonitorId) -> WindowDesc<'static> {
     WindowDesc {
@@ -25,20 +25,32 @@ pub fn window_desc(bar: &Bar, monitor: MonitorId) -> WindowDesc<'static> {
     }
 }
 
-/// A bar's size: the width is the output's, since a panel anchored to both
-/// sides takes its size along that axis from the monitor, not from here.
+/// A bar's size: its thickness across its edge, and 0 along it, since a
+/// panel anchored to both ends of an axis takes its size along that axis
+/// from the monitor, not from here.
 fn size(bar: &Bar) -> LogicalSize {
-    LogicalSize {
-        width: 0.0,
-        height: f64::from(bar.height),
+    let thickness = f64::from(bar.thickness());
+    if bar.position.is_vertical() {
+        LogicalSize {
+            width: thickness,
+            height: 0.0,
+        }
+    } else {
+        LogicalSize {
+            width: 0.0,
+            height: thickness,
+        }
     }
 }
 
 /// The panel a bar on `monitor` is.
 fn panel_desc(bar: &Bar, monitor: MonitorId) -> PanelDesc<'static> {
-    let edge = match bar.position {
-        Position::Top => PanelAnchor::TOP,
-        Position::Bottom => PanelAnchor::BOTTOM,
+    // The edge, and the two it is stretched between.
+    let anchor = match bar.position {
+        Position::Top => PanelAnchor::TOP | PanelAnchor::LEFT | PanelAnchor::RIGHT,
+        Position::Bottom => PanelAnchor::BOTTOM | PanelAnchor::LEFT | PanelAnchor::RIGHT,
+        Position::Left => PanelAnchor::LEFT | PanelAnchor::TOP | PanelAnchor::BOTTOM,
+        Position::Right => PanelAnchor::RIGHT | PanelAnchor::TOP | PanelAnchor::BOTTOM,
     };
     PanelDesc {
         namespace: NAMESPACE,
@@ -49,7 +61,7 @@ fn panel_desc(bar: &Bar, monitor: MonitorId) -> PanelDesc<'static> {
             Layer::Top => PanelLayer::Top,
             Layer::Overlay => PanelLayer::Overlay,
         },
-        anchor: edge | PanelAnchor::LEFT | PanelAnchor::RIGHT,
+        anchor,
         reserve: Reserve::OwnExtent,
         margins: Margins::default(),
         keyboard: PanelKeyboard::None,
@@ -132,8 +144,9 @@ impl Bars {
         Ok(changed)
     }
 
-    /// Gives every bar `bar`'s height, layer and edge in place, the window
-    /// and its surface kept: the new size comes back as each window's next
+    /// Gives every bar `bar`'s thickness, layer and edge in place, the window
+    /// and its surface kept, a move from a top or bottom edge to a side
+    /// included: the new size comes back as each window's next
     /// `Resized`. [`Bars::sync`] then adds or removes bars if `bar` changed
     /// which outputs have one.
     ///

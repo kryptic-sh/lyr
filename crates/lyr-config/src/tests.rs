@@ -36,6 +36,7 @@ fn the_defaults_are_the_waybar_port() {
     let config = from_sources(None, Platform::Linux).expect("defaults");
     assert_eq!(config.bar.position, Position::Top);
     assert_eq!(config.bar.height, 50);
+    assert_eq!(config.bar.width, 50, "a side bar as thick as a top one");
     assert_eq!(
         names(&config.layout.left),
         ["power", "battery", "power_profile", "network", "bluetooth"]
@@ -86,6 +87,50 @@ fn a_user_platform_table_applies_only_on_that_platform() {
     assert_eq!(user(text, Platform::Windows).expect("valid").bar.height, 40);
     assert_eq!(user(text, Platform::Linux).expect("valid").bar.height, 44);
     assert_eq!(user(text, Platform::Macos).expect("valid").bar.height, 50);
+}
+
+#[test]
+fn a_bar_goes_on_any_edge_and_a_side_bar_is_sized_by_its_width() {
+    let left = user(
+        "[bar]
+position = \"left\"
+width = 64
+",
+        Platform::Linux,
+    )
+    .expect("valid");
+    assert_eq!(left.bar.position, Position::Left);
+    assert_eq!(left.bar.thickness(), 64, "the width, not the height");
+    let right = user(
+        "[bar]
+position = \"right\"
+",
+        Platform::Linux,
+    )
+    .expect("valid");
+    assert_eq!(right.bar.position, Position::Right);
+    assert!(right.bar.position.is_vertical());
+    let bottom = user(
+        "[bar]
+position = \"bottom\"
+width = 64
+",
+        Platform::Linux,
+    )
+    .expect("valid");
+    assert_eq!(bottom.bar.thickness(), 50, "the height, the width ignored");
+    assert!(!bottom.bar.position.is_vertical());
+}
+
+#[test]
+fn an_unknown_position_is_an_error() {
+    let message = invalid(user(
+        "[bar]
+position = \"middle\"
+",
+        Platform::Linux,
+    ));
+    assert!(message.starts_with("bar.position: "), "{message}");
 }
 
 #[test]
@@ -178,6 +223,7 @@ fn a_bad_colour_is_an_error() {
 fn values_out_of_range_are_errors() {
     for (text, key) in [
         ("[bar]\nheight = 0\n", "bar.height"),
+        ("[bar]\nwidth = 0\n", "bar.width"),
         ("[theme]\nfont_size = 0\n", "theme.font_size"),
         ("[theme]\nmodule_opacity = 1.5\n", "theme.module_opacity"),
     ] {

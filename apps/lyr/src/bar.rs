@@ -667,7 +667,10 @@ impl App {
         for window in windows.values_mut().filter(|window| window.dirty) {
             let hovered = window.hovered();
             let drawn = modules::draw(
-                window.width,
+                lyr_core::draw::Size {
+                    width: window.width,
+                    height: window.height,
+                },
                 window.monitor.as_deref(),
                 hovered,
                 config,

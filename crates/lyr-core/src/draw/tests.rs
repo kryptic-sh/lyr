@@ -1,7 +1,8 @@
 use lyr_config::{Colour, Platform, Theme, from_sources};
 
 use super::{
-    Bar, Button, Content, DrawList, Entry, Item, Module, Picture, Target, TextStyle, build,
+    Bar, Button, Content, DrawList, Entry, Item, Module, Orientation, Picture, Target, TextStyle,
+    build,
 };
 use crate::hit::Rect;
 
@@ -33,6 +34,7 @@ fn bar<'a>(
     Bar {
         width: 1000.0,
         height: 50.0,
+        orientation: Orientation::Horizontal,
         left,
         center,
         right,

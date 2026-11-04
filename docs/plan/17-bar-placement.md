@@ -115,6 +115,26 @@ Each slice is pushed once its gate is green.
    the keys; the changelog entry is written alongside each slice; then this file
    is deleted and a release is cut.
 
+## Found in slice 1, for slice 2
+
+- **Labels lose their text at the default width.** On a side bar `width` 50
+  wide, volume, mic and the clock have no compact form, so they show as a cut
+  "…" (run on Windows, 2026-11-04). Give the modules with an icon a compact form
+  (the icon alone), and decide whether a side bar's default `width` should be
+  wider.
+- **Zones meeting drop modules rather than compacting them.** Compacting saves
+  no length on a side bar, so the modules nearest the centre are dropped, unlike
+  the horizontal rule above.
+- **A button wider than the bar** (a long workspace name) is not cut.
+- **A panel's top margin is measured from the output's top.** crcbl places a
+  panel that reserves nothing inside the work area, so a taskbar or bar at the
+  top would push it down by its height. Check this when the popups are redone.
+- **Popups, panels and tooltips from a side bar** open beside it in slice 1
+  (`menu_panel::placement`, `Place::top`). They are checked by unit tests only
+  and have not been opened on screen.
+- **No `DrawList` snapshot** of a side bar yet
+  (`apps/lyr/src/modules/snapshots.rs` has the horizontal ones).
+
 ## Not in this phase
 
 - **Rotated text** (waybar's `rotate`): declined in the backlog.

@@ -1,6 +1,6 @@
 use crcbl_shell::{
-    HeadlessShell, MonitorId, MonitorInfo, PanelAnchor, PanelLayer, PhysicalRect, Reserve, Shell,
-    ShellError, ShellEvent, WindowId, WindowRole,
+    HeadlessShell, LogicalSize, MonitorId, MonitorInfo, PanelAnchor, PanelLayer, PhysicalRect,
+    Reserve, Shell, ShellError, ShellEvent, WindowId, WindowRole,
 };
 use lyr_config::{Bar, Layer, Position};
 
@@ -10,6 +10,7 @@ fn bar(output: &[&str]) -> Bar {
     Bar {
         position: Position::Top,
         height: 50,
+        width: 40,
         output: output.iter().map(|&name| name.to_owned()).collect(),
         layer: Layer::Top,
     }
@@ -207,4 +208,69 @@ fn a_bar_is_a_stretched_panel_that_reserves_its_height() {
     );
     assert_eq!(panel.reserve, Reserve::OwnExtent);
     assert_eq!(panel.namespace, "lyr");
+}
+
+#[test]
+fn each_edge_anchors_the_bar_along_it_and_sizes_it_across() {
+    let horizontal = |height| LogicalSize::new(0.0, height);
+    let vertical = |width| LogicalSize::new(width, 0.0);
+    for (position, anchor, size) in [
+        (
+            Position::Top,
+            PanelAnchor::TOP | PanelAnchor::LEFT | PanelAnchor::RIGHT,
+            horizontal(50.0),
+        ),
+        (
+            Position::Bottom,
+            PanelAnchor::BOTTOM | PanelAnchor::LEFT | PanelAnchor::RIGHT,
+            horizontal(50.0),
+        ),
+        (
+            Position::Left,
+            PanelAnchor::LEFT | PanelAnchor::TOP | PanelAnchor::BOTTOM,
+            vertical(40.0),
+        ),
+        (
+            Position::Right,
+            PanelAnchor::RIGHT | PanelAnchor::TOP | PanelAnchor::BOTTOM,
+            vertical(40.0),
+        ),
+    ] {
+        let mut config = bar(&[]);
+        config.position = position;
+        let desc = window_desc(&config, MonitorId(1));
+        assert_eq!(desc.size, size, "{position:?}");
+        let WindowRole::Panel(panel) = desc.role else {
+            panic!("a bar is a panel");
+        };
+        assert_eq!(panel.anchor, anchor, "{position:?}");
+        assert!(
+            panel.reserved_edge().is_some(),
+            "{position:?} reserves one edge"
+        );
+    }
+}
+
+#[test]
+fn a_reshape_moves_a_top_bar_to_a_side_in_place() {
+    let mut shell = two_monitors();
+    let mut bars = Bars::default();
+    bars.sync(&mut shell, &bar(&[]), retire_into(&mut Vec::new()))
+        .expect("sync");
+    let before: Vec<_> = bars.windows().collect();
+    let mut config = bar(&[]);
+    config.position = Position::Left;
+    bars.reshape(&mut shell, &config).expect("reshaped");
+    assert_eq!(
+        bars.windows().collect::<Vec<_>>(),
+        before,
+        "the same windows"
+    );
+    for (_, window) in bars.windows() {
+        let panel = shell.panel(window).expect("live").expect("a panel");
+        assert_eq!(
+            panel.anchor,
+            PanelAnchor::LEFT | PanelAnchor::TOP | PanelAnchor::BOTTOM
+        );
+    }
 }

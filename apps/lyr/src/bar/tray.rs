@@ -48,7 +48,7 @@ impl App {
                             let tray = lyr_core::draw::Target::Module(lyr_config::Module::Tray);
                             crate::menu_panel::popup_anchor(
                                 window.regions.rect(&tray).unwrap_or(rect),
-                                window.height,
+                                window.thickness(self.config.bar.position),
                                 self.config.bar.position,
                             )
                         }),

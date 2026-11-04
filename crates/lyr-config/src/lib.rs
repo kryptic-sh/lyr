@@ -299,6 +299,9 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
     if config.bar.height == 0 {
         return Err("bar.height: must be more than 0".to_owned());
     }
+    if config.bar.width == 0 {
+        return Err("bar.width: must be more than 0".to_owned());
+    }
     if config.theme.font_size == 0 {
         return Err("theme.font_size: must be more than 0".to_owned());
     }

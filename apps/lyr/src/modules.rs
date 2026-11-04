@@ -10,7 +10,7 @@ use chrono::{DateTime, FixedOffset};
 use lyr_config::{Config, Item, Module};
 use lyr_core::battery::{self, Level, Reading};
 use lyr_core::clock;
-use lyr_core::draw::{self, Bar, Content, DrawList, Entry, Target};
+use lyr_core::draw::{self, Bar, Content, DrawList, Entry, Orientation, Size, Target};
 use lyr_core::hit::Regions;
 use lyr_render::text::Text;
 
@@ -199,10 +199,11 @@ fn entries(
         .collect()
 }
 
-/// Lays out one bar `width` logical pixels wide, on the output named
-/// `monitor`, with the pointer over workspace button `hovered`.
+/// Lays out one bar in a window `window` big, on the output named
+/// `monitor`, with the pointer over workspace button `hovered`. The window
+/// gives the bar's length; the config, its thickness.
 pub fn draw(
-    width: f32,
+    window: Size,
     monitor: Option<&str>,
     hovered: Option<usize>,
     config: &Config,
@@ -216,9 +217,21 @@ pub fn draw(
         modules(&config.layout.center),
         modules(&config.layout.right),
     );
+    let thickness = config.bar.thickness() as f32;
+    let (width, height, orientation) = if config.bar.position.is_vertical() {
+        let line_height = text.line_height();
+        (
+            thickness,
+            window.height,
+            Orientation::Vertical { line_height },
+        )
+    } else {
+        (window.width, thickness, Orientation::Horizontal)
+    };
     let bar = Bar {
         width,
-        height: config.bar.height as f32,
+        height,
+        orientation,
         left: &left,
         center: &center,
         right: &right,

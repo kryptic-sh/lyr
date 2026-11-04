@@ -131,14 +131,17 @@ impl App {
                     .map(|(monitor, _)| monitor);
                 let info = output.and_then(|monitor| shell.monitor(monitor));
                 // Unknown, a menu beside it is not held short of the far edge.
-                let output_height = info.map_or(f32::INFINITY, |info| {
-                    (f64::from(info.bounds.height) / info.scale_factor) as f32
-                });
+                let (output_width, output_height) =
+                    info.map_or((f32::INFINITY, f32::INFINITY), |info| {
+                        let logical = |pixels: u32| (f64::from(pixels) / info.scale_factor) as f32;
+                        (logical(info.bounds.width), logical(info.bounds.height))
+                    });
                 let monitor = info.map(|info| info.name.clone());
                 if let Some(open) = self.windows.get_mut(&window) {
                     open.surface.resize(device, scale)?;
                     open.width = width;
                     open.height = height;
+                    open.output_width = output_width;
                     open.output_height = output_height;
                     open.scale = scale;
                     open.dirty = true;
@@ -153,6 +156,7 @@ impl App {
                             surface,
                             width,
                             height,
+                            output_width,
                             output_height,
                             scale,
                             monitor,

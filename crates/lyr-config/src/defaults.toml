@@ -6,8 +6,11 @@
 # the rest of this file on that platform, before the user file.
 
 [bar]
+# top | bottom | left | right
 position = "top"
+# A top or bottom bar's height, and a left or right bar's width.
 height = 50
+width = 50
 output = []
 layer = "top"
 

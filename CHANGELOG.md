@@ -8,6 +8,24 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Breaking
+
+- For users of the library crates: `lyr_config::Position` gains `Left` and
+  `Right`, `lyr_config::Bar` the `width` field, and `lyr_core::draw::Bar` the
+  `orientation` field, so an exhaustive match on `Position` needs the new arms.
+
+### Added
+
+- A bar on the left or right edge: `[bar] position = "left"` or `"right"` runs
+  the bar down that side of each output, reserving its width (an AppBar on
+  Windows, an exclusive zone on Wayland). The new `[bar] width` sets a side
+  bar's width, as `height` sets a top or bottom bar's, and defaults to the same
+  value. Zones run top to bottom with the centre centred; each module is one
+  line tall, its text level and centred, showing its compact form when the label
+  is too wide and cut with an ellipsis when even that is; the workspaces and
+  tray stack one button a row; a separator lies across the bar. A reload moves
+  the bars between any two edges in place.
+
 ## [0.6.0] - 2026-11-04
 
 ### Breaking

@@ -32,8 +32,9 @@ machine.
 
 ```toml
 [bar]
-position = "top"        # top | bottom
-height = 50
+position = "top"        # top | bottom | left | right
+height = 50             # a top or bottom bar's height
+width = 50              # a left or right bar's width
 output = []             # empty = every output
 layer = "top"           # Wayland only: background | bottom | top | overlay
 
@@ -119,7 +120,8 @@ and new configs:
 
 - a theme or format change re-lays out and repaints;
 - a layout or module change starts and stops only the affected sources;
-- a bar change (position, height, layer) changes the bar windows in place
+- a bar change (position, height, width, layer) changes the bar windows in
+  place, a move between a top or bottom edge and a side included
   (`Shell::set_panel`), and a change of outputs adds or removes bars.
 
 ## Migration from waybar

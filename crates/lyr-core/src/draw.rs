@@ -14,6 +14,8 @@ use lyr_config::{Colour, Theme};
 use crate::hit::{Rect, Regions};
 use crate::layout::{Form, Slot, layout};
 
+mod vertical;
+
 /// How text is drawn: which of the font's faces, whether underlined, and
 /// whether in the calendar's font.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -212,7 +214,7 @@ pub enum Content {
     },
     /// A row of buttons, each with its own text and colour or a picture,
     /// `padding` logical pixels each side of its face and `gap` apart: the
-    /// workspaces, the tray's items.
+    /// workspaces, the tray's items. On a side bar, a column of them.
     Buttons {
         buttons: Vec<Button>,
         padding: f32,
@@ -250,10 +252,11 @@ pub struct Module<T> {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Entry<T> {
     Module(Module<T>),
-    /// An empty gap this many logical pixels wide.
+    /// An empty gap this many logical pixels wide, or tall on a side bar.
     Spacer(f32),
     /// A thin rule: as wide as the module boxes' border, in its colour, as
     /// tall as the boxes, and a module's left margin from what is before it.
+    /// On a side bar it lies across the bar, as wide as the boxes.
     Separator,
 }
 
@@ -271,11 +274,22 @@ pub enum Target<T> {
     Button(T, usize),
 }
 
+/// Which way a bar runs.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Orientation {
+    /// Along the top or bottom edge, its zones left to right.
+    Horizontal,
+    /// Down a side, its zones top to bottom, each module's box one line of
+    /// text `line_height` tall (`docs/plan/17-bar-placement.md`).
+    Vertical { line_height: f32 },
+}
+
 /// What one bar holds, by zone.
 #[derive(Clone, Copy, Debug)]
 pub struct Bar<'a, T> {
     pub width: f32,
     pub height: f32,
+    pub orientation: Orientation,
     pub left: &'a [Entry<T>],
     pub center: &'a [Entry<T>],
     pub right: &'a [Entry<T>],
@@ -298,6 +312,9 @@ pub fn build<T: Clone>(
     theme: &Theme,
     measure: impl Fn(&str) -> f32,
 ) -> (DrawList, Regions<Target<T>>) {
+    if let Orientation::Vertical { line_height } = bar.orientation {
+        return vertical::build(bar, theme, measure, line_height);
+    }
     let px = |value: u32| value as f32;
     let padding = px(theme.module_padding_x);
     let min_width = px(theme.module_min_width);
@@ -388,19 +405,10 @@ pub fn build<T: Clone>(
 
     let top = px(theme.module_margin_top);
     let box_height = (bar.height - top - px(theme.module_margin_bottom)).max(0.0);
-    let mut list = DrawList::default();
+    let mut list = DrawList {
+        items: vec![background(bar, theme)],
+    };
     let mut regions = Regions::default();
-    list.items.push(Item::Box {
-        rect: Rect {
-            x: 0.0,
-            y: 0.0,
-            width: bar.width,
-            height: bar.height,
-        },
-        radius: 0.0,
-        fill: theme.bar_background,
-        border: None,
-    });
     let placed_zones = [
         (bar.left, &left, &zones.left),
         (bar.center, &center, &zones.center),
@@ -419,24 +427,11 @@ pub fn build<T: Clone>(
                 Entry::Module(module) => module,
                 Entry::Spacer(_) => continue,
                 Entry::Separator => {
-                    list.items.push(Item::Group {
-                        opacity: theme.module_opacity,
-                        items: vec![Item::Box {
-                            rect,
-                            radius: 0.0,
-                            fill: theme.border,
-                            border: None,
-                        }],
-                    });
+                    list.items.push(separator(rect, theme));
                     continue;
                 }
             };
-            let mut items = vec![Item::Box {
-                rect,
-                radius: px(theme.radius),
-                fill: theme.module_background,
-                border: Some((px(theme.border_width), theme.border)),
-            }];
+            let mut items = vec![module_box(rect, theme)];
             regions.push(rect, Target::Module(module.target.clone()));
             match &module.content {
                 Content::Label {
@@ -507,6 +502,44 @@ pub fn build<T: Clone>(
         }
     }
     (list, regions)
+}
+
+/// The bar's own background, under its modules.
+fn background<T>(bar: &Bar<'_, T>, theme: &Theme) -> Item {
+    Item::Box {
+        rect: Rect {
+            x: 0.0,
+            y: 0.0,
+            width: bar.width,
+            height: bar.height,
+        },
+        radius: 0.0,
+        fill: theme.bar_background,
+        border: None,
+    }
+}
+
+/// A separator filling `rect`, faded as the module boxes are.
+fn separator(rect: Rect, theme: &Theme) -> Item {
+    Item::Group {
+        opacity: theme.module_opacity,
+        items: vec![Item::Box {
+            rect,
+            radius: 0.0,
+            fill: theme.border,
+            border: None,
+        }],
+    }
+}
+
+/// A module's box filling `rect`: its background and border.
+fn module_box(rect: Rect, theme: &Theme) -> Item {
+    Item::Box {
+        rect,
+        radius: theme.radius as f32,
+        fill: theme.module_background,
+        border: Some((theme.border_width as f32, theme.border)),
+    }
 }
 
 /// The space around a tooltip's text: GTK 3's Adwaita pads both the

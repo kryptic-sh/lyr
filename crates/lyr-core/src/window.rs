@@ -11,7 +11,7 @@ pub struct View {
 }
 
 /// What stands for the characters a cut title loses.
-const ELLIPSIS: char = '\u{2026}';
+pub(crate) const ELLIPSIS: char = '\u{2026}';
 
 /// `text` cut to `max` characters, the last of them an ellipsis, as Pango's
 /// end ellipsis reads at waybar's `max-length`. Text that fits is kept.

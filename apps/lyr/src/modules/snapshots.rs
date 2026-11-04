@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use chrono::DateTime;
 use lyr_config::{Colour, Config, Platform, from_sources};
 use lyr_core::battery::{Reading, Status, TimeTo};
-use lyr_core::draw::{Bar, DrawList, Item, build};
+use lyr_core::draw::{Bar, DrawList, Item, Orientation, build};
 use lyr_core::hit::Rect;
 
 use super::{Data, entries};
@@ -28,6 +28,7 @@ fn bar(config: &Config, data: &Data) -> DrawList {
     let bar = Bar {
         width: 1920.0,
         height: config.bar.height as f32,
+        orientation: Orientation::Horizontal,
         left: &left,
         center: &center,
         right: &right,

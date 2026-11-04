@@ -1,8 +1,8 @@
 //! One bar window's state.
 
 use crcbl_shell::MonitorId;
-use lyr_config::{Module, Position};
-use lyr_core::draw::{DrawList, Target};
+use lyr_config::{Bar, Module, Position};
+use lyr_core::draw::{DrawList, Size, Target};
 use lyr_core::hit::{Rect, Regions};
 use lyr_render::surface::Surface;
 
@@ -16,7 +16,8 @@ pub(super) struct Window {
     /// Logical pixels.
     pub(super) width: f32,
     pub(super) height: f32,
-    /// Its output's height, in logical pixels.
+    /// Its output's size, in logical pixels.
+    pub(super) output_width: f32,
     pub(super) output_height: f32,
     /// Device pixels per logical pixel.
     pub(super) scale: f32,
@@ -60,19 +61,67 @@ impl Window {
     /// when the last frame did not draw it.
     pub(super) fn place_under(&self, target: &Target<Module>, edge: Position) -> Option<Place> {
         let rect = self.regions.rect(target)?;
+        let (width, room) = if edge.is_vertical() {
+            // Beside a side bar, the whole height of the output.
+            (self.output_width, self.output_height)
+        } else {
+            (self.width, self.output_height - self.height)
+        };
         Some(Place {
             left: f64::from(rect.x),
-            width: f64::from(self.width),
-            room: f64::from(self.output_height - self.height),
+            top: f64::from(rect.y),
+            width: f64::from(width),
+            room: f64::from(room),
             edge,
             monitor: self.output,
         })
+    }
+
+    /// Its size across its edge, `edge`: its height, or a side bar's width.
+    pub(super) fn thickness(&self, edge: Position) -> f32 {
+        if edge.is_vertical() {
+            self.width
+        } else {
+            self.height
+        }
     }
 
     /// The anchor for a popup under `target`, or `None` when the last frame
     /// did not draw it.
     pub(super) fn popup_anchor(&self, target: &Target<Module>, edge: Position) -> Option<Rect> {
         let rect = self.regions.rect(target)?;
-        Some(crate::menu_panel::popup_anchor(rect, self.height, edge))
+        Some(crate::menu_panel::popup_anchor(
+            rect,
+            self.thickness(edge),
+            edge,
+        ))
+    }
+
+    /// The size it is to get when the bar moves from `from` to `bar`'s edge:
+    /// `bar`'s thickness across it, and along it its own length on the same
+    /// axis, or its output's length on the other. The window system may
+    /// give it less (a work area's), but a size other than its current one
+    /// only waits for the size it does get, which a move between axes
+    /// always changes.
+    pub(super) fn size_on(&self, from: Position, bar: &Bar) -> Size {
+        let thickness = bar.thickness() as f32;
+        match (from.is_vertical(), bar.position.is_vertical()) {
+            (false, false) => Size {
+                width: self.width,
+                height: thickness,
+            },
+            (true, false) => Size {
+                width: self.output_width,
+                height: thickness,
+            },
+            (true, true) => Size {
+                width: thickness,
+                height: self.height,
+            },
+            (false, true) => Size {
+                width: thickness,
+                height: self.output_height,
+            },
+        }
     }
 }

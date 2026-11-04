@@ -6,8 +6,8 @@
 use std::time::Instant;
 
 use crcbl_shell::{
-    LogicalPoint, LogicalRect, LogicalSize, PopupDesc, PopupInput, PopupPlacement, Shell,
-    ShellCaps, ShellEvent, WindowDesc, WindowId, WindowRole,
+    LogicalPoint, LogicalRect, LogicalSize, PopupDesc, PopupInput, Shell, ShellCaps, ShellEvent,
+    WindowDesc, WindowId, WindowRole,
 };
 use lyr_config::{Module, Position, Theme};
 use lyr_core::draw::{self, DrawList, Size, Target, TextStyle};
@@ -149,10 +149,7 @@ impl Tooltips {
                 parent: anchor.bar,
                 anchor: logical_rect(rect),
                 // Away from the screen edge the bar is on.
-                placement: match anchor.position {
-                    Position::Top => PopupPlacement::Below,
-                    Position::Bottom => PopupPlacement::Above,
-                },
+                placement: crate::menu_panel::placement(anchor.position),
                 input: PopupInput::Passthrough,
             }),
             ..WindowDesc::default()

@@ -65,13 +65,17 @@ impl Config {
     }
 }
 
-/// One bar per output: where it sits and how tall it is.
+/// One bar per output: where it sits and how thick it is.
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct Bar {
     pub position: Position,
-    /// Logical pixels.
+    /// A top or bottom bar's height, in logical pixels; a side bar ignores
+    /// it.
     pub height: u32,
+    /// A left or right bar's width, in logical pixels; a top or bottom bar
+    /// ignores it.
+    pub width: u32,
     /// Output names to put a bar on. Empty means every output.
     pub output: Vec<String>,
     /// The layer-shell layer. Wayland only; ignored elsewhere.
@@ -84,6 +88,29 @@ pub struct Bar {
 pub enum Position {
     Top,
     Bottom,
+    Left,
+    Right,
+}
+
+impl Position {
+    /// Whether a bar here runs down a side of the output.
+    #[must_use]
+    pub const fn is_vertical(self) -> bool {
+        matches!(self, Self::Left | Self::Right)
+    }
+}
+
+impl Bar {
+    /// Its size across its edge, in logical pixels: the height of a top or
+    /// bottom bar, the width of a side one.
+    #[must_use]
+    pub const fn thickness(&self) -> u32 {
+        if self.position.is_vertical() {
+            self.width
+        } else {
+            self.height
+        }
+    }
 }
 
 /// The Wayland layer-shell layer the bar is placed in.
