@@ -48,6 +48,9 @@ and this project adheres to
   volume modules now show their icon alone where zones meet and their whole
   label does not fit, instead of being dropped, wherever their format shows
   `{icon}` beside more.
+- Built on crcbl 0.17.2 (from 0.17.1) and hjkl 0.45.0 (from 0.44.0) for
+  `hjkl-config` and `hjkl-xdg`. hjkl's changes are all in its editor, so the
+  config and path crates behave as before.
 
 ## [0.6.0] - 2026-11-04
 

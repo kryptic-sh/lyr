@@ -11,7 +11,7 @@ authors.workspace = true
 readme.workspace = true
 
 [dependencies]
-crcbl-shell = "=0.17.1"
+crcbl-shell = "=0.17.2"
 lyr-config.workspace = true
 
 [lints]
