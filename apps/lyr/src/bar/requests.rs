@@ -68,6 +68,12 @@ impl App {
                 let reply = self.notifications(request);
                 incoming.reply(reply);
             }
+            Request::Signal(number) => match self.custom.signal(number) {
+                0 => incoming.reply(format!(
+                    "error: no running custom module has signal = {number}"
+                )),
+                _ => incoming.reply(control::OK),
+            },
             Request::Event(Event::Workspace) => {
                 // AeroSpace pushes nothing, so its hook asks for a read;
                 // Linux compositors push their own changes.
@@ -151,6 +157,10 @@ impl App {
                     self.keep_bars(shell, &new.bar, None)
                         .context("creating the bars")?;
                 }
+                // Module indices may name other modules now; the loop
+                // starts the new config's scripts.
+                self.custom.restart();
+                self.data.custom.clear();
                 self.tick = Tick::of(&new.clock.format);
                 self.next_tick = next_tick(self.tick);
                 self.config = new;

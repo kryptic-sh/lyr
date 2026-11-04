@@ -26,6 +26,9 @@ pub enum Request {
     Clear,
     /// Something outside lyr changed what a source reads.
     Event(Event),
+    /// Run every custom module whose `signal` is this number again: what
+    /// waybar's `SIGRTMIN+N` does, on every platform.
+    Signal(u32),
 }
 
 /// What an external hook tells the bar has changed.
@@ -84,6 +87,7 @@ impl fmt::Display for Request {
             Self::Dnd => f.write_str("dnd"),
             Self::Clear => f.write_str("clear"),
             Self::Event(event) => write!(f, "event {}", event.name()),
+            Self::Signal(number) => write!(f, "signal {number}"),
         }
     }
 }
@@ -129,6 +133,14 @@ impl FromStr for Request {
                     .ok_or_else(unknown)?;
                 Self::Event(event)
             }
+            Some("signal") => {
+                let number = words.next().ok_or_else(unknown)?;
+                // Digits only: Rust's parsing would also take a sign.
+                if !number.bytes().all(|b| b.is_ascii_digit()) {
+                    return Err(unknown());
+                }
+                Self::Signal(number.parse().map_err(|_| unknown())?)
+            }
             _ => return Err(unknown()),
         };
         match words.next() {
@@ -150,6 +162,7 @@ mod tests {
             Request::Quit,
             Request::Dnd,
             Request::Clear,
+            Request::Signal(8),
         ];
         all.extend(Panel::ALL.map(Request::Panel));
         all.extend(Event::ALL.map(Request::Event));
@@ -177,6 +190,12 @@ mod tests {
     }
 
     #[test]
+    fn a_signal_request_carries_its_number() {
+        assert_eq!(Request::Signal(8).to_string(), "signal 8");
+        assert_eq!("signal 12".parse(), Ok(Request::Signal(12)));
+    }
+
+    #[test]
     fn anything_else_is_refused() {
         for line in [
             "",
@@ -187,6 +206,12 @@ mod tests {
             "event",
             "event window",
             "event workspace now",
+            "signal",
+            "signal x",
+            "signal +8",
+            "signal -1",
+            "signal 8 9",
+            "signal 99999999999",
             "Reload",
             " quit",
         ] {

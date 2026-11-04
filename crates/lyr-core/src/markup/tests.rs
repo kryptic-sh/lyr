@@ -1,4 +1,4 @@
-use super::{Span, Style, escape, links, openable, parse, plain};
+use super::{Span, Style, escape, links, openable, parse, plain, text_of};
 
 const BOLD: Style = Style {
     bold: true,
@@ -184,4 +184,16 @@ fn only_an_http_or_https_link_opens() {
     ] {
         assert!(!openable(href), "{href}");
     }
+}
+
+#[test]
+fn pango_markup_s_text_drops_every_tag_and_decodes_entities() {
+    assert_eq!(
+        text_of("<span foreground='red'>hot</span> &amp; <big>loud</big>"),
+        "hot & loud"
+    );
+    assert_eq!(text_of("<b>a</b>&#x41;&#66;&lt;"), "aAB<");
+    assert_eq!(text_of("1 < 2 & 3 &bogus; <"), "1 < 2 & 3 &bogus; <");
+    assert_eq!(text_of("plain"), "plain");
+    assert_eq!(text_of("<i cut short"), "<i cut short");
 }

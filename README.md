@@ -16,7 +16,8 @@ on the GPU through [crcbl](https://github.com/kryptic-sh/crcbl). Part of the
   `hl.dsp.focus({ workspace = N })`), sway and niri, with Windows virtual
   desktops and AeroSpace on macOS.
 - **Modules:** power menu, battery, power profile, network, bluetooth, tray,
-  volume, mic, clock with a calendar, and notifications. Each one works on every
+  volume, mic, clock with a calendar, and notifications, plus waybar's
+  `custom/<name>` modules for a script's output. Each one works on every
   platform that exposes what it needs.
 - **Its own notification centre and menus:** on Linux lyr is the notification
   daemon, and draws the calendar, notification history and the Wi-Fi, Bluetooth
@@ -92,6 +93,7 @@ bar:
 | `lyr quit`              | Stops the bar                                            |
 | `lyr dnd` / `lyr clear` | Do-not-disturb on or off / dismiss every notification    |
 | `lyr panel <name>`      | Opens a panel: `clock`, `bluetooth`, `wifi` or `audio`   |
+| `lyr signal <N>`        | Runs every custom module whose `signal` is N again       |
 
 `lyr -c FILE` uses another config file, and `lyr --stats` logs the bar's
 wake-ups and redraws once a minute. Logs go to `~/.local/state/lyr/logs/lyr.log`
@@ -129,6 +131,7 @@ The defaults are the reference for every key and value:
 | `[volume]`        | `format`, `format_muted`, `format_bluetooth`, `format_bluetooth_muted`, `tooltip_format`, `icons`, `scroll_step`, `mute_links_mic` |
 | `[mic]`           | `format`, `format_muted`, `tooltip_format`, `scroll_step`                                                                          |
 | `[notifications]` | `replace`, `format`, `icons`                                                                                                       |
+| `[custom.<name>]` | `exec`, `interval`, `return_type`, `format`, `icons`, `colours` and more ([plan 07](docs/plan/07-modules.md#custom))               |
 | `[theme]`         | font, colours and box metrics; see the defaults                                                                                    |
 
 Every module also takes an `[<module>.on]` table binding `click`, `click_right`,

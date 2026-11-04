@@ -1,6 +1,7 @@
 //! What each module shows, from the sources' latest data, and drawing a bar
 //! from them.
 
+use std::collections::HashMap;
 #[cfg(target_os = "linux")]
 use std::sync::PoisonError;
 use std::sync::{Arc, Mutex};
@@ -54,6 +55,9 @@ pub struct Data {
     /// The foreground window, on Windows; Linux reads it from the compositor.
     #[cfg(windows)]
     pub active_window: Option<lyr_sources::window::Active>,
+    /// Each custom module's last output, by its index in the config's
+    /// custom tables and its bar's output: `None` leaves it out.
+    pub custom: HashMap<(usize, Option<String>), Option<lyr_core::custom::Output>>,
 }
 
 impl Data {
@@ -77,6 +81,26 @@ impl Data {
             question: *question,
             typed: "",
         })
+    }
+
+    /// What the custom module `index` shows on the bar on `monitor`: a
+    /// static one shows its format alone; one with a script, its script's
+    /// last output, and nothing before the first.
+    pub fn custom_view(
+        &self,
+        index: usize,
+        config: &Config,
+        monitor: Option<&str>,
+    ) -> Option<lyr_core::custom::View> {
+        let custom = config.custom.get(index)?;
+        if custom.exec.is_none() {
+            return lyr_core::custom::view(&lyr_core::custom::Output::default(), custom);
+        }
+        let output = self
+            .custom
+            .get(&(index, monitor.map(str::to_owned)))?
+            .as_ref()?;
+        lyr_core::custom::view(output, custom)
     }
 
     /// The notification store, while lyr is the notification daemon.
@@ -162,7 +186,7 @@ fn entries(
         .filter_map(|item| match item {
             Item::Named(name) if name == "separator" => Some(Entry::Separator),
             Item::Named(name) => {
-                let module = Module::from_name(name)?;
+                let module = config.module(name)?;
                 content(module, config, data, now, monitor, hovered).map(|content| {
                     Entry::Module(draw::Module {
                         content,
@@ -227,7 +251,7 @@ fn content(
     config: &Config,
     data: &Data,
     now: &DateTime<FixedOffset>,
-    #[cfg_attr(not(target_os = "linux"), allow(unused_variables))] monitor: Option<&str>,
+    monitor: Option<&str>,
     #[cfg_attr(not(target_os = "linux"), allow(unused_variables))] hovered: Option<usize>,
 ) -> Option<Content> {
     let theme = &config.theme;
@@ -286,6 +310,10 @@ fn content(
         Module::Mic => {
             let shown = lyr_core::audio::mic(data.source.as_ref()?, &config.mic);
             Some(label(shown.text, theme.mic))
+        }
+        Module::Custom(index) => {
+            let shown = data.custom_view(index, config, monitor)?;
+            Some(label(shown.text, shown.colour.unwrap_or(theme.foreground)))
         }
         Module::Tray => {
             // Each item's icon, or its letter when none was found.
@@ -360,12 +388,14 @@ fn content(
     }
 }
 
-/// The tooltip `target` shows now, or `None` when it has none or no data:
-/// a module's, or a tray item's. The workspaces have none, as in waybar.
+/// The tooltip `target` shows now on the bar on `monitor`, or `None` when it
+/// has none or no data: a module's, or a tray item's. The workspaces have
+/// none, as in waybar.
 pub fn tooltip(
     target: &Target<Module>,
     config: &Config,
     data: &Data,
+    monitor: Option<&str>,
     now: &DateTime<FixedOffset>,
 ) -> Option<String> {
     let module = match target {
@@ -410,6 +440,7 @@ pub fn tooltip(
         Module::Bluetooth => {
             Some(lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth).tooltip)
         }
+        Module::Custom(index) => data.custom_view(index, config, monitor)?.tooltip,
         _ => None,
     }
 }
@@ -490,7 +521,7 @@ mod tests {
             })
         );
         assert_eq!(
-            tooltip(&Target::Module(Module::Power), &config, &data, &now).as_deref(),
+            tooltip(&Target::Module(Module::Power), &config, &data, None, &now).as_deref(),
             Some("Power Button")
         );
     }
@@ -517,6 +548,62 @@ mod tests {
     }
 
     #[test]
+    fn a_custom_module_shows_its_own_bar_s_output() {
+        let config = from_sources(
+            Some((
+                std::path::Path::new("config.toml"),
+                "[layout]\nleft = [\"custom/a\", \"custom/fixed\"]\n\
+                 [custom.a]\nexec = \"x\"\ncolours = { warn = \"#ff0000\" }\n\
+                 [custom.fixed]\nformat = \"F\"\ntooltip = false\n",
+            )),
+            Platform::current(),
+        )
+        .expect("valid");
+        let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+        let a = config.module("custom/a").expect("a module");
+        let Module::Custom(index) = a else {
+            panic!("{a:?} is not custom");
+        };
+        let mut data = Data::default();
+        let output = lyr_core::custom::Output {
+            text: "on DP-1".to_owned(),
+            tooltip: "tip".to_owned(),
+            class: vec!["warn".to_owned()],
+            ..lyr_core::custom::Output::default()
+        };
+        data.custom
+            .insert((index, Some("DP-1".to_owned())), Some(output));
+        data.custom.insert((index, Some("DP-2".to_owned())), None);
+        let shown = |monitor| content(a, &config, &data, &now, monitor, None);
+        assert_eq!(
+            shown(Some("DP-1")),
+            Some(Content::Label {
+                text: "on DP-1".to_owned(),
+                compact: None,
+                colour: lyr_config::Colour::parse("#ff0000").expect("a colour"),
+            })
+        );
+        assert_eq!(shown(Some("DP-2")), None, "its script left it out");
+        assert_eq!(shown(Some("DP-3")), None, "no output yet");
+        let tip = |monitor| tooltip(&Target::Module(a), &config, &data, monitor, &now);
+        assert_eq!(tip(Some("DP-1")).as_deref(), Some("tip"));
+        assert_eq!(tip(Some("DP-3")), None);
+        let fixed = config.module("custom/fixed").expect("a module");
+        assert_eq!(
+            content(fixed, &config, &data, &now, None, None),
+            Some(Content::Label {
+                text: "F".to_owned(),
+                compact: None,
+                colour: config.theme.foreground,
+            })
+        );
+        assert_eq!(
+            tooltip(&Target::Module(fixed), &config, &data, None, &now),
+            None
+        );
+    }
+
+    #[test]
     fn a_tray_button_s_tooltip_is_its_shown_item_s() {
         let config = from_sources(None, Platform::current()).expect("the defaults");
         let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
@@ -532,7 +619,15 @@ mod tests {
             ],
             ..Data::default()
         };
-        let tip = |index| tooltip(&Target::Button(Module::Tray, index), &config, &data, &now);
+        let tip = |index| {
+            tooltip(
+                &Target::Button(Module::Tray, index),
+                &config,
+                &data,
+                None,
+                &now,
+            )
+        };
         assert_eq!(
             tip(0).as_deref(),
             Some("Steam"),
@@ -540,7 +635,13 @@ mod tests {
         );
         assert_eq!(tip(1), None);
         assert_eq!(
-            tooltip(&Target::Button(Module::Workspaces, 0), &config, &data, &now),
+            tooltip(
+                &Target::Button(Module::Workspaces, 0),
+                &config,
+                &data,
+                None,
+                &now
+            ),
             None
         );
     }

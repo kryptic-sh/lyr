@@ -57,6 +57,8 @@ struct App {
     windows: HashMap<WindowId, Window>,
     data: Data,
     commands: Commands,
+    /// The custom modules' scripts.
+    custom: crate::custom::Runner,
     toasts: Toasts,
     /// The clock panel, while it is open.
     clock_panel: Option<ClockPanel>,
@@ -148,6 +150,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         windows: HashMap::new(),
         data: Data::default(),
         commands,
+        custom: crate::custom::Runner::new(shell.waker()),
         toasts: Toasts::default(),
         clock_panel: None,
         bluetooth_menu: None,
@@ -210,6 +213,19 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             app.stats.changed(woke);
             app.redraw_all();
         }
+        // A busy script's lines are drawn once a pass, the latest of each.
+        let mut scripts_changed = false;
+        while let Some(shown) = app.custom.recv() {
+            app.data
+                .custom
+                .insert((shown.module, shown.output), shown.shown);
+            app.stats.events += 1;
+            scripts_changed = true;
+        }
+        if scripts_changed {
+            app.stats.changed(woke);
+            app.redraw_all();
+        }
         let mut events = Vec::new();
         shell.pump(&mut |event| events.push(event));
         app.stats.events += events.len() as u64;
@@ -229,6 +245,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
             .tray_menu(app.tray_menu.as_ref().map(TrayMenu::item));
         #[cfg(any(target_os = "linux", windows))]
         app.commands.wifi_menu(app.wifi_menu.is_some());
+        app.sync_custom();
         app.draw(shell.as_mut())?;
         let open = app.popups_open();
         if std::mem::replace(&mut app.popups_open, open) && !open {
@@ -458,6 +475,21 @@ impl App {
         )
     }
 
+    /// Runs the shown custom modules' scripts for the bars there are, and
+    /// stops those of bars that went. A hidden bar's scripts keep running,
+    /// so `lyr toggle` does not run a one-off script again.
+    fn sync_custom(&mut self) {
+        if self.hidden {
+            return;
+        }
+        let outputs: Vec<Option<&str>> = self
+            .windows
+            .values()
+            .map(|window| window.monitor.as_deref())
+            .collect();
+        self.custom.sync(&self.config, &outputs);
+    }
+
     /// Marks every bar to be drawn again.
     fn redraw_all(&mut self) {
         self.windows
@@ -599,11 +631,12 @@ impl App {
                 regions: &window.regions,
                 position: config.bar.position,
             };
+            let monitor = window.monitor.as_deref();
             window.tooltips.sync(
                 shell,
                 &anchor,
                 &look,
-                |target| modules::tooltip(target, config, data, &now),
+                |target| modules::tooltip(target, config, data, monitor, &now),
                 Instant::now(),
             )?;
             window.tooltips.draw(shell, text)?;

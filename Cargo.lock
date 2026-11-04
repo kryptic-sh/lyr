@@ -916,6 +916,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "windows-sys",
 ]
 
 [[package]]
@@ -936,6 +937,7 @@ version = "0.5.2"
 dependencies = [
  "chrono",
  "lyr-config",
+ "serde_json",
 ]
 
 [[package]]

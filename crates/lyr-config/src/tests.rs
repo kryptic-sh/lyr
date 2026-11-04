@@ -482,3 +482,163 @@ fn the_defaults_match_the_dotfiles_waybar_config() {
         differ.join("\n")
     );
 }
+
+#[test]
+fn a_custom_module_is_named_in_a_zone_and_configured_in_its_table() {
+    let config = user(
+        r##"
+[layout]
+left = ["custom/media", "clock", "custom/hello"]
+[custom.media]
+exec = "playerctl metadata"
+exec_if = "pgrep spotify"
+return_type = "json"
+interval = 0.0001
+format = "{icon} {text}"
+icons = { playing = "P", default = ["a", "b"] }
+max_length = 40
+min_length = 3
+align = 0.25
+tooltip_format = "{alt}: {percentage}"
+escape = true
+hide_empty_text = true
+exec_on_event = false
+on_update = "notify"
+colours = { warning = "#ffaa00" }
+[custom.media.on]
+click = { exec = "playerctl play-pause" }
+[custom.hello]
+format = "hello"
+[custom.unused]
+exec = "true"
+"##,
+        Platform::Linux,
+    )
+    .expect("valid");
+    let media = config.module("custom/media").expect("found");
+    let hello = config.module("custom/hello").expect("found");
+    assert_eq!(config.module("custom/nothing"), None);
+    assert_eq!(config.module("clock"), Some(super::Module::Clock));
+    assert_eq!(
+        config.shown().take(3).collect::<Vec<_>>(),
+        [media, super::Module::Clock, hello]
+    );
+    let super::Module::Custom(index) = media else {
+        panic!("{media:?} is not custom");
+    };
+    let media = &config.custom[index];
+    assert_eq!(media.name, "media");
+    assert_eq!(media.return_type, super::ReturnType::Json);
+    assert_eq!(
+        media.runs(),
+        Some(super::Runs::Every(super::custom::SHORTEST)),
+        "raised to the shortest"
+    );
+    assert!(!media.exec_on_event && media.escape && media.hide_empty_text);
+    assert!(config.custom.iter().any(|custom| custom.name == "unused"));
+    let super::Module::Custom(index) = hello else {
+        panic!("{hello:?} is not custom");
+    };
+    let hello = &config.custom[index];
+    assert_eq!(hello.runs(), None, "static");
+    assert!(hello.tooltip && hello.exec_on_event, "the defaults");
+    assert_eq!(hello.format.placeholders().count(), 0);
+}
+
+#[test]
+fn a_custom_module_s_runs_follow_interval_and_signal() {
+    let runs = |body: &str| {
+        let config = user(
+            &format!("[custom.a]\nexec = \"x\"\n{body}"),
+            Platform::Linux,
+        )
+        .expect("valid");
+        config.custom[0].runs().expect("it runs")
+    };
+    let seconds = std::time::Duration::from_secs;
+    assert_eq!(runs("interval = 5\n"), super::Runs::Every(seconds(5)));
+    assert_eq!(
+        runs("interval = 5\nsignal = 8\n"),
+        super::Runs::Every(seconds(5))
+    );
+    assert_eq!(runs("interval = \"once\"\n"), super::Runs::Once);
+    assert_eq!(runs("signal = 8\n"), super::Runs::Once);
+    assert_eq!(runs(""), super::Runs::Continuous { restart: None });
+    assert_eq!(
+        runs("restart_interval = 2\n"),
+        super::Runs::Continuous {
+            restart: Some(seconds(2))
+        }
+    );
+    assert_eq!(
+        user(
+            "[custom.a]\nexec = \"x\"\nreturn_type = \"i3blocks\"\n",
+            Platform::Linux
+        )
+        .expect("valid")
+        .custom[0]
+            .return_type,
+        super::ReturnType::Lines,
+        "anything but json is lines, as in waybar"
+    );
+}
+
+#[test]
+fn a_bad_custom_module_names_its_key() {
+    for (text, key) in [
+        (
+            "[layout]\nleft = [\"custom/x\"]\n",
+            "layout.left[0]: `custom/x` names no `[custom.x]` table",
+        ),
+        ("[custom.x]\nexek = \"y\"\n", "custom.x.exek: "),
+        (
+            "[custom.x]\ninterval = 5\n",
+            "custom.x.interval: needs `exec`",
+        ),
+        ("[custom.x]\nexec = \" \"\n", "custom.x.exec: is empty"),
+        (
+            "[custom.x]\nexec = \"y\"\ninterval = 5\nrestart_interval = 1\n",
+            "custom.x.restart_interval: ",
+        ),
+        (
+            "[custom.x]\nexec = \"y\"\ninterval = -1\n",
+            "custom.x.interval: ",
+        ),
+        (
+            "[custom.x]\nexec = \"y\"\ninterval = \"twice\"\n",
+            "custom.x.interval: ",
+        ),
+        (
+            "[custom.x]\nexec = \"y\"\nrestart_interval = \"once\"\n",
+            "custom.x.restart_interval: ",
+        ),
+        (
+            "[custom.x]\nexec = \"y\"\nsignal = 0\n",
+            "custom.x.signal: ",
+        ),
+        ("[custom.x]\nformat = \"{} {icon}\"\n", "custom.x.format: "),
+        ("[custom.x]\nformat = \"{volume}\"\n", "custom.x.format: "),
+        (
+            "[custom.x]\ntooltip_format = \"{volume}\"\n",
+            "custom.x.tooltip_format: ",
+        ),
+        ("[custom.x]\nmax_length = 0\n", "custom.x.max_length: "),
+        ("[custom.x]\nalign = 2.0\n", "custom.x.align: "),
+        (
+            "[custom.x]\ncolours = { a = \"red\" }\n",
+            "custom.x.colours.a: ",
+        ),
+        ("[custom.x]\nrotate = 90\n", "custom.x.rotate: "),
+        (
+            "[custom.x.on]\nclick = \"toggle_mute\"\n",
+            "custom.x.on.click: ",
+        ),
+        (
+            "[custom.x.on]\nclick = { exec = \"\" }\n",
+            "custom.x.on.click: ",
+        ),
+    ] {
+        let message = invalid(user(text, Platform::Linux));
+        assert!(message.starts_with(key), "{text:?}: {message}");
+    }
+}

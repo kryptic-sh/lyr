@@ -23,6 +23,7 @@ pub mod calendar;
 pub mod centre;
 pub mod clock;
 pub mod control;
+pub mod custom;
 pub mod draw;
 pub mod hit;
 pub mod icon;

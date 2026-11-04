@@ -101,25 +101,45 @@ impl Pointer {
     }
 }
 
-/// Carries out the action `press` on `target` asks for. `workspaces` are the
-/// workspaces the bar's buttons stand for, and `monitor` the bar's output.
-/// Returns the built-ins the main loop carries out itself: opening a
-/// window, and do-not-disturb, which lives with the notification daemon.
+/// The bar a press landed on.
+pub struct Bar<'a> {
+    /// The workspaces its buttons stand for, in order.
+    #[cfg_attr(
+        windows,
+        expect(dead_code, reason = "Windows shows no workspace buttons")
+    )]
+    pub workspaces: &'a [i64],
+    /// Its output, by name.
+    pub monitor: Option<&'a str>,
+}
+
+/// Carries out the action `press` on `target` on `bar` asks for. A command
+/// bound on a custom module runs its script again once started, unless its
+/// `exec_on_event` is off. Returns the built-ins the main loop carries out
+/// itself: opening a window, and do-not-disturb, which lives with the
+/// notification daemon.
 #[cfg_attr(not(target_os = "linux"), allow(unused_variables))]
 pub fn act(
     target: &Target<Module>,
     press: Press,
     config: &Config,
     data: &Data,
-    workspaces: &[i64],
-    monitor: Option<&str>,
+    bar: &Bar<'_>,
     commands: &Commands,
+    custom: &crate::custom::Runner,
 ) -> Option<Builtin> {
     let action = pointer::action(target, press, config)?;
     match action {
         Action::Exec(command) => {
             if let Err(error) = exec::spawn(&command) {
                 tracing::warn!("`{command}` did not start: {error}");
+            } else if let Target::Module(Module::Custom(index)) = *target
+                && config
+                    .custom
+                    .get(index)
+                    .is_some_and(|module| module.exec_on_event)
+            {
+                custom.run(index, bar.monitor);
             }
         }
         #[cfg(target_os = "linux")]
@@ -201,7 +221,7 @@ pub fn act(
         }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         Action::FocusWorkspace(index) => {
-            let workspace = workspaces.get(index).and_then(|id| {
+            let workspace = bar.workspaces.get(index).and_then(|id| {
                 data.workspaces
                     .as_ref()?
                     .workspaces()
@@ -221,7 +241,7 @@ pub fn act(
                 Direction::Previous => Step::Previous,
             };
             let own = (!config.workspaces.all_outputs)
-                .then_some(monitor)
+                .then_some(bar.monitor)
                 .flatten();
             if let Some(workspace) = state.step(step, own) {
                 commands.focus(workspace.clone());

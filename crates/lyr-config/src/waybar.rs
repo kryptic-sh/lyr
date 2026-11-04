@@ -134,8 +134,20 @@ fn trailing_commas(text: &str) -> String {
     out
 }
 
-/// The lyr module a waybar module stands for, from its name and its table.
-fn module(name: &str, body: Option<&Map<String, Value>>) -> Option<&'static str> {
+/// The lyr module a waybar module stands for, from its name and its table:
+/// a built-in one, else, for a `custom/<name>`, lyr's custom module of the
+/// same name. A name with a `.` has none, as it would split the TOML key.
+fn module(name: &str, body: Option<&Map<String, Value>>) -> Option<String> {
+    if let Some(builtin) = builtin(name, body) {
+        return Some(builtin.to_owned());
+    }
+    name.strip_prefix(crate::custom::PREFIX)
+        .filter(|custom| !custom.is_empty() && !custom.contains('.'))
+        .map(|_| name.to_owned())
+}
+
+/// The built-in lyr module a waybar module stands for.
+fn builtin(name: &str, body: Option<&Map<String, Value>>) -> Option<&'static str> {
     let text = |key: &str| {
         body.and_then(|body| body.get(key))
             .and_then(Value::as_str)
@@ -346,7 +358,8 @@ pub fn import(text: &str) -> Result<Imported, ImportError> {
     let mut config = Table::new();
     let mut skipped = Vec::new();
     let mut layout_skipped = Vec::new();
-    let mut modules: Vec<(String, &'static str)> = Vec::new();
+    // Each carried module's waybar name and the name lyr's layout gives it.
+    let mut modules: Vec<(String, String)> = Vec::new();
     for (key, value) in top {
         let bar_key = match key.as_str() {
             "position" | "height" | "layer" | "output" => key.as_str(),
@@ -363,14 +376,27 @@ pub fn import(text: &str) -> Result<Imported, ImportError> {
                             layout_skipped.push(format!("{key}: `{name}` has no lyr module"));
                             return None;
                         };
-                        if modules.iter().any(|(_, taken)| *taken == lyr) {
+                        let taken = modules.iter().any(|(_, taken)| *taken == lyr);
+                        if let Some(custom) = lyr.strip_prefix(crate::custom::PREFIX) {
+                            // A zone may name it before its keys are carried,
+                            // and a custom module may be shown twice.
+                            if !taken {
+                                set(
+                                    &mut config,
+                                    &format!("custom.{custom}"),
+                                    toml::Value::Table(Table::new()),
+                                );
+                                modules.push((name.to_owned(), lyr.clone()));
+                            }
+                        } else if taken {
                             layout_skipped.push(format!(
                                 "{key}: `{name}` is a second `{lyr}`, which lyr has one of"
                             ));
                             return None;
+                        } else {
+                            modules.push((name.to_owned(), lyr.clone()));
                         }
-                        modules.push((name.to_owned(), lyr));
-                        Some(toml::Value::String(lyr.to_owned()))
+                        Some(toml::Value::String(lyr))
                     })
                     .collect();
                 try_set(
@@ -417,11 +443,16 @@ pub fn import(text: &str) -> Result<Imported, ImportError> {
         let Some(body) = top.get(waybar).and_then(Value::as_object) else {
             continue;
         };
-        for (key, value, from) in keys(lyr, waybar, body, &mut skipped) {
+        // A custom module's keys are `custom`'s, in its own table.
+        let (kind, table) = match lyr.strip_prefix(crate::custom::PREFIX) {
+            Some(custom) => ("custom", format!("custom.{custom}")),
+            None => (lyr.as_str(), lyr.clone()),
+        };
+        for (key, value, from) in keys(kind, waybar, body, &mut skipped) {
             try_set(
                 &mut config,
                 &mut skipped,
-                format!("{lyr}.{key}"),
+                format!("{table}.{key}"),
                 value,
                 from,
             );

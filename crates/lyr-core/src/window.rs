@@ -15,7 +15,7 @@ const ELLIPSIS: char = '\u{2026}';
 
 /// `text` cut to `max` characters, the last of them an ellipsis, as Pango's
 /// end ellipsis reads at waybar's `max-length`. Text that fits is kept.
-fn cut(text: String, max: Option<u32>) -> String {
+pub(crate) fn cut(text: String, max: Option<u32>) -> String {
     let Some(max) = max.and_then(|max| usize::try_from(max).ok()) else {
         return text;
     };

@@ -201,3 +201,94 @@ fn glyphs_are_written_as_escapes() {
         format("\u{F240} \u{F140B} {capacity}%")
     );
 }
+
+#[test]
+fn a_custom_module_is_carried_with_its_keys() {
+    let jsonc = r#"{
+        "modules-left": ["custom/spotify", "custom/pacman#2", "custom/weird.name"],
+        "modules-right": ["custom/spotify"],
+        "custom/spotify": {
+            "interval": 30,
+            "format": "S {}",
+            "max-length": 40,
+            "exec": "mediaplayer.sh 2> /dev/null",
+            "exec-if": "pgrep spotify",
+            "return-type": "json",
+            "on-click": "playerctl play-pause",
+            "format-icons": { "playing": "P", "default": ["a", "b"] },
+            "rotate": 90,
+            "escape": true,
+            "tooltip": false,
+        },
+        "custom/pacman#2": {
+            "format": "{text}",
+            "interval": "once",
+            "exec": "pacman_packages",
+            "signal": 8,
+            "restart-interval": 5,
+            "menu": "on-click",
+            "smooth-scrolling-threshold": 1.0,
+        },
+        "custom/weird.name": { "exec": "x" },
+    }"#;
+    let imported = import(jsonc).expect("converted");
+    let config = from_sources(
+        Some((Path::new("import.toml"), &imported.toml)),
+        Platform::Linux,
+    )
+    .expect("the result loads");
+    assert_eq!(
+        config.layout.left,
+        [
+            crate::Item::Named("custom/spotify".to_owned()),
+            crate::Item::Named("custom/pacman#2".to_owned()),
+        ]
+    );
+    assert_eq!(
+        config.layout.right,
+        [crate::Item::Named("custom/spotify".to_owned())],
+        "a custom module can be shown twice"
+    );
+    let custom = |name: &str| {
+        config
+            .custom
+            .iter()
+            .find(|custom| custom.name == name)
+            .unwrap_or_else(|| panic!("no [custom.{name}]"))
+    };
+    let spotify = custom("spotify");
+    assert_eq!(spotify.exec.as_deref(), Some("mediaplayer.sh 2> /dev/null"));
+    assert_eq!(spotify.exec_if.as_deref(), Some("pgrep spotify"));
+    assert_eq!(spotify.return_type, crate::ReturnType::Json);
+    assert_eq!(
+        spotify.runs(),
+        Some(crate::Runs::Every(std::time::Duration::from_secs(30)))
+    );
+    assert_eq!(spotify.format, format("S {text}"));
+    assert_eq!(spotify.max_length, Some(40));
+    assert!(spotify.escape && !spotify.tooltip);
+    assert!(matches!(spotify.icons, Some(crate::Icons::Named(_))));
+    assert_eq!(
+        spotify.on.click,
+        Some(Binding::Exec {
+            exec: "playerctl play-pause".to_owned()
+        })
+    );
+    let pacman = custom("pacman#2");
+    assert_eq!(pacman.runs(), Some(crate::Runs::Once));
+    assert_eq!(pacman.signal, Some(8));
+    for key in [
+        "custom/spotify.rotate: ",
+        "custom/pacman#2.restart-interval: ",
+        "custom/pacman#2.menu: ",
+        "custom/pacman#2.smooth-scrolling-threshold: ",
+        "modules-left: `custom/weird.name` has no lyr module",
+        "custom/weird.name: not carried",
+    ] {
+        assert!(
+            imported.skipped.iter().any(|line| line.starts_with(key)),
+            "{key} not in {:?}",
+            imported.skipped
+        );
+    }
+}

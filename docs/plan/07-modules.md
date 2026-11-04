@@ -222,6 +222,75 @@ muted, and unmuting output restores that state.
 
 See [09-notifications.md](09-notifications.md).
 
+## Custom
+
+waybar's `custom/<name>` (`waybar-custom(5)`): a script's output, or static
+text. A zone names `custom/<name>` and its config is the `[custom.<name>]`
+table, with waybar's keys in snake case (`format-icons` is `icons`); a zone
+naming one with no table is a config error, and a table no zone names runs
+nothing. The schema is `lyr_config::custom`, the view `lyr_core::custom`, and
+the runner `apps/lyr/src/custom.rs`.
+
+```toml
+[layout]
+left = ["custom/media"]
+
+[custom.media]
+exec = "playerctl metadata --format '{\"text\": \"{{title}}\", \"alt\": \"{{status}}\"}'"
+exec_if = "pgrep spotify"
+return_type = "json"
+interval = 5
+format = "{icon} {text}"
+icons = { Playing = "P", default = "S" }
+max_length = 40
+colours = { warning = "#ffaa00" }
+
+[custom.media.on]
+click = { exec = "playerctl play-pause" }
+```
+
+- **Running.** `exec` runs through the platform shell (`sh -c`, or `cmd /C` with
+  no console window), once per module per bar, with `WAYBAR_OUTPUT_NAME` and
+  `LYR_OUTPUT_NAME` set to the bar's output. `interval` (seconds, at least 1 ms,
+  or `"once"`) runs it again that long after the last run ended, so two runs
+  never overlap. With no `interval` but a `signal` it runs once. With neither it
+  is continuous: each line it prints is an update, and `restart_interval` runs
+  it again after it exits. `exec_if` runs first and must exit 0. `lyr signal N`
+  runs every module whose `signal` is N again, on every platform. A click whose
+  binding is `{ exec = … }` runs the script again once the command started,
+  unless `exec_on_event = false`. `on_update` runs after each update. A script's
+  process tree stops when its bar goes, on `lyr reload` and on quit: a process
+  group sent `SIGTERM` on Unix, a Job Object killed on Windows. stdout is read
+  as UTF-8 (anything else replaced), a trailing CR is stripped from each line,
+  and stderr is dropped.
+- **Output.** By default i3blocks' lines: the text, then the tooltip (the text
+  when there is no second line), then the class. `return_type = "json"` reads
+  the first line as an object with `text`, `alt`, `tooltip`, `class` (a string
+  or a list) and `percentage`; a line that is not an object is logged and the
+  module keeps what it showed. A CR in a tooltip breaks the line.
+- **Showing.** `format` (default `{text}`) takes `{text}` (or a bare `{}` on its
+  own), `{alt}`, `{percentage}` and `{icon}`; `icons` is one icon, a ramp by
+  percentage, or a table by `alt` whose values may be ramps, with `default`. The
+  module is left out before the first output, when the script printed nothing,
+  when `exec_if` or `exec` exited non-zero, when the label comes out empty, and,
+  with `hide_empty_text`, when the script's text is empty. `max_length` cuts the
+  label with an ellipsis; `min_length` pads it with spaces, `align` (0 – 1,
+  default the middle) placing the text in them.
+- **Markup.** waybar draws Pango markup; lyr's labels and tooltips are plain
+  text, so tags are dropped and entities decoded: the words show, their styling
+  does not. `escape = true` shows the script's text and alt as printed.
+- **Tooltip.** `tooltip_format` (the same placeholders) when set, else the
+  script's tooltip; when that is the text, the whole label. `tooltip = false`
+  has none.
+- **Colour.** lyr has no CSS: `colours` maps a class to the label's colour, the
+  first of the script's classes listed there winning; otherwise the theme's
+  foreground.
+- **Static.** No `exec`: the module is its `format`.
+
+Not built: `rotate`, `menu`/`menu_file`/`menu_actions`, `justify`, `expand`,
+`image_path`/`image_name`/`icon_size`, `smooth_scrolling_threshold` and
+`SIGRTMIN+N`; the backlog says why.
+
 ## Not carried over
 
 The waybar config also defines `cpu`, `memory` and `disk`. None of them is in

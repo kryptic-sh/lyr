@@ -13,6 +13,7 @@
 
 mod actions;
 mod colour;
+pub mod custom;
 mod format;
 mod schema;
 pub mod waybar;
@@ -21,6 +22,7 @@ use std::path::{Path, PathBuf};
 
 pub use actions::{Binding, Builtin, Exec, On, PowerMenu};
 pub use colour::{Colour, InvalidColour};
+pub use custom::{Custom, Icons, Interval, ReturnType, Runs};
 pub use format::{Format, InvalidFormat};
 pub use hjkl_config::{ConfigError, ConfigSource};
 pub use schema::{
@@ -157,6 +159,7 @@ fn typed(mut merged: toml::Table) -> Result<Config, String> {
         window: section(&mut merged, "window")?,
         tray: section(&mut merged, "tray")?,
         theme: section(&mut merged, "theme")?,
+        custom: customs(&mut merged)?,
     };
     match merged.keys().next() {
         Some(key) => Err(format!("{key}: unknown table")),
@@ -183,6 +186,22 @@ fn section<T: serde::de::DeserializeOwned>(
         };
         format!("{path}: {}", error.inner().message())
     })
+}
+
+/// Takes the `[custom.<name>]` tables out of `merged`, which may have none,
+/// each named for its key.
+fn customs(merged: &mut toml::Table) -> Result<Vec<custom::Custom>, String> {
+    if !merged.contains_key("custom") {
+        return Ok(Vec::new());
+    }
+    let tables: std::collections::BTreeMap<String, custom::Custom> = section(merged, "custom")?;
+    Ok(tables
+        .into_iter()
+        .map(|(name, mut custom)| {
+            custom.name = name;
+            custom
+        })
+        .collect())
 }
 
 /// Parses TOML text into a table. A syntax error's message is toml's own,
@@ -255,7 +274,14 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
         if name == "separator" {
             continue;
         }
-        let Some(module) = Module::from_name(name) else {
+        if let Some(custom) = name.strip_prefix(custom::PREFIX)
+            && config.module(name).is_none()
+        {
+            return Err(format!(
+                "{key}: `{name}` names no `[custom.{custom}]` table"
+            ));
+        }
+        let Some(module) = config.module(name) else {
             let known: Vec<&str> = Module::ALL.iter().map(|module| module.name()).collect();
             return Err(format!(
                 "{key}: unknown module `{name}` (expected `separator`, \
@@ -351,6 +377,32 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
         ("clock", &config.clock.on),
         ("notifications", &config.notifications.on),
     ];
+    let custom_keys: Vec<String> = config
+        .custom
+        .iter()
+        .map(|custom| format!("custom.{}", custom.name))
+        .collect();
+    let bound = bound.into_iter().chain(
+        custom_keys
+            .iter()
+            .zip(&config.custom)
+            .map(|(key, custom)| (key.as_str(), &custom.on)),
+    );
+    for (key, custom) in custom_keys.iter().zip(&config.custom) {
+        custom.validate(key)?;
+        check_placeholders(
+            &format!("{key}.format"),
+            &custom.format,
+            &custom::PLACEHOLDERS,
+        )?;
+        if let Some(format) = &custom.tooltip_format {
+            check_placeholders(
+                &format!("{key}.tooltip_format"),
+                format,
+                &custom::PLACEHOLDERS,
+            )?;
+        }
+    }
     for (module, on) in bound {
         for (key, binding) in on.bindings(module) {
             match binding {

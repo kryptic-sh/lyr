@@ -162,5 +162,5 @@ The dotfiles change in M8 ([15](15-milestones.md)):
   With the defaults being the waybar port, that file starts empty.
 
 `lyr import-waybar FILE` converts a waybar `config.jsonc` to a lyr config,
-listing what it cannot carry; reading `style.css` into `[theme]` is a backlog
-item.
+custom modules (`custom/<name>`) included, listing what it cannot carry; reading
+`style.css` into `[theme]` is a backlog item.

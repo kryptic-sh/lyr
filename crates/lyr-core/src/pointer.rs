@@ -77,7 +77,7 @@ pub fn action(target: &Target<Module>, press: Press, config: &Config) -> Option<
 }
 
 /// A module's `[<module>.on]` table; the workspaces and the tray have none.
-const fn bindings(module: Module, config: &Config) -> Option<&On> {
+fn bindings(module: Module, config: &Config) -> Option<&On> {
     Some(match module {
         Module::Power => &config.power.on,
         Module::Battery => &config.battery.on,
@@ -89,6 +89,7 @@ const fn bindings(module: Module, config: &Config) -> Option<&On> {
         Module::Clock => &config.clock.on,
         Module::Notifications => &config.notifications.on,
         Module::Window => &config.window.on,
+        Module::Custom(index) => &config.custom.get(index)?.on,
         Module::Workspaces | Module::Tray => return None,
     })
 }
@@ -162,6 +163,35 @@ mod tests {
             action(&Target::Module(Module::Battery), Press::Left, &config),
             None
         );
+    }
+
+    #[test]
+    fn a_custom_module_follows_its_own_bindings() {
+        let config = from_sources(
+            Some((
+                std::path::Path::new("config.toml"),
+                "[layout]
+left = [\"custom/a\", \"custom/b\"]
+                 [custom.a.on]
+click = { exec = \"one\" }
+                 [custom.b.on]
+click = \"open_clock_panel\"
+",
+            )),
+            Platform::Linux,
+        )
+        .expect("valid");
+        let a = config.module("custom/a").expect("a module");
+        let b = config.module("custom/b").expect("a module");
+        assert_eq!(
+            action(&Target::Module(a), Press::Left, &config),
+            Some(Action::Exec("one".to_owned()))
+        );
+        assert_eq!(
+            action(&Target::Module(b), Press::Left, &config),
+            Some(Action::Builtin(Builtin::OpenClockPanel))
+        );
+        assert_eq!(action(&Target::Module(a), Press::Right, &config), None);
     }
 
     #[test]

@@ -126,6 +126,45 @@ pub fn escape(text: &str) -> String {
     escaped
 }
 
+/// The text Pango markup draws, without its styling: every tag (`<` then a
+/// letter or `/`, through the next `>`) dropped and the entities decoded. A
+/// `<` or `&` that starts neither is kept as it is. What a custom module's
+/// label shows, since the bar draws no styled spans in a label.
+#[must_use]
+pub fn text_of(markup: &str) -> String {
+    let mut out = String::with_capacity(markup.len());
+    let mut rest = markup;
+    while let Some(at) = rest.find(['<', '&']) {
+        out.push_str(&rest[..at]);
+        rest = &rest[at..];
+        let tag_end = rest
+            .strip_prefix('<')
+            .and_then(|after| after.chars().next())
+            .filter(|c| c.is_ascii_alphabetic() || *c == '/')
+            .and_then(|_| rest.find('>'));
+        let used = match tag_end {
+            Some(end) => end + 1,
+            None if rest.starts_with('&') => match entity(rest) {
+                Some((decoded, used)) => {
+                    out.push_str(&decoded);
+                    used
+                }
+                None => {
+                    out.push('&');
+                    1
+                }
+            },
+            None => {
+                out.push('<');
+                1
+            }
+        };
+        rest = &rest[used..];
+    }
+    out.push_str(rest);
+    out
+}
+
 /// A tag the spec lists.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Tag<'a> {

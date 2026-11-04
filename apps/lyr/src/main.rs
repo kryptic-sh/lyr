@@ -9,6 +9,7 @@ mod bar;
 mod bluetooth_menu;
 mod clock_panel;
 mod control;
+mod custom;
 mod exec;
 mod gpu;
 mod input;
@@ -93,6 +94,12 @@ enum BarCommand {
         #[arg(value_enum)]
         event: EventArg,
     },
+    /// Run every custom module whose `signal` is N again, as waybar's
+    /// `pkill -RTMIN+N waybar` does.
+    Signal {
+        #[arg(value_name = "N", value_parser = clap::value_parser!(u32).range(1..))]
+        number: u32,
+    },
 }
 
 impl BarCommand {
@@ -106,6 +113,7 @@ impl BarCommand {
             Self::Dnd => Request::Dnd,
             Self::Clear => Request::Clear,
             Self::Event { event } => Request::Event(event.event()),
+            Self::Signal { number } => Request::Signal(*number),
         }
     }
 }
@@ -245,6 +253,12 @@ mod cli_tests {
         assert_eq!(request(&["lyr", "dnd"]).as_deref(), Some("dnd"));
         assert_eq!(request(&["lyr", "clear"]).as_deref(), Some("clear"));
         assert_eq!(request(&["lyr", "quit"]).as_deref(), Some("quit"));
+        assert_eq!(
+            request(&["lyr", "signal", "8"]).as_deref(),
+            Some("signal 8")
+        );
+        assert!(Cli::try_parse_from(["lyr", "signal", "0"]).is_err());
+        assert!(Cli::try_parse_from(["lyr", "signal", "x"]).is_err());
     }
 
     #[test]

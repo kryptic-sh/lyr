@@ -1,9 +1,13 @@
-//! Running a binding's `exec` command through the platform shell
-//! (`docs/plan/05-layout-and-config.md`). A config file is code: the command
-//! runs as the user (SECURITY.md).
+//! Running a binding's `exec` command, and a custom module's script, through
+//! the platform shell (`docs/plan/05-layout-and-config.md`). A config file is
+//! code: the command runs as the user (SECURITY.md).
+
+mod tree;
 
 use std::io;
-use std::process::{Command, Stdio};
+use std::process::{Child, Command, Stdio};
+
+pub use tree::Tree;
 
 /// Starts `command` through the platform shell and returns without waiting
 /// for it ([`start`]).
@@ -13,6 +17,27 @@ use std::process::{Command, Stdio};
 /// When the shell cannot be started.
 pub fn spawn(command: &str) -> io::Result<()> {
     start(shell(command))
+}
+
+/// Starts `command` through the platform shell as a custom module's script
+/// (`crate::custom`): with `env` added to its environment, its output piped
+/// back, no input, its errors dropped, and in a process tree of its own
+/// that [`Tree::kill`] stops.
+///
+/// # Errors
+///
+/// When the shell cannot be started, or its tree made.
+pub fn script(command: &str, env: &[(&str, &str)]) -> io::Result<(Child, Tree)> {
+    let mut shell = shell(command);
+    shell
+        .envs(env.iter().copied())
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    tree::prepare(&mut shell);
+    let mut child = shell.spawn()?;
+    let tree = tree::adopt(&mut child)?;
+    Ok((child, tree))
 }
 
 /// Opens `url` in the user's browser through `xdg-open`, the URL its one
@@ -41,8 +66,7 @@ fn child(program: &str) -> Command {
     #[cfg(windows)]
     let command = {
         use std::os::windows::process::CommandExt as _;
-        /// `CREATE_NO_WINDOW` from the Win32 process creation flags.
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        use windows_sys::Win32::System::Threading::CREATE_NO_WINDOW;
         let mut command = command;
         command.creation_flags(CREATE_NO_WINDOW);
         command

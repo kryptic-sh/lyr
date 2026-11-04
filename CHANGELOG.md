@@ -8,6 +8,25 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- Custom modules, waybar's `custom/<name>`: a zone names `custom/<name>`, and
+  the `[custom.<name>]` table takes `exec`, `exec_if`, `return_type` (i3blocks
+  lines, or `"json"` with `text`, `alt`, `tooltip`, `class` and `percentage`),
+  `interval` (seconds or `"once"`), `restart_interval` for a continuous script,
+  `signal`, `format` (`{text}`/`{}`, `{alt}`, `{percentage}`, `{icon}`),
+  `icons`, `hide_empty_text`, `exec_on_event`, `max_length`, `min_length`,
+  `align`, `tooltip`, `tooltip_format`, `escape`, `on_update`, `[…on]` bindings,
+  and `colours`, a label colour per script class in place of waybar's CSS. A
+  module without `exec` shows its format. Each bar runs its own script with
+  `WAYBAR_OUTPUT_NAME` and `LYR_OUTPUT_NAME` set, and its whole process tree
+  stops on `lyr reload` and on quit (a process group on Unix, a Job Object on
+  Windows). Pango markup in a script's text shows as plain text.
+- `lyr signal <N>` runs every custom module whose `signal` is N again, on every
+  platform, where waybar takes `SIGRTMIN+N`.
+- `lyr import-waybar` carries `custom/<name>` modules with their keys; ones lyr
+  refuses, such as `rotate` and `menu`, are listed at the top.
+
 ### Changed
 
 - On Windows, built on windows-rs 0.100's crates (`windows-core`,

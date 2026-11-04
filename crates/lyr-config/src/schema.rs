@@ -9,6 +9,7 @@ use serde::Deserialize;
 
 use crate::actions::{On, PowerMenu};
 use crate::colour::Colour;
+use crate::custom::{Custom, PREFIX};
 use crate::format::Format;
 
 /// The whole config, after the user file is layered over the defaults. It is
@@ -31,6 +32,37 @@ pub struct Config {
     pub window: Window,
     pub tray: Tray,
     pub theme: Theme,
+    /// The `[custom.<name>]` tables, by name: what [`Module::Custom`]
+    /// indexes.
+    pub custom: Vec<Custom>,
+}
+
+impl Config {
+    /// The module a zone entry names: a built-in one, or `custom/<name>`
+    /// with a `[custom.<name>]` table.
+    #[must_use]
+    pub fn module(&self, name: &str) -> Option<Module> {
+        match name.strip_prefix(PREFIX) {
+            Some(name) => self
+                .custom
+                .iter()
+                .position(|custom| custom.name == name)
+                .map(Module::Custom),
+            None => Module::from_name(name),
+        }
+    }
+
+    /// The modules the zones name, in order, repeats included.
+    pub fn shown(&self) -> impl Iterator<Item = Module> {
+        let layout = &self.layout;
+        [&layout.left, &layout.center, &layout.right]
+            .into_iter()
+            .flatten()
+            .filter_map(|item| match item {
+                Item::Named(name) => self.module(name),
+                Item::Spacer { .. } => None,
+            })
+    }
 }
 
 /// One bar per output: where it sits and how tall it is.
@@ -103,7 +135,7 @@ pub enum Item {
 }
 
 /// The modules a zone can name.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Module {
     Power,
     Battery,
@@ -117,10 +149,13 @@ pub enum Module {
     Clock,
     Notifications,
     Window,
+    /// `custom/<name>`, by its index in [`Config::custom`].
+    Custom(usize),
 }
 
 impl Module {
-    /// Every module, for error messages that list what a name could be.
+    /// Every built-in module, for error messages that list what a name
+    /// could be.
     pub const ALL: [Self; 12] = [
         Self::Power,
         Self::Battery,
@@ -152,10 +187,13 @@ impl Module {
             Self::Clock => "clock",
             Self::Notifications => "notifications",
             Self::Window => "window",
+            // Its own name is its table's (`Custom::name`).
+            Self::Custom(_) => "custom",
         }
     }
 
-    /// The module a zone entry names, if any.
+    /// The built-in module a zone entry names, if any; [`Config::module`]
+    /// also finds custom ones.
     #[must_use]
     pub fn from_name(name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|module| module.name() == name)

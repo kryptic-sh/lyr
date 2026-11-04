@@ -24,11 +24,14 @@ days from acknowledgment, extendable for complex issues.
 lyr runs as your user and acts on your behalf:
 
 - **Config is code.** Module actions can be `exec` commands
-  ([docs/plan/05-layout-and-config.md](docs/plan/05-layout-and-config.md)).
-  Treat a `config.toml` like a shell script you are about to run.
-- **The control socket** (`lyr reload`, `lyr event …`) accepts commands, so it
-  is restricted to your own user: a per-user directory created `0700` on Unix,
-  and a pipe for the current user only on Windows.
+  ([docs/plan/05-layout-and-config.md](docs/plan/05-layout-and-config.md)), and
+  a custom module's `exec`, `exec_if` and `on_update` run on their own, at start
+  and on their interval
+  ([docs/plan/07-modules.md](docs/plan/07-modules.md#custom)). Treat a
+  `config.toml` like a shell script you are about to run.
+- **The control socket** (`lyr reload`, `lyr signal …`, `lyr event …`) accepts
+  commands, so it is restricted to your own user: a per-user directory created
+  `0700` on Unix, and a pipe for the current user only on Windows.
 - **Untrusted input** reaches lyr from other processes: tray item names, icons
   and menus over D-Bus, and notification counts. It is displayed, never
   executed, and icon data is size-checked before it is decoded.

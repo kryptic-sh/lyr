@@ -67,6 +67,8 @@ A small local socket (a Unix socket on Linux and macOS, a named pipe on
 Windows), modelled on tmxr's `interprocess` use. It is used by:
 
 - `lyr reload`, `lyr quit`, and `lyr toggle` (hide or show the bars);
+- `lyr signal N`, which runs every custom module whose `signal` is N again
+  ([07](07-modules.md#custom)), where waybar takes `SIGRTMIN+N`;
 - `lyr panel clock|wifi|bluetooth|audio` (toggle a panel on the focused output),
   `lyr dnd` (toggle do-not-disturb) and `lyr clear` (clear the notifications),
   which the Hyprland bindings run ([09](09-notifications.md),

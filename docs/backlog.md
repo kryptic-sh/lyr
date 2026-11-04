@@ -1689,6 +1689,72 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Post-MVP
 
+- **Custom modules (waybar's `custom/<name>`): built, with these gaps.**
+  `docs/plan/07-modules.md#custom` describes what shipped (`lyr_config::custom`,
+  `lyr_core::custom`, `apps/lyr/src/custom.rs`, `lyr signal N`, and
+  `import-waybar` carrying them). Checked against `waybar-custom(5)`
+  (Alexays/Waybar `33485c8`, read 2026-10-15); the hide rules (empty output,
+  `exec` or `exec_if` exiting non-zero) and the tooltip rules (a JSON line
+  without `tooltip` has none, an i3blocks text-only line's tooltip is the label)
+  follow waybar's `custom.cpp` as remembered, not re-read. What is not built:
+  - **`SIGRTMIN+N`.** `lyr signal N` is the only trigger. A POSIX handler needs
+    a crate the project does not depend on directly (`signal-hook`, or `libc`
+    for `SIGRTMIN()`, or tokio's `signal` feature, which pulls in
+    `signal-hook-registry`); the owner's call. waybar users' scripts that run
+    `pkill -RTMIN+N waybar` need changing to `lyr signal N`.
+  - **Markup styling.** lyr's bar labels and tooltips draw plain text, so a
+    script's Pango markup has its tags dropped and entities decoded
+    (`lyr_core::markup::text_of`): colour, weight and size are lost. Drawing it
+    would mean styled spans in `Content::Label`.
+  - **`justify`**: lyr's labels are one line, and GTK's `justify` only moves
+    lines against each other, so it would be a key that does nothing.
+  - **`expand`**: the zone layout (`lyr_core::layout`) has no module that takes
+    the leftover space.
+  - **`image_path`, `image_name` and `icon_size`**: `Content::Label` carries no
+    picture, and loading a file or a themed icon by name outside the tray is new
+    machinery.
+  - **`smooth_scrolling_threshold`**: touchpad travel is turned into steps per
+    bar (`input::Pointer`, `PIXELS_PER_STEP`) before the target is known.
+  - **`min_length` is approximate**: lyr pads with spaces, where GTK reserves
+    `width-chars` of the font's approximate character width, so the width is
+    close to waybar's, not equal.
+  - **Unix process trees**: stopped with `kill -s TERM -- -<group>` through
+    `kill(1)`, as lyr links no libc binding; a script that leaves its group
+    (`setsid`) or ignores `SIGTERM` survives, and if lyr itself is killed its
+    scripts are orphaned (Windows' Job Object kills them when lyr's handle
+    closes). On Windows, a finished run's leftover background processes are
+    killed when the next run starts (the old job's handle closes); on Unix they
+    are left, and the group's id is forgotten once its shell is reaped, so a
+    reused id is never signalled.
+  - **Windows thread snapshot per run**: the shell starts suspended and is found
+    in a snapshot of every thread on the system to be resumed
+    (`exec::tree::windows::resume`), since std's `ChildExt::main_thread_handle`
+    is unstable (`windows_process_extensions_main_thread_handle`, rustc 1.99).
+    Cheap at a seconds-long `interval`, wasteful at a few milliseconds; switch
+    to the std handle once it is stable.
+  - **Clicks on a running continuous script** do nothing to it (a click while it
+    waits out its `restart_interval` starts it at once), and a binding re-runs a
+    script as soon as its command started, as waybar does, not once the command
+    finished.
+  - **Unverified**: the Unix side (`process_group`, `kill(1)`, `sh -c`) is
+    compiled and tested only by CI; it was not run on Linux or macOS. Tooltips
+    were not hovered in the Windows run below; they are covered by unit tests
+    only. A custom module named in two zones of one bar runs one script, shown
+    in both places.
+
+  Run on Windows 11 (2026-11-04): `echo hello %LYR_OUTPUT_NAME%` at
+  `interval = 1` showed `hello \\.\DISPLAY1`, a JSON `echo` showed its ramp
+  icon, text and percentage in its class's colour, a static module its format,
+  and `ping -n 100 127.0.0.1` as a continuous script its lines cut at
+  `max_length`. `lyr reload` replaced the `cmd` and `ping` processes, `lyr quit`
+  left neither, `lyr signal 8` answered `ok` and `lyr signal 3` an error, as no
+  module had it.
+
+  **Declined, unless the owner wants it.**
+  - `rotate`: lyr's bars are horizontal only.
+  - `menu`, `menu_file` and `menu_actions`: they would mean parsing GtkBuilder
+    XML.
+
 - **Window title module: built, run on Windows and on Linux's three
   compositors.** `window` (`lyr_core::window`, and
   `lyr_wm::State::active_window`) follows Hyprland's `activewindow>>CLASS,TITLE`

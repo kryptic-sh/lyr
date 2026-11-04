@@ -225,9 +225,12 @@ impl App {
                         press,
                         &self.config,
                         &self.data,
-                        &window.workspaces,
-                        window.monitor.as_deref(),
+                        &input::Bar {
+                            workspaces: &window.workspaces,
+                            monitor: window.monitor.as_deref(),
+                        },
                         &self.commands,
+                        &self.custom,
                     );
                     if opens == Some(Builtin::ToggleDnd) {
                         toggle_dnd = !toggle_dnd;
