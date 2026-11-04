@@ -360,9 +360,28 @@ pub fn import(text: &str) -> Result<Imported, ImportError> {
     let mut layout_skipped = Vec::new();
     // Each carried module's waybar name and the name lyr's layout gives it.
     let mut modules: Vec<(String, String)> = Vec::new();
+    // A side bar spans its output's height, so waybar's `height` there is
+    // its length, which lyr has no key for; its `width` is lyr's. A top or
+    // bottom bar is the other way round.
+    let vertical = matches!(
+        top.get("position").and_then(Value::as_str),
+        Some("left" | "right")
+    );
+    let (size, length) = if vertical {
+        ("width", "height")
+    } else {
+        ("height", "width")
+    };
     for (key, value) in top {
         let bar_key = match key.as_str() {
-            "position" | "height" | "layer" | "output" => key.as_str(),
+            "position" | "layer" | "output" => key.as_str(),
+            _ if key == size => size,
+            _ if key == length => {
+                skipped.push(format!(
+                    "{key}: the bar's length, and a lyr bar spans its output"
+                ));
+                continue;
+            }
             "modules-left" | "modules-center" | "modules-right" => {
                 let zone = key.trim_start_matches("modules-");
                 let names: Vec<toml::Value> = value
@@ -429,6 +448,7 @@ pub fn import(text: &str) -> Result<Imported, ImportError> {
             key.as_str(),
             "position"
                 | "height"
+                | "width"
                 | "layer"
                 | "output"
                 | "modules-left"

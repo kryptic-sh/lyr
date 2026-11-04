@@ -24,7 +24,9 @@ and this project adheres to
   line tall, its text level and centred, showing its compact form when the label
   is too wide and cut with an ellipsis when even that is; the workspaces and
   tray stack one button a row; a separator lies across the bar. A reload moves
-  the bars between any two edges in place.
+  the bars between any two edges in place. `lyr import-waybar` carries a side
+  bar's `position` and its `width`, and lists its `height` (in waybar, the bar's
+  length) as not carried, as it does a top or bottom bar's `width`.
 
 ## [0.6.0] - 2026-11-04
 

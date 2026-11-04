@@ -292,3 +292,56 @@ fn a_custom_module_is_carried_with_its_keys() {
         );
     }
 }
+
+#[test]
+fn a_bar_s_size_across_its_edge_is_carried_and_its_length_listed() {
+    let load = |imported: &super::Imported| {
+        from_sources(
+            Some((Path::new("import.toml"), &imported.toml)),
+            Platform::Linux,
+        )
+        .expect("the result loads")
+    };
+    let length = |imported: &super::Imported, key: &str| {
+        imported
+            .skipped
+            .iter()
+            .any(|line| line.starts_with(&format!("{key}: the bar's length")))
+    };
+    let listed_once = |imported: &super::Imported| {
+        assert!(
+            !imported
+                .skipped
+                .iter()
+                .any(|line| line.ends_with("not carried")),
+            "a size is listed once: {:?}",
+            imported.skipped
+        );
+    };
+    for (position, edge) in [
+        ("left", crate::Position::Left),
+        ("right", crate::Position::Right),
+    ] {
+        let side = import(&format!(
+            r#"{{ "position": "{position}", "width": 52, "height": 900 }}"#
+        ))
+        .expect("converted");
+        let config = load(&side);
+        assert_eq!(config.bar.position, edge);
+        assert_eq!(config.bar.width, 52, "a side bar's width is lyr's");
+        assert_ne!(config.bar.height, 900, "nor is its length carried");
+        assert!(length(&side, "height"), "{:?}", side.skipped);
+        assert!(!length(&side, "width"), "{:?}", side.skipped);
+        listed_once(&side);
+    }
+    let top = import(r#"{ "position": "top", "width": 1200, "height": 30 }"#).expect("converted");
+    let config = load(&top);
+    assert_eq!(config.bar.height, 30, "a top bar's height is lyr's");
+    assert_ne!(config.bar.width, 1200, "nor is its length carried");
+    assert!(length(&top, "width"), "{:?}", top.skipped);
+    assert!(!length(&top, "height"), "{:?}", top.skipped);
+    listed_once(&top);
+    let unplaced = import(r#"{ "width": 1200, "height": 30 }"#).expect("converted");
+    assert_eq!(load(&unplaced).bar.height, 30, "waybar's default is top");
+    assert!(length(&unplaced, "width"), "{:?}", unplaced.skipped);
+}
