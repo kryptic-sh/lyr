@@ -507,6 +507,19 @@ implementation follows meanwhile.
 
 ## Dependency updates that cannot land alone
 
+- **0.7.0 is bumped but not tagged** (2026-11-05). `chore: bump version` is on
+  main, followed by this entry; the session ended before the tag. CI run
+  41843915751 on the commit before the bump (same code) passed on Linux and
+  Windows, and its macOS builds passed on a rerun after GitHub never assigned
+  them a runner; this push cancelled it while its macOS smoke job was still
+  queued. Once main's CI run is green, tag the bump commit `v0.7.0` (annotated),
+  push the tag, and check every publish target: the GitHub release, crates.io
+  (all seven crates), AUR, Homebrew and Scoop.
+- **crcbl 0.17.2 is out; lyr is on 0.17.1.** Held back from 0.7.0 so the release
+  ships only CI-tested code (`cargo update --workspace` instead of
+  `cargo generate-lockfile`). Take it after the release with `cargo update` and
+  a full CI run.
+
 - **`windows` 0.62 stays in the tree through crcbl-mixer and crcbl-dx12.** lyr's
   own Windows code is on windows-rs 0.100's crates (`windows-core`,
   `windows-collections`, `windows-future`), with the Bluetooth source's WinRT
