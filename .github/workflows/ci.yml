@@ -266,7 +266,7 @@ jobs:
         timeout-minutes: 10
         run:
           sudo apt-get update && sudo apt-get install -y --no-install-recommends
-          sway foot jq mesa-vulkan-drivers libvulkan1
+          sway foot grim jq mesa-vulkan-drivers libvulkan1
       - name: Build the test and lyr
         run: |
           cargo test --locked -p lyr-wm --test sway_e2e --no-run
@@ -330,31 +330,43 @@ jobs:
           done
           export SWAYSOCK WAYLAND_DISPLAY="$(cd "$runtime" && ls wayland-* | grep -v lock | head -n 1)"
           cfg="$runtime/lyr.toml"
-          printf '[bar]\nposition = "left"\nwidth = 40\nheight = 30\n[layout]\nleft = ["workspaces"]\ncenter = ["clock"]\nright = []\n' > "$cfg"
+          # A coloured bar, so a screenshot shows whether it drew.
+          printf '[bar]\nposition = "left"\nwidth = 40\nheight = 30\n[layout]\nleft = ["workspaces"]\ncenter = ["clock"]\nright = []\n[theme]\nbar_background = "#ff00ff"\n' > "$cfg"
           # The workspace's area, as "x y width height".
           area() {
             swaymsg -t get_workspaces -r | jq -r '.[0].rect | "\(.x) \(.y) \(.width) \(.height)"'
           }
-          # Waits for the area to be $1, failing with both logs at a deadline.
+          # The colour on screen at x y, as rrggbb.
+          pixel() {
+            grim -g "$1,$2 1x1" -t ppm - | tail -c 3 | od -An -tx1 | tr -d ' \n'
+          }
+          # Waits for the area to be $1 and, unless $2 is empty, the pixel at
+          # $2, an empty stretch of the bar, to be $3: a bar that reserved its
+          # edge but never drew fails here. Each reload changes the colour,
+          # since sway shows a moved bar's last frame until it draws again.
           expect() {
             deadline=$(( $(date +%s) + 30 ))
-            until [ "$(area)" = "$1" ]; do
+            until [ "$(area)" = "$1" ] && { [ -z "$2" ] || [ "$(pixel $2)" = "$3" ]; }; do
               if ! kill -0 "$lyr_pid" 2>/dev/null || [ "$(date +%s)" -ge "$deadline" ]; then
-                echo "expected '$1', the area is '$(area)'"
+                echo "expected '$1' and $3 at '$2', the area is '$(area)'"
+                [ -z "$2" ] || echo "and the pixel there is $(pixel $2)"
                 cat "$runtime/lyr.log" "$runtime/sway.log"; exit 1
               fi
               sleep 0.2
             done
-            echo "$2: $1"
+            echo "$4: $1"
           }
-          expect '0 0 1280 720' 'no bar'
+          expect '0 0 1280 720' '' '' 'no bar'
           dbus-run-session -- "$lyr" -c "$cfg" > "$runtime/lyr.log" 2>&1 &
           lyr_pid=$!
-          expect '40 0 1240 720' left
-          for edge in 'right:0 0 1240 720' 'top:0 30 1280 690' 'bottom:0 0 1280 690' 'left:40 0 1240 720'; do
-            sed -i "s/^position = .*/position = \"${edge%%:*}\"/" "$cfg"
+          expect '40 0 1240 720' '2 600' ff00ff left
+          for edge in 'right:0 0 1240 720:1277 600:00ffff' 'top:0 30 1280 690:1100 2:ffff00' \
+              'bottom:0 0 1280 690:1100 717:00ff00' 'left:40 0 1240 720:2 600:ff00ff'; do
+            IFS=: read -r name want at colour <<< "$edge"
+            sed -i -e "s/^position = .*/position = \"$name\"/" \
+              -e "s/^bar_background = .*/bar_background = \"#$colour\"/" "$cfg"
             "$lyr" reload
-            expect "${edge#*:}" "${edge%%:*}"
+            expect "$want" "$at" "$colour" "$name"
           done
           "$lyr" quit
 
