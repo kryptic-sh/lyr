@@ -3,7 +3,7 @@
 
 use lyr_config::{Format, Network as Config};
 
-use crate::icon::pick;
+use crate::icon::{compact, pick};
 
 /// The link's state, decided as waybar's `getNetworkState` does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -88,6 +88,9 @@ impl Reading {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct View {
     pub text: String,
+    /// The icon alone, shown where `text` does not fit; `None` when the
+    /// format shows no icon or nothing else ([`crate::icon::compact`]).
+    pub compact: Option<String>,
     pub tooltip: String,
 }
 
@@ -122,8 +125,11 @@ pub fn view(state: State, link: &Link, config: &Config) -> View {
             _ => None,
         })
     };
+    let format = format.as_ref().unwrap_or(&config.format);
+    let text = fill(format);
     View {
-        text: fill(format.as_ref().unwrap_or(&config.format)),
+        compact: compact(format, icon, &text),
+        text,
         tooltip: fill(tooltip_format.as_ref().unwrap_or(&config.tooltip_format)),
     }
 }
@@ -171,6 +177,12 @@ mod tests {
         config.format_wifi = Some(Format::parse("{essid}").expect("valid"));
         assert_eq!(view(State::Wifi, &link(), &config).text, "home");
         assert_eq!(view(State::Ethernet, &link(), &config).text, "\u{EF09}");
+        config.format_wifi = Some(Format::parse("{icon} {essid}").expect("valid"));
+        assert_eq!(
+            view(State::Wifi, &link(), &config).compact.as_deref(),
+            Some("\u{F1EB}"),
+            "the state's format, not the plain one"
+        );
     }
 
     #[test]

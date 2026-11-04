@@ -140,9 +140,12 @@ impl App {
                     self.text = new_text;
                 }
                 if new.bar != self.config.bar && !self.hidden {
-                    // The power menu hangs from a bar that may move.
-                    if let Some(menu) = self.power_menu.take() {
-                        menu.close(shell, false)?;
+                    // Every menu, panel and tooltip was placed beside a bar
+                    // that may move; left open, a panel stays where the old
+                    // bar put it and the next click on its module closes it.
+                    self.close_menus(shell)?;
+                    for window in self.windows.values_mut() {
+                        window.tooltips.close(shell)?;
                     }
                     self.bars
                         .reshape(shell, &new.bar)

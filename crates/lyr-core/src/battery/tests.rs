@@ -38,8 +38,14 @@ fn charging_adds_the_bolt_and_plugged_shows_the_plug_alone() {
     let config = defaults();
     let charging = view(&reading(45, Status::Charging, TimeTo::Unknown), &config);
     assert_eq!(charging.text, "\u{F242} \u{F140B}");
+    assert_eq!(
+        charging.compact.as_deref(),
+        Some("\u{F242}"),
+        "the ramp's icon"
+    );
     let plugged = view(&reading(80, Status::Plugged, TimeTo::Unknown), &config);
     assert_eq!(plugged.text, "\u{EE9E}");
+    assert_eq!(plugged.compact, None, "the plug is no `{{icon}}`");
 }
 
 #[test]

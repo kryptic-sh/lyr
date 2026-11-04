@@ -55,7 +55,8 @@ width = 50          # a left or right bar's width (new)
   wider than its box shows its compact, icon-only form. If even that does not
   fit, it is cut with an ellipsis, measured in pixels.
 - **Button rows become columns.** The workspaces and the tray stack one button
-  per row, `gap` apart, each centred across the bar.
+  per row, `gap` apart, each centred across the bar; a name too wide is cut as a
+  label is.
 - **A separator becomes a horizontal rule**, and a `{ spacer = N }` becomes a
   vertical gap.
 - **Hit-testing needs no change:** regions are rectangles. Wheel steps work as
@@ -72,20 +73,31 @@ Each one opens away from the bar's edge, beside the module it belongs to:
 - **Tooltips:** `PopupPlacement::Right` from a left bar, `Left` from a right
   one.
 - **Panels** (the clock panel and the Wi-Fi, Bluetooth and audio menus) are
-  anchored to the bar's edge:
+  anchored to the bar's edge and the bar's start:
   - one `GAP` past the bar;
-  - their top level with the module's box, moved up as far as it takes to stay
-    on the output;
-  - their room is the output's width less the bar's.
+  - their top level with the module's box, moved up as far as it takes to end a
+    margin short of the bar's end, never above its start;
+  - no taller than the bar's length less a margin at each end.
 
-  `menu_panel::Place` gains the bar's edge on both axes, in place of a left
-  offset and a fixed `Top`/`Bottom` edge.
+  `menu_panel::Place` holds the bar's `edge`, the module's offset `along` the
+  bar, the bar's `length`, and the room `across` it to the output's far edge.
+  crcbl measures a panel that reserves nothing from the area clear of every
+  reserved edge (the work area on Win32 and X11, the visible frame on AppKit,
+  exclusive zone 0 on Wayland), and places the bar in that area too, so the
+  module's offset in its bar is its offset from the area's start, and the bar's
+  length, not the output's height, is the room along it. On Windows with the
+  taskbar at the bottom the bar is the work area's height.
 
 - **Popups** (the power menu, list popups and tray menus) are anchored to the
-  module's box stretched `GAP` past the bar's edge, as
-  `menu_panel::popup_anchor` does vertically today.
+  module's box stretched `GAP` past the bar's edge (`menu_panel::popup_anchor`),
+  and every popup, tooltips included, opens on `menu_panel::placement`'s side:
+  `Right` from a left bar, `Left` from a right one. Tooltips are anchored to the
+  box itself, as on a top or bottom bar.
+- **A reload that moves the bar** closes every menu, panel and tooltip, since
+  each was placed beside the old bar.
 - **Toasts** stay at the top right of the output. A right bar's reserved space
-  keeps them clear, since their panel reserves nothing.
+  keeps them clear, since their panel reserves nothing. lyr draws toasts on
+  Linux only.
 
 ## Slices
 
@@ -115,25 +127,35 @@ Each slice is pushed once its gate is green.
    the keys; the changelog entry is written alongside each slice; then this file
    is deleted and a release is cut.
 
-## Found in slice 1, for slice 2
+## Left after slice 2
 
-- **Labels lose their text at the default width.** On a side bar `width` 50
-  wide, volume, mic and the clock have no compact form, so they show as a cut
-  "…" (run on Windows, 2026-11-04). Give the modules with an icon a compact form
-  (the icon alone), and decide whether a side bar's default `width` should be
-  wider.
+- **Labels with no icon form still lose their text.** The volume, battery,
+  network, Bluetooth and power-profile modules show their icon alone where their
+  format has `{icon}` and more. At the default `width` of 50 on Windows, the
+  clock shows a cut "2…", and the mic, whose format has a literal glyph and no
+  `{icon}`, a cut glyph and ellipsis; the volume while muted (`format_muted` has
+  no `{icon}`) is cut too. Whether a side bar's default `width` should be wider
+  is the owner's call; the default is unchanged.
 - **Zones meeting drop modules rather than compacting them.** Compacting saves
   no length on a side bar, so the modules nearest the centre are dropped, unlike
   the horizontal rule above.
-- **A button wider than the bar** (a long workspace name) is not cut.
-- **A panel's top margin is measured from the output's top.** crcbl places a
-  panel that reserves nothing inside the work area, so a taskbar or bar at the
-  top would push it down by its height. Check this when the popups are redone.
-- **Popups, panels and tooltips from a side bar** open beside it in slice 1
-  (`menu_panel::placement`, `Place::top`). They are checked by unit tests only
-  and have not been opened on screen.
-- **No `DrawList` snapshot** of a side bar yet
-  (`apps/lyr/src/modules/snapshots.rs` has the horizontal ones).
+- **A tray menu opens at the tray's top**, the module's box, not beside the item
+  clicked; on a long tray column that is far from the item.
+- **macOS:** a panel lies over the bar there, since AppKit reserves nothing and
+  places panels in the visible frame. CI only builds it.
+- **Wayland arrangement order:** if another client's top bar is arranged after
+  lyr's side bar, the side bar may start at the output's top while a panel's
+  area starts below that bar, putting a panel lower than its module by that
+  bar's height. Not seen; reasoned from the protocol.
+- **The clock's tooltip stays over its open panel**, on every edge (seen on
+  Hyprland and sway); not side-bar specific.
+- **Checked on screen:** Windows, left and right bars (2026-11-04): the clock
+  panel, the power menu and a tooltip open beside the bar, the panel moved up
+  clear of the taskbar; a reload from top to left with the clock panel open
+  closes it, and the next `lyr panel clock` opens it beside the left bar.
+  Hyprland and sway (office-lyr, slice 1): the exclusive zone on every edge, the
+  power menu beside its button on both sides, a reload moving the bar in place.
+  niri is not checked (nested niri stopped answering IPC); macOS is CI-only.
 
 ## Not in this phase
 

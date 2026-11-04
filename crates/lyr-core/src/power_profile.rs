@@ -3,7 +3,7 @@
 
 use lyr_config::{Format, PowerProfile as Config};
 
-use crate::icon::pick;
+use crate::icon::{compact, pick};
 
 /// The active profile, as power-profiles-daemon names it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -18,6 +18,9 @@ pub struct Profile {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct View {
     pub text: String,
+    /// The icon alone, shown where `text` does not fit; `None` when the
+    /// format shows no icon or nothing else ([`crate::icon::compact`]).
+    pub compact: Option<String>,
     pub tooltip: String,
 }
 
@@ -33,8 +36,10 @@ pub fn view(profile: &Profile, config: &Config) -> View {
             _ => None,
         })
     };
+    let text = fill(&config.format);
     View {
-        text: fill(&config.format),
+        compact: compact(&config.format, icon, &text),
+        text,
         tooltip: fill(&config.tooltip_format),
     }
 }
@@ -82,6 +87,19 @@ mod tests {
             .power_profile;
         assert_eq!(view(&profile("performance"), &config).text, "\u{F04C5}");
         assert_eq!(view(&profile("balanced"), &config).text, "\u{F24E}");
+        assert_eq!(
+            view(&profile("balanced"), &config).compact,
+            None,
+            "the icon is all it shows"
+        );
+        let named = lyr_config::PowerProfile {
+            format: lyr_config::Format::parse("{icon} {profile}").expect("valid"),
+            ..config.clone()
+        };
+        assert_eq!(
+            view(&profile("balanced"), &named).compact.as_deref(),
+            Some("\u{F24E}")
+        );
         assert_eq!(view(&profile("power-saver"), &config).text, "\u{F06C}");
         assert_eq!(
             view(&profile("custom"), &config).text,

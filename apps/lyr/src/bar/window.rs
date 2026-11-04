@@ -60,21 +60,14 @@ impl Window {
     /// Where a menu opens under `target` on this bar at `edge`, or `None`
     /// when the last frame did not draw it.
     pub(super) fn place_under(&self, target: &Target<Module>, edge: Position) -> Option<Place> {
-        let rect = self.regions.rect(target)?;
-        let (width, room) = if edge.is_vertical() {
-            // Beside a side bar, the whole height of the output.
-            (self.output_width, self.output_height)
-        } else {
-            (self.width, self.output_height - self.height)
-        };
-        Some(Place {
-            left: f64::from(rect.x),
-            top: f64::from(rect.y),
-            width: f64::from(width),
-            room: f64::from(room),
+        let size = |width, height| Size { width, height };
+        Some(Place::beside(
+            self.regions.rect(target)?,
+            size(self.width, self.height),
+            size(self.output_width, self.output_height),
             edge,
-            monitor: self.output,
-        })
+            self.output,
+        ))
     }
 
     /// Its size across its edge, `edge`: its height, or a side bar's width.

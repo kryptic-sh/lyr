@@ -5,7 +5,7 @@
 
 use lyr_config::{Format, Mic, Volume};
 
-use crate::icon::pick;
+use crate::icon::{compact, pick};
 
 /// The port kinds waybar looks for in a sink's port name and form factor, in
 /// the order it tries them (`ports` in `pulseaudio.cpp`).
@@ -51,6 +51,9 @@ pub struct Source {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct View {
     pub text: String,
+    /// The icon alone, shown where `text` does not fit; `None` when the
+    /// format shows no icon or nothing else ([`crate::icon::compact`]).
+    pub compact: Option<String>,
     pub tooltip: String,
 }
 
@@ -104,8 +107,10 @@ pub fn volume(sink: &Sink, config: &Volume) -> View {
             _ => None,
         })
     };
+    let text = fill(format);
     View {
-        text: fill(format),
+        compact: compact(format, icon, &text),
+        text,
         tooltip: config
             .tooltip_format
             .as_ref()
@@ -129,8 +134,10 @@ pub fn mic(source: &Source, config: &Mic) -> View {
             _ => None,
         })
     };
+    // The mic's formats have no `{icon}`, so it has no compact form.
     View {
         text: fill(format),
+        compact: None,
         tooltip: config
             .tooltip_format
             .as_ref()

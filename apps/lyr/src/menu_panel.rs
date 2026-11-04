@@ -73,23 +73,30 @@ pub enum Event<T> {
 }
 
 /// Where a menu, popup or panel the bar opens sits: `GAP` past the bar's
-/// edge, its left edge on the module that opened it, kept inside the
-/// output. Every one of them opens by this rule, so they line up alike.
+/// edge, starting along the bar where the module that opened it starts, and
+/// moved back along the bar as far as it takes to stay inside the output.
+/// Every one of them opens by this rule, so they line up alike.
+///
+/// It is measured in the area the window system places a panel that
+/// reserves nothing in: the output less every edge something reserves (the
+/// work area on Windows and X11, the layer shell's usable area on Wayland),
+/// which starts where the bar ends across it and runs the bar's length
+/// along it, as the bar is placed in it too. So a margin `GAP` from the
+/// bar's edge is `GAP` past the bar, and a module's offset from the bar's
+/// start is its offset from the area's start. macOS reserves nothing for a
+/// bar, so there a panel lies over it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Place {
-    /// The module's left edge, from its output's left edge, in logical
-    /// pixels: where a panel from a top or bottom bar starts.
-    pub left: f64,
-    /// The module's top edge, from the top of its bar: where a panel beside
-    /// a side bar starts.
-    pub top: f64,
-    /// The output's width.
-    pub width: f64,
-    /// The height beside the bar, from its edge to the output's far edge,
-    /// or the output's whole height beside a side bar.
-    pub room: f64,
     /// The bar's edge of the output, which the menu opens away from.
     pub edge: Position,
+    /// Where the module starts along the bar, from the bar's start (a top
+    /// or bottom bar's left end, a side bar's top), in logical pixels.
+    pub along: f64,
+    /// The bar's length: the room a menu has along it.
+    pub length: f64,
+    /// The room a menu has across the bar: from the bar's far side to the
+    /// output's far edge.
+    pub across: f64,
     /// The output it opens on; `None` leaves that to the compositor, which
     /// puts it on the focused output.
     pub monitor: Option<MonitorId>,
@@ -107,36 +114,64 @@ impl Place {
     /// At the output's left edge, on an output of unknown size: where
     /// `lyr panel` opens a menu no bar shows the module of.
     pub const EDGE: Self = Self {
-        left: EDGE_MARGIN,
-        top: EDGE_MARGIN,
-        width: f64::INFINITY,
-        room: f64::INFINITY,
         edge: Position::Top,
+        along: EDGE_MARGIN,
+        length: f64::INFINITY,
+        across: f64::INFINITY,
         monitor: None,
     };
 
-    /// The left margin of a panel `size` big: `left`, moved left as far as
-    /// it takes to end a margin from the output's right edge, but not past
-    /// its left edge.
-    fn left(self, size: Size) -> f64 {
-        self.left
-            .min(self.width - f64::from(size.width) - EDGE_MARGIN)
+    /// Under `module`, a box on a bar `bar` big at `edge` of an output
+    /// `output` big (all in logical pixels, the box in the bar's own).
+    pub fn beside(
+        module: Rect,
+        bar: Size,
+        output: Size,
+        edge: Position,
+        monitor: Option<MonitorId>,
+    ) -> Self {
+        let (along, length, across) = if edge.is_vertical() {
+            (module.y, bar.height, output.width - bar.width)
+        } else {
+            (module.x, bar.width, output.height - bar.height)
+        };
+        Self {
+            edge,
+            along: f64::from(along),
+            length: f64::from(length),
+            across: f64::from(across),
+            monitor,
+        }
+    }
+
+    /// A panel `size` big's extent along the bar.
+    fn extent_along(self, size: Size) -> f64 {
+        f64::from(if self.edge.is_vertical() {
+            size.height
+        } else {
+            size.width
+        })
+    }
+
+    /// The margin from the bar's start of a panel `size` big: `along`,
+    /// moved back as far as it takes to end a margin short of the bar's
+    /// end, but not past its start.
+    fn start(self, size: Size) -> f64 {
+        self.along
+            .min(self.length - self.extent_along(size) - EDGE_MARGIN)
             .max(0.0)
     }
 
-    /// The top margin of a panel `size` big beside a side bar: `top`, moved
-    /// up as far as it takes to end a margin from the output's bottom edge,
-    /// but not past its top edge.
-    fn top(self, size: Size) -> f64 {
-        self.top
-            .min(self.room - f64::from(size.height) - EDGE_MARGIN)
-            .max(0.0)
-    }
-
-    /// The tallest a panel here can be and still end a margin short of the
-    /// output's far edge.
+    /// The tallest a panel here can be: beside a top or bottom bar, `GAP`
+    /// past it and a margin short of the output's far edge; beside a side
+    /// bar, a margin short of both its ends.
     pub fn max_height(self) -> f32 {
-        (self.room - 2.0 * GAP).max(0.0) as f32
+        let room = if self.edge.is_vertical() {
+            self.length - 2.0 * EDGE_MARGIN
+        } else {
+            self.across - GAP - EDGE_MARGIN
+        };
+        room.max(0.0) as f32
     }
 }
 
@@ -179,45 +214,42 @@ pub const fn placement(edge: Position) -> PopupPlacement {
     }
 }
 
-/// The panel, `size` big at `place`: kept inside the output, so its margin
-/// along the bar moves with its size. Beside a side bar it opens a gap past
-/// the bar, level with the module.
+/// The panel, `size` big at `place`: anchored to the bar's edge and to the
+/// bar's start, `GAP` past the bar, its margin along the bar moving with
+/// its size to keep it inside the output.
 pub fn panel_desc(size: Size, place: Place) -> PanelDesc<'static> {
+    let start = place.start(size);
     let (anchor, margins) = match place.edge {
         Position::Top => (
             PanelAnchor::TOP | PanelAnchor::LEFT,
             Margins {
                 top: GAP,
-                right: 0.0,
-                bottom: 0.0,
-                left: place.left(size),
+                left: start,
+                ..Margins::default()
             },
         ),
         Position::Bottom => (
             PanelAnchor::BOTTOM | PanelAnchor::LEFT,
             Margins {
-                top: 0.0,
-                right: 0.0,
                 bottom: GAP,
-                left: place.left(size),
+                left: start,
+                ..Margins::default()
             },
         ),
         Position::Left => (
             PanelAnchor::LEFT | PanelAnchor::TOP,
             Margins {
-                top: place.top(size),
-                right: 0.0,
-                bottom: 0.0,
                 left: GAP,
+                top: start,
+                ..Margins::default()
             },
         ),
         Position::Right => (
             PanelAnchor::RIGHT | PanelAnchor::TOP,
             Margins {
-                top: place.top(size),
                 right: GAP,
-                bottom: 0.0,
-                left: 0.0,
+                top: start,
+                ..Margins::default()
             },
         ),
     };
@@ -645,29 +677,29 @@ mod tests {
             width: 600.0,
             height: 200.0,
         };
-        let place = |left| Place {
-            left,
-            width: 1920.0,
+        let place = |along| Place {
+            along,
+            length: 1920.0,
             ..Place::EDGE
         };
         assert!(
-            (place(100.0).left(size) - 100.0).abs() < f64::EPSILON,
+            (place(100.0).start(size) - 100.0).abs() < f64::EPSILON,
             "room"
         );
         assert!(
-            (place(1500.0).left(size) - (1920.0 - 600.0 - EDGE_MARGIN)).abs() < f64::EPSILON,
+            (place(1500.0).start(size) - (1920.0 - 600.0 - EDGE_MARGIN)).abs() < f64::EPSILON,
             "moved left to end a margin from the right edge"
         );
         let narrow = Place {
-            left: 100.0,
-            width: 400.0,
+            along: 100.0,
+            length: 400.0,
             ..Place::EDGE
         };
         assert!(
-            narrow.left(size).abs() < f64::EPSILON,
+            narrow.start(size).abs() < f64::EPSILON,
             "wider than the output"
         );
-        assert!((Place::EDGE.left(size) - EDGE_MARGIN).abs() < f64::EPSILON);
+        assert!((Place::EDGE.start(size) - EDGE_MARGIN).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -690,7 +722,7 @@ mod tests {
         assert!((bottom.margins.bottom - GAP).abs() < f64::EPSILON);
         assert!(bottom.margins.top.abs() < f64::EPSILON);
         let room = Place {
-            room: 1000.0,
+            across: 1000.0,
             ..Place::EDGE
         };
         assert!((room.max_height() - (1000.0 - 2.0 * GAP as f32)).abs() < f32::EPSILON);
@@ -702,9 +734,9 @@ mod tests {
             width: 300.0,
             height: 200.0,
         };
-        let place = |edge, top| Place {
-            top,
-            room: 1000.0,
+        let place = |edge, along| Place {
+            along,
+            length: 1000.0,
             edge,
             ..Place::EDGE
         };
@@ -721,6 +753,106 @@ mod tests {
         assert!(
             (right.margins.top - (1000.0 - 200.0 - EDGE_MARGIN)).abs() < f64::EPSILON,
             "moved up to stay on the output"
+        );
+    }
+
+    #[test]
+    fn a_place_runs_along_the_bar_on_every_edge() {
+        // A box 300 px along a bar 1920 x 50 or 50 x 1040: the bar's length
+        // is the work area's, short of a 1920 x 1080 output's.
+        let module = Rect {
+            x: 300.0,
+            y: 300.0,
+            width: 30.0,
+            height: 24.0,
+        };
+        let output = Size {
+            width: 1920.0,
+            height: 1080.0,
+        };
+        let across = Size {
+            width: 1920.0,
+            height: 50.0,
+        };
+        let down = Size {
+            width: 50.0,
+            height: 1040.0,
+        };
+        let place = |bar, edge| Place::beside(module, bar, output, edge, None);
+        for edge in [Position::Top, Position::Bottom] {
+            let at = place(across, edge);
+            assert!((at.along - 300.0).abs() < f64::EPSILON, "{edge:?}");
+            assert!((at.length - 1920.0).abs() < f64::EPSILON, "{edge:?}");
+            assert!((at.across - 1030.0).abs() < f64::EPSILON, "{edge:?}");
+            assert!(
+                (at.max_height() - (1030.0 - 2.0 * GAP as f32)).abs() < f32::EPSILON,
+                "{edge:?}: a gap past the bar and a margin short of the far edge"
+            );
+        }
+        for edge in [Position::Left, Position::Right] {
+            let at = place(down, edge);
+            assert!((at.along - 300.0).abs() < f64::EPSILON, "{edge:?}");
+            assert!(
+                (at.length - 1040.0).abs() < f64::EPSILON,
+                "{edge:?}: the bar's length, not the output's height"
+            );
+            assert!((at.across - 1870.0).abs() < f64::EPSILON, "{edge:?}");
+            assert!(
+                (at.max_height() - (1040.0 - 2.0 * EDGE_MARGIN as f32)).abs() < f32::EPSILON,
+                "{edge:?}: a margin short of both ends"
+            );
+        }
+    }
+
+    #[test]
+    fn a_panel_is_anchored_to_the_bar_s_edge_and_start_on_every_edge() {
+        let size = Size {
+            width: 300.0,
+            height: 200.0,
+        };
+        let place = |edge| Place {
+            edge,
+            along: 120.0,
+            length: 1000.0,
+            across: 1000.0,
+            monitor: None,
+        };
+        let close = |a: f64, b: f64| (a - b).abs() < f64::EPSILON;
+        let top = panel_desc(size, place(Position::Top));
+        assert_eq!(top.anchor, PanelAnchor::TOP | PanelAnchor::LEFT);
+        assert!(close(top.margins.top, GAP) && close(top.margins.left, 120.0));
+        assert!(close(top.margins.right, 0.0) && close(top.margins.bottom, 0.0));
+        let bottom = panel_desc(size, place(Position::Bottom));
+        assert_eq!(bottom.anchor, PanelAnchor::BOTTOM | PanelAnchor::LEFT);
+        assert!(close(bottom.margins.bottom, GAP) && close(bottom.margins.left, 120.0));
+        assert!(close(bottom.margins.top, 0.0) && close(bottom.margins.right, 0.0));
+        let left = panel_desc(size, place(Position::Left));
+        assert_eq!(left.anchor, PanelAnchor::LEFT | PanelAnchor::TOP);
+        assert!(close(left.margins.left, GAP) && close(left.margins.top, 120.0));
+        assert!(close(left.margins.right, 0.0) && close(left.margins.bottom, 0.0));
+        let right = panel_desc(size, place(Position::Right));
+        assert_eq!(right.anchor, PanelAnchor::RIGHT | PanelAnchor::TOP);
+        assert!(close(right.margins.right, GAP) && close(right.margins.top, 120.0));
+        assert!(close(right.margins.left, 0.0) && close(right.margins.bottom, 0.0));
+
+        // Along a side bar it is held by its height, not its width: 900
+        // down a 1000 px bar, a 200 px tall panel moves up to end a margin
+        // short of its end.
+        let low = Place {
+            along: 900.0,
+            ..place(Position::Left)
+        };
+        assert!(close(
+            panel_desc(size, low).margins.top,
+            1000.0 - 200.0 - EDGE_MARGIN
+        ));
+        let high = Place {
+            along: 700.0,
+            ..place(Position::Right)
+        };
+        assert!(
+            close(panel_desc(size, high).margins.top, 700.0),
+            "a 300 px wide panel fits 700 px down"
         );
     }
 
@@ -767,7 +899,7 @@ mod tests {
             regions.push(rect, usize::from(row));
         }
         let place = Place {
-            room: 200.0 + 2.0 * GAP,
+            across: 200.0 + 2.0 * GAP,
             ..Place::EDGE
         };
         let mut shell = HeadlessShell::new();
@@ -881,7 +1013,7 @@ mod tests {
     #[test]
     fn a_menu_that_fits_draws_as_it_is() {
         let (mut panel, _shell) = tall();
-        panel.place.room = 1000.0;
+        panel.place.across = 1000.0;
         panel.size = held(panel.content, panel.place);
         assert_eq!(panel.visible(), panel.list);
     }

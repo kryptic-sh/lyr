@@ -1,7 +1,7 @@
 //! Choosing an icon: from a ramp by a percentage, or from named icons by
 //! state.
 
-use lyr_config::{Icon, NamedIcons};
+use lyr_config::{Format, Icon, NamedIcons};
 
 /// The icon for the first of `names` that `icons` has, else its `default`,
 /// else none. A ramp is indexed by `value` out of 100. This is waybar's
@@ -17,6 +17,15 @@ pub fn pick<'a>(icons: &'a NamedIcons, names: &[&str], value: u32) -> &'a str {
         Some(Icon::Ramp(icons)) => ramp(icons, value, 100).map_or("", String::as_str),
         None => "",
     }
+}
+
+/// The compact form of a label `format` rendered as `text`, with `icon` in
+/// its `{icon}`: the icon alone, for a bar too narrow for the text. `None`
+/// when the format shows no icon, or shows nothing but it.
+#[must_use]
+pub fn compact(format: &Format, icon: &str, text: &str) -> Option<String> {
+    (format.placeholders().any(|name| name == "icon") && !icon.is_empty() && icon != text)
+        .then(|| icon.to_owned())
 }
 
 /// The icon for `value` out of `max` from `icons`, ordered low to high.
@@ -39,9 +48,9 @@ pub fn ramp<T>(icons: &[T], value: u32, max: u32) -> Option<&T> {
 
 #[cfg(test)]
 mod tests {
-    use lyr_config::{Icon, NamedIcons};
+    use lyr_config::{Format, Icon, NamedIcons};
 
-    use super::{pick, ramp};
+    use super::{compact, pick, ramp};
 
     fn icons(entries: &[(&str, Icon)]) -> NamedIcons {
         entries
@@ -70,6 +79,20 @@ mod tests {
         assert_eq!(pick(&icons, &["speaker"], 10), "l");
         assert_eq!(pick(&icons, &["speaker"], 90), "h");
         assert_eq!(pick(&icons, &["headphone"], 90), "p");
+    }
+
+    #[test]
+    fn a_compact_form_is_the_icon_alone_where_the_label_shows_more() {
+        let format = |source| Format::parse(source).expect("valid");
+        let volume = format("{icon} {volume}%");
+        assert_eq!(compact(&volume, "v", "v 40%").as_deref(), Some("v"));
+        assert_eq!(compact(&format("{icon}"), "v", "v"), None, "the icon only");
+        assert_eq!(
+            compact(&format("m {volume}%"), "v", "m 40%"),
+            None,
+            "no `{{icon}}` in the format"
+        );
+        assert_eq!(compact(&volume, "", " 40%"), None, "no icon picked");
     }
 
     const BATTERY: [char; 5] = ['0', '1', '2', '3', '4'];

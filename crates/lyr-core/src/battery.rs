@@ -6,7 +6,7 @@
 
 use lyr_config::{Battery as Config, Format};
 
-use crate::icon::ramp;
+use crate::icon::{compact, ramp};
 
 /// What the battery is doing, as the source resolved it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,6 +68,9 @@ pub enum Level {
 #[derive(Clone, Debug, PartialEq)]
 pub struct View {
     pub text: String,
+    /// The icon alone, shown where `text` does not fit; `None` when the
+    /// format shows no icon or nothing else ([`crate::icon::compact`]).
+    pub compact: Option<String>,
     pub tooltip: String,
     pub level: Option<Level>,
 }
@@ -120,8 +123,10 @@ pub fn view(reading: &Reading, config: &Config) -> View {
             _ => None,
         })
     };
+    let text = fill(format);
     View {
-        text: fill(format),
+        compact: compact(format, icon, &text),
+        text,
         tooltip: fill(&config.tooltip_format),
         level,
     }

@@ -12,7 +12,8 @@
 //!
 //! Text stays horizontal and is centred in its box. A label too wide for
 //! its box shows its compact form, and is cut with an ellipsis when even
-//! that does not fit. Giving a module its compact form saves no length, so
+//! that does not fit; a button's name too wide for the box is cut the same
+//! way. Giving a module its compact form saves no length, so
 //! where zones meet, the modules nearest the centre are dropped.
 
 use lyr_config::Theme;
@@ -120,16 +121,23 @@ pub(super) fn build<T: Clone>(
                 } => {
                     let mut y = rect.y + border;
                     for (i, button) in buttons.iter().enumerate() {
-                        let face = button.face_width(&measure);
+                        // A name wider than the box is cut as a label is;
+                        // the padding around it gives way first.
+                        let text = cut(&button.text, room, &measure);
+                        let face = button
+                            .picture
+                            .as_ref()
+                            .map_or_else(|| measure(&text), |picture| picture.width);
                         let height = row_height(button, line_height);
+                        let width = (face + 2.0 * padding).min(rect.width);
                         // One button a row, centred across the bar.
                         let button_rect = Rect {
-                            x: rect.x + (rect.width - face) / 2.0 - padding,
+                            x: rect.x + (rect.width - width) / 2.0,
                             y,
-                            width: face + 2.0 * padding,
+                            width,
                             height,
                         };
-                        let face_x = button_rect.x + padding;
+                        let face_x = rect.x + (rect.width - face) / 2.0;
                         items.push(match &button.picture {
                             Some(picture) => Item::Image {
                                 rect: Rect {
@@ -146,7 +154,7 @@ pub(super) fn build<T: Clone>(
                                     width: face,
                                     ..button_rect
                                 },
-                                text: button.text.clone(),
+                                text,
                                 colour: button.colour,
                                 style: TextStyle::PLAIN,
                             },

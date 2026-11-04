@@ -273,6 +273,12 @@ fn content(
         compact: None,
         colour,
     };
+    // A label that falls back to its icon alone where its text does not fit.
+    let with_icon = |text: String, compact: Option<String>, colour| Content::Label {
+        text,
+        compact,
+        colour,
+    };
     match module {
         Module::Power => Some(label(
             config.power.format.render(|_| None),
@@ -289,20 +295,20 @@ fn content(
                 Some(Level::Warning) => theme.battery_warning,
                 None => theme.foreground,
             };
-            Some(label(shown.text, colour))
+            Some(with_icon(shown.text, shown.compact, colour))
         }
         Module::PowerProfile => {
             let profiles = data.power_profile.as_ref()?;
             let shown = lyr_core::power_profile::view(&profiles.active, &config.power_profile);
-            Some(label(shown.text, theme.foreground))
+            Some(with_icon(shown.text, shown.compact, theme.foreground))
         }
         Module::Network => {
             let shown = data.network.as_ref()?.view(&config.network);
-            Some(label(shown.text, theme.foreground))
+            Some(with_icon(shown.text, shown.compact, theme.foreground))
         }
         Module::Bluetooth => {
             let shown = lyr_core::bluetooth::view(data.bluetooth.as_ref()?, &config.bluetooth);
-            Some(label(shown.text, theme.foreground))
+            Some(with_icon(shown.text, shown.compact, theme.foreground))
         }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         Module::Window => {
@@ -318,7 +324,7 @@ fn content(
         }
         Module::Volume => {
             let shown = lyr_core::audio::volume(data.sink.as_ref()?, &config.volume);
-            Some(label(shown.text, theme.volume))
+            Some(with_icon(shown.text, shown.compact, theme.volume))
         }
         Module::Mic => {
             let shown = lyr_core::audio::mic(data.source.as_ref()?, &config.mic);
@@ -536,6 +542,29 @@ mod tests {
         assert_eq!(
             tooltip(&Target::Module(Module::Power), &config, &data, None, &now).as_deref(),
             Some("Power Button")
+        );
+    }
+
+    #[test]
+    fn the_volume_falls_back_to_its_icon_alone() {
+        let config = from_sources(None, Platform::current()).expect("the defaults");
+        let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+        let data = Data {
+            sink: Some(lyr_core::audio::Sink {
+                volume: 40,
+                ..lyr_core::audio::Sink::default()
+            }),
+            ..Data::default()
+        };
+        // The default ramp's middle step, as `{icon} {volume}%` shows it.
+        let icon = char::from_u32(0xF027).expect("a char").to_string();
+        assert_eq!(
+            content(Module::Volume, &config, &data, &now, None, None),
+            Some(Content::Label {
+                text: format!("{icon} 40%"),
+                compact: Some(icon),
+                colour: config.theme.volume,
+            })
         );
     }
 

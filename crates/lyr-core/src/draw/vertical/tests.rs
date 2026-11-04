@@ -196,6 +196,47 @@ fn buttons_stack_one_a_row_centred_across_the_bar() {
 }
 
 #[test]
+fn a_button_wider_than_the_bar_is_cut_as_a_label_is() {
+    let left = [Entry::Module(Module {
+        content: Content::Buttons {
+            buttons: vec![Button {
+                text: "mail".to_owned(),
+                colour: theme().foreground,
+                picture: None,
+            }],
+            padding: 8.0,
+            gap: 4.0,
+        },
+        target: "workspaces",
+    })];
+    let (list, regions) = build(&bar(1000.0, &left, &[], &[]), &theme(), measure);
+    // 26 px inside the box's border: a letter and the ellipsis, centred,
+    // its padding cut to the box.
+    assert_eq!(
+        texts(&list),
+        [(
+            "m\u{2026}".to_owned(),
+            Rect {
+                x: 15.0,
+                y: 12.0,
+                width: 20.0,
+                height: 20.0
+            }
+        )]
+    );
+    assert_eq!(
+        regions.rect(&Target::Button("workspaces", 0)),
+        Some(Rect {
+            x: 10.0,
+            y: 12.0,
+            width: 30.0,
+            height: 20.0
+        }),
+        "no wider than its box"
+    );
+}
+
+#[test]
 fn a_separator_lies_across_the_bar_and_a_spacer_is_a_vertical_gap() {
     let left = [
         Entry::Spacer(50.0),

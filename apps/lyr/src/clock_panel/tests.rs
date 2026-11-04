@@ -247,7 +247,7 @@ fn closing_destroys_its_window() {
 impl Setup {
     /// Lays the panel out with `height` to fill at most.
     fn lay_out(&mut self, height: f32) {
-        self.panel.place.room = f64::from(height) + 2.0 * GAP;
+        self.panel.place.across = f64::from(height) + 2.0 * GAP;
         let look = Look {
             theme: &self.theme,
             measure: &measure,

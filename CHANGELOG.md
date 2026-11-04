@@ -13,6 +13,8 @@ and this project adheres to
 - For users of the library crates: `lyr_config::Position` gains `Left` and
   `Right`, `lyr_config::Bar` the `width` field, and `lyr_core::draw::Bar` the
   `orientation` field, so an exhaustive match on `Position` needs the new arms.
+  The `View` of `lyr_core::audio`, `battery`, `bluetooth`, `network` and
+  `power_profile` gains the `compact` field.
 
 ### Added
 
@@ -23,10 +25,17 @@ and this project adheres to
   value. Zones run top to bottom with the centre centred; each module is one
   line tall, its text level and centred, showing its compact form when the label
   is too wide and cut with an ellipsis when even that is; the workspaces and
-  tray stack one button a row; a separator lies across the bar. A reload moves
-  the bars between any two edges in place. `lyr import-waybar` carries a side
-  bar's `position` and its `width`, and lists its `height` (in waybar, the bar's
-  length) as not carried, as it does a top or bottom bar's `width`.
+  tray stack one button a row, a name too wide cut the same way; a separator
+  lies across the bar. The volume, battery, network, Bluetooth and power-profile
+  modules have a compact form, their icon alone, wherever their format shows
+  `{icon}` beside more. Menus open beside a side bar, away from its edge: the
+  clock panel and the Wi-Fi, Bluetooth and audio menus a gap past the bar, level
+  with their module and moved up to stay on the output, and the power menu, tray
+  menus and tooltips to its right or left. A reload moves the bars between any
+  two edges in place, closing any menu, panel or tooltip open beside them.
+  `lyr import-waybar` carries a side bar's `position` and its `width`, and lists
+  its `height` (in waybar, the bar's length) as not carried, as it does a top or
+  bottom bar's `width`.
 
 ## [0.6.0] - 2026-11-04
 

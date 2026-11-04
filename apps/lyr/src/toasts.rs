@@ -77,6 +77,8 @@ const fn panel_desc() -> PanelDesc<'static> {
         monitor: None,
         layer: PanelLayer::Overlay,
         anchor: PanelAnchor::TOP.union(PanelAnchor::RIGHT),
+        // Placed clear of every reserved edge, so a bar on the top or the
+        // right, which reserves its edge, keeps it clear.
         reserve: Reserve::None,
         margins: Margins {
             top: EDGE_MARGIN,

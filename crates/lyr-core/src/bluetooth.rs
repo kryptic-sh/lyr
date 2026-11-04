@@ -6,7 +6,7 @@
 
 use lyr_config::{Bluetooth as Config, Format};
 
-use crate::icon::pick;
+use crate::icon::{compact, pick};
 
 /// The controller's state.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -53,6 +53,9 @@ pub struct Reading {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct View {
     pub text: String,
+    /// The icon alone, shown where `text` does not fit; `None` when the
+    /// format shows no icon or nothing else ([`crate::icon::compact`]).
+    pub compact: Option<String>,
     pub tooltip: String,
 }
 
@@ -101,8 +104,10 @@ pub fn view(reading: &Reading, config: &Config) -> View {
             _ => None,
         })
     };
+    let text = fill(format, label_icon);
     View {
-        text: fill(format, label_icon),
+        compact: compact(format, label_icon, &text),
+        text,
         tooltip: fill(&config.tooltip_format, icon),
     }
 }
@@ -144,6 +149,7 @@ mod tests {
     fn a_connected_device_with_a_battery_is_named_with_its_level() {
         let shown = view(&reading(State::Connected, Some(70)), &defaults());
         assert_eq!(shown.text, "\u{F00AF} Buds 70%");
+        assert_eq!(shown.compact.as_deref(), Some("\u{F00AF}"));
     }
 
     #[test]
