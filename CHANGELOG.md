@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-05
+
 ### Breaking
 
 - For users of the library crates: `lyr_config::Position` gains `Left` and
@@ -535,7 +537,8 @@ and this project adheres to
   tables. An invalid config is an error naming the key, such as
   ``theme.border: `teal` is not a colour``.
 
-[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/kryptic-sh/lyr/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/kryptic-sh/lyr/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/kryptic-sh/lyr/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/kryptic-sh/lyr/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/kryptic-sh/lyr/compare/v0.4.0...v0.5.0
