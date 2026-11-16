@@ -752,12 +752,12 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hjkl-config"
-version = "0.45.0"
+version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4eaf3c0710c7efb8ee6b253d464667335a505b4a15e41b03b337fdf5a72af413"
+checksum = "5515840c9c7a020ce036e5d0e448fcfe1007a744ab3bd6227d4d9fe6a67efc3b"
 dependencies = [
  "hjkl-fs",
- "hjkl-xdg",
+ "hjkl-xdg 0.46.0",
  "serde",
  "thiserror",
  "toml",
@@ -766,11 +766,11 @@ dependencies = [
 
 [[package]]
 name = "hjkl-fs"
-version = "0.45.0"
+version = "0.46.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f0de8534fcd4584bef815041bd64aa7e1bf6726556b48875bca00b78a567419"
+checksum = "9ad9fa47ab2e3a10df37203f604d207f40e1956e396fb2bfac132cdcc2dfad1e"
 dependencies = [
- "hjkl-xdg",
+ "hjkl-xdg 0.46.0",
  "ignore",
  "libc",
  "windows-sys",
@@ -781,6 +781,16 @@ name = "hjkl-xdg"
 version = "0.45.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90c395b26320530eb600ab42e4f44f3cfff405761ae7c164fc63af76a3afb709"
+dependencies = [
+ "dirs",
+ "thiserror",
+]
+
+[[package]]
+name = "hjkl-xdg"
+version = "0.46.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b3fef01410e48889fa37ec735d82f4366f32d5f424d1c4cc5c9ee238f6e39e6a"
 dependencies = [
  "dirs",
  "thiserror",
@@ -923,7 +933,7 @@ dependencies = [
  "chrono",
  "clap",
  "crcbl-shell",
- "hjkl-xdg",
+ "hjkl-xdg 0.45.0",
  "interprocess",
  "lyr-config",
  "lyr-core",
