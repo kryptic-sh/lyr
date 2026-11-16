@@ -330,6 +330,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "crcbl-font"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3a4c2c671a112c14436f5866b886d01e83515900caf88895df57deaff2bc4fe7"
+dependencies = [
+ "memmap2",
+ "skrifa",
+]
+
+[[package]]
 name = "crcbl-frame"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -360,7 +370,7 @@ version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20f3be14570ace13f7b682802ec70caff3583c78571f61d4157e45ee566d89a4"
 dependencies = [
- "crcbl-font",
+ "crcbl-font 0.17.2",
  "harfrust",
  "png",
  "skrifa",
@@ -452,7 +462,7 @@ checksum = "d4f254407c526b29e59c6ebffe90fd3be4b7ebda5a45472492fcae3f292d6093"
 dependencies = [
  "bytemuck",
  "crcbl-core",
- "crcbl-font",
+ "crcbl-font 0.17.2",
  "crcbl-image",
  "crcbl-reflect",
  "cssparser",
@@ -965,7 +975,7 @@ name = "lyr-render"
 version = "0.7.0"
 dependencies = [
  "crcbl-app",
- "crcbl-font",
+ "crcbl-font 0.20.0",
  "crcbl-frame",
  "crcbl-hal",
  "crcbl-image",
@@ -1038,6 +1048,15 @@ name = "memchr"
 version = "2.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
+
+[[package]]
+name = "memmap2"
+version = "0.9.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b0ca1155a9ecc25aa12e8313a119f32edf0255fea2f44839c4ac0a12b2ac157"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "memoffset"
