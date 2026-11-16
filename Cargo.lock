@@ -370,9 +370,9 @@ dependencies = [
 
 [[package]]
 name = "crcbl-mixer"
-version = "0.17.2"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f377fd37068253867a760154b39e13bab6f459844abe7caa8850d5ab1389b1da"
+checksum = "c2c73e8b55183e7a6371bd8a444421b09aca878c8c3cc2f066e7f77dd3449e4b"
 dependencies = [
  "windows",
  "windows-core 0.62.2",
