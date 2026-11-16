@@ -11,7 +11,7 @@ authors.workspace = true
 readme.workspace = true
 
 [dependencies]
-crcbl-app = "=0.17.2"
+crcbl-app = "=0.20.0"
 crcbl-font = "=0.17.2"
 crcbl-frame = "=0.17.2"
 crcbl-hal = "=0.17.2"
