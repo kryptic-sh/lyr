@@ -8,6 +8,13 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Changed
+
+- Built on crcbl 0.20.0 (from 0.17.2). The bar's system fonts are now
+  memory-mapped instead of copied onto the heap wherever crcbl allows it. For
+  users of the library crates: `lyr_shell::bars::Bars` takes a
+  `crcbl_shell::Shell`, so callers move to crcbl-shell 0.20 with it.
+
 ## [0.7.0] - 2026-11-05
 
 ### Breaking

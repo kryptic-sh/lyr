@@ -21,6 +21,7 @@ fn monitor(id: u32, name: &str) -> MonitorInfo {
     MonitorInfo {
         id: MonitorId(id),
         name: name.to_owned(),
+        connector: None,
         bounds: PhysicalRect::new(x, 0, 1920, 1080),
         work_area: PhysicalRect::new(x, 0, 1920, 1080),
         scale_factor: 1.0,
