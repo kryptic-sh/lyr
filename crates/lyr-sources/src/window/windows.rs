@@ -44,8 +44,7 @@ pub fn read() -> Option<Active> {
         GetWindowThreadProcessId(window, &raw mut pid);
         Some(Active {
             class: program::windows::path(pid)
-                .map(|path| program::name(&path).to_owned())
-                .unwrap_or_default(),
+                .map_or_default(|path| program::name(&path).to_owned()),
             title: String::from_utf16_lossy(&title[..usize::try_from(length).unwrap_or(0)]),
         })
     }

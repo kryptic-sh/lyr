@@ -239,16 +239,12 @@ pub fn draw(
     let (list, regions) = draw::build(&bar, &config.theme, |s| text.measure(s));
     // The same order the workspace buttons were made in.
     #[cfg(any(target_os = "linux", target_os = "macos"))]
-    let workspaces = data
-        .workspaces
-        .as_ref()
-        .map(|state| {
-            shown_workspaces(state, config, monitor)
-                .iter()
-                .map(|workspace| workspace.id)
-                .collect()
-        })
-        .unwrap_or_default();
+    let workspaces = data.workspaces.as_ref().map_or_default(|state| {
+        shown_workspaces(state, config, monitor)
+            .iter()
+            .map(|workspace| workspace.id)
+            .collect()
+    });
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     let workspaces = Vec::new();
     Drawn {

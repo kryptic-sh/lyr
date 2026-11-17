@@ -226,8 +226,7 @@ impl NetworkManager {
                     .unwrap_or_default();
                 link.cidr = field("prefix")
                     .and_then(|value| u32::try_from(value).ok())
-                    .map(|prefix| prefix.to_string())
-                    .unwrap_or_default();
+                    .map_or_default(|prefix| prefix.to_string());
             }
             link.gwaddr = config_proxy.gateway().await?;
             paths.push(config);

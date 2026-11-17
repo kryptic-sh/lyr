@@ -61,7 +61,7 @@ pub fn reading(state: &MixerState) -> Reading {
         volume: sink.volume,
         muted: sink.muted,
         name: sink.name.clone(),
-        source_name: source.map(|source| source.name.clone()).unwrap_or_default(),
+        source_name: source.map_or_default(|source| source.name.clone()),
         port: format!(
             "{}{}",
             sink.active_port.as_deref().unwrap_or("Unknown"),

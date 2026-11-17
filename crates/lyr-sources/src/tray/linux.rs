@@ -333,9 +333,7 @@ fn entry((id, properties, children): &Layout) -> Entry {
     };
     let defaults = Entry::new(*id);
     Entry {
-        label: text("label")
-            .map(|raw| menu::label(&raw))
-            .unwrap_or_default(),
+        label: text("label").map_or_default(|raw| menu::label(&raw)),
         enabled: flag("enabled").unwrap_or(defaults.enabled),
         visible: flag("visible").unwrap_or(defaults.visible),
         separator: text("type").as_deref() == Some("separator"),
@@ -388,8 +386,7 @@ fn item(bus_name: &str, path: &str, properties: &HashMap<String, OwnedVariant>) 
     let tooltip = properties
         .get("ToolTip")
         .and_then(|value| ToolTip::try_from(value.clone()).ok())
-        .map(|(_, _, title, _)| title)
-        .unwrap_or_default();
+        .map_or_default(|(_, _, title, _)| title);
     Item {
         bus_name: bus_name.to_owned(),
         path: path.to_owned(),

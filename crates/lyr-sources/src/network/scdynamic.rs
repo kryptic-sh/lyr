@@ -55,14 +55,10 @@ pub fn prefix(mask: &str) -> Option<u32> {
 #[must_use]
 pub fn link(primary: &Primary, wifi: Option<&Wifi>) -> Link {
     let wifi = wifi.filter(|wifi| wifi.interface == primary.interface);
-    let (ipaddr, cidr) = primary
-        .address
-        .as_ref()
-        .map(|(address, mask)| {
-            let cidr = prefix(mask).map(|length| length.to_string());
-            (address.clone(), cidr.unwrap_or_default())
-        })
-        .unwrap_or_default();
+    let (ipaddr, cidr) = primary.address.as_ref().map_or_default(|(address, mask)| {
+        let cidr = prefix(mask).map(|length| length.to_string());
+        (address.clone(), cidr.unwrap_or_default())
+    });
     Link {
         ifname: primary.interface.clone(),
         ipaddr,

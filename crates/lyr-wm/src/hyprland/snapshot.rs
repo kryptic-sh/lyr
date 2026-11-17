@@ -75,8 +75,7 @@ pub(super) fn parse(workspaces: &str, active: &str, clients: &str) -> serde_json
         let class = clients
             .iter()
             .find(|client| client.address == active.lastwindow)
-            .map(|client| client.class.clone())
-            .unwrap_or_default();
+            .map_or_default(|client| client.class.clone());
         (class, active.lastwindowtitle.clone())
     });
     Ok(Tracker::seeded(

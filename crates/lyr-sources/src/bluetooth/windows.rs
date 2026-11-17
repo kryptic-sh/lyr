@@ -81,7 +81,7 @@ pub fn snapshot(tracker: &mut Tracker, scan: Option<&Scan>) -> (Snapshot, Vec<En
         endpoints.extend(paired(
             &BluetoothLEDevice::GetDeviceSelectorFromPairingState(true),
         ));
-        endpoints.extend(scan.map(Scan::found).unwrap_or_default());
+        endpoints.extend(scan.map_or_default(Scan::found));
     }
     let devices = devices(&endpoints);
     (

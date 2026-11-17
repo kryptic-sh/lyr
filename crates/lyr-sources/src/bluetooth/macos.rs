@@ -75,12 +75,10 @@ fn device(device: &IOBluetoothDevice) -> Device {
         Device {
             path: device
                 .addressString()
-                .map(|address| address.to_string())
-                .unwrap_or_default(),
+                .map_or_default(|address| address.to_string()),
             alias: device
                 .nameOrAddress()
-                .map(|name| name.to_string())
-                .unwrap_or_default(),
+                .map_or_default(|name| name.to_string()),
             connected: device.isConnected(),
             paired: true,
             trusted: false,

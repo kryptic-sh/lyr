@@ -58,8 +58,7 @@ pub fn link(adapter: &Adapter, wifi: Option<&Wifi>) -> Option<Link> {
     }
     let (ipaddr, cidr) = adapter
         .address
-        .map(|(address, prefix)| (address.to_string(), prefix.to_string()))
-        .unwrap_or_default();
+        .map_or_default(|(address, prefix)| (address.to_string(), prefix.to_string()));
     let wifi = wifi.filter(|_| adapter.wifi);
     Some(Link {
         ifname: adapter.name.clone(),
@@ -67,11 +66,8 @@ pub fn link(adapter: &Adapter, wifi: Option<&Wifi>) -> Option<Link> {
         cidr,
         gwaddr: adapter
             .gateway
-            .map(|gateway| gateway.to_string())
-            .unwrap_or_default(),
-        essid: wifi
-            .map(|wifi| String::from_utf8_lossy(&wifi.ssid).into_owned())
-            .unwrap_or_default(),
+            .map_or_default(|gateway| gateway.to_string()),
+        essid: wifi.map_or_default(|wifi| String::from_utf8_lossy(&wifi.ssid).into_owned()),
         signal_strength: wifi.map_or(0, |wifi| wifi.quality.min(100) as u8),
         wireless: false,
     })
