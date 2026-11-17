@@ -14,6 +14,9 @@ and this project adheres to
   memory-mapped instead of copied onto the heap wherever crcbl allows it. For
   users of the library crates: `lyr_shell::bars::Bars` takes a
   `crcbl_shell::Shell`, so callers move to crcbl-shell 0.20 with it.
+- Built on hjkl 0.46.0 (from 0.45.0) for `hjkl-config` and `hjkl-xdg`. hjkl's
+  changes are in its terminal layer, so the config and path crates behave as
+  before.
 
 ## [0.7.0] - 2026-11-05
 
