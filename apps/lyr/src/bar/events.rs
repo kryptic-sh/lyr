@@ -23,7 +23,7 @@ use crate::input::{self, Pointer};
 use crate::list_popup::Outcome;
 use crate::power_menu::PowerMenu;
 use crate::toasts::Clicked;
-use crate::tooltips::{Look, Tooltips};
+use crate::tooltips::{self, Look, Tooltips};
 
 impl App {
     /// Applies `event`, which arrived at `instant`.
@@ -196,9 +196,10 @@ impl App {
                 if window.hovered() != window.hovered {
                     window.dirty = true;
                 }
+                let hovered = window.pointer.target(&window.regions);
                 window
                     .tooltips
-                    .hover(window.pointer.target(&window.regions), instant);
+                    .hover(hovered.filter(|target| tooltips::on_bar(target)), instant);
                 if !presses.is_empty() {
                     window.tooltips.press(instant);
                 }

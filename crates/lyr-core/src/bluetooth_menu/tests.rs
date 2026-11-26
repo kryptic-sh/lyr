@@ -459,3 +459,14 @@ fn a_failure_shows_in_red_until_ok() {
         .collect();
     assert_eq!(answers, [Target::Answer(true)], "OK alone");
 }
+
+#[test]
+fn an_icon_button_s_tooltip_is_its_word() {
+    assert_eq!(
+        Target::Device(0, DeviceAction::Disconnect).tooltip(),
+        Some("Disconnect")
+    );
+    assert_eq!(Target::Forget(2).tooltip(), Some("Forget"));
+    assert_eq!(Target::Scan.tooltip(), None, "labelled already");
+    assert_eq!(Target::Answer(true).tooltip(), None, "labelled already");
+}

@@ -256,8 +256,10 @@ It replaces bluetui in a floating terminal, over BlueZ's D-Bus API
   take no clicks, as the Wi-Fi menu's rows wait while it joins. A device's
   buttons are icons in squares a row tall, so the spinner changes no width; a
   word such as "Disconnecting…" widened the whole menu (the owner's call,
-  2026-11-26). Other devices stay usable; BlueZ's requests run one after
-  another, so theirs wait behind it.
+  2026-11-26). Each icon button names itself in a tooltip over the menu, the
+  bar's tooltip code and timing (`tooltips::Tooltips`, over any target), opened
+  through `MenuPanel::with_tooltips`. Other devices stay usable; BlueZ's
+  requests run one after another, so theirs wait behind it.
 - **A failure shows in red** at the top of the menu until OK, with BlueZ's own
   reason, behind the pairing agent's question and a rename; with the menu closed
   it is a notification, as a failed Wi-Fi join is.

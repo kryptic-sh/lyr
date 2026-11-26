@@ -88,7 +88,8 @@ impl BluetoothMenu {
         };
         let drawn = bluetooth_menu::draw(&shown, None, look.measure, look.line_height, look.theme);
         let menu = Self {
-            panel: MenuPanel::open(shell, place, look.line_height, drawn)?,
+            panel: MenuPanel::open(shell, place, look.line_height, drawn)?
+                .with_tooltips(Target::tooltip),
             paths: paths(devices),
             renaming: None,
             showing: ask.map(|ask| Showing::Ask(ask.device.to_owned(), ask.question)),
@@ -299,9 +300,19 @@ impl BluetoothMenu {
         }
     }
 
-    /// Draws the menu if it has a frame to present.
-    pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
-        self.panel.draw(shell, text)
+    /// Draws the menu, and its tooltip, if they have frames to present.
+    pub fn draw(
+        &mut self,
+        shell: &mut dyn Shell,
+        text: &Text,
+        look: &Look<'_>,
+    ) -> anyhow::Result<()> {
+        self.panel.draw(shell, text, look)
+    }
+
+    /// When its tooltip next has something to do.
+    pub fn next_wake(&self) -> Option<std::time::Instant> {
+        self.panel.next_wake()
     }
 
     /// Closes the menu: its surface, then its window unless the window

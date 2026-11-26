@@ -234,6 +234,25 @@ pub enum Target {
     Settings,
 }
 
+impl Target {
+    /// The word a device's icon button stands for, shown as its tooltip;
+    /// the switches and the header's buttons are labelled already.
+    #[must_use]
+    pub const fn tooltip(&self) -> Option<&'static str> {
+        Some(match self {
+            Self::Device(_, DeviceAction::Connect) => "Connect",
+            Self::Device(_, DeviceAction::Disconnect) => "Disconnect",
+            Self::Device(_, DeviceAction::Pair) => "Pair",
+            Self::Device(_, DeviceAction::Trust) => "Trust",
+            Self::Device(_, DeviceAction::Untrust) => "Untrust",
+            Self::Rename(_) => "Rename",
+            Self::Forget(_) => "Forget",
+            Self::Settings => "Settings",
+            Self::Answer(_) | Self::Switch(_) | Self::Scan => return None,
+        })
+    }
+}
+
 /// The devices in the order the menu lists them: paired first, then those a
 /// scan found, each part by name.
 #[must_use]

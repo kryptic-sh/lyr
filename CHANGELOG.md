@@ -24,6 +24,11 @@ and this project adheres to
   logged. For users of the library crates: `lyr_core::bluetooth_menu::draw`
   takes a `Shown` in place of the adapter, devices and header, `Header` gains
   `Failed`, and `lyr_core::menu` gains `icon_button`.
+- Each of the Bluetooth menu's icon buttons names itself in a tooltip
+  ("Connect", "Forget", …) when the pointer rests on it, timed as the bar's
+  tooltips are: 500 ms, quicker when moving from one to the next, hidden by a
+  click. For users of the library crates: `lyr_core::bluetooth_menu::Target`
+  gains `tooltip`.
 
 ### Changed
 

@@ -257,7 +257,8 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
 impl App {
     /// How long the loop may sleep. A bar or tooltip still to draw (a frame
     /// the swapchain swallowed) goes round again at once; otherwise the loop
-    /// sleeps until the clock's next tick or a tooltip's delay is up.
+    /// sleeps until the clock's next tick or a tooltip's delay is up, the
+    /// Bluetooth menu's buttons' included.
     fn wait(&self) -> Duration {
         if self
             .windows
@@ -282,6 +283,11 @@ impl App {
             .filter_map(|window| window.tooltips.next_wake())
             .chain(self.toasts.next_wake())
             .chain(self.wifi_wake())
+            .chain(
+                self.bluetooth_menu
+                    .as_ref()
+                    .and_then(BluetoothMenu::next_wake),
+            )
             .fold(self.next_tick, Instant::min);
         wake.saturating_duration_since(Instant::now())
     }
@@ -662,8 +668,9 @@ impl App {
         };
         for (&bar, window) in windows.iter_mut() {
             let anchor = Anchor {
-                bar,
+                parent: bar,
                 regions: &window.regions,
+                scroll: 0.0,
                 position: config.bar.position,
             };
             let monitor = window.monitor.as_deref();
@@ -683,13 +690,13 @@ impl App {
             panel.draw(shell, text)?;
         }
         if let Some(menu) = bluetooth_menu {
-            menu.draw(shell, text)?;
+            menu.draw(shell, text, &look)?;
         }
         if let Some(menu) = wifi_menu {
-            menu.draw(shell, text)?;
+            menu.draw(shell, text, &look)?;
         }
         if let Some(menu) = audio_menu {
-            menu.draw(shell, text)?;
+            menu.draw(shell, text, &look)?;
         }
         if let Some(menu) = tray_menu {
             menu.draw(shell, text)?;

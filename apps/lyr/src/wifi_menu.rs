@@ -389,8 +389,13 @@ impl WifiMenu {
     }
 
     /// Draws the menu if it has a frame to present.
-    pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
-        self.panel.draw(shell, text)
+    pub fn draw(
+        &mut self,
+        shell: &mut dyn Shell,
+        text: &Text,
+        look: &Look<'_>,
+    ) -> anyhow::Result<()> {
+        self.panel.draw(shell, text, look)
     }
 
     /// Closes the menu: its surface, then its window unless the window
