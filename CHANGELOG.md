@@ -8,6 +8,13 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- A button in the Bluetooth, Wi-Fi and audio menus shows pushed in while the
+  pointer holds it down: its fill darkens until the button is let go, so a click
+  shows it landed. A slider being dragged does not. For users of the library
+  crates: `lyr_core::menu` gains `pressed` and `PRESSED_SHADE`.
+
 ### Changed
 
 - Built on crcbl 0.20.0 (from 0.17.2). The bar's system fonts are now

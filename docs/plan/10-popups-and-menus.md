@@ -45,6 +45,13 @@ with no bar showing the module opens at the output's left edge.
 All of them share one renderer and theme, and draw the same `DrawList`
 ([04](04-rendering-and-theme.md)) as the bar.
 
+In the Wi-Fi, Bluetooth and audio menus, a button the pointer holds down shows
+pushed in until it is let go: `MenuPanel` lays a dark translucent shade
+(`lyr_core::menu::PRESSED_SHADE`) over its region, so it darkens whatever the
+theme's colours are. A click acts when the button goes down, so the shade is
+feedback that it landed, not a chance to back out. A slider being dragged is not
+shaded.
+
 How a panel closes on an outside click is not settled. It closes on `Escape`, on
 a second click on its module, and on the same binding again. Closing when it
 loses keyboard focus (S17) covers a click on another window, but not a click on

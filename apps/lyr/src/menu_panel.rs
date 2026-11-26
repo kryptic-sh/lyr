@@ -51,6 +51,9 @@ pub struct MenuPanel<T> {
     /// The target the left button went down on, while it is held, when it
     /// is one [`Self::drags`] takes.
     dragging: Option<T>,
+    /// The target the left button went down on, while it is held, drawn
+    /// pushed in; not one [`Self::drags`] takes, which is no button.
+    pressed: Option<T>,
     scale: f32,
     surface: Option<Surface>,
     dirty: bool,
@@ -349,6 +352,7 @@ impl<T: Copy> MenuPanel<T> {
             picked_at: None,
             drags: |_| false,
             dragging: None,
+            pressed: None,
             pointer: Pointer::default(),
             scale: 1.0,
             surface: None,
@@ -489,13 +493,30 @@ impl<T: Copy> MenuPanel<T> {
         self.regions.hit(x, y + self.scroll)
     }
 
-    /// What the window shows: the list, or when it holds more than fits,
-    /// its frame at the window's size and the rest scrolled inside it.
-    fn visible(&self) -> DrawList {
-        if self.scroll_max() <= 0.0 {
-            return self.list.clone();
-        }
+    /// What the window shows: the list with the held button pushed in, or
+    /// when it holds more than fits, its frame at the window's size and the
+    /// rest scrolled inside it.
+    fn visible(&self) -> DrawList
+    where
+        T: PartialEq,
+    {
         let mut items = self.list.items.clone();
+        if let Some(rect) = self
+            .pressed
+            .as_ref()
+            .and_then(|target| self.regions.rect(target))
+        {
+            // Its corners are the frame's, which `lyr_core::menu::frame`
+            // puts first: the theme's radius, as every button's.
+            let radius = match items.first() {
+                Some(Item::Box { radius, .. }) => *radius,
+                _ => 0.0,
+            };
+            items.push(lyr_core::menu::pressed(rect, radius));
+        }
+        if self.scroll_max() <= 0.0 {
+            return DrawList { items };
+        }
         let whole = |rect: &lyr_core::hit::Rect| {
             rect.x == 0.0
                 && rect.y == 0.0
@@ -600,7 +621,12 @@ impl<T: Copy> MenuPanel<T> {
                 button: PointerButton::Left,
                 state: ButtonState::Released,
                 ..
-            } => self.dragging = None,
+            } => {
+                self.dragging = None;
+                if self.pressed.take().is_some() {
+                    self.dirty = true;
+                }
+            }
             _ => {
                 let presses = self.pointer.handle(event, self.scale);
                 let scrolled = presses
@@ -622,6 +648,10 @@ impl<T: Copy> MenuPanel<T> {
                 {
                     self.picked_at = self.pointer.position();
                     self.dragging = (self.drags)(&target).then_some(target);
+                    if self.dragging.is_none() {
+                        self.pressed = Some(target);
+                        self.dirty = true;
+                    }
                     return Ok(Event::Pick(target));
                 }
                 if let (ShellEvent::PointerMotion { .. }, Some(target)) = (event, self.dragging) {
@@ -634,7 +664,10 @@ impl<T: Copy> MenuPanel<T> {
     }
 
     /// Draws the panel if it has a frame to present.
-    pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
+    pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()>
+    where
+        T: PartialEq,
+    {
         if self.dirty {
             let visible = self.visible();
             if let Some(surface) = &mut self.surface {
@@ -1016,6 +1049,68 @@ mod tests {
         panel.place.across = 1000.0;
         panel.size = held(panel.content, panel.place);
         assert_eq!(panel.visible(), panel.list);
+    }
+
+    /// Whether `panel` draws the pressed shade over `rect`.
+    fn shaded(panel: &MenuPanel<usize>, rect: Rect) -> bool {
+        panel.visible().items.iter().any(|item| {
+            matches!(item, Item::Box { rect: at, fill, .. }
+                if *at == rect && *fill == menu::PRESSED_SHADE)
+        })
+    }
+
+    #[test]
+    fn a_held_button_shows_pushed_in_until_it_is_let_go() {
+        let (mut panel, mut shell) = tall();
+        let window = panel.window;
+        panel.place.across = 1000.0;
+        panel.size = held(panel.content, panel.place);
+        let second = Rect {
+            x: 0.0,
+            y: 60.0,
+            width: 100.0,
+            height: 60.0,
+        };
+        assert!(!shaded(&panel, second), "nothing held yet");
+
+        let at = PhysicalPoint { x: 50.0, y: 70.0 };
+        shell.move_pointer(window, at, (0.0, 0.0)).expect("moved");
+        shell
+            .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
+            .expect("pressed");
+        assert!(pump(&mut panel, &mut shell).contains(&Event::Pick(1)));
+        assert!(shaded(&panel, second), "held down");
+        assert!(panel.dirty, "drawn again to show it");
+
+        panel.dirty = false;
+        shell
+            .button(window, PointerButton::Left, ButtonState::Released, Some(at))
+            .expect("released");
+        pump(&mut panel, &mut shell);
+        assert!(!shaded(&panel, second), "let go");
+        assert!(panel.dirty, "drawn again to show it");
+    }
+
+    #[test]
+    fn a_dragged_target_is_not_shown_pushed_in() {
+        let (panel, mut shell) = tall();
+        let mut panel = panel.with_drags(|_| true);
+        let window = panel.window;
+        panel.place.across = 1000.0;
+        panel.size = held(panel.content, panel.place);
+        let at = PhysicalPoint { x: 50.0, y: 10.0 };
+        shell.move_pointer(window, at, (0.0, 0.0)).expect("moved");
+        shell
+            .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
+            .expect("pressed");
+        pump(&mut panel, &mut shell);
+        let first = Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 60.0,
+        };
+        assert!(!shaded(&panel, first), "a slider is not a button");
     }
 
     #[test]

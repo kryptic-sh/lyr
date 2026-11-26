@@ -13,6 +13,15 @@ pub const GAP: f32 = 6.0;
 /// Around a button's label, across and down.
 pub const BUTTON_PADDING: (f32, f32) = (8.0, 2.0);
 
+/// Laid over a button while the pointer holds it down, so it shows pushed
+/// in: its fill darkened, whatever the theme's colours.
+pub const PRESSED_SHADE: Colour = Colour {
+    r: 0,
+    g: 0,
+    b: 0,
+    a: 0x40,
+};
+
 /// The height of a row of text `line_height` tall, buttons included.
 #[must_use]
 pub fn row(line_height: f32) -> f32 {
@@ -73,6 +82,18 @@ pub fn button(
             theme.foreground,
         ),
     ]
+}
+
+/// The shade over a button filling `rect`, its corners `radius` round,
+/// while the pointer holds it down.
+#[must_use]
+pub const fn pressed(rect: Rect, radius: f32) -> Item {
+    Item::Box {
+        rect,
+        radius,
+        fill: PRESSED_SHADE,
+        border: None,
+    }
 }
 
 /// A field for typing filling `rect`, showing `shown`. Its end shows,
