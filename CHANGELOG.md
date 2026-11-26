@@ -32,6 +32,10 @@ and this project adheres to
 
 ### Changed
 
+- The Bluetooth menu's on/off switch is labelled "Bluetooth", not "Power", as
+  the Wi-Fi menu's is labelled "Wi-Fi". While Bluetooth is off the menu shows
+  only that switch and "Bluetooth is off", hiding the other switches and the
+  devices, as the Wi-Fi menu does.
 - Built on crcbl 0.20.0 (from 0.17.2). The bar's system fonts are now
   memory-mapped instead of copied onto the heap wherever crcbl allows it. For
   users of the library crates: `lyr_shell::bars::Bars` takes a

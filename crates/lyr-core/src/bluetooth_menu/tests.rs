@@ -161,15 +161,46 @@ fn windows_draws_only_what_it_can_do() {
             _ => None,
         })
         .collect();
-    assert!(labels.contains(&"Power") && labels.contains(&"Scan"));
+    assert!(labels.contains(&"Bluetooth") && labels.contains(&"Scan"));
     assert!(!labels.contains(&"Discoverable") && !labels.contains(&"Pairable"));
-    // Buttons start after the widest name ("Phone", 50 px).
-    let x = PADDING + 50.0 + GAP + 1.0;
+    // Buttons start after the widest label ("Bluetooth", 90 px).
+    let x = PADDING + 90.0 + GAP + 1.0;
     assert_eq!(regions.hit(x, first + 1.0), Some(&Target::Settings));
     assert_eq!(
         regions.hit(x, second + 1.0),
         Some(&Target::Device(1, DeviceAction::Pair))
     );
+}
+
+#[test]
+fn off_it_shows_only_its_switch_and_says_so() {
+    let theme = theme();
+    let off = Adapter {
+        powered: false,
+        ..adapter()
+    };
+    let devices = [device("Buds", true, true, true)];
+    let (list, size, regions) = draw(&off, &devices, None, None, &measure, LINE, &theme);
+    let texts: Vec<&str> = list
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Text { text, .. } => Some(text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, ["Bluetooth", "Bluetooth is off"]);
+    let x = size.width - PADDING - 1.0;
+    assert_eq!(
+        regions.hit(x, PADDING + 1.0),
+        Some(&Target::Switch(Switch::Powered)),
+        "it can be turned back on"
+    );
+    let below = PADDING + ROW + GAP;
+    let clickable = (0..(size.height as usize))
+        .filter(|y| (*y as f32) > below)
+        .any(|y| (0..(size.width as usize)).any(|x| regions.hit(x as f32, y as f32).is_some()));
+    assert!(!clickable, "nothing else takes a click");
 }
 
 #[test]

@@ -241,6 +241,8 @@ It replaces bluetui in a floating terminal, over BlueZ's D-Bus API
 (`org.bluez.Adapter1`, `Device1`, `Battery1`).
 
 - The adapter's power, pairable and discoverable switches, and a scan toggle.
+  While the power is off only its switch shows, with a line saying so, as in the
+  Wi-Fi menu.
 - Paired devices first, then new ones found by the scan, each with its battery
   where `Battery1` reports one.
 - Connect, disconnect, pair, trust, forget and rename, and mark a device as a

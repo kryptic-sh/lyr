@@ -293,6 +293,8 @@ const UNTRUST: &str = "\u{F512}"; // oct-shield_slash
 const RENAME: &str = "\u{F040}"; // fa-pencil
 const SETTINGS: &str = "\u{F013}"; // fa-gear
 const FORGET: &str = "\u{F1F8}"; // fa-trash
+/// What the menu says in place of the rest while the adapter is off.
+const OFF: &str = "Bluetooth is off";
 /// In place of the icon of what is being done to a device.
 const BUSY: &str = "\u{F110}"; // fa-spinner
 
@@ -379,8 +381,11 @@ pub fn draw(
     let across = menu::BUTTON_PADDING.0;
     let row = menu::row(line_height);
     let abilities = adapter.abilities;
-    let mut switches = vec![("Power", Target::Switch(Switch::Powered), adapter.powered)];
-    if abilities.visibility {
+    // Off, the rest is hidden behind a line saying so, as in the Wi-Fi menu.
+    let on = adapter.powered;
+    let status = (!on).then_some(OFF);
+    let mut switches = vec![("Bluetooth", Target::Switch(Switch::Powered), on)];
+    if on && abilities.visibility {
         switches.push((
             "Discoverable",
             Target::Switch(Switch::Discoverable),
@@ -392,8 +397,10 @@ pub fn draw(
             adapter.pairable,
         ));
     }
-    switches.push(("Scan", Target::Scan, adapter.discovering));
-    let ordered = order(devices);
+    if on {
+        switches.push(("Scan", Target::Scan, adapter.discovering));
+    }
+    let ordered = if on { order(devices) } else { Vec::new() };
     let name = |device: &Device| match device.battery {
         Some(battery) => format!("{} {battery}%", device.alias),
         None => device.alias.clone(),
@@ -402,6 +409,7 @@ pub fn draw(
         .iter()
         .map(|(label, _, _)| measure(label))
         .chain(ordered.iter().map(|device| measure(&name(device))))
+        .chain(status.map(measure))
         .fold(0.0, f32::max);
     let button_width = |label: &str| button_width(label, measure);
     // Every icon button is a square a row tall.
@@ -479,6 +487,10 @@ pub fn draw(
         items.extend(switch(rect, on, theme));
         regions.push(rect, target);
         y += row + GAP;
+    }
+    if let Some(status) = status {
+        items.push(text(status.to_owned(), PADDING, y + GAP, theme.foreground));
+        y += GAP + row + GAP;
     }
     for (index, device) in ordered.iter().enumerate() {
         y += if index == 0 { GAP } else { 0.0 };
