@@ -67,15 +67,43 @@ pub fn button(
     theme: &Theme,
 ) -> [Item; 2] {
     [
-        Item::Box {
-            rect,
-            radius: theme.radius as f32,
-            fill: theme.toast_background,
-            border: Some((theme.border_width as f32, theme.panel_border)),
-        },
+        button_box(rect, theme),
         text(
             label.to_owned(),
             rect.x + BUTTON_PADDING.0,
+            rect.y,
+            measure,
+            line_height,
+            theme.foreground,
+        ),
+    ]
+}
+
+/// A button's box, filling `rect`.
+const fn button_box(rect: Rect, theme: &Theme) -> Item {
+    Item::Box {
+        rect,
+        radius: theme.radius as f32,
+        fill: theme.toast_background,
+        border: Some((theme.border_width as f32, theme.panel_border)),
+    }
+}
+
+/// A button showing the icon `icon` centred in `rect`.
+#[must_use]
+pub fn icon_button(
+    rect: Rect,
+    icon: &str,
+    measure: &dyn Fn(&str) -> f32,
+    line_height: f32,
+    theme: &Theme,
+) -> [Item; 2] {
+    let x = rect.x + (rect.width - measure(icon)) / 2.0;
+    [
+        button_box(rect, theme),
+        text(
+            icon.to_owned(),
+            x,
             rect.y,
             measure,
             line_height,

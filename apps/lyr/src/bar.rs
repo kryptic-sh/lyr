@@ -316,6 +316,10 @@ impl App {
 
     /// Applies a source's update.
     fn update(&mut self, update: Update, now: Instant) {
+        #[cfg(any(target_os = "linux", windows))]
+        if let Update::BluetoothDone(device, action, Err(why)) = &update {
+            self.bluetooth_failed(device, *action, why);
+        }
         #[cfg(windows)]
         if let Update::WifiJoined(joined) = &update {
             self.wifi_joined(joined.clone());
@@ -432,6 +436,7 @@ impl App {
                 &look,
                 adapter,
                 &self.data.bluetooth_devices,
+                &self.data.bluetooth_busy,
                 self.data.bluetooth_question(),
             )
             .context("opening the Bluetooth menu")?,
@@ -471,8 +476,38 @@ impl App {
             &look,
             adapter,
             &self.data.bluetooth_devices,
+            &self.data.bluetooth_busy,
             self.data.bluetooth_question(),
         )
+    }
+
+    /// Shows that doing `action` to the device at `device` failed, `why`,
+    /// in the Bluetooth menu; with the menu closed, a notice on Linux, and
+    /// logged on Windows, which has no daemon of lyr's to show one.
+    #[cfg(any(target_os = "linux", windows))]
+    fn bluetooth_failed(
+        &mut self,
+        device: &str,
+        action: lyr_core::bluetooth_menu::DeviceAction,
+        why: &str,
+    ) {
+        let name = self
+            .data
+            .bluetooth_devices
+            .iter()
+            .find(|known| known.path == device)
+            .map_or(device, |known| known.alias.as_str());
+        let message = action.failed(name, why);
+        match &mut self.bluetooth_menu {
+            Some(menu) => menu.failed(message),
+            None => {
+                tracing::warn!("bluetooth: {message}");
+                // It names the device, which is anyone's text.
+                #[cfg(target_os = "linux")]
+                self.commands
+                    .notify("Bluetooth".to_owned(), lyr_core::markup::escape(&message));
+            }
+        }
     }
 
     /// Runs the shown custom modules' scripts for the bars there are, and

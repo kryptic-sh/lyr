@@ -249,6 +249,18 @@ It replaces bluetui in a floating terminal, over BlueZ's D-Bus API
   PIN entry happen in the menu.
 - `Escape` closes it, as the dotfiles set bluetui's `esc_quit` to make every
   menu close the same way.
+- **A device action shows until it is answered.** BlueZ has no "connecting"
+  state to read, so lyr keeps its own: from the click until the source answers
+  (`Update::BluetoothDone`, sent once for every device request, by the pairing's
+  thread on Windows), the button's icon is a spinner and that device's buttons
+  take no clicks, as the Wi-Fi menu's rows wait while it joins. A device's
+  buttons are icons in squares a row tall, so the spinner changes no width; a
+  word such as "Disconnecting…" widened the whole menu (the owner's call,
+  2026-11-26). Other devices stay usable; BlueZ's requests run one after
+  another, so theirs wait behind it.
+- **A failure shows in red** at the top of the menu until OK, with BlueZ's own
+  reason, behind the pairing agent's question and a rename; with the menu closed
+  it is a notification, as a failed Wi-Fi join is.
 
 The list matches bluetui 0.8.2's documented actions (its README and default key
 bindings, read 2026-10-18): adapter power, pairing and discovery, a scan toggle,
