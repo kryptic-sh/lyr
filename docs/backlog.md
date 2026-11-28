@@ -1739,12 +1739,22 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   accent, or one person of a family emoji. Reasoned from the code, not seen.
   Cutting at cluster boundaries needs `unicode-segmentation` as a direct
   dependency (it is in the tree only through other crates): the owner's call.
-- **The clock panel can be taller than the room below a top bar.** On a 720-tall
-  output with a top bar, the panel does not fit below the bar and its bottom row
-  (Do Not Disturb) is cut at the output's edge (office-lyr, Hyprland 0.57.1
-  nested, 2026-11-04). On a side bar it fits, since there the panel is held to
-  the bar's length. The panel needs a maximum height of the room below the bar,
-  scrolling or shrinking within it.
+- **On a short output the year calendar leaves the notification centre a sliver:
+  the owner's call.** The panel is already held to the room below a top bar
+  (`Place::max_height`), and the centre scrolls within what is left
+  (`ClockPanel::rebuild`'s `centre_view`). But the panel opens on the year
+  (`Mode::Year` in `ClockPanel::open`), whose twelve months fill nearly all of a
+  720-tall output's room, so the centre's view is one row high: "Notification
+  Center" and Clear All show, Do Not Disturb is cut by the clip, and the
+  notifications are reached only by scrolling that row. Seen on a headless sway
+  1.12 at 1280 x 720 with a top bar and twelve notifications (office-lyr,
+  2026-11-28, at 28e049d). The earlier report (Hyprland 0.57.1 nested,
+  2026-11-04) read it as the panel overrunning the output's edge; on sway it
+  ends a margin short of it, and Hyprland was not tried again. Options: open on
+  the month when the year leaves the centre too little room; scroll the whole
+  panel, which takes the wheel from the calendar's year and month stepping; or
+  keep the centre's header and Do Not Disturb rows fixed and scroll only the
+  notifications.
 - **macOS cannot reserve screen space.** The bar overlaps windows unless the
   menu bar is set to auto-hide.
 - **No tray and no notification state on Windows or macOS.** Neither platform
