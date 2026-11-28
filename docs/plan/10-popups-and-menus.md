@@ -83,7 +83,9 @@ From the top:
 
 1. **Calendar**, carried from waybar's clock tooltip:
    - Opens in **year** mode (`mode: "year"`): twelve months in 3 columns
-     (`mode-mon-col: 3`). Right click switches between year and month mode
+     (`mode-mon-col: 3`), or on the month when the year would leave the
+     notification centre no room for its title and Do Not Disturb row (a short
+     output). Right click switches between year and month mode
      (`on-click-right: "mode"`). Scrolling over it shifts it by one unit of the
      current mode (`on-scroll: 1`): a year in year mode, a month in month mode.
    - Week numbers in a right-hand column (`weeks-pos: right`), prefixed `W`

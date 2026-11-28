@@ -59,6 +59,9 @@ pub struct ClockPanel {
     /// The month the calendar shows, and how.
     shown: Date,
     mode: Mode,
+    /// Whether the first layout has chosen between the year and the month,
+    /// after which only a right click switches them.
+    mode_chosen: bool,
     /// Logical pixels: what it shows needs, held to the output.
     size: Size,
     /// The size last asked of the window system, and one still to ask.
@@ -112,7 +115,9 @@ pub struct Contents<'a> {
 
 impl ClockPanel {
     /// Opens the panel at `place` showing `today`'s year, as big as the
-    /// year's calendar; the centre, if any, is sized in on its first draw.
+    /// year's calendar; the centre, if any, is sized in on its first draw,
+    /// which shows the month instead when the year leaves the centre no
+    /// room ([`ClockPanel::year_leaves_room`]).
     pub fn open(
         shell: &mut dyn Shell,
         place: Place,
@@ -150,6 +155,7 @@ impl ClockPanel {
             first,
             shown: today,
             mode: Mode::Year,
+            mode_chosen: false,
             size,
             requested: size,
             resize_to: None,
@@ -341,6 +347,12 @@ impl ClockPanel {
     /// below the calendar, at the size they need, and asks the window
     /// system for that size when it changed.
     fn rebuild(&mut self, look: &Look<'_>, contents: &Contents<'_>) {
+        if !self.mode_chosen {
+            self.mode_chosen = true;
+            if !self.year_leaves_room(look, contents) {
+                self.mode = Mode::Month;
+            }
+        }
         let (calendar, calendar_size) = calendar::draw::draw(
             self.shown,
             self.mode,
@@ -426,6 +438,43 @@ impl ClockPanel {
             self.centre_origin = origin;
         }
         self.dirty = true;
+    }
+
+    /// Whether the year's calendar leaves the centre, if there is one, room
+    /// for itself with nothing in it: its title, Clear All and the
+    /// do-not-disturb row. On a short output it does not, and the panel
+    /// opens on the month instead, so the centre is more than a sliver.
+    fn year_leaves_room(&self, look: &Look<'_>, contents: &Contents<'_>) -> bool {
+        if contents.store.is_none() {
+            return true;
+        }
+        let (_, year) = calendar::draw::draw(
+            self.shown,
+            Mode::Year,
+            self.first,
+            contents.today,
+            look.measure_in,
+            look.calendar_line_height,
+            look.theme,
+        );
+        let inset = BORDER + PADDING;
+        let width = (year.width + 2.0 * inset).max(CENTRE_WIDTH);
+        let empty = centre::Shown {
+            store: &Store::default(),
+            players: &[],
+            now: contents.now,
+            hovered: None,
+            dnd_switch: contents.dnd_switch,
+        };
+        let (_, centre, _) = centre::draw(
+            &empty,
+            width - 2.0 * inset,
+            look.measure_in,
+            look.lay_out,
+            look.line_height,
+            look.theme,
+        );
+        inset + year.height + centre::GAP + centre.height + inset <= self.place.max_height()
     }
 
     /// Asks the window system for the size the panel needs, if that

@@ -169,6 +169,34 @@ fn the_centre_widens_it_and_the_output_holds_it() {
 }
 
 #[test]
+fn on_a_short_output_it_opens_on_the_month() {
+    let mut setup = setup();
+    setup.store = Some(Store::default());
+    setup.lay_out(400.0);
+    assert_eq!(
+        setup.panel.mode,
+        Mode::Month,
+        "the year leaves the centre none"
+    );
+    assert_eq!(
+        setup.panel.scroll_max, 0.0,
+        "the empty centre shows whole, its do-not-disturb row too"
+    );
+    setup.right_click_calendar();
+    assert_eq!(setup.panel.mode, Mode::Year, "a right click still shows it");
+    setup.lay_out(400.0);
+    assert_eq!(setup.panel.mode, Mode::Year, "and it stays chosen");
+
+    let mut tall = self::setup();
+    tall.store = Some(Store::default());
+    tall.lay_out(2000.0);
+    assert_eq!(tall.panel.mode, Mode::Year, "with room, the year");
+    let mut bare = self::setup();
+    bare.lay_out(400.0);
+    assert_eq!(bare.panel.mode, Mode::Year, "with no centre, the year");
+}
+
+#[test]
 fn escape_and_losing_focus_close_it() {
     let mut setup = setup();
     let window = setup.panel.window;

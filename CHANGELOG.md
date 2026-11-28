@@ -82,6 +82,11 @@ and this project adheres to
 
 ### Fixed
 
+- On a short output, the clock panel opens on the month rather than the year
+  when the year's calendar would leave the notification centre too little room
+  for its own title and Do Not Disturb row (as on a 720-tall output under a top
+  bar, where the centre was one row high). A right click still switches to the
+  year.
 - A click or hover in the moment after a reload moves the bar to another edge no
   longer lands on a module laid out for the old edge, or opens a menu placed for
   it: until the bar's new size arrives it is hit-tested over nothing. For users
