@@ -52,9 +52,12 @@ pub struct MenuPanel<T> {
     /// The target the left button went down on, while it is held, when it
     /// is one [`Self::drags`] takes.
     dragging: Option<T>,
-    /// The target the left button went down on, while it is held, drawn
-    /// pushed in; not one [`Self::drags`] takes, which is no button.
-    pressed: Option<T>,
+    /// Where the target the left button went down on was drawn, while it is
+    /// held, drawn pushed in; not one [`Self::drags`] takes, which is no
+    /// button. The place is kept rather than the target, so the shade stays
+    /// when a redraw takes the button's region away (a device turning busy)
+    /// or moves its index (a scan finding a device).
+    pressed: Option<Rect>,
     /// The tooltip of the target under the pointer, from `tooltip_of`.
     tooltips: Tooltips<T>,
     tooltip_of: fn(&T) -> Option<&'static str>,
@@ -469,6 +472,9 @@ impl<T: Copy + PartialEq> MenuPanel<T> {
         self.list = list;
         self.regions = regions;
         self.scroll_to(self.scroll);
+        // What is under the pointer may have moved (a scan finding a device
+        // renumbers the rows), and the tooltip names what is there now.
+        self.hover(std::time::Instant::now());
         self.dirty = true;
         Ok(())
     }
@@ -514,16 +520,22 @@ impl<T: Copy + PartialEq> MenuPanel<T> {
         self.regions.hit(x, y + self.scroll)
     }
 
+    /// Has the tooltip follow the target under the pointer, if it has one.
+    fn hover(&mut self, now: std::time::Instant) {
+        let tooltip_of = self.tooltip_of;
+        let hovered = self
+            .under_pointer()
+            .copied()
+            .filter(|target| tooltip_of(target).is_some());
+        self.tooltips.hover(hovered.as_ref(), now);
+    }
+
     /// What the window shows: the list with the held button pushed in, or
     /// when it holds more than fits, its frame at the window's size and the
     /// rest scrolled inside it.
     fn visible(&self) -> DrawList {
         let mut items = self.list.items.clone();
-        if let Some(rect) = self
-            .pressed
-            .as_ref()
-            .and_then(|target| self.regions.rect(target))
-        {
+        if let Some(rect) = self.pressed {
             // Its corners are the frame's, which `lyr_core::menu::frame`
             // puts first: the theme's radius, as every button's.
             let radius = match items.first() {
@@ -682,12 +694,7 @@ impl<T: Copy + PartialEq> MenuPanel<T> {
                     }
                 }
                 let now = std::time::Instant::now();
-                let tooltip_of = self.tooltip_of;
-                let hovered = self
-                    .under_pointer()
-                    .copied()
-                    .filter(|target| tooltip_of(target).is_some());
-                self.tooltips.hover(hovered.as_ref(), now);
+                self.hover(now);
                 if presses.contains(&Press::Left) {
                     self.tooltips.press(now);
                 }
@@ -697,7 +704,7 @@ impl<T: Copy + PartialEq> MenuPanel<T> {
                     self.picked_at = self.pointer.position();
                     self.dragging = (self.drags)(&target).then_some(target);
                     if self.dragging.is_none() {
-                        self.pressed = Some(target);
+                        self.pressed = self.regions.rect(&target);
                         self.dirty = true;
                     }
                     return Ok(Event::Pick(target));
@@ -1152,6 +1159,10 @@ mod tests {
         assert!(pump(&mut panel, &mut shell).contains(&Event::Pick(1)));
         assert!(shaded(&panel, second), "held down");
         assert!(panel.dirty, "drawn again to show it");
+        // A redraw that takes the button's region away, as a device turning
+        // busy does, leaves it pushed in where it was.
+        panel.regions = Regions::default();
+        assert!(shaded(&panel, second), "still held down");
 
         panel.dirty = false;
         shell
@@ -1183,6 +1194,35 @@ mod tests {
             .expect("pressed");
         pump(&mut panel, &mut shell);
         assert_eq!(panel.next_wake(), None, "a click hides it");
+    }
+
+    #[test]
+    fn a_redraw_that_moves_the_rows_moves_the_tooltip_with_them() {
+        let (panel, mut shell) = tall();
+        let mut panel = panel.with_tooltips(|row| (*row == 1).then_some("Connect"));
+        let window = panel.window;
+        let at = PhysicalPoint { x: 50.0, y: 70.0 };
+        shell.move_pointer(window, at, (0.0, 0.0)).expect("moved");
+        pump(&mut panel, &mut shell);
+        assert!(panel.next_wake().is_some(), "over the second row");
+
+        // A row comes in above it, as a scan finds a device: the pointer is
+        // now over row 2, which has no tooltip.
+        let mut regions = Regions::default();
+        for row in 0..10_u8 {
+            let rect = Rect {
+                x: 0.0,
+                y: f32::from(row) * 60.0,
+                width: 100.0,
+                height: 60.0,
+            };
+            regions.push(rect, usize::from(row) + 1);
+        }
+        let (list, content) = (panel.list.clone(), panel.content);
+        panel
+            .show(&mut shell, (list, content, regions))
+            .expect("shown");
+        assert_eq!(panel.next_wake(), None, "its tooltip went with it");
     }
 
     #[test]

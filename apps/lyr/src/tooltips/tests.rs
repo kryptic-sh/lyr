@@ -6,7 +6,7 @@ use lyr_core::draw::Target;
 use lyr_core::hit::{Rect, Regions};
 use lyr_core::tooltip::HOVER_DELAY;
 
-use super::{Anchor, Look, Tooltips, on_bar};
+use super::{Anchor, Look, Tooltips};
 
 fn theme() -> Theme {
     from_sources(None, Platform::Linux)
@@ -144,12 +144,13 @@ fn nothing_opens_without_text_a_box_or_a_module() {
         None,
         "no box"
     );
-    assert!(
-        !on_bar(&Target::Button(Module::Workspaces, 0)),
-        "a workspace button has none"
-    );
-    assert!(
-        on_bar(&Target::Button(Module::Tray, 0)),
+    let mut tooltips = Tooltips::default();
+    tooltips.hover_bar(Some(&Target::Button(Module::Workspaces, 0)), start);
+    assert_eq!(tooltips.next_wake(), None, "a workspace button has none");
+    tooltips.hover_bar(Some(&Target::Button(Module::Tray, 0)), start);
+    assert_eq!(
+        tooltips.next_wake(),
+        Some(start + HOVER_DELAY),
         "a tray button has one"
     );
 }

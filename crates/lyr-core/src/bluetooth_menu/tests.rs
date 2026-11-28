@@ -429,6 +429,36 @@ fn the_focused_target_is_outlined_in_the_active_colour() {
 }
 
 #[test]
+fn the_spinner_stays_while_bluez_answers() {
+    // BlueZ reports Connected and Paired before Connect and Pair return, so
+    // the button the spinner is on would turn into its opposite or go.
+    let theme = theme();
+    let first = PADDING + 4.0 * (ROW + GAP) + GAP;
+    let names = ["Buds"];
+    let shown_with = |devices: &[Device], action| {
+        let busy = [("/org/bluez/hci0/Buds".to_owned(), action)];
+        let shown = Shown {
+            adapter: &adapter(),
+            devices,
+            busy: &busy,
+            header: None,
+        };
+        let (list, _, _) = super::draw(&shown, None, &measure, LINE, &theme);
+        buttons_at(&list.items, first + 2.0, &names)
+    };
+    let connected = [device("Buds", true, true, true)];
+    assert_eq!(
+        shown_with(&connected, DeviceAction::Connect),
+        [BUSY, UNTRUST, RENAME, FORGET]
+    );
+    let paired = [device("Buds", true, false, false)];
+    assert_eq!(
+        shown_with(&paired, DeviceAction::Pair)[..2],
+        [CONNECT, BUSY]
+    );
+}
+
+#[test]
 fn a_busy_device_says_so_and_waits() {
     let theme = theme();
     let devices = [

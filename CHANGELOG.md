@@ -20,6 +20,9 @@ and this project adheres to
   takes a `jiff::ZonedDateTime` and `lyr_core::calendar` a `jiff::civil::Date`
   and `Weekday`, with `month` taking `i16` and `i8` and `Week::days` holding
   `i8`.
+- For users of the library crates: `lyr_core::bluetooth_menu::draw` takes a
+  `Shown` in place of the adapter, devices and header, and `Header` gains
+  `Failed`, so an exhaustive match on it needs the new arm.
 
 ### Added
 
@@ -33,10 +36,9 @@ and this project adheres to
   pairing) answers, its icon is a spinner in the same square, so the menu keeps
   its size, and that device's buttons wait. A failure shows in red at the top of
   the menu until OK, naming the device and BlueZ's reason ("Connecting Buds
-  failed: …"), or as a notification when the menu is closed; before, it was only
-  logged. For users of the library crates: `lyr_core::bluetooth_menu::draw`
-  takes a `Shown` in place of the adapter, devices and header, `Header` gains
-  `Failed`, and `lyr_core::menu` gains `icon_button`.
+  failed: …"), or, with the menu closed, as a notification on Linux and in the
+  log on Windows; before, it was only logged. For users of the library crates:
+  `lyr_core::menu` gains `icon_button`.
 - Each of the Bluetooth menu's icon buttons names itself in a tooltip
   ("Connect", "Forget", …) when the pointer rests on it, timed as the bar's
   tooltips are: 500 ms, quicker when moving from one to the next, hidden by a

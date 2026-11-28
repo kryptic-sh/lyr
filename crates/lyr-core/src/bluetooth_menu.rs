@@ -99,6 +99,15 @@ pub enum DeviceAction {
 }
 
 impl DeviceAction {
+    /// The button it is on: an action and its opposite share one.
+    const fn button(self) -> Self {
+        match self {
+            Self::Connect | Self::Disconnect => Self::Connect,
+            Self::Trust | Self::Untrust => Self::Trust,
+            Self::Pair => Self::Pair,
+        }
+    }
+
     /// Its verb as it goes on.
     const fn doing(self) -> &'static str {
         match self {
@@ -301,14 +310,21 @@ const BUSY: &str = "\u{F110}"; // fa-spinner
 /// A device's buttons, left to right, those `abilities` allow: connect or
 /// disconnect, pair while it is not paired, trust or untrust, Rename once
 /// it is paired, as bluetui does, Settings once it is paired, then Forget.
-/// While `busy` is being carried out, its button shows [`BUSY`].
+/// While `busy` is being carried out, its button shows [`BUSY`], also once
+/// the device's properties have turned it into its opposite or (pairing)
+/// would take it away: BlueZ reports a device connected or paired before the
+/// call that asked for it returns.
 fn buttons(
     device: &Device,
     abilities: Abilities,
     busy: Option<DeviceAction>,
 ) -> Vec<(&'static str, Button)> {
-    let action = |icon, action| {
-        let icon = if busy == Some(action) { BUSY } else { icon };
+    let action = |icon, action: DeviceAction| {
+        let icon = if busy.is_some_and(|busy| busy.button() == action.button()) {
+            BUSY
+        } else {
+            icon
+        };
         (icon, Button::Action(action))
     };
     let mut buttons = Vec::new();
@@ -319,7 +335,7 @@ fn buttons(
             action(CONNECT, DeviceAction::Connect)
         });
     }
-    if !device.paired {
+    if !device.paired || busy == Some(DeviceAction::Pair) {
         buttons.push(action(PAIR, DeviceAction::Pair));
     }
     if abilities.trust {

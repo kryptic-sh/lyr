@@ -264,7 +264,8 @@ It replaces bluetui in a floating terminal, over BlueZ's D-Bus API
   requests run one after another, so theirs wait behind it.
 - **A failure shows in red** at the top of the menu until OK, with BlueZ's own
   reason, behind the pairing agent's question and a rename; with the menu closed
-  it is a notification, as a failed Wi-Fi join is.
+  it is a notification on Linux, as a failed Wi-Fi join is, and only logged on
+  Windows, where lyr is no notification daemon.
 
 The list matches bluetui 0.8.2's documented actions (its README and default key
 bindings, read 2026-10-18): adapter power, pairing and discovery, a scan toggle,

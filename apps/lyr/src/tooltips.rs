@@ -74,7 +74,7 @@ pub struct Look<'a> {
 
 /// Whether `target` on a bar has a tooltip: a module does, and so does a
 /// tray item's button; workspace buttons have none, as in waybar.
-pub const fn on_bar(target: &Target<Module>) -> bool {
+const fn on_bar(target: &Target<Module>) -> bool {
     match target {
         Target::Module(_) | Target::Button(Module::Tray, _) => true,
         Target::Button(..) => false,
@@ -93,6 +93,14 @@ impl<T> Default for Tooltips<T> {
             timer: Tooltip::default(),
             popup: None,
         }
+    }
+}
+
+impl Tooltips {
+    /// The pointer is over `target` on a bar, or `None`; only a target
+    /// [`on_bar`] takes has a tooltip.
+    pub fn hover_bar(&mut self, target: Option<&Target<Module>>, now: Instant) {
+        self.hover(target.filter(|target| on_bar(target)), now);
     }
 }
 
