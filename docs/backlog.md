@@ -566,6 +566,32 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Known gaps in the design
 
+- **Scope pull-request CI runs to the jobs a change needs** (asked by the owner,
+  2026-11-28, through the crcbl session). A pull request runs every CI job,
+  whatever files it touches; run only the jobs whose inputs changed, judged from
+  the PR's changed files. Not started.
+  - What exists: `.github/workflows/ci.yml` runs on `pull_request`, on pushes to
+    `main` and `v*` tags, and on `workflow_dispatch`; its `concurrency` group
+    cancels an older run of the same PR or branch, but never a tag's. No job
+    filters by path: `fmt`, `clippy`, `machete`, `deny`, `audit`, the three-OS
+    `test` matrix, `leak-guard`, `smoke`, `nerd-font`, `render`, `sway-e2e` and
+    `package` run on every pull request; only `build` (and so `smoke-cross`,
+    which needs it) is left out of pull requests
+    (`if: github.event_name != 'pull_request'`). `publish-github-release` needs
+    every check job and runs only for a `v*` tag; the publish jobs after it need
+    it. `.github/workflows/cron.yml` runs `deny` every Monday at 06:00 UTC.
+  - How, without a new dependency: a first job lists the PR's changed files
+    against its base (`git diff --name-only`) and maps them to the jobs that
+    need them, and the other jobs read its outputs in their `if:`. Changes to
+    `.github/`, `Cargo.lock` or `rust-toolchain.toml` select everything; in the
+    workspace a changed crate selects its reverse dependencies too. A
+    path-filter action such as `dorny/paths-filter` would be a new dependency,
+    which is the owner's call.
+  - Keep: pushes to `main`, tags and scheduled runs still run everything. A
+    skipped job says why in the run summary rather than passing silently, and
+    since a job skipped by `if:` reports as skipped, required checks and
+    `publish-github-release`'s `needs` must tolerate it; one summary job to
+    require is the usual answer.
 - **`memory::tests::a_large_buffer_freed_once_configured_is_not_kept` failed
   once** in a full `cargo test --workspace` in WSL Ubuntu 26.04 (2026-11-28):
   resident memory grew by more than its 1024 kB allowance after freeing a 4 MB
@@ -713,9 +739,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     (`windows-bindgen` makes them for Bluetooth). Not tried: a UWP app, whose
     windows belong to `ApplicationFrameHost.exe`. Left to do: move to crcbl's
     `Notifications::listing()` once released, which skips an unreadable toast
-    and counts it in `Listing::unreadable` (crcbl is building it, the shape
-    agreed 2026-11-28), and log that count. No toast that fails to read has been
-    found to test with.
+    and counts it in `Listing::unreadable` (on crcbl's main at 35e600239,
+    2026-11-28, not released yet: crcbl holds its release until a Wayland
+    present seam lands, and will say which version carries it), and log that
+    count. No toast that fails to read has been found to test with.
   - macOS: as on Windows, lyr draws no notifications.
 
 - **The media player card: where it still differs from swaync's.** The card
