@@ -5,7 +5,12 @@
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/RustSec/advisory-db"]
 yanked = "warn"
-ignore = []
+ignore = [
+    # chrono is unmaintained (no fix exists). It formats the clock and dates
+    # notifications; moving to jiff or time is a new dependency, open in
+    # docs/backlog.md.
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained; migration to jiff or time is in docs/backlog.md" },
+]
 
 [licenses]
 allow = [

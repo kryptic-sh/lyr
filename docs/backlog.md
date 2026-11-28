@@ -520,6 +520,21 @@ implementation follows meanwhile.
   check every publish target: the GitHub release, crates.io (all seven crates),
   AUR, Homebrew and Scoop.
 
+- **chrono is unmaintained: move to jiff or time?** (2026-11-28.) **Q:**
+  RUSTSEC-2026-0543 (2026-09-14) marks every chrono version unmaintained, with
+  no fix; it recommends jiff or time. cargo-deny fails on it (the nightly
+  `cron.yml` run of 2026-11-23 went red), so `deny.toml` ignores that one ID
+  with a reason; cargo-audit only warns. chrono is a direct dependency of
+  `lyr-core`, `lyr-config` and `lyr-bin` (the clock's strftime formats in
+  `lyr_core::clock`, the calendar, notification times in
+  `lyr_core::notifications` and `lyr_sources::notifications::linux`). Neither
+  jiff nor time is in the tree yet, so moving is a new dependency and the
+  owner's call. jiff has strftime-style formatting and reads the system time
+  zone itself; whichever is picked, the clock's format strings must keep their
+  meaning (users' configs and `lyr import-waybar`'s output use them), so check
+  its `%` specifiers against chrono's. Drop the `deny.toml` ignore when chrono
+  leaves the tree.
+
 - **`windows` 0.62 stays in the tree through crcbl's Windows crates.** lyr's own
   Windows code is on windows-rs 0.100's crates (`windows-core`,
   `windows-collections`, `windows-future`), with the Bluetooth source's WinRT
