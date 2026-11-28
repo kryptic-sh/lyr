@@ -82,6 +82,9 @@ and this project adheres to
 
 ### Fixed
 
+- On a side bar, a tray item's menu opens level with the item clicked, beside
+  the bar, rather than at the top of the tray's column, which on a long tray
+  could be far from it.
 - On a short output, the clock panel opens on the month rather than the year
   when the year's calendar would leave the notification centre too little room
   for its own title and Do Not Disturb row (as on a 720-tall output under a top

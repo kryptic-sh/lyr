@@ -579,8 +579,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   - **Where zones meet, modules are dropped, not shrunk.** An icon-only form
     saves no length on a side bar, so the modules nearest the centre go whole,
     unlike a horizontal bar's.
-  - **A tray menu opens at the tray's top** (the module's box), not beside the
-    item clicked; on a long tray column that is far from the item.
   - **Narrow side bars.** The mic has no icon-only form (its default format has
     a literal glyph, not `{icon}`), so below about 100 px it shows its glyph
     over a cut percentage, and its glyph line keeps the box two lines; the
@@ -1885,6 +1883,9 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Not yet verified
 
+- A side bar's tray menu opening level with the item (`menu_box` in
+  `bar/tray.rs`): the box is unit-tested; no menu has been opened on a side bar
+  since, as no tray item was running in a test compositor.
 - An edge-changing reload hit-testing over nothing until the bar's new size
   arrives (`Surface::awaits_size`, `App::draw`'s filter, and the reload in
   `bar::requests` clearing `regions`): reasoned from the code; no click has been

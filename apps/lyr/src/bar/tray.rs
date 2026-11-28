@@ -9,6 +9,23 @@ use super::App;
 use crate::tooltips::Look;
 use crate::tray_menu::Outcome;
 
+/// The box an item's menu opens beside: where every menu of the bar's
+/// opens, past the tray module's box rather than the item's button inside
+/// it, but level with the button on a side bar, where the tray is a column
+/// and its top can be far from the item clicked.
+#[cfg(target_os = "linux")]
+fn menu_box(module: Rect, button: Rect, edge: lyr_config::Position) -> Rect {
+    if edge.is_vertical() {
+        Rect {
+            y: button.y,
+            height: button.height,
+            ..module
+        }
+    } else {
+        module
+    }
+}
+
 impl App {
     /// Carries out `press` on the tray button `index` of the bar `bar`,
     /// drawn at `rect`.
@@ -42,14 +59,17 @@ impl App {
                         menu: menu.clone(),
                         root: lyr_core::tray::menu::Entry::default(),
                         bar,
-                        // Where every menu of the bar's opens: under the
-                        // module's box, not the item's button inside it.
                         anchor: self.windows.get(&bar).map_or(rect, |window| {
                             let tray = lyr_core::draw::Target::Module(lyr_config::Module::Tray);
+                            let position = self.config.bar.position;
                             crate::menu_panel::popup_anchor(
-                                window.regions.rect(&tray).unwrap_or(rect),
-                                window.thickness(self.config.bar.position),
-                                self.config.bar.position,
+                                menu_box(
+                                    window.regions.rect(&tray).unwrap_or(rect),
+                                    rect,
+                                    position,
+                                ),
+                                window.thickness(position),
+                                position,
                             )
                         }),
                     },
@@ -175,4 +195,38 @@ impl App {
     /// Windows and macOS have no tray menus.
     #[cfg(not(target_os = "linux"))]
     fn tray_clicked(&self, _id: i32) {}
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod tests {
+    use lyr_config::Position;
+    use lyr_core::hit::Rect;
+
+    use super::menu_box;
+
+    const fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
+        Rect {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
+
+    #[test]
+    fn a_side_bar_s_tray_menu_opens_level_with_the_item() {
+        let tray = rect(4.0, 300.0, 32.0, 200.0);
+        let item = rect(8.0, 440.0, 24.0, 24.0);
+        assert_eq!(
+            menu_box(tray, item, Position::Left),
+            rect(4.0, 440.0, 32.0, 24.0),
+            "past the module's box, level with the item"
+        );
+        assert_eq!(menu_box(tray, item, Position::Right).y, 440.0);
+        assert_eq!(
+            menu_box(tray, item, Position::Top),
+            tray,
+            "under the module's box, as every menu of a top bar's"
+        );
+    }
 }
