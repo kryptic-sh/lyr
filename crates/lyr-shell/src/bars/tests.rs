@@ -126,6 +126,24 @@ fn named_outputs_limit_the_bars() {
 }
 
 #[test]
+fn an_output_is_named_by_its_connector_or_its_shown_name() {
+    let mut model = monitor(1, "Dell U2723QE");
+    model.connector = Some("DP-2".to_owned());
+    let mut shell = HeadlessShell::new().with_monitors(vec![model, monitor(2, "HDMI-A-1")]);
+    let mut bars = Bars::default();
+    bars.sync(&mut shell, &bar(&["DP-2"]), retire_into(&mut Vec::new()))
+        .expect("sync");
+    assert_eq!(monitors_with_bars(&bars), [1], "by its connector");
+    bars.sync(
+        &mut shell,
+        &bar(&["Dell U2723QE"]),
+        retire_into(&mut Vec::new()),
+    )
+    .expect("sync");
+    assert_eq!(monitors_with_bars(&bars), [1], "by the name shown");
+}
+
+#[test]
 fn a_config_change_removes_bars_no_longer_wanted() {
     let mut shell = two_monitors();
     let mut bars = Bars::default();

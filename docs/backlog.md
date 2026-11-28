@@ -574,14 +574,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   module, so any other test of `lyr-bin` allocating at the same moment counts
   against it. Not investigated further; running it in a process of its own, or
   with the other tests held back, would make it reliable.
-- **`[bar] output` matches only `MonitorInfo::name`.** `lyr_shell::bars`'s
-  `wanted` compares each configured output with the monitor's `name`. crcbl
-  0.20.0 added `MonitorInfo::connector` (the compositor's `wl_output.name` or
-  `zxdg_output_v1.name`, X11's RandR output name) and documents `name` as for
-  display only, possibly a placeholder such as `wl-output-N` and not stable
-  across drivers. Matching `connector` first, then `name`, would follow that.
-  Not checked: whether any compositor lyr runs on reports a `name` that differs
-  from its connector today.
 - **Side bars: what is left** (plan 17, closed 2026-11-04;
   [05](plan/05-layout-and-config.md#side-bars) describes what shipped).
   - **Where zones meet, modules are dropped, not shrunk.** An icon-only form

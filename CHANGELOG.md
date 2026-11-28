@@ -78,6 +78,10 @@ and this project adheres to
 
 ### Fixed
 
+- `[bar] output` matches an output by its connector (`DP-2`, `HDMI-A-1`) as well
+  as by the name the window system shows, which on some backends is the
+  monitor's model or a made-up `wl-output-N`, so a connector name now picks the
+  output wherever the window system reports one.
 - A module's tooltip no longer shows over the menu or panel its click opened
   (Network's over the Wi-Fi menu, the clock's over the clock panel, and so on).
   It shows again once that menu or panel closes.

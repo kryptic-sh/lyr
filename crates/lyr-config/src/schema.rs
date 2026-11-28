@@ -76,7 +76,8 @@ pub struct Bar {
     /// A left or right bar's width, in logical pixels; a top or bottom bar
     /// ignores it.
     pub width: u32,
-    /// Output names to put a bar on. Empty means every output.
+    /// Outputs to put a bar on, by connector (`DP-2`) or by the name the
+    /// window system shows. Empty means every output.
     pub output: Vec<String>,
     /// The layer-shell layer. Wayland only; ignored elsewhere.
     pub layer: Layer,

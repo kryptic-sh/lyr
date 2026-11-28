@@ -69,9 +69,14 @@ fn panel_desc(bar: &Bar, monitor: MonitorId) -> PanelDesc<'static> {
 }
 
 /// Whether `monitor` gets a bar: every output when `bar.output` is empty,
-/// otherwise the outputs it names.
+/// otherwise the outputs it names, by connector (`DP-2`) or by the name the
+/// window system shows, which on some backends is the monitor's model or a
+/// made-up `wl-output-N`.
 fn wanted(bar: &Bar, monitor: &MonitorInfo) -> bool {
-    bar.output.is_empty() || bar.output.contains(&monitor.name)
+    bar.output.is_empty()
+        || bar.output.iter().any(|output| {
+            monitor.connector.as_deref() == Some(output.as_str()) || *output == monitor.name
+        })
 }
 
 /// The bar windows, by the monitor each is on.
