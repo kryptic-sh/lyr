@@ -41,6 +41,7 @@ fn the_title_row_has_clear_all_at_the_right() {
         &Shown {
             store: &Store::default(),
             players: &[],
+            dnd_switch: true,
             now: Instant::now(),
             hovered: None,
         },
@@ -70,6 +71,7 @@ fn the_switch_shows_do_not_disturb() {
             &Shown {
                 store,
                 players: &[],
+                dnd_switch: true,
                 now: Instant::now(),
                 hovered: None,
             },
@@ -113,6 +115,7 @@ fn the_history_follows_the_switch_newest_first() {
         &Shown {
             store: &store,
             players: &[],
+            dnd_switch: true,
             now,
             hovered: None,
         },
@@ -138,6 +141,7 @@ fn an_empty_history_ends_at_the_switch() {
         &Shown {
             store: &Store::default(),
             players: &[],
+            dnd_switch: true,
             now: Instant::now(),
             hovered: None,
         },
@@ -161,6 +165,7 @@ fn entries_of_one_app_sit_closer_than_groups() {
         &Shown {
             store: &store,
             players: &[],
+            dnd_switch: true,
             now,
             hovered: None,
         },
@@ -196,6 +201,7 @@ fn an_entry_s_action_button_is_its_own_target() {
         &Shown {
             store: &store,
             players: &[],
+            dnd_switch: true,
             now,
             hovered: None,
         },
@@ -231,6 +237,7 @@ fn a_link_in_an_entry_is_its_own_target() {
         &Shown {
             store: &store,
             players: &[],
+            dnd_switch: true,
             now,
             hovered: None,
         },
@@ -271,6 +278,7 @@ fn a_media_player_is_a_card_with_its_controls_before_the_history() {
         &Shown {
             store: &store,
             players: &players,
+            dnd_switch: true,
             now,
             hovered: None,
         },
@@ -333,6 +341,7 @@ fn a_media_player_s_art_stands_left_of_its_text() {
         &Shown {
             store: &store,
             players: &players,
+            dnd_switch: true,
             now: Instant::now(),
             hovered: None,
         },
@@ -380,6 +389,7 @@ fn a_player_with_no_subtitle_has_its_title_centred() {
         &Shown {
             store: &store,
             players: &players,
+            dnd_switch: true,
             now: Instant::now(),
             hovered: None,
         },
@@ -421,6 +431,7 @@ fn a_symbolic_icon_is_drawn_in_the_text_s_colour() {
         &Shown {
             store: &store,
             players: &players,
+            dnd_switch: true,
             now: Instant::now(),
             hovered: None,
         },
@@ -455,6 +466,7 @@ fn the_entry_under_the_pointer_has_a_close_button() {
         &Shown {
             store: &store,
             players: &[],
+            dnd_switch: true,
             now,
             hovered: None,
         },
@@ -473,6 +485,7 @@ fn the_entry_under_the_pointer_has_a_close_button() {
         &Shown {
             store: &store,
             players: &[],
+            dnd_switch: true,
             now,
             hovered: Some(id),
         },
@@ -495,4 +508,34 @@ fn the_entry_under_the_pointer_has_a_close_button() {
     assert_eq!(Target::Close(id).entry(), Some(id));
     assert_eq!(Target::Notification(id).entry(), Some(id));
     assert_eq!(Target::ClearAll.entry(), None);
+}
+
+#[test]
+fn without_the_switch_the_history_follows_the_title_row() {
+    let theme = theme();
+    let mut store = Store::default();
+    let id = notify(&mut store, "a", Urgency::Normal, Instant::now());
+    let (_, _, regions) = draw(
+        &Shown {
+            store: &store,
+            players: &[],
+            dnd_switch: false,
+            now: Instant::now(),
+            hovered: None,
+        },
+        WIDTH,
+        &measure,
+        &lay_out,
+        LINE,
+        &theme,
+    );
+    assert!(
+        regions.targets().all(|target| *target != Target::Dnd),
+        "no switch to click"
+    );
+    // Below the 32 px title row and a gap, where the switch was.
+    assert_eq!(
+        regions.hit(1.0, 32.0 + GAP),
+        Some(&Target::Notification(id))
+    );
 }

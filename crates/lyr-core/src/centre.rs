@@ -90,6 +90,9 @@ pub struct Shown<'a> {
     /// The history entry under the pointer, which shows its close button
     /// as a toast does.
     pub hovered: Option<u32>,
+    /// Whether the do-not-disturb row is drawn: only where lyr's switch has
+    /// something to hold back, its own toasts. Windows' is out of reach.
+    pub dnd_switch: bool,
 }
 
 /// The centre showing `shown`, `width` wide: its draw list, its size, and
@@ -109,6 +112,7 @@ pub fn draw(
         players,
         now,
         hovered,
+        dnd_switch,
     } = *shown;
     let plain = |text: &str| measure(text, TextStyle::PLAIN);
     let mut items = Vec::new();
@@ -153,21 +157,24 @@ pub fn draw(
         theme.panel_foreground,
     ));
     regions.push(button, Target::ClearAll);
+    // The bottom of the last thing drawn.
+    let mut bottom = row;
     let mut y = row + GAP;
 
     // Do Not Disturb and its switch.
-    let switch = Rect {
-        x: width - 2.0 * line_height,
-        y,
-        width: 2.0 * line_height,
-        height: line_height,
-    };
-    items.push(label("Do Not Disturb", 0.0, y, theme.panel_foreground));
-    items.extend(draw::switch(switch, store.dnd, theme));
-    regions.push(switch, Target::Dnd);
-    // The bottom of the last thing drawn.
-    let mut bottom = switch.y + switch.height;
-    y = bottom + GAP;
+    if dnd_switch {
+        let switch = Rect {
+            x: width - 2.0 * line_height,
+            y,
+            width: 2.0 * line_height,
+            height: line_height,
+        };
+        items.push(label("Do Not Disturb", 0.0, y, theme.panel_foreground));
+        items.extend(draw::switch(switch, store.dnd, theme));
+        regions.push(switch, Target::Dnd);
+        bottom = switch.y + switch.height;
+        y = bottom + GAP;
+    }
 
     // The media players, a card each.
     for (index, player) in players.iter().enumerate() {

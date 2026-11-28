@@ -23,8 +23,20 @@ and this project adheres to
 - For users of the library crates: `lyr_core::bluetooth_menu::draw` takes a
   `Shown` in place of the adapter, devices and header, and `Header` gains
   `Failed`, so an exhaustive match on it needs the new arm.
+- For users of the library crates: `lyr_core::centre::Shown` gains `dnd_switch`,
+  which says whether the do-not-disturb row is drawn.
 
 ### Added
+
+- On Windows, the clock panel lists Windows' own notifications under the
+  calendar, read every two seconds through crcbl-notify once Windows'
+  notification-access privacy setting allows it. Clear All, an entry's close
+  button and a middle click dismiss them in Windows too, as does `lyr clear`.
+  The notifications module's bell shows whether any are waiting. There is no
+  do-not-disturb row: lyr cannot reach Windows' own. For users of the library
+  crates: `lyr_core::notifications` gains `Mirror`, which keeps a `Store` in
+  step with snapshots of another program's notifications, and `lyr-sources`
+  gains `notifications::windows`.
 
 - A button in the Bluetooth, Wi-Fi and audio menus shows pushed in while the
   pointer holds it down: its fill darkens until the button is let go, so a click

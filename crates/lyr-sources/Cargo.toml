@@ -31,6 +31,7 @@ tokio = { version = "1.54.1", features = ["rt", "macros", "sync", "time"] }
 zbus = { version = "6.2.1", default-features = false, features = ["tokio", "proxy", "service", "p2p", "object-manager"] }
 
 [target."cfg(windows)".dependencies]
+crcbl-notify = "=0.21.0"
 windows-collections = "0.100.0"
 windows-core = "0.100.0"
 windows-future = "0.100.0"

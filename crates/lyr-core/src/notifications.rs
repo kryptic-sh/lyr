@@ -1,11 +1,15 @@
 //! The notification daemon's store (`docs/plan/09-notifications.md`): what
 //! lyr keeps of each notification, the ids it hands out, when one expires,
-//! whether it is shown as a toast, and the history's order.
+//! whether it is shown as a toast, and the history's order. On Windows the
+//! store is a copy of Windows' own notifications instead ([`Mirror`]).
 //!
 //! The rules come from the Desktop Notifications Specification 1.3 and, where
 //! the spec leaves a choice, from swaync, which lyr replaces. The D-Bus side
 //! is in `lyr-sources`.
 
+use std::collections::hash_map::Entry;
+use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 use std::time::{Duration, Instant};
 
 use crate::draw::Picture;
@@ -261,6 +265,65 @@ impl Store {
                 .then_with(|| b[0].arrival.cmp(&a[0].arrival))
         });
         groups
+    }
+}
+
+/// A [`Store`] kept as a copy of notifications another program holds,
+/// Windows' own, read as snapshots: which of lyr's ids each of that
+/// program's keys `K` was given.
+#[derive(Clone, Debug)]
+pub struct Mirror<K> {
+    ids: HashMap<K, u32>,
+}
+
+impl<K> Default for Mirror<K> {
+    fn default() -> Self {
+        Self {
+            ids: HashMap::new(),
+        }
+    }
+}
+
+impl<K: Clone + Eq + Hash> Mirror<K> {
+    /// Makes `store` hold what `listed` holds, oldest first, each with the
+    /// moment it arrived: one not held before is added, in that order, and
+    /// one held but no longer listed is closed. One held already is left as
+    /// it is, since a key names the same notification for as long as it is
+    /// shown. Returns whether `store` changed.
+    pub fn apply(&mut self, store: &mut Store, listed: Vec<(K, Incoming, Instant)>) -> bool {
+        let keys: HashSet<&K> = listed.iter().map(|(key, ..)| key).collect();
+        let gone: Vec<K> = self
+            .ids
+            .keys()
+            .filter(|key| !keys.contains(key))
+            .cloned()
+            .collect();
+        let mut changed = !gone.is_empty();
+        for key in gone {
+            if let Some(id) = self.ids.remove(&key) {
+                store.close(id);
+            }
+        }
+        for (key, incoming, received) in listed {
+            if let Entry::Vacant(vacant) = self.ids.entry(key) {
+                vacant.insert(store.notify(incoming, received));
+                changed = true;
+            }
+        }
+        changed
+    }
+
+    /// The key the notification `id` was listed under.
+    #[must_use]
+    pub fn key(&self, id: u32) -> Option<&K> {
+        self.ids
+            .iter()
+            .find_map(|(key, held)| (*held == id).then_some(key))
+    }
+
+    /// Every key held, for closing them all.
+    pub fn keys(&self) -> impl Iterator<Item = &K> {
+        self.ids.keys()
     }
 }
 

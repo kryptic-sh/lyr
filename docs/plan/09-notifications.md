@@ -5,7 +5,9 @@ On Linux, lyr **is the notification daemon**. It owns
 history, and shows that history in the clock panel
 ([10](10-popups-and-menus.md#clock-panel)) under the calendar. swaync goes
 (decided by the owner on 2026-10-16). Windows and macOS keep their own
-notification centres, because neither lets another program replace them.
+notification centres, because neither lets another program replace them; on
+Windows lyr lists Windows' notifications in the clock panel
+([Windows](#windows)).
 
 ## What swaync does today
 
@@ -190,12 +192,15 @@ dotfiles uses, so lyr has no inhibitors and no inhibited state.
 
 ## Windows
 
-The notification centre belongs to the shell. Reading notifications needs WinRT
-`UserNotificationListener`, which requires package identity and a user
-permission prompt. There is no public API to toggle Do Not Disturb or Focus.
-Provisional default: the module shows a static bell, and a click opens the
-notification centre with the `ms-actioncenter:` URI. Count and DND state are
-**not** shown on Windows.
+The notification centre belongs to the shell, and Windows draws the toasts. lyr
+reads the toasts other programs have shown through WinRT's
+`UserNotificationListener` (crcbl-notify), which an unpackaged program may use
+once Windows' notification-access privacy setting allows it. It has no change
+event outside a package, so lyr polls it. The clock panel lists them under the
+calendar as the Linux history is listed, and dismissing one there dismisses it
+in Windows. The bell shows whether any are waiting, and a click opens the
+notification centre with the `ms-actioncenter:` URI. There is no public API to
+toggle Do Not Disturb or Focus, so the panel has no do-not-disturb row.
 
 ## macOS
 

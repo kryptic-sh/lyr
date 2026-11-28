@@ -481,6 +481,7 @@ impl App {
         let contents = Contents {
             today: jiff::ZonedDateTime::now().date(),
             store: store.as_deref(),
+            dnd_switch: cfg!(target_os = "linux"),
             players: &self.data.players,
             now: Instant::now(),
         };
@@ -701,9 +702,26 @@ impl App {
         (!names.is_empty()).then_some(names)
     }
 
-    /// Windows and macOS have no toasts: lyr is not their notification
-    /// daemon.
-    #[cfg(not(target_os = "linux"))]
+    /// Windows: lyr draws no toasts, so this is a click on a clock-panel
+    /// entry, one of Windows' notifications. Dismissing it dismisses it in
+    /// Windows. Windows' notifications carry no actions lyr can invoke, and
+    /// a click on the body does nothing yet. Never invokes an action.
+    #[cfg(windows)]
+    fn toast_clicked(
+        &self,
+        _shell: &mut dyn Shell,
+        _window: Option<WindowId>,
+        clicked: Option<Clicked>,
+    ) -> bool {
+        if let Some(Clicked::Dismiss(id)) = clicked {
+            self.commands
+                .close_notification(id, lyr_core::notifications::CloseReason::Dismissed);
+        }
+        false
+    }
+
+    /// macOS has no toasts: lyr is not its notification daemon.
+    #[cfg(target_os = "macos")]
     const fn toast_clicked(
         &self,
         _shell: &mut dyn Shell,

@@ -360,6 +360,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "crcbl-notify"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "652b8a0ee312d54ac7b1eb04beb5cd0c2dda5e7752b6050dc06ade9564f27471"
+dependencies = [
+ "bitflags",
+ "thiserror",
+ "windows",
+]
+
+[[package]]
 name = "crcbl-reflect"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -986,6 +997,7 @@ dependencies = [
  "block2",
  "crcbl-image",
  "crcbl-mixer",
+ "crcbl-notify",
  "futures-util",
  "lyr-core",
  "objc2",

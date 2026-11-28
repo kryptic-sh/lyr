@@ -2,7 +2,7 @@
 //! from them.
 
 use std::collections::HashMap;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", windows))]
 use std::sync::PoisonError;
 use std::sync::{Arc, Mutex};
 
@@ -41,8 +41,9 @@ pub struct Data {
     /// The system time zone's name, from timedate1.
     #[cfg(target_os = "linux")]
     pub zone: Option<String>,
-    /// The notification store, while lyr is the notification daemon.
-    #[cfg(target_os = "linux")]
+    /// The notification store, while lyr is the notification daemon; on
+    /// Windows, its copy of Windows' notifications, once they can be read.
+    #[cfg(any(target_os = "linux", windows))]
     pub notifications: Option<Arc<Mutex<lyr_core::notifications::Store>>>,
     /// The media players, for the clock panel. Empty where there is no
     /// source for them.
@@ -106,11 +107,12 @@ impl Data {
         lyr_core::custom::view(output, custom)
     }
 
-    /// The notification store, while lyr is the notification daemon.
+    /// The notification store, while lyr is the notification daemon, or
+    /// holds Windows' notifications.
     pub const fn notification_store(&self) -> Option<&Arc<Mutex<lyr_core::notifications::Store>>> {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", windows))]
         return self.notifications.as_ref();
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(target_os = "macos")]
         None
     }
 
@@ -153,7 +155,7 @@ impl Data {
             Update::Workspaces(state) => self.workspaces = Some(state),
             #[cfg(target_os = "linux")]
             Update::Zone(zone) => self.zone = zone,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", windows))]
             Update::Notifications(store) => self.notifications = Some(store),
             #[cfg(target_os = "linux")]
             Update::Players(players) => self.players = players,
@@ -376,12 +378,19 @@ fn content(
                 theme.foreground,
             ))
         }
-        // Windows keeps its notifications to itself: a bell that opens them.
+        // Whether Windows holds any, once they can be read; its
+        // do-not-disturb cannot be.
         #[cfg(windows)]
-        Module::Notifications => Some(label(
-            lyr_core::bell::stateless(&config.notifications),
-            theme.foreground,
-        )),
+        Module::Notifications => {
+            let text = match &data.notifications {
+                Some(store) => lyr_core::bell::view(
+                    &store.lock().unwrap_or_else(PoisonError::into_inner),
+                    &config.notifications,
+                ),
+                None => lyr_core::bell::stateless(&config.notifications),
+            };
+            Some(label(text, theme.foreground))
+        }
         #[cfg(any(target_os = "linux", target_os = "macos"))]
         Module::Workspaces => {
             let state = data.workspaces.as_ref()?;

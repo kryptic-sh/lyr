@@ -1,8 +1,9 @@
 //! The clock panel (`docs/plan/10-popups-and-menus.md#clock-panel`): a panel
 //! under the module that opened it, where every menu of the bar's opens
 //! ([`Place`]), as big as what it shows: the calendar's view, the year or a
-//! month ([`lyr_core::calendar`]), and while lyr is the notification daemon
-//! the notification centre below it ([`lyr_core::centre`]), held short of
+//! month ([`lyr_core::calendar`]), and while lyr is the notification daemon,
+//! or reads Windows' notifications, the notification centre below it
+//! ([`lyr_core::centre`]), held short of
 //! the output's far edge, past which the centre scrolls.
 //!
 //! It takes the keyboard. `Escape`, losing focus and the same click or
@@ -97,10 +98,13 @@ pub enum Outcome {
 }
 
 /// What the panel shows at a moment: today, and the notification store when
-/// lyr is the daemon.
+/// lyr is the daemon or reads Windows' notifications.
 pub struct Contents<'a> {
     pub today: Date,
     pub store: Option<&'a Store>,
+    /// Whether the centre draws lyr's do-not-disturb switch: only where lyr
+    /// is the daemon.
+    pub dnd_switch: bool,
     /// The media players, drawn in the centre.
     pub players: &'a [Player],
     pub now: Instant,
@@ -358,6 +362,7 @@ impl ClockPanel {
                 players: contents.players,
                 now: contents.now,
                 hovered: self.hovered,
+                dnd_switch: contents.dnd_switch,
             };
             let drawn = centre::draw(
                 &shown,

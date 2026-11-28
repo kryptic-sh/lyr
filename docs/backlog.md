@@ -566,6 +566,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Known gaps in the design
 
+- **`memory::tests::a_large_buffer_freed_once_configured_is_not_kept` failed
+  once** in a full `cargo test --workspace` in WSL Ubuntu 26.04 (2026-11-28):
+  resident memory grew by more than its 1024 kB allowance after freeing a 4 MB
+  buffer. It passed alone and on the next full run. It reads the whole process's
+  `RssAnon`, and its `MEASURING` lock holds back only the other test in that
+  module, so any other test of `lyr-bin` allocating at the same moment counts
+  against it. Not investigated further; running it in a process of its own, or
+  with the other tests held back, would make it reliable.
 - **`[bar] output` matches only `MonitorInfo::name`.** `lyr_shell::bars`'s
   `wanted` compares each configured output with the monitor's `name`. crcbl
   0.20.0 added `MonitorInfo::connector` (the compositor's `wl_output.name` or
@@ -650,19 +658,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     machine). An app whose class matches neither its name nor its desktop entry
     is not found. An action button's click does not focus the sender, only the
     body's.
-  - Windows: lyr is not the notification daemon and draws no notifications;
-    Windows' own toasts and Notification Center activate the sending application
-    when clicked. lyr's one notification surface is the clock's bell, which
-    opens `ms-actioncenter:`. The owner decided (2026-10-30): lyr lists Windows'
-    notifications in the clock panel, read through crcbl's notification seam
-    (the cross-repo entry above), and a click brings the sender's window forward
-    from lyr's own click (`SetForegroundWindow`), or starts the application by
-    its AppUserModelID when it has no window. The click cannot do what the
-    toast's own click does (open that email, say): the listener has no way to
-    activate a toast. Seen on this machine (Windows 11 26300, from an unpackaged
-    Windows PowerShell, 2026-10-30): `UserNotificationListener` gives access
-    without package identity (`GetAccessStatus` returned `Allowed`) and lists
-    toasts with their app's AppUserModelID and display name, but subscribing to
+  - Windows: lyr is not the notification daemon and draws no toasts; Windows'
+    own toasts and Notification Center activate the sending application when
+    clicked, and the clock's bell opens `ms-actioncenter:`. The owner decided
+    (2026-10-30): lyr lists Windows' notifications in the clock panel, read
+    through crcbl's notification seam (the cross-repo entry above), and a click
+    brings the sender's window forward from lyr's own click
+    (`SetForegroundWindow`), or starts the application by its AppUserModelID
+    when it has no window. The click cannot do what the toast's own click does
+    (open that email, say): the listener has no way to activate a toast. Seen on
+    this machine (Windows 11 26300, from an unpackaged Windows PowerShell,
+    2026-10-30): `UserNotificationListener` gives access without package
+    identity (`GetAccessStatus` returned `Allowed`) and lists toasts with their
+    app's AppUserModelID and display name, but subscribing to
     `NotificationChanged` fails with `0x80070490` (element not found), so the
     list has to be polled. crcbl built the read side the same day, on its main
     as `afe7b4e9` (not yet released), in a shape lyr agreed to: the new crate
@@ -683,11 +691,24 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     0.14.0 (2026-10-31), but without the skip: read in 0.15.0's
     `crates/crcbl-notify/src/windows.rs` (2026-11-01), `list` still returns on
     the first toast that fails, and the fix is still open on crcbl's backlog
-    ("One unreadable toast fails the whole `list`"). It is also the Windows
-    session's to build. Once the skip ships: poll it on a worker, show the
-    entries in the clock panel on Windows, and on a click focus the sender,
-    matching its windows with `lyr_wm::app::is_app` on the executable or
-    AppUserModelID.
+    ("One unreadable toast fails the whole `list`"). Built in lyr (2026-11-28)
+    on crcbl-notify 0.21.0's `list`, which still lacks the skip:
+    `apps/lyr/src/sources/windows_notifications.rs` polls it on a worker and
+    keeps the clock panel's store a copy of it through
+    `lyr_core::notifications::Mirror`, keyed by `NotificationId`; Clear All, the
+    close button, a middle click and `lyr clear` dismiss in Windows. A failed
+    read keeps the last snapshot listed and is logged once, so one unreadable
+    toast freezes the list rather than emptying it. Seen on this machine: a
+    toast sent from Windows PowerShell and a Chrome one listed, the body's `<b>`
+    and `&` shown as text, and a middle click removed the PowerShell one from
+    Windows' own list (read back through the listener) and from the panel. Left
+    to do: move to crcbl's `Notifications::listing()` once released, which skips
+    an unreadable toast and counts it in `Listing::unreadable` (crcbl is
+    building it, the shape agreed 2026-11-28), and log that count; and a click
+    on an entry's body, which does nothing yet: it is to focus the sender
+    (`SetForegroundWindow`), matching its windows with `lyr_wm::app::is_app` on
+    the executable or AppUserModelID, or start it by its AppUserModelID when it
+    has no window. No toast that fails to read has been found to test with.
   - macOS: as on Windows, lyr draws no notifications.
 
 - **The media player card: where it still differs from swaync's.** The card
@@ -1163,35 +1184,35 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   device's bus rather than the endpoint's own `SWD`, and no Bluetooth endpoint
   has been seen. A handset's form factor reads as `handset`, which none of
   waybar's port kinds match, as on Linux; lyr's own code read it as `phone`. The
-  notifications module is plan 09's Windows bell: always the `none` icon
-  (`lyr_core::bell::stateless`), since Windows offers no API for its
-  notifications or do-not-disturb, with both clicks bound in
-  `[platform.windows.notifications.on]` to `start "" ms-actioncenter:`; run on
-  Windows (2026-10-20), a click on it opened the notification centre. The Wi-Fi
-  and Bluetooth menus open Windows' Settings pages in their place
-  (`apps/lyr/src/settings.rs`, `ms-settings:network` and `:bluetooth` through
-  `cmd /C start`), from their bindings and from `lyr panel`; run on Windows
-  (2026-10-22), `lyr panel bluetooth` opened Settings on Bluetooth & devices and
-  `lyr panel wifi` on Network & internet, read from the Settings window through
-  UI Automation. The audio menu is native on Windows (`lyr_core::audio_menu`,
-  `apps/lyr/src/audio_menu.rs`, its rows from `mixer::nodes`): tabs for playback
-  and recording streams (WASAPI's audio sessions on every active endpoint, named
-  by the session, else its program's file name, as crcbl names them; every
-  endpoint has a system-sounds session, so those off the default endpoint are
-  left out, and another stream there names its endpoint, `mixer::nodes_on` with
-  `WINDOWS`, tested and mutation-checked on every platform) and output and input
-  devices, each row with mute, a step down and up by the module's `scroll_step`,
-  and on a device that is not the default a Default button, which makes it the
-  default through crcbl's `IPolicyConfig` (undocumented; before crcbl's mixer it
-  opened `ms-settings:sound`). A session's changes come through crcbl's
-  callbacks, followed only while the menu is open; the once-a-second re-read is
-  gone. Run on Windows (2026-10-23): `lyr panel audio` opened it on this
-  machine's four output devices, the default in the active colour and no
-  Configuration tab, and its Playback tab listed five streams, one of them
-  System sounds, with no device buttons. The Default button has not been
-  clicked, since it moves what is heard to another device; crcbl's own
-  `wasapi_live` test sets a default. Each row's lookup is tested by a 0 % step
-  on every device and stream
+  notifications module is plan 09's Windows bell: whether Windows holds any
+  notifications once lyr can read them (`lyr_core::bell::view` on the copy the
+  clock panel lists), else the `none` icon (`lyr_core::bell::stateless`), with
+  both clicks bound in `[platform.windows.notifications.on]` to
+  `start "" ms-actioncenter:`; run on Windows (2026-10-20), a click on it opened
+  the notification centre. The Wi-Fi and Bluetooth menus open Windows' Settings
+  pages in their place (`apps/lyr/src/settings.rs`, `ms-settings:network` and
+  `:bluetooth` through `cmd /C start`), from their bindings and from
+  `lyr panel`; run on Windows (2026-10-22), `lyr panel bluetooth` opened
+  Settings on Bluetooth & devices and `lyr panel wifi` on Network & internet,
+  read from the Settings window through UI Automation. The audio menu is native
+  on Windows (`lyr_core::audio_menu`, `apps/lyr/src/audio_menu.rs`, its rows
+  from `mixer::nodes`): tabs for playback and recording streams (WASAPI's audio
+  sessions on every active endpoint, named by the session, else its program's
+  file name, as crcbl names them; every endpoint has a system-sounds session, so
+  those off the default endpoint are left out, and another stream there names
+  its endpoint, `mixer::nodes_on` with `WINDOWS`, tested and mutation-checked on
+  every platform) and output and input devices, each row with mute, a step down
+  and up by the module's `scroll_step`, and on a device that is not the default
+  a Default button, which makes it the default through crcbl's `IPolicyConfig`
+  (undocumented; before crcbl's mixer it opened `ms-settings:sound`). A
+  session's changes come through crcbl's callbacks, followed only while the menu
+  is open; the once-a-second re-read is gone. Run on Windows (2026-10-23):
+  `lyr panel audio` opened it on this machine's four output devices, the default
+  in the active colour and no Configuration tab, and its Playback tab listed
+  five streams, one of them System sounds, with no device buttons. The Default
+  button has not been clicked, since it moves what is heard to another device;
+  crcbl's own `wasapi_live` test sets a default. Each row's lookup is tested by
+  a 0 % step on every device and stream
   (`this_machine_s_audio_reads_and_each_row_finds_its_control`, run on this
   machine). From the runs of 2026-10-20, which tried the menu rather than its
   source: a menu panel stays inside its output (`menu_panel::Place`, from the

@@ -107,6 +107,7 @@ impl Setup {
                     &Contents {
                         today: today(),
                         store: self.store.as_ref(),
+                        dnd_switch: true,
                         players: &[],
                         now: Instant::now(),
                     },
@@ -261,6 +262,7 @@ impl Setup {
             &Contents {
                 today: today(),
                 store: self.store.as_ref(),
+                dnd_switch: true,
                 players: &[],
                 now: Instant::now(),
             },
@@ -497,6 +499,7 @@ fn the_calendar_is_laid_out_in_its_own_line_height() {
             &Contents {
                 today: today(),
                 store: None,
+                dnd_switch: true,
                 players: &[],
                 now: Instant::now(),
             },

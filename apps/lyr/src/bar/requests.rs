@@ -198,8 +198,23 @@ impl App {
         control::OK.to_owned()
     }
 
-    /// Windows and macOS keep their own notification centres.
-    #[cfg(not(target_os = "linux"))]
+    /// Windows: `lyr clear` dismisses Windows' notifications, once lyr can
+    /// read them. Its do-not-disturb cannot be reached, so `lyr dnd` cannot
+    /// switch it.
+    #[cfg(windows)]
+    pub(super) fn notifications(&mut self, request: Request) -> String {
+        if request == Request::Dnd {
+            return "error: Windows' do-not-disturb cannot be switched from lyr".to_owned();
+        }
+        if self.data.notifications.is_none() {
+            return "error: lyr cannot read Windows' notifications".to_owned();
+        }
+        self.commands.clear_notifications();
+        control::OK.to_owned()
+    }
+
+    /// macOS keeps its own notification centre.
+    #[cfg(target_os = "macos")]
     pub(super) fn notifications(&mut self, _request: Request) -> String {
         "error: lyr is not the notification daemon on this platform".to_owned()
     }

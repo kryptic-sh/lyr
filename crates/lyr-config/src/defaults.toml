@@ -181,8 +181,9 @@ calendar_today = "#ff6699"
 center = []
 right = ["volume", "mic", "clock", "notifications"]
 
-# Windows has no API for its notifications or do-not-disturb: either click
-# opens its notification centre (plan 09).
+# Windows' do-not-disturb is out of reach, and lyr lists its notifications only
+# in the clock panel: either click on the bell opens Windows' notification
+# centre (plan 09).
 [platform.windows.notifications.on]
 click = { exec = 'start "" ms-actioncenter:' }
 click_right = { exec = 'start "" ms-actioncenter:' }

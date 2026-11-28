@@ -63,8 +63,10 @@ pub enum Update {
     /// The system time zone's name, or `None` when none is set.
     #[cfg(target_os = "linux")]
     Zone(Option<String>),
-    /// lyr is the notification daemon, with this store.
-    #[cfg(target_os = "linux")]
+    /// lyr is the notification daemon, with this store; on Windows, the
+    /// store copying Windows' notifications, handed over again after every
+    /// change to them.
+    #[cfg(any(target_os = "linux", windows))]
     Notifications(std::sync::Arc<std::sync::Mutex<lyr_core::notifications::Store>>),
     /// A notification arrived or an application closed one.
     #[cfg(target_os = "linux")]
@@ -242,6 +244,8 @@ pub struct Commands {
     wifi: std::sync::mpsc::Sender<windows::WifiWork>,
     #[cfg(windows)]
     bluetooth: std::sync::mpsc::Sender<windows::BluetoothWork>,
+    #[cfg(windows)]
+    notifications: std::sync::mpsc::Sender<windows_notifications::Work>,
     /// Windows: whether the Wi-Fi menu is open, as on Linux.
     #[cfg(windows)]
     wifi_menu: std::sync::Arc<std::sync::atomic::AtomicBool>,
@@ -442,6 +446,18 @@ impl Commands {
         self.wifi_menu
             .store(open, std::sync::atomic::Ordering::Relaxed);
     }
+
+    /// Dismisses Windows' notification `id`; Windows takes no reason.
+    pub fn close_notification(&self, id: u32, _reason: lyr_core::notifications::CloseReason) {
+        let _stopped = self
+            .notifications
+            .send(windows_notifications::Work::Dismiss(id));
+    }
+
+    /// Dismisses every one of Windows' notifications, as Clear All does.
+    pub fn clear_notifications(&self) {
+        let _stopped = self.notifications.send(windows_notifications::Work::Clear);
+    }
 }
 
 #[cfg(not(target_os = "linux"))]
@@ -524,8 +540,8 @@ impl Commands {
     /// none to control.
     pub fn media(&self, _bus_name: String, _control: lyr_core::media::Control) {}
 
-    /// Windows and macOS: lyr is not the notification daemon there, so it
-    /// holds no notification to close.
+    /// macOS: lyr reads no notifications there, so it holds none to close.
+    #[cfg(target_os = "macos")]
     pub fn close_notification(&self, _id: u32, _reason: lyr_core::notifications::CloseReason) {}
 }
 
@@ -603,11 +619,13 @@ pub fn start(
             waker.clone(),
             std::sync::Arc::clone(&wifi_menu),
         )?;
+        let notifications = windows_notifications::start(sender.clone(), waker.clone())?;
         let battery = windows::battery(sender, waker);
         Ok((
             receiver,
             Commands {
                 _battery: battery,
+                notifications,
                 _network: network,
                 _power_profile: power_profile,
                 _window: window,
@@ -979,6 +997,9 @@ mod macos {
 /// The sources Windows has so far: the battery, the network, the power
 /// profile, the audio devices and streams, Wi-Fi, Bluetooth and the
 /// foreground window.
+#[cfg(windows)]
+mod windows_notifications;
+
 #[cfg(windows)]
 mod windows {
     use std::sync::mpsc;

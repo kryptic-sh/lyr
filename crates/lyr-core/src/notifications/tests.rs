@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use super::{Expiry, Incoming, LOW_TIMEOUT, NORMAL_TIMEOUT, Store, Urgency};
+use super::{Expiry, Incoming, LOW_TIMEOUT, Mirror, NORMAL_TIMEOUT, Store, Urgency};
 
 fn from(app: &str, summary: &str) -> Incoming {
     Incoming {
@@ -220,4 +220,56 @@ fn clear_all_closes_everything() {
     store.notify(from("b", "y"), Instant::now());
     assert_eq!(store.clear(), [1, 2]);
     assert!(store.history().is_empty());
+}
+
+/// The summaries `store`'s history shows, newest first.
+fn summaries(store: &Store) -> Vec<&str> {
+    let mut held: Vec<&super::Notification> = store
+        .history()
+        .into_iter()
+        .flat_map(|(_, members)| members)
+        .collect();
+    held.sort_by_key(|held| std::cmp::Reverse(held.arrival));
+    held.iter()
+        .map(|held| held.content.summary.as_str())
+        .collect()
+}
+
+#[test]
+fn a_mirror_adds_what_is_listed_and_closes_what_is_not() {
+    let now = Instant::now();
+    let listed = |keys: &[(u8, &str)]| {
+        keys.iter()
+            .map(|&(key, summary)| (key, from("a", summary), now))
+            .collect::<Vec<_>>()
+    };
+    let mut store = Store::default();
+    let mut mirror = Mirror::default();
+    assert!(mirror.apply(&mut store, listed(&[(7, "old"), (9, "new")])));
+    assert_eq!(summaries(&store), ["new", "old"], "in the order listed");
+    let old = *mirror.key(1).expect("the first listed");
+    assert_eq!(old, 7);
+
+    assert!(
+        !mirror.apply(&mut store, listed(&[(7, "old"), (9, "new")])),
+        "the same snapshot again changes nothing"
+    );
+    assert!(
+        !mirror.apply(&mut store, listed(&[(7, "edited"), (9, "new")])),
+        "a key names the same notification while it is shown"
+    );
+    assert_eq!(summaries(&store), ["new", "old"]);
+
+    assert!(mirror.apply(&mut store, listed(&[(9, "new"), (4, "newest")])));
+    assert_eq!(summaries(&store), ["newest", "new"], "7 closed, 4 added");
+    assert_eq!(mirror.key(1), None, "7's id is gone with it");
+    let mut keys: Vec<u8> = mirror.keys().copied().collect();
+    keys.sort_unstable();
+    assert_eq!(keys, [4, 9]);
+
+    assert!(mirror.apply(&mut store, Vec::new()));
+    assert!(
+        store.history().is_empty(),
+        "an empty snapshot closes them all"
+    );
 }
