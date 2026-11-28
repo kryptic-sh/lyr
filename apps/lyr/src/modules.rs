@@ -339,7 +339,7 @@ fn content(
         }
         Module::Mic => {
             let shown = lyr_core::audio::mic(data.source.as_ref()?, &config.mic);
-            Some(label(shown.text, theme.mic))
+            Some(with_icon(shown.text, shown.compact, theme.mic))
         }
         Module::Custom(index) => {
             let shown = data.custom_view(index, config, monitor)?;

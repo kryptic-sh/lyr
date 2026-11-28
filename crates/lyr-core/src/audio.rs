@@ -134,10 +134,10 @@ pub fn mic(source: &Source, config: &Mic) -> View {
             _ => None,
         })
     };
-    // The mic's formats have no `{icon}`, so it has no compact form.
+    let text = fill(format);
     View {
-        text: fill(format),
-        compact: None,
+        compact: compact(format, "", &text),
+        text,
         tooltip: config
             .tooltip_format
             .as_ref()

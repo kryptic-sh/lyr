@@ -60,6 +60,16 @@ impl Format {
         })
     }
 
+    /// The text written before the first placeholder: all of it when there
+    /// is none.
+    #[must_use]
+    pub fn lead(&self) -> &str {
+        match self.pieces.first() {
+            Some(Piece::Text(text)) => text,
+            _ => "",
+        }
+    }
+
     /// The placeholder names, in order, repeats included.
     pub fn placeholders(&self) -> impl Iterator<Item = &str> {
         self.pieces.iter().filter_map(|piece| match piece {

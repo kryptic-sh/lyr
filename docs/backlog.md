@@ -579,12 +579,12 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   - **Where zones meet, modules are dropped, not shrunk.** An icon-only form
     saves no length on a side bar, so the modules nearest the centre go whole,
     unlike a horizontal bar's.
-  - **Narrow side bars.** The mic has no icon-only form (its default format has
-    a literal glyph, not `{icon}`), so below about 100 px it shows its glyph
-    over a cut percentage, and its glyph line keeps the box two lines; the
-    volume while muted (`format_muted` has no `{icon}`) is cut the same way.
-    Network's glyph needs more than 40 px. Seen on niri at widths 40 and 50
-    (office-lyr, 31d06e2).
+  - **Narrow side bars.** Network's glyph needs more than 40 px, so on a bar
+    that narrow it is cut. Seen on niri at widths 40 and 50 (office-lyr,
+    31d06e2). The mic and a muted volume, which once showed their glyph over a
+    cut percentage there, now fall back to their glyph alone (`icon::compact`
+    takes a format's leading text when it has no `{icon}`); not seen on a narrow
+    bar since.
   - **Wayland arrangement order, reasoned and not seen:** if another client's
     top bar is arranged after lyr's side bar, the side bar may start at the
     output's top while a panel's area starts below that bar, so a panel opens

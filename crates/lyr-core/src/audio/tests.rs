@@ -101,6 +101,31 @@ fn the_mic_shows_its_own_icon_and_description() {
 }
 
 #[test]
+fn on_a_narrow_bar_the_mic_and_a_muted_output_show_their_glyph() {
+    let mut source = Source {
+        volume: 65,
+        muted: false,
+        description: "USB Microphone".to_owned(),
+    };
+    let config = defaults();
+    assert_eq!(
+        mic(&source, &config.mic).compact.as_deref(),
+        Some("\u{F130}")
+    );
+    source.muted = true;
+    assert_eq!(
+        mic(&source, &config.mic).compact.as_deref(),
+        Some("\u{F131}")
+    );
+    let mut muted = speakers(40);
+    muted.muted = true;
+    assert_eq!(
+        volume(&muted, &config.volume).compact.as_deref(),
+        Some("\u{EEE8}")
+    );
+}
+
+#[test]
 fn a_linked_mute_takes_the_mic_and_gives_its_state_back() {
     let mut link = MuteLink::default();
     let both = |output, mic| Mutes { output, mic };

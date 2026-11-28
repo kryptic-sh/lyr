@@ -20,12 +20,19 @@ pub fn pick<'a>(icons: &'a NamedIcons, names: &[&str], value: u32) -> &'a str {
 }
 
 /// The compact form of a label `format` rendered as `text`, with `icon` in
-/// its `{icon}`: the icon alone, for a bar too narrow for the text. `None`
-/// when the format shows no icon, or shows nothing but it.
+/// its `{icon}`, for a bar too narrow for the text: the icon alone, or for a
+/// format with no `{icon}` the glyph written before its first placeholder
+/// (the mic's `\u{F130} {volume}%`). `None` when that is empty or is all the
+/// label shows.
 #[must_use]
 pub fn compact(format: &Format, icon: &str, text: &str) -> Option<String> {
-    (format.placeholders().any(|name| name == "icon") && !icon.is_empty() && icon != text)
-        .then(|| icon.to_owned())
+    let short = if format.placeholders().any(|name| name == "icon") {
+        icon
+    } else {
+        format.lead()
+    }
+    .trim();
+    (!short.is_empty() && short != text).then(|| short.to_owned())
 }
 
 /// The icon for `value` out of `max` from `icons`, ordered low to high.
@@ -88,10 +95,16 @@ mod tests {
         assert_eq!(compact(&volume, "v", "v 40%").as_deref(), Some("v"));
         assert_eq!(compact(&format("{icon}"), "v", "v"), None, "the icon only");
         assert_eq!(
-            compact(&format("m {volume}%"), "v", "m 40%"),
-            None,
-            "no `{{icon}}` in the format"
+            compact(&format("m {volume}%"), "v", "m 40%").as_deref(),
+            Some("m"),
+            "no `{{icon}}`: what is written before the value"
         );
+        assert_eq!(
+            compact(&format("{volume}% m"), "v", "40% m"),
+            None,
+            "nothing written before it"
+        );
+        assert_eq!(compact(&format("m"), "v", "m"), None, "the glyph only");
         assert_eq!(compact(&volume, "", " 40%"), None, "no icon picked");
     }
 
