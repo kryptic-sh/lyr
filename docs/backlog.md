@@ -240,9 +240,13 @@ implementation follows meanwhile.
   with frames in flight, `push_opacity` groups, premultiplied transparent
   windows through sway, the real popup-reposition path on sway 1.12, and a layer
   panel at 1.5 scale. lyr's own runs showed `set_panel` and the frame gate
-  working, the latter with an output turned off. Still open in crcbl:
-  pointer-leave between an app's own windows on Wayland and X11, X11's
-  `display_adapter`, and the scripted resize and read-back as CI jobs.
+  working, the latter with an output turned off. The three rows left open then
+  are done in crcbl 0.21.0 (its backlog table, read at the tag on 2026-11-28):
+  pointer-leave between an app's own windows has e2e tests on Wayland and X11
+  (`crossing_into_another_of_our_windows_leaves_the_first`; the X11 one runs on
+  CI's Xvfb only), X11's `display_adapter` answers through Xwayland, and the
+  resize under load runs as `run_sandbox_resize` in both e2e scripts. lyr pins
+  crcbl 0.20.0, so it gets these with the move to 0.21.0.
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
   `=0.17.1` (2026-11-04). 0.17.0's breaking changes and 0.17.1's fix are in
@@ -406,25 +410,28 @@ implementation follows meanwhile.
   and `CURSOR_SHAPE` caps, cursor-shape-v1 on Wayland, the fall-through to D3D12
   for a transparent Win32 window, and Vulkan refusing a composite alpha the
   surface lacks; on main after 0.5.0 (`f35f4228`), X11 cursor shapes through
-  libxcb-cursor. AT-SPI is on crcbl's main (2026-10-20, unreleased): with
-  crcbl-shell's `accesskit` feature each window gets an `accesskit_unix` adapter
-  Orca can read and press, raising `AccessibilityActivated`,
-  `AccessibilityAction` and `AccessibilityDeactivated`. It brings zbus 5
-  (`accesskit_unix` 0.24) beside lyr's zbus 6, so turning the feature on in lyr
-  puts two zbus versions in its build, and crcbl ignores three RustSec
-  "unmaintained" advisories on zbus 5's crates meanwhile; whether lyr takes it
-  before an `accesskit_unix` on zbus 6 is the owner's call. Still open: AppKit
-  accessibility; AppKit's input-method switch, secure input and pre-edit; X11
-  panels, popups and transparency; tests for the untested cells, including a
-  Hyprland job, a FreeBSD VM job and S21 (fractional scale on a layer panel,
-  which lyr's bar is); no flash on map on AppKit; cold-start timing (S13).
+  libxcb-cursor. AT-SPI is released (in 0.21.0, and earlier): with crcbl-shell's
+  `accesskit` feature each window gets an `accesskit_unix` adapter Orca can read
+  and press, raising `AccessibilityActivated`, `AccessibilityAction` and
+  `AccessibilityDeactivated`. It brings zbus 5 (`accesskit_unix` 0.24) beside
+  lyr's zbus 6, so turning the feature on in lyr puts two zbus versions in its
+  build, and crcbl ignores three RustSec "unmaintained" advisories on zbus 5's
+  crates meanwhile; whether lyr takes it before an `accesskit_unix` on zbus 6 is
+  the owner's call (0.21.0 still has zbus 5.19 there). In 0.21.0 (read at the
+  tag, 2026-11-28): X11 panels (`x11::panel`, dock windows reserving with
+  `_NET_WM_STRUT_PARTIAL`), popups (`x11::popup`) and transparency (a 32-bit
+  ARGB visual when something composites), each with `x11_e2e` tests; S21 has a
+  Wayland e2e test and a laptop run. crcbl lists as not done for X11: a strut on
+  an inner monitor edge reserves nothing, two reserving panels on one edge
+  overlap, and a popup does not follow a moving parent. Still open: AppKit
+  accessibility; AppKit's input-method switch, secure input and pre-edit; a
+  Hyprland CI job; FreeBSD is a compile-only check with no runner; no flash on
+  map on AppKit; cold-start timing (S13).
 - **crcbl: gaps that bear on lyr's milestones.** S9: no pre-edit during a
   compose sequence, no surrounding text, and losing the keyboard mid-sequence is
   untested (crcbl judges the Wi-Fi password field needs none of it). S17: a
   panel's focus loss is tested on sway only, and a click on the empty desktop
-  does not count as one (M5 measures Hyprland). S3: the Wayland
-  `reposition_popup` path needs xdg_wm_base 3 and has not run anywhere.
-  `ui.scrollbar` is vertical only.
+  does not count as one (M5 measures Hyprland). `ui.scrollbar` is vertical only.
 - **crcbl's frame gate: adopted, seen on outputs turned off by the compositor.**
   A FIFO present to an output the compositor has turned off (hypridle DPMS)
   could block lyr's loop, by crcbl's reading of its own source (2026-10-19).
