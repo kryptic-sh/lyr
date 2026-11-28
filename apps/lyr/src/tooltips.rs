@@ -100,17 +100,19 @@ impl Tooltips {
     /// The pointer is over `target` on a bar, or `None`; only a target
     /// [`on_bar`] takes has a tooltip. `held` opened the menu or panel that
     /// is open, and shows none while it is, so its tooltip does not lie over
-    /// what the click opened.
+    /// what the click opened; nor once it closes, until the pointer moves to
+    /// another target, as after any click.
     pub fn hover_bar(
         &mut self,
         target: Option<&Target<Module>>,
         held: Option<&Target<Module>>,
         now: Instant,
     ) {
-        self.hover(
-            target.filter(|target| on_bar(target) && Some(*target) != held),
-            now,
-        );
+        let target = target.filter(|target| on_bar(target));
+        self.hover(target, now);
+        if target.is_some() && target == held {
+            self.press(now);
+        }
     }
 }
 

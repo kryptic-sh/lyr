@@ -186,7 +186,7 @@ impl App {
                     .context("showing or hiding a bar")?;
             }
             _ => {
-                let opened_from = self.opened_from.clone().filter(|_| self.menu_open());
+                let held = event.window().and_then(|id| self.held(id));
                 let Some((id, window)) = event
                     .window()
                     .and_then(|id| Some((id, self.windows.get_mut(&id)?)))
@@ -198,11 +198,7 @@ impl App {
                     window.dirty = true;
                 }
                 let hovered = window.pointer.target(&window.regions);
-                let held = opened_from
-                    .as_ref()
-                    .filter(|(bar, _)| *bar == id)
-                    .map(|(_, target)| target);
-                window.tooltips.hover_bar(hovered, held, instant);
+                window.tooltips.hover_bar(hovered, held.as_ref(), instant);
                 if !presses.is_empty() {
                     window.tooltips.press(instant);
                 }
@@ -228,7 +224,6 @@ impl App {
                         && let Some(rect) = window.regions.rect(target)
                     {
                         tray_press = Some((rect, index, press));
-                        opener = Some(target.clone());
                         continue;
                     }
                     let opens = input::act(

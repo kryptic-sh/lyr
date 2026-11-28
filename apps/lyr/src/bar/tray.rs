@@ -26,6 +26,16 @@ fn menu_box(module: Rect, button: Rect, edge: lyr_config::Position) -> Rect {
     }
 }
 
+/// Where the tray item whose menu is `menu` on the bus name `bus_name` is
+/// among the tray's `shown` items: its button's index, which moves as items
+/// come and go.
+pub(super) fn button_of<'a>(
+    mut shown: impl Iterator<Item = &'a lyr_core::tray::Item>,
+    (bus_name, menu): (&str, &str),
+) -> Option<usize> {
+    shown.position(|item| item.bus_name == bus_name && item.menu.as_deref() == Some(menu))
+}
+
 impl App {
     /// Carries out `press` on the tray button `index` of the bar `bar`,
     /// drawn at `rect`.
@@ -197,13 +207,34 @@ impl App {
     fn tray_clicked(&self, _id: i32) {}
 }
 
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(test)]
 mod tests {
+    #[cfg(target_os = "linux")]
     use lyr_config::Position;
+    #[cfg(target_os = "linux")]
     use lyr_core::hit::Rect;
+    use lyr_core::tray::Item;
 
+    use super::button_of;
+    #[cfg(target_os = "linux")]
     use super::menu_box;
 
+    #[test]
+    fn a_tray_menu_s_button_is_found_by_its_item() {
+        let item = |bus_name: &str, menu: Option<&str>| Item {
+            bus_name: bus_name.to_owned(),
+            menu: menu.map(str::to_owned),
+            ..Item::default()
+        };
+        let mut items = vec![item(":1.2", Some("/Menu")), item(":1.7", Some("/Menu"))];
+        let open = (":1.7", "/Menu");
+        assert_eq!(button_of(items.iter(), open), Some(1));
+        items.remove(0);
+        assert_eq!(button_of(items.iter(), open), Some(0), "it moved up");
+        assert_eq!(button_of([item(":1.7", None)].iter(), open), None);
+    }
+
+    #[cfg(target_os = "linux")]
     const fn rect(x: f32, y: f32, width: f32, height: f32) -> Rect {
         Rect {
             x,
@@ -213,6 +244,7 @@ mod tests {
         }
     }
 
+    #[cfg(target_os = "linux")]
     #[test]
     fn a_side_bar_s_tray_menu_opens_level_with_the_item() {
         let tray = rect(4.0, 300.0, 32.0, 200.0);
@@ -222,11 +254,16 @@ mod tests {
             rect(4.0, 440.0, 32.0, 24.0),
             "past the module's box, level with the item"
         );
-        assert_eq!(menu_box(tray, item, Position::Right).y, 440.0);
         assert_eq!(
-            menu_box(tray, item, Position::Top),
-            tray,
-            "under the module's box, as every menu of a top bar's"
+            menu_box(tray, item, Position::Right),
+            rect(4.0, 440.0, 32.0, 24.0)
         );
+        for edge in [Position::Top, Position::Bottom] {
+            assert_eq!(
+                menu_box(tray, item, edge),
+                tray,
+                "beside the module's box, as every menu of a {edge:?} bar's"
+            );
+        }
     }
 }

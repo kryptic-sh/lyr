@@ -72,8 +72,9 @@ struct App {
     power_menu: Option<PowerMenu>,
     /// A tray item's menu, while it is open.
     tray_menu: Option<TrayMenu>,
-    /// The bar and the module or tray button whose click opened the menu or
-    /// panel that is open, which shows no tooltip meanwhile.
+    /// The bar and the module whose click opened the menu or panel that is
+    /// open, which shows no tooltip meanwhile. A tray menu's button is found
+    /// by its item instead ([`Self::held`]).
     opened_from: Option<(WindowId, lyr_core::draw::Target<lyr_config::Module>)>,
     /// The event batch that last dismissed the power menu: a click outside it
     /// that the bar also receives must not open it again at once.
@@ -554,6 +555,23 @@ impl App {
         self.menu_open() || self.toasts.is_open()
     }
 
+    /// The target on the bar `bar` whose click opened the menu or panel that
+    /// is open: a tray menu's item's button wherever the item now is, or the
+    /// module [`Self::opened_from`] names.
+    fn held(&self, bar: WindowId) -> Option<lyr_core::draw::Target<lyr_config::Module>> {
+        if let Some(menu) = &self.tray_menu {
+            return menu
+                .opened_from(bar)
+                .then(|| tray::button_of(self.data.tray_shown(), menu.item()))
+                .flatten()
+                .map(|index| lyr_core::draw::Target::Button(lyr_config::Module::Tray, index));
+        }
+        self.opened_from
+            .clone()
+            .filter(|(from, _)| *from == bar && self.menu_open())
+            .map(|(_, target)| target)
+    }
+
     /// Whether a panel or a menu is open.
     const fn menu_open(&self) -> bool {
         self.clock_panel.is_some()
@@ -565,6 +583,7 @@ impl App {
     }
 
     fn close_menus(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {
+        self.opened_from = None;
         if let Some(panel) = self.clock_panel.take() {
             panel.close(shell, false)?;
         }

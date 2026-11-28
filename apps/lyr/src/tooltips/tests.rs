@@ -288,12 +288,22 @@ fn the_module_whose_menu_is_open_shows_no_tooltip() {
         None,
         "its panel is open"
     );
+    // The click that closes the panel leaves the pointer on the clock.
     let closed = start + HOVER_DELAY;
+    tooltips.press(closed);
     tooltips.hover_bar(Some(&clock), None, closed);
+    assert_eq!(
+        setup.sync(&mut tooltips, Some("UTC"), closed + HOVER_DELAY),
+        None,
+        "nor once it closes, while the pointer stays"
+    );
+    let back = closed + HOVER_DELAY;
+    tooltips.hover_bar(None, None, back);
+    tooltips.hover_bar(Some(&clock), None, back);
     assert!(
         setup
-            .sync(&mut tooltips, Some("UTC"), closed + HOVER_DELAY)
+            .sync(&mut tooltips, Some("UTC"), back + HOVER_DELAY)
             .is_some(),
-        "with the panel closed it shows again"
+        "back on it after leaving, it shows again"
     );
 }
