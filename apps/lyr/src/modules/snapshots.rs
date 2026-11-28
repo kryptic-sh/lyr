@@ -8,7 +8,7 @@
 use std::fmt::Write as _;
 use std::path::PathBuf;
 
-use chrono::DateTime;
+use jiff::ZonedDateTime;
 use lyr_config::{Colour, Config, Platform, Position, from_sources};
 use lyr_core::battery::{Reading, Status, TimeTo};
 use lyr_core::draw::{Bar, DrawList, Item, Orientation, build};
@@ -22,7 +22,9 @@ const LINE_HEIGHT: f32 = 20.0;
 /// The bar of `config` showing `data` at 09:05 on 2026-10-19, 1920 px wide,
 /// or as a side bar 1080 px tall with lines [`LINE_HEIGHT`] tall.
 fn bar(config: &Config, data: &Data) -> DrawList {
-    let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+    let now = "2026-10-19T09:05:00+08:00[+08:00]"
+        .parse::<ZonedDateTime>()
+        .expect("a time");
     let zone = |items| entries(items, config, data, &now, None, None);
     let (left, center, right) = (
         zone(&config.layout.left),

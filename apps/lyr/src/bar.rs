@@ -23,8 +23,8 @@ use std::sync::PoisonError;
 use std::time::{Duration, Instant};
 
 use anyhow::Context as _;
-use chrono::Local;
 use crcbl_shell::{Shell, ShellEvent, WindowId};
+use jiff::ZonedDateTime;
 use lyr_config::{Config, Platform};
 use lyr_core::clock::Tick;
 use lyr_render::text::Text;
@@ -111,16 +111,9 @@ fn load_family(family: &str) -> anyhow::Result<lyr_render::fonts::Loaded> {
     Ok(font)
 }
 
-/// How long after a time zone change the clock is drawn again: chrono
-/// 0.4.45's `Local` reads `/etc/localtime` again when its mtime changed, but
-/// looks at most once a second (`src/offset/local/unix.rs`), so a draw at
-/// the change itself can still show the old zone.
-#[cfg(target_os = "linux")]
-const ZONE_SETTLED: std::time::Duration = std::time::Duration::from_millis(1100);
-
 /// When the clock's text next changes under `tick`.
 fn next_tick(tick: Tick) -> Instant {
-    Instant::now() + tick.until_next(&Local::now().fixed_offset())
+    Instant::now() + tick.until_next(&ZonedDateTime::now())
 }
 
 /// Runs the bar until `lyr quit` stops it, logging [`Stats`] once a minute
@@ -180,6 +173,10 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         }
         if Instant::now() >= app.next_tick {
             app.stats.changed(woke);
+            // jiff keeps the system time zone for minutes; reading it again
+            // each tick shows a changed zone by the next one, on every
+            // platform, including where no source reports the change.
+            jiff::tz::reset_system_time_zone_cache();
             app.next_tick = next_tick(app.tick);
             app.redraw_all();
             // Its calendar's today and its history's "2 mins ago" move on.
@@ -340,8 +337,8 @@ impl App {
                 }
                 Update::Notification(Change::Closed(id, _)) => self.toasts.closed(*id, now),
                 Update::WifiJoined(joined) => self.wifi_joined(joined.clone()),
-                // The tick comes early to draw the clock in the new zone.
-                Update::Zone(_) => self.next_tick = self.next_tick.min(now + ZONE_SETTLED),
+                // The tick comes at once, to draw the clock in the new zone.
+                Update::Zone(_) => self.next_tick = now,
                 _ => {}
             }
         }
@@ -370,7 +367,7 @@ impl App {
             .notification_store()
             .map(|store| store.lock().unwrap_or_else(PoisonError::into_inner));
         let contents = Contents {
-            today: Local::now().date_naive(),
+            today: ZonedDateTime::now().date(),
             store: store.as_deref(),
             players: &self.data.players,
             now: Instant::now(),
@@ -393,7 +390,7 @@ impl App {
             line_height: self.text.line_height(),
             calendar_line_height: self.text.calendar_line_height(),
         };
-        let today = Local::now().date_naive();
+        let today = ZonedDateTime::now().date();
         self.clock_panel =
             Some(ClockPanel::open(shell, place, &look, today).context("opening the clock panel")?);
         self.toasts.take_down();
@@ -657,7 +654,7 @@ impl App {
             tray_menu,
             ..
         } = self;
-        let now = Local::now().fixed_offset();
+        let now = ZonedDateTime::now();
         let look = Look {
             theme: &config.theme,
             measure: &|s: &str| text.measure(s),

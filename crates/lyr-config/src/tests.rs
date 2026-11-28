@@ -350,8 +350,14 @@ fn an_empty_command_and_an_unknown_action_are_errors() {
 
 #[test]
 fn a_bad_clock_format_is_an_error() {
-    let message = invalid(user("[clock]\nformat = \"%H:%Q\"\n", Platform::Linux));
-    assert_eq!(message, "clock.format: `%H:%Q` is not a strftime format");
+    for format in ["%H:%K", "%+"] {
+        let message = invalid(user(
+            &format!("[clock]\nformat = \"{format}\"\n"),
+            Platform::Linux,
+        ));
+        let expected = format!("clock.format: `{format}` is not a strftime format: ");
+        assert!(message.starts_with(&expected), "{message}");
+    }
     assert!(user("[clock]\nformat = \"%H:%M:%S\"\n", Platform::Linux).is_ok());
 }
 

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::PoisonError;
 use std::sync::{Arc, Mutex};
 
-use chrono::{DateTime, FixedOffset};
+use jiff::ZonedDateTime;
 use lyr_config::{Config, Item, Module};
 use lyr_core::battery::{self, Level, Reading};
 use lyr_core::clock;
@@ -190,7 +190,7 @@ fn entries(
     items: &[Item],
     config: &Config,
     data: &Data,
-    now: &DateTime<FixedOffset>,
+    now: &ZonedDateTime,
     monitor: Option<&str>,
     hovered: Option<usize>,
 ) -> Vec<Entry<Module>> {
@@ -222,7 +222,7 @@ pub fn draw(
     config: &Config,
     text: &Text,
     data: &Data,
-    now: &DateTime<FixedOffset>,
+    now: &ZonedDateTime,
 ) -> Drawn {
     let modules = |items: &[Item]| entries(items, config, data, now, monitor, hovered);
     let (left, center, right) = (
@@ -272,7 +272,7 @@ fn content(
     module: Module,
     config: &Config,
     data: &Data,
-    now: &DateTime<FixedOffset>,
+    now: &ZonedDateTime,
     monitor: Option<&str>,
     #[cfg_attr(not(target_os = "linux"), allow(unused_variables))] hovered: Option<usize>,
 ) -> Option<Content> {
@@ -424,7 +424,7 @@ pub fn tooltip(
     config: &Config,
     data: &Data,
     monitor: Option<&str>,
-    now: &DateTime<FixedOffset>,
+    now: &ZonedDateTime,
 ) -> Option<String> {
     let module = match target {
         Target::Module(module) => *module,
@@ -527,7 +527,7 @@ mod snapshots;
 
 #[cfg(test)]
 mod tests {
-    use chrono::DateTime;
+    use jiff::ZonedDateTime;
     use lyr_config::{Item as LayoutItem, Module, Platform, from_sources};
     use lyr_core::draw::{Content, Entry, Target};
     use lyr_core::tray::{Item, Status};
@@ -537,7 +537,9 @@ mod tests {
     #[test]
     fn the_power_button_is_its_glyph_with_its_tooltip() {
         let config = from_sources(None, Platform::current()).expect("the defaults");
-        let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+        let now = "2026-10-19T09:05:00+08:00[+08:00]"
+            .parse::<ZonedDateTime>()
+            .expect("a time");
         let data = Data::default();
         let glyph = char::from_u32(0xF011).expect("a char").to_string();
         assert_eq!(
@@ -557,7 +559,9 @@ mod tests {
     #[test]
     fn the_volume_falls_back_to_its_icon_alone() {
         let config = from_sources(None, Platform::current()).expect("the defaults");
-        let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+        let now = "2026-10-19T09:05:00+08:00[+08:00]"
+            .parse::<ZonedDateTime>()
+            .expect("a time");
         let data = Data {
             sink: Some(lyr_core::audio::Sink {
                 volume: 40,
@@ -592,7 +596,9 @@ mod tests {
             Platform::current(),
         )
         .expect("valid");
-        let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+        let now = "2026-10-19T09:05:00+08:00[+08:00]"
+            .parse::<ZonedDateTime>()
+            .expect("a time");
         let data = Data {
             battery: Some(lyr_core::battery::Reading {
                 capacity: 64,
@@ -697,7 +703,9 @@ mod tests {
     #[test]
     fn a_zone_s_separators_and_spacers_are_kept_in_place() {
         let config = from_sources(None, Platform::current()).expect("the defaults");
-        let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+        let now = "2026-10-19T09:05:00+08:00[+08:00]"
+            .parse::<ZonedDateTime>()
+            .expect("a time");
         let items = [
             LayoutItem::Named("power".to_owned()),
             LayoutItem::Named("separator".to_owned()),
@@ -727,7 +735,9 @@ mod tests {
             Platform::current(),
         )
         .expect("valid");
-        let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+        let now = "2026-10-19T09:05:00+08:00[+08:00]"
+            .parse::<ZonedDateTime>()
+            .expect("a time");
         let a = config.module("custom/a").expect("a module");
         let Module::Custom(index) = a else {
             panic!("{a:?} is not custom");
@@ -774,7 +784,9 @@ mod tests {
     #[test]
     fn a_tray_button_s_tooltip_is_its_shown_item_s() {
         let config = from_sources(None, Platform::current()).expect("the defaults");
-        let now = DateTime::parse_from_rfc3339("2026-10-19T09:05:00+08:00").expect("a time");
+        let now = "2026-10-19T09:05:00+08:00[+08:00]"
+            .parse::<ZonedDateTime>()
+            .expect("a time");
         let item = |title: &str, status| Item {
             title: title.to_owned(),
             status,

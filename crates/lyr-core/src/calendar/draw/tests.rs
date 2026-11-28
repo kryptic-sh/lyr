@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, Weekday};
+use jiff::civil::{Date, Weekday};
 use lyr_config::{Platform, Theme, from_sources};
 
 use super::draw;
@@ -20,8 +20,8 @@ fn measure(text: &str, _: TextStyle) -> f32 {
 
 const LINE: f32 = 20.0;
 
-fn date(year: i32, month: u32, day: u32) -> NaiveDate {
-    NaiveDate::from_ymd_opt(year, month, day).expect("a date")
+fn date(year: i16, month: i8, day: i8) -> Date {
+    Date::new(year, month, day).expect("a date")
 }
 
 /// Each text drawn, with its rect.
@@ -49,7 +49,7 @@ fn a_month_has_its_title_weekdays_and_weeks() {
     let (list, size) = draw(
         today,
         Mode::Month,
-        Weekday::Mon,
+        Weekday::Monday,
         today,
         &measure,
         LINE,
@@ -76,7 +76,7 @@ fn days_are_right_aligned_in_their_column() {
     let (list, _) = draw(
         today,
         Mode::Month,
-        Weekday::Mon,
+        Weekday::Monday,
         today,
         &measure,
         LINE,
@@ -103,7 +103,7 @@ fn today_is_coloured_and_underlined() {
     let (list, _) = draw(
         today,
         Mode::Month,
-        Weekday::Mon,
+        Weekday::Monday,
         today,
         &measure,
         LINE,
@@ -123,7 +123,7 @@ fn today_is_coloured_and_underlined() {
     let (list, _) = draw(
         date(2025, 10, 1),
         Mode::Month,
-        Weekday::Mon,
+        Weekday::Monday,
         today,
         &measure,
         LINE,
@@ -144,7 +144,7 @@ fn a_year_is_twelve_months_three_across() {
     let (list, size) = draw(
         today,
         Mode::Year,
-        Weekday::Mon,
+        Weekday::Monday,
         today,
         &measure,
         LINE,
@@ -185,7 +185,7 @@ fn spaces_are_measured_between_letters() {
     let (_, spaced) = draw(
         today,
         Mode::Month,
-        Weekday::Mon,
+        Weekday::Monday,
         today,
         &measure,
         LINE,
@@ -194,7 +194,7 @@ fn spaces_are_measured_between_letters() {
     let (_, trimmed) = draw(
         today,
         Mode::Month,
-        Weekday::Mon,
+        Weekday::Monday,
         today,
         &trimmed,
         LINE,
@@ -218,7 +218,7 @@ fn it_is_all_bold_and_measured_so() {
     let (list, size) = draw(
         today,
         Mode::Year,
-        Weekday::Mon,
+        Weekday::Monday,
         today,
         &bold_only,
         LINE,

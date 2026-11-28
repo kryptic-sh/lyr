@@ -1,13 +1,14 @@
 //! The clock module (`docs/plan/07-modules.md#clock`).
 //!
-//! The text is a strftime format (chrono's), as waybar's `{:%Y/%m/%d %H:%M}`
-//! is. The finest unit the format shows decides how often the clock ticks, so
-//! a minute format wakes lyr once a minute rather than every second.
+//! The text is a strftime format (jiff's, with POSIX's `%c`, `%x`, `%X` and
+//! `%r`), as waybar's `{:%Y/%m/%d %H:%M}` is. The finest unit the format shows
+//! decides how often the clock ticks, so a minute format wakes lyr once a
+//! minute rather than every second.
 
 use std::time::Duration;
 
-use chrono::format::{Fixed, Item, Numeric, StrftimeItems};
-use chrono::{DateTime, FixedOffset, Timelike};
+use jiff::fmt::strtime::{BrokenDownTime, Config, PosixCustom};
+use jiff::{Timestamp, ZonedDateTime, tz::TimeZone};
 
 /// How often the clock's text can change.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -17,43 +18,33 @@ pub enum Tick {
 }
 
 impl Tick {
-    /// The finest unit `format` shows: a second when any of its items shows
-    /// seconds or finer (`%S`, `%T`, `%c`, `%s`, `%+`, …), a minute otherwise.
+    /// The finest unit `format` shows: a second when its text differs between
+    /// two moments a second and a half apart in the same minute (`%S`, `%T`,
+    /// `%c`, `%s`, `%f`, …), a minute otherwise.
     #[must_use]
     pub fn of(format: &str) -> Self {
-        let shows_seconds = StrftimeItems::new(format).any(|item| match item {
-            Item::Numeric(numeric, _) => {
-                matches!(
-                    numeric,
-                    Numeric::Second | Numeric::Nanosecond | Numeric::Timestamp
-                )
-            }
-            Item::Fixed(fixed) => matches!(
-                fixed,
-                Fixed::Nanosecond
-                    | Fixed::Nanosecond3
-                    | Fixed::Nanosecond6
-                    | Fixed::Nanosecond9
-                    | Fixed::RFC2822
-                    | Fixed::RFC3339
-            ),
-            _ => false,
-        });
-        if shows_seconds {
-            Self::Second
-        } else {
-            Self::Minute
+        let at = |millis| {
+            Timestamp::from_millisecond(millis)
+                .map(|moment| format_at(&moment.to_zoned_datetime(TimeZone::UTC), format))
+        };
+        // 2026-01-01T00:00:00Z and 1.5 s later.
+        let start = 1_767_225_600_000;
+        match (at(start), at(start + 1_500)) {
+            (Ok(Ok(first)), Ok(Ok(second))) if first == second => Self::Minute,
+            _ => Self::Second,
         }
     }
 
     /// How long from `now` until the text next changes: the start of the
     /// next minute or second, so the clock flips on the boundary.
     #[must_use]
-    pub fn until_next(self, now: &DateTime<FixedOffset>) -> Duration {
-        let into_second = Duration::from_nanos(u64::from(now.nanosecond() % 1_000_000_000));
+    pub fn until_next(self, now: &ZonedDateTime) -> Duration {
+        let into_second = Duration::from_nanos(u64::from(now.subsec_nanosecond().unsigned_abs()));
         let into_tick = match self {
             Self::Second => into_second,
-            Self::Minute => Duration::from_secs(u64::from(now.second())) + into_second,
+            Self::Minute => {
+                Duration::from_secs(u64::from(now.second().unsigned_abs())) + into_second
+            }
         };
         let period = match self {
             Self::Second => Duration::from_secs(1),
@@ -61,6 +52,18 @@ impl Tick {
         };
         period.saturating_sub(into_tick)
     }
+}
+
+/// `now` under the strftime `format`, with POSIX's `%c`, `%x`, `%X` and `%r`
+/// (`Sun Jul  8 00:34:59 2001` rather than jiff's default locale), as chrono
+/// and the C library print them. Fails on a specifier jiff does not know.
+///
+/// # Errors
+///
+/// When `format` has a conversion specifier jiff does not support.
+pub fn format_at(now: &ZonedDateTime, format: &str) -> Result<String, jiff::Error> {
+    let config = Config::new().custom(PosixCustom::new());
+    BrokenDownTime::from(now).to_string_with_config(&config, format)
 }
 
 /// What the module draws.
@@ -73,12 +76,14 @@ pub struct View {
 }
 
 /// The view of `now` in the zone named `zone`, under the strftime `format`.
-/// The config has already checked that `format` parses.
+/// The config has already checked that `format` formats ([`format_at`]); were
+/// it to fail, the text is the error, so it shows rather than going blank.
 #[must_use]
-pub fn view(now: &DateTime<FixedOffset>, zone: Option<&str>, format: &str) -> View {
-    let offset = format!("UTC{}", now.format("%:z"));
+pub fn view(now: &ZonedDateTime, zone: Option<&str>, format: &str) -> View {
+    let shown = |format| format_at(now, format).unwrap_or_else(|error| error.to_string());
+    let offset = format!("UTC{}", shown("%:z"));
     View {
-        text: now.format(format).to_string(),
+        text: shown(format),
         tooltip: zone.map_or_else(|| offset.clone(), |zone| format!("{zone}, {offset}")),
     }
 }
@@ -87,12 +92,16 @@ pub fn view(now: &DateTime<FixedOffset>, zone: Option<&str>, format: &str) -> Vi
 mod tests {
     use std::time::Duration;
 
-    use chrono::{DateTime, FixedOffset};
+    use jiff::ZonedDateTime;
+    use jiff::fmt::strtime;
 
-    use super::{Tick, view};
+    use super::{Tick, format_at, view};
 
-    fn at(text: &str) -> DateTime<FixedOffset> {
-        DateTime::parse_from_rfc3339(text).expect("a valid time")
+    /// The time `text` names (RFC 3339), in a fixed zone of its offset.
+    fn at(text: &str) -> ZonedDateTime {
+        strtime::parse("%Y-%m-%dT%H:%M:%S%.f%:z", text)
+            .and_then(|tm| tm.to_zoned_datetime())
+            .expect("a valid time")
     }
 
     #[test]
@@ -126,9 +135,26 @@ mod tests {
     fn the_tick_follows_the_finest_unit_shown() {
         assert_eq!(Tick::of("%Y/%m/%d %H:%M"), Tick::Minute);
         assert_eq!(Tick::of("%a %e %b"), Tick::Minute);
-        for format in ["%H:%M:%S", "%T", "%X", "%c", "%r", "%s", "%+", "%.3f"] {
+        for format in ["%H:%M:%S", "%T", "%X", "%c", "%r", "%s", "%.3f", "%f"] {
             assert_eq!(Tick::of(format), Tick::Second, "{format}");
         }
+    }
+
+    #[test]
+    fn the_locale_specifiers_read_as_posix() {
+        let now = at("2026-10-05T17:05:09+08:00");
+        let shown = |format| format_at(&now, format).expect("a known format");
+        assert_eq!(shown("%c"), "Mon Oct  5 17:05:09 2026");
+        assert_eq!(shown("%x"), "10/05/26");
+        assert_eq!(shown("%X"), "17:05:09");
+        assert_eq!(shown("%r"), "05:05:09 PM");
+    }
+
+    #[test]
+    fn an_unknown_specifier_is_an_error() {
+        let now = at("2026-10-05T17:05:09+08:00");
+        assert!(format_at(&now, "%+").is_err());
+        assert!(format_at(&now, "%Y %K").is_err());
     }
 
     #[test]

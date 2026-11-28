@@ -5,14 +5,15 @@
 
 pub mod draw;
 
-use chrono::{Datelike, Months, NaiveDate, Weekday};
+use jiff::Span;
+use jiff::civil::{Date, Weekday};
 
 /// One row of a month: its week number, and the day of the month in each of
 /// the seven columns, `None` outside the month.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Week {
     pub number: u32,
-    pub days: [Option<u32>; 7],
+    pub days: [Option<i8>; 7],
 }
 
 /// The seven weekdays in column order, starting from `first`.
@@ -21,7 +22,7 @@ pub fn weekdays(first: Weekday) -> [Weekday; 7] {
     let mut day = first;
     std::array::from_fn(|_| {
         let this = day;
-        day = day.succ();
+        day = day.next();
         this
     })
 }
@@ -29,24 +30,25 @@ pub fn weekdays(first: Weekday) -> [Weekday; 7] {
 /// The rows of `month` in `year` (`month` from 1), weeks starting on `first`.
 /// `None` for a month that does not exist.
 #[must_use]
-pub fn month(year: i32, month: u32, first: Weekday) -> Option<Vec<Week>> {
-    let start = NaiveDate::from_ymd_opt(year, month, 1)?;
-    let length = start.checked_add_months(Months::new(1))?.pred_opt()?.day();
+pub fn month(year: i16, month: i8, first: Weekday) -> Option<Vec<Week>> {
+    let start = Date::new(year, month, 1).ok()?;
+    let length = start.days_in_month();
     // Columns before the 1st.
-    let offset = start.weekday().days_since(first);
-    let rows = (offset + length).div_ceil(7);
+    let offset = start.weekday().since(first);
+    let rows = (offset + length + 6) / 7;
     (0..rows)
         .map(|row| {
             let days = std::array::from_fn(|column| {
-                let day = (row * 7 + column as u32).checked_sub(offset)? + 1;
-                (day <= length).then_some(day)
+                // `column` is below 7.
+                let day = row * 7 + column as i8 - offset + 1;
+                (1..=length).contains(&day).then_some(day)
             });
             // waybar numbers the first row by the 1st and every other row by
             // its first day.
             let numbered = if row == 0 {
                 start
             } else {
-                start.with_day(row * 7 + 1 - offset)?
+                start.with().day(row * 7 + 1 - offset).build().ok()?
             };
             Some(Week {
                 number: week_number(numbered, first),
@@ -61,14 +63,16 @@ pub fn month(year: i32, month: u32, first: Weekday) -> Option<Vec<Week>> {
 /// on Monday, `%U` (from the first Sunday) otherwise. Both count the days
 /// before that first day as week 0.
 #[must_use]
-pub fn week_number(date: NaiveDate, first: Weekday) -> u32 {
-    let from = if first == Weekday::Mon {
-        Weekday::Mon
+pub fn week_number(date: Date, first: Weekday) -> u32 {
+    let from = if first == Weekday::Monday {
+        Weekday::Monday
     } else {
-        Weekday::Sun
+        Weekday::Sunday
     };
-    // POSIX strftime: (tm_yday + 7 - days since the week's first day) / 7.
-    (date.ordinal0() + 7 - date.weekday().days_since(from)) / 7
+    // POSIX strftime: (tm_yday + 7 - days since the week's first day) / 7,
+    // tm_yday counting from 0.
+    let yday = u32::from(date.day_of_year().unsigned_abs()) - 1;
+    (yday + 7 - u32::from(date.weekday().since(from).unsigned_abs())) / 7
 }
 
 /// What the calendar shows: a year of twelve months, or one month.
@@ -80,20 +84,18 @@ pub enum Mode {
 
 /// The month the view shows after moving `steps` units of `mode` from
 /// `shown` (a year in year mode, a month in month mode, backwards when
-/// negative), as waybar's `on-scroll` does. `None` past chrono's range.
+/// negative), as waybar's `on-scroll` does. `None` past jiff's range.
 #[must_use]
-pub fn shift(shown: NaiveDate, mode: Mode, steps: i32) -> Option<NaiveDate> {
+pub fn shift(shown: Date, mode: Mode, steps: i32) -> Option<Date> {
     let unit = match mode {
         Mode::Year => 12,
         Mode::Month => 1,
     };
-    let months = Months::new(steps.unsigned_abs().checked_mul(unit)?);
-    let first = shown.with_day(1)?;
-    if steps < 0 {
-        first.checked_sub_months(months)
-    } else {
-        first.checked_add_months(months)
-    }
+    let months = i64::from(steps) * unit;
+    shown
+        .first_of_month()
+        .checked_add(Span::new().try_months(months).ok()?)
+        .ok()
 }
 
 #[cfg(test)]

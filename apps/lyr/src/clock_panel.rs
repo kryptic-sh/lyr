@@ -13,8 +13,8 @@
 //! `Enter` acts on the outlined one, and `Delete` dismisses its notification
 //! (swaync's `keyboard-shortcuts`).
 
-use chrono::{NaiveDate, Weekday};
 use crcbl_shell::{CloseReply, Shell, ShellEvent, WindowDesc, WindowId, WindowRole};
+use jiff::civil::{Date, Weekday};
 use lyr_config::{Colour, Theme};
 use std::time::Instant;
 
@@ -45,7 +45,7 @@ const BORDER: f32 = 2.0;
 /// swaync's corner radius.
 const RADIUS: f32 = 8.0;
 /// The calendar's first weekday where the locale's cannot be read: ISO's.
-const FIRST_WEEKDAY: Weekday = Weekday::Mon;
+const FIRST_WEEKDAY: Weekday = Weekday::Monday;
 /// Lines the centre scrolls per wheel step.
 const SCROLL_LINES: f32 = 3.0;
 
@@ -56,7 +56,7 @@ pub struct ClockPanel {
     /// The locale's first weekday, read when the panel opens.
     first: Weekday,
     /// The month the calendar shows, and how.
-    shown: NaiveDate,
+    shown: Date,
     mode: Mode,
     /// Logical pixels: what it shows needs, held to the output.
     size: Size,
@@ -99,7 +99,7 @@ pub enum Outcome {
 /// What the panel shows at a moment: today, and the notification store when
 /// lyr is the daemon.
 pub struct Contents<'a> {
-    pub today: NaiveDate,
+    pub today: Date,
     pub store: Option<&'a Store>,
     /// The media players, drawn in the centre.
     pub players: &'a [Player],
@@ -113,10 +113,10 @@ impl ClockPanel {
         shell: &mut dyn Shell,
         place: Place,
         look: &Look<'_>,
-        today: NaiveDate,
+        today: Date,
     ) -> anyhow::Result<Self> {
         let first = lyr_sources::locale::first_weekday()
-            .and_then(|day| Weekday::try_from(day).ok())
+            .and_then(|day| Weekday::from_monday_zero_offset(i8::try_from(day).ok()?).ok())
             .unwrap_or(FIRST_WEEKDAY);
         let (_, calendar) = calendar::draw::draw(
             today,

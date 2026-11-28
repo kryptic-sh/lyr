@@ -1,10 +1,10 @@
 use std::time::Instant;
 
-use chrono::NaiveDate;
 use crcbl_shell::{
     ButtonState, HeadlessShell, KeyCode, PhysicalPoint, PointerButton, ScrollDelta, Shell,
     ShellEvent,
 };
+use jiff::civil::Date;
 use lyr_config::{Platform, Theme, from_sources};
 use lyr_core::calendar::Mode;
 use lyr_core::centre::Target;
@@ -28,8 +28,8 @@ struct Setup {
     store: Option<Store>,
 }
 
-fn today() -> NaiveDate {
-    NaiveDate::from_ymd_opt(2026, 10, 19).expect("a date")
+fn today() -> Date {
+    Date::new(2026, 10, 19).expect("a date")
 }
 
 fn setup() -> Setup {
@@ -212,7 +212,7 @@ fn a_right_click_switches_the_mode_and_scrolling_moves_by_it() {
     setup.pump();
     assert_eq!(
         setup.panel.shown,
-        NaiveDate::from_ymd_opt(2027, 10, 1).expect("a date"),
+        Date::new(2027, 10, 1).expect("a date"),
         "a year in year mode"
     );
     setup
@@ -228,7 +228,7 @@ fn a_right_click_switches_the_mode_and_scrolling_moves_by_it() {
     setup.pump();
     assert_eq!(
         setup.panel.shown,
-        NaiveDate::from_ymd_opt(2027, 9, 1).expect("a date"),
+        Date::new(2027, 9, 1).expect("a date"),
         "a month in month mode"
     );
     assert!(setup.panel.ready(), "redrawn");

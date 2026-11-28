@@ -481,7 +481,7 @@ impl App {
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
         });
         let contents = Contents {
-            today: chrono::Local::now().date_naive(),
+            today: jiff::ZonedDateTime::now().date(),
             store: store.as_deref(),
             players: &self.data.players,
             now: Instant::now(),

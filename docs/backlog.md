@@ -520,21 +520,6 @@ implementation follows meanwhile.
   check every publish target: the GitHub release, crates.io (all seven crates),
   AUR, Homebrew and Scoop.
 
-- **chrono is unmaintained: move to jiff or time?** (2026-11-28.) **Q:**
-  RUSTSEC-2026-0543 (2026-09-14) marks every chrono version unmaintained, with
-  no fix; it recommends jiff or time. cargo-deny fails on it (the nightly
-  `cron.yml` run of 2026-11-23 went red), so `deny.toml` ignores that one ID
-  with a reason; cargo-audit only warns. chrono is a direct dependency of
-  `lyr-core`, `lyr-config` and `lyr-bin` (the clock's strftime formats in
-  `lyr_core::clock`, the calendar, notification times in
-  `lyr_core::notifications` and `lyr_sources::notifications::linux`). Neither
-  jiff nor time is in the tree yet, so moving is a new dependency and the
-  owner's call. jiff has strftime-style formatting and reads the system time
-  zone itself; whichever is picked, the clock's format strings must keep their
-  meaning (users' configs and `lyr import-waybar`'s output use them), so check
-  its `%` specifiers against chrono's. Drop the `deny.toml` ignore when chrono
-  leaves the tree.
-
 - **`windows` 0.62 stays in the tree through crcbl's Windows crates.** lyr's own
   Windows code is on windows-rs 0.100's crates (`windows-core`,
   `windows-collections`, `windows-future`), with the Bluetooth source's WinRT
@@ -883,17 +868,17 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   (`lyr_sources::clock::linux::TimeDate`, tested against a fake timedated and
   mutation-checked, and read from the owner's real one by the `system_services`
   test), so a zone change redraws the bar at once. The clock's text takes the
-  new zone because chrono 0.4.45's `Local` re-reads `/etc/localtime` when its
-  mtime changes, checking at most once a second (`src/offset/local/unix.rs`); so
-  a zone change also brings the clock's tick in to `ZONE_SETTLED` later
-  (`apps/lyr/src/bar.rs`), past that check (2026-10-28). Not seen working: it
-  needs the system's zone changed. Text is cut at its rect's edges
-  (`lyr_render::translate` clips each text item), so a label wider than its box
-  no longer runs over its neighbours. A format cannot drop the literal text
-  around an empty placeholder; the one case that came up, a battery with no
-  power reading, now shows 0 W as waybar 0.15.0 does (`total_power / 1e6`), and
-  UPower always reports a rate. Measuring text (the widths `layout` takes) needs
-  crcbl-ui's font atlas, so it is done by the caller in `lyr-render`.
+  new zone because each tick resets jiff's cache of the system zone
+  (`jiff::tz::reset_system_time_zone_cache`, which otherwise keeps it for
+  minutes), and a timedate1 change brings the tick in at once
+  (`apps/lyr/src/bar.rs`, 2026-11-28). Not seen working: it needs the system's
+  zone changed. Text is cut at its rect's edges (`lyr_render::translate` clips
+  each text item), so a label wider than its box no longer runs over its
+  neighbours. A format cannot drop the literal text around an empty placeholder;
+  the one case that came up, a battery with no power reading, now shows 0 W as
+  waybar 0.15.0 does (`total_power / 1e6`), and UPower always reports a rate.
+  Measuring text (the widths `layout` takes) needs crcbl-ui's font atlas, so it
+  is done by the caller in `lyr-render`.
 - **Notification daemon, M6.** Built: the store (`lyr_core::notifications`): ids
   from 1 that skip 0 and held ids, `replaces_id` kept as the id and replacing in
   place (even for an id lyr does not hold, as the spec says), swaync's timeouts
@@ -1670,10 +1655,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 - **Clock panel, M5.** Built: the calendar maths (`lyr_core::calendar`): a
   month's rows from a first weekday, waybar's week numbers (`%W` from Monday,
   `%U` otherwise, the first row numbered by the 1st), the header order and
-  scrolling by a month or a year, tested against chrono's `%W` and `%U` for
-  every day of 2020 – 2030 and mutation-checked. The week numbers follow waybar,
-  not ISO, because the dotfiles do not set `iso8601`; ISO would be `%V`, a
-  one-line change, if the owner prefers it. The calendar is drawn too
+  scrolling by a month or a year, tested against jiff's `%W` and `%U` for every
+  day of 2020 – 2030 and mutation-checked. The week numbers follow waybar, not
+  ISO, because the dotfiles do not set `iso8601`; ISO would be `%V`, a one-line
+  change, if the owner prefers it. The calendar is drawn too
   (`lyr_core::calendar::draw`): waybar's month blocks on a grid of cells as wide
   as the widest day or weekday name, so a proportional font still lines up, year
   mode three months across, week numbers on the right, all in bold and today in

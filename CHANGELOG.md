@@ -8,6 +8,19 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Breaking
+
+- The clock and calendar are built on jiff instead of chrono, which is
+  unmaintained (RUSTSEC-2026-0543). `clock.format` keeps its strftime codes,
+  with `%c`, `%x`, `%X` and `%r` printed as before, but a few change: `%+` and
+  `%v` are no longer accepted (the config says so when it loads; write
+  `%Y-%m-%dT%H:%M:%S%.f%:z` and `%e-%b-%Y`), `%Z` prints the zone's abbreviation
+  (`PST`) rather than its offset, and `%f` prints the fraction of a second
+  without trailing zeros. For users of the library crates: `lyr_core::clock`
+  takes a `jiff::ZonedDateTime` and `lyr_core::calendar` a `jiff::civil::Date`
+  and `Weekday`, with `month` taking `i16` and `i8` and `Week::days` holding
+  `i8`.
+
 ### Added
 
 - A button in the Bluetooth, Wi-Fi and audio menus shows pushed in while the
@@ -36,6 +49,8 @@ and this project adheres to
   the Wi-Fi menu's is labelled "Wi-Fi". While Bluetooth is off the menu shows
   only that switch and "Bluetooth is off", hiding the other switches and the
   devices, as the Wi-Fi menu does.
+- A time zone change shows on the clock at the next tick on every platform, and
+  at once on Linux when timedate1 reports it, rather than after a second.
 - Built on crcbl 0.20.0 (from 0.17.2). The bar's system fonts are now
   memory-mapped instead of copied onto the heap wherever crcbl allows it. For
   users of the library crates: `lyr_shell::bars::Bars` takes a

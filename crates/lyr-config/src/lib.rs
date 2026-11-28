@@ -320,8 +320,12 @@ fn validate(config: &Config, platform: Platform) -> Result<(), String> {
         return Err("window.max_length: must be more than 0".to_owned());
     }
     let clock = &config.clock.format;
-    if chrono::format::StrftimeItems::new(clock).any(|item| item == chrono::format::Item::Error) {
-        return Err(format!("clock.format: `{clock}` is not a strftime format"));
+    // Any moment does: a format jiff knows formats every one.
+    let moment = jiff::Timestamp::UNIX_EPOCH.to_zoned_datetime(jiff::tz::TimeZone::UTC);
+    if let Err(error) = jiff::fmt::strtime::format(clock, &moment) {
+        return Err(format!(
+            "clock.format: `{clock}` is not a strftime format: {error}"
+        ));
     }
     let battery = &config.battery;
     let bar_formats = [

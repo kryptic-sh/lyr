@@ -9,7 +9,7 @@
 //! Everything is bold and today underlined, as the dotfiles' calendar format
 //! marks them up.
 
-use chrono::{Datelike, NaiveDate, Weekday};
+use jiff::civil::{Date, Weekday};
 use lyr_config::{Colour, Theme};
 
 use super::{Mode, Week, month, weekdays};
@@ -49,13 +49,13 @@ const MONTHS: [&str; 12] = [
 /// A weekday's name cut to two letters, as waybar cuts `%a`.
 const fn short(day: Weekday) -> &'static str {
     match day {
-        Weekday::Mon => "Mo",
-        Weekday::Tue => "Tu",
-        Weekday::Wed => "We",
-        Weekday::Thu => "Th",
-        Weekday::Fri => "Fr",
-        Weekday::Sat => "Sa",
-        Weekday::Sun => "Su",
+        Weekday::Monday => "Mo",
+        Weekday::Tuesday => "Tu",
+        Weekday::Wednesday => "We",
+        Weekday::Thursday => "Th",
+        Weekday::Friday => "Fr",
+        Weekday::Saturday => "Sa",
+        Weekday::Sunday => "Su",
     }
 }
 
@@ -71,7 +71,7 @@ struct Grid<'a> {
     /// The week number's column.
     week: f32,
     first: Weekday,
-    today: NaiveDate,
+    today: Date,
     theme: &'a Theme,
 }
 
@@ -110,10 +110,10 @@ impl Grid<'_> {
 /// measured by `measure` in lines `line_height` tall.
 #[must_use]
 pub fn draw(
-    shown: NaiveDate,
+    shown: Date,
     mode: Mode,
     first: Weekday,
-    today: NaiveDate,
+    today: Date,
     measure: &dyn Fn(&str, TextStyle) -> f32,
     line_height: f32,
     theme: &Theme,
@@ -133,7 +133,7 @@ pub fn draw(
         today,
         theme,
     };
-    let months: Vec<u32> = match mode {
+    let months: Vec<i8> = match mode {
         Mode::Year => (1..=12).collect(),
         Mode::Month => vec![shown.month()],
     };
@@ -172,7 +172,7 @@ fn block(
     items: &mut Vec<Item>,
     grid: &Grid<'_>,
     at: (f32, f32),
-    (year, number): (i32, u32),
+    (year, number): (i16, i8),
     weeks: &[Week],
 ) {
     let Grid {
@@ -183,7 +183,7 @@ fn block(
     } = *grid;
     let (x, y) = at;
     let lh = grid.line_height;
-    let title = format!("{} {year}", MONTHS[number as usize - 1]);
+    let title = format!("{} {year}", MONTHS[usize::from(number.unsigned_abs()) - 1]);
     items.push(Item::Text {
         rect: Rect {
             x,
