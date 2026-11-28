@@ -1740,14 +1740,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   the size arrives and the bar is drawn again; reasoned from the code, not seen.
   A fix would skip hit-testing and menu placement while a window awaits its
   size.
-- **A module's tooltip stays over its own open popup or panel.** Network's
-  tooltip stays over the Wi-Fi menu, Bluetooth's over its menu, the output
-  device's name over the audio menu, and the clock's time zone over the clock
-  panel's Do Not Disturb row. Seen by the Linux session (office-lyr) on Hyprland
-  0.57.1 nested, with a top bar and a side bar alike (2026-11-04); sway 1.12
-  headless showed no tooltips at all, and the clock's case on Windows earlier.
-  Not side-bar specific. Opening a popup or panel from a module should hide that
-  module's tooltip.
 - **The clock panel can be taller than the room below a top bar.** On a 720-tall
   output with a top bar, the panel does not fit below the bar and its bottom row
   (Do Not Disturb) is cut at the output's edge (office-lyr, Hyprland 0.57.1
@@ -1900,6 +1892,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Not yet verified
 
+- A module's tooltip held back while the menu or panel its click opened is up
+  (`App::opened_from`, `Tooltips::hover_bar`'s `held`): the filter is
+  unit-tested, the wiring in `bar::events` is not, and it has not been seen on
+  Hyprland, where the tooltip was seen over its menu (2026-11-04).
 - First run on the owner's Hyprland 0.56.2 (Arch, 2026-10-20, Intel RPL-U GPU,
   one 2560 × 1440 output, next to the running waybar): the layer panel reserved
   its 50 px under waybar's, and drew the power button, battery, power profile,

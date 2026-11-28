@@ -78,6 +78,9 @@ and this project adheres to
 
 ### Fixed
 
+- A module's tooltip no longer shows over the menu or panel its click opened
+  (Network's over the Wi-Fi menu, the clock's over the clock panel, and so on).
+  It shows again once that menu or panel closes.
 - On Linux, answering a pairing question in the Bluetooth menu (a confirmation
   or a PIN) reaches BlueZ at once. Before, the answer waited behind the pairing
   that asked it, so BlueZ gave up and the pairing failed though it was answered.

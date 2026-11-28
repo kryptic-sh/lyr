@@ -145,9 +145,9 @@ fn nothing_opens_without_text_a_box_or_a_module() {
         "no box"
     );
     let mut tooltips = Tooltips::default();
-    tooltips.hover_bar(Some(&Target::Button(Module::Workspaces, 0)), start);
+    tooltips.hover_bar(Some(&Target::Button(Module::Workspaces, 0)), None, start);
     assert_eq!(tooltips.next_wake(), None, "a workspace button has none");
-    tooltips.hover_bar(Some(&Target::Button(Module::Tray, 0)), start);
+    tooltips.hover_bar(Some(&Target::Button(Module::Tray, 0)), None, start);
     assert_eq!(
         tooltips.next_wake(),
         Some(start + HOVER_DELAY),
@@ -273,5 +273,27 @@ fn a_tooltip_opens_where_its_target_is_scrolled_to() {
     assert_eq!(
         tooltips.popup.as_ref().map(|popup| popup.anchor.y),
         Some(-90.0)
+    );
+}
+
+#[test]
+fn the_module_whose_menu_is_open_shows_no_tooltip() {
+    let mut setup = setup();
+    let start = Instant::now();
+    let clock = Target::Module(Module::Clock);
+    let mut tooltips = Tooltips::default();
+    tooltips.hover_bar(Some(&clock), Some(&clock), start);
+    assert_eq!(
+        setup.sync(&mut tooltips, Some("UTC"), start + HOVER_DELAY),
+        None,
+        "its panel is open"
+    );
+    let closed = start + HOVER_DELAY;
+    tooltips.hover_bar(Some(&clock), None, closed);
+    assert!(
+        setup
+            .sync(&mut tooltips, Some("UTC"), closed + HOVER_DELAY)
+            .is_some(),
+        "with the panel closed it shows again"
     );
 }

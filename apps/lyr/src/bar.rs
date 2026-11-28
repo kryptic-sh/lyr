@@ -72,6 +72,9 @@ struct App {
     power_menu: Option<PowerMenu>,
     /// A tray item's menu, while it is open.
     tray_menu: Option<TrayMenu>,
+    /// The bar and the module or tray button whose click opened the menu or
+    /// panel that is open, which shows no tooltip meanwhile.
+    opened_from: Option<(WindowId, lyr_core::draw::Target<lyr_config::Module>)>,
     /// The event batch that last dismissed the power menu: a click outside it
     /// that the bar also receives must not open it again at once.
     menu_dismissed_at: Option<Instant>,
@@ -154,6 +157,7 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         menu_dismissed_at: None,
         hidden: false,
         popups_open: false,
+        opened_from: None,
         stats: Stats::new(Instant::now()),
     };
     let bar = app.config.bar.clone();
@@ -244,6 +248,11 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
         app.commands.wifi_menu(app.wifi_menu.is_some());
         app.sync_custom();
         app.draw(shell.as_mut())?;
+        // Opened some other way (`lyr` on the socket) once this one closed,
+        // a menu shows every module's tooltip.
+        if !app.menu_open() {
+            app.opened_from = None;
+        }
         let open = app.popups_open();
         if std::mem::replace(&mut app.popups_open, open) && !open {
             crate::memory::give_back();
@@ -542,13 +551,17 @@ impl App {
     /// Whether a panel, a menu or the toasts are open: what a bar shows
     /// besides itself and its tooltips.
     const fn popups_open(&self) -> bool {
+        self.menu_open() || self.toasts.is_open()
+    }
+
+    /// Whether a panel or a menu is open.
+    const fn menu_open(&self) -> bool {
         self.clock_panel.is_some()
             || self.bluetooth_menu.is_some()
             || self.wifi_menu.is_some()
             || self.audio_menu.is_some()
             || self.power_menu.is_some()
             || self.tray_menu.is_some()
-            || self.toasts.is_open()
     }
 
     fn close_menus(&mut self, shell: &mut dyn Shell) -> anyhow::Result<()> {

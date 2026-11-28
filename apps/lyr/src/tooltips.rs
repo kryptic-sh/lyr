@@ -98,9 +98,19 @@ impl<T> Default for Tooltips<T> {
 
 impl Tooltips {
     /// The pointer is over `target` on a bar, or `None`; only a target
-    /// [`on_bar`] takes has a tooltip.
-    pub fn hover_bar(&mut self, target: Option<&Target<Module>>, now: Instant) {
-        self.hover(target.filter(|target| on_bar(target)), now);
+    /// [`on_bar`] takes has a tooltip. `held` opened the menu or panel that
+    /// is open, and shows none while it is, so its tooltip does not lie over
+    /// what the click opened.
+    pub fn hover_bar(
+        &mut self,
+        target: Option<&Target<Module>>,
+        held: Option<&Target<Module>>,
+        now: Instant,
+    ) {
+        self.hover(
+            target.filter(|target| on_bar(target) && Some(*target) != held),
+            now,
+        );
     }
 }
 

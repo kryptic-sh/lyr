@@ -186,6 +186,7 @@ impl App {
                     .context("showing or hiding a bar")?;
             }
             _ => {
+                let opened_from = self.opened_from.clone().filter(|_| self.menu_open());
                 let Some((id, window)) = event
                     .window()
                     .and_then(|id| Some((id, self.windows.get_mut(&id)?)))
@@ -197,7 +198,11 @@ impl App {
                     window.dirty = true;
                 }
                 let hovered = window.pointer.target(&window.regions);
-                window.tooltips.hover_bar(hovered, instant);
+                let held = opened_from
+                    .as_ref()
+                    .filter(|(bar, _)| *bar == id)
+                    .map(|(_, target)| target);
+                window.tooltips.hover_bar(hovered, held, instant);
                 if !presses.is_empty() {
                     window.tooltips.press(instant);
                 }
@@ -212,6 +217,8 @@ impl App {
                 // The power menu's anchor, when there is room for it.
                 let mut power_at = None;
                 let mut tray_press = None;
+                // The target whose click opens a menu or panel.
+                let mut opener = None;
                 for press in presses {
                     let Some(target) = window.pointer.target(&window.regions) else {
                         continue;
@@ -221,6 +228,7 @@ impl App {
                         && let Some(rect) = window.regions.rect(target)
                     {
                         tray_press = Some((rect, index, press));
+                        opener = Some(target.clone());
                         continue;
                     }
                     let opens = input::act(
@@ -238,6 +246,18 @@ impl App {
                     if opens == Some(Builtin::ToggleDnd) {
                         toggle_dnd = !toggle_dnd;
                         continue;
+                    }
+                    if matches!(
+                        opens,
+                        Some(
+                            Builtin::OpenClockPanel
+                                | Builtin::OpenBluetoothMenu
+                                | Builtin::OpenAudioMenu
+                                | Builtin::OpenWifiMenu
+                                | Builtin::OpenPowerMenu
+                        )
+                    ) {
+                        opener = Some(target.clone());
                     }
                     if opens == Some(Builtin::OpenClockPanel) {
                         toggle_panel = match toggle_panel {
@@ -321,6 +341,9 @@ impl App {
                     && let Err(why) = self.toggle_wifi_menu(shell, place, instant)?
                 {
                     tracing::warn!("open_wifi_menu: {why}");
+                }
+                if let Some(target) = opener {
+                    self.opened_from = Some((id, target));
                 }
                 if toggle_dnd {
                     let reply = self.notifications(Request::Dnd);
