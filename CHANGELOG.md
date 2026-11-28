@@ -61,6 +61,12 @@ and this project adheres to
   changes are in its terminal layer, so the config and path crates behave as
   before.
 
+### Fixed
+
+- On Linux, answering a pairing question in the Bluetooth menu (a confirmation
+  or a PIN) reaches BlueZ at once. Before, the answer waited behind the pairing
+  that asked it, so BlueZ gave up and the pairing failed though it was answered.
+
 ## [0.7.0] - 2026-11-05
 
 ### Breaking

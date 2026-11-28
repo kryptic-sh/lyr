@@ -1783,7 +1783,7 @@ mod linux {
     use lyr_sources::power::linux::Logind;
     use lyr_sources::power_profile::linux::PowerProfiles;
     use lyr_wm::Compositor;
-    use tokio::sync::mpsc::UnboundedReceiver;
+    use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
     use tokio::sync::watch;
 
     use std::sync::{Arc, Mutex};
@@ -2270,7 +2270,7 @@ mod linux {
 
     async fn bluetooth(
         sender: mpsc::Sender<Update>,
-        mut requests: UnboundedReceiver<BluetoothRequest>,
+        requests: UnboundedReceiver<BluetoothRequest>,
         waker: Option<ShellWaker>,
     ) {
         let bluez = match BlueZ::system().await {
@@ -2311,16 +2311,10 @@ mod linux {
                 }
             }
         };
+        let (actions, mut queued) = tokio::sync::mpsc::unbounded_channel();
+        let route = answer_first(requests, actions, &questions);
         let act = async {
-            while let Some(request) = requests.recv().await {
-                if let BluetoothRequest::Answer(id, reply) = request {
-                    if !questions.borrow_mut().answer(id, reply) {
-                        tracing::debug!(
-                            "bluetooth: question {id} was answered after BlueZ gave up"
-                        );
-                    }
-                    continue;
-                }
+            while let Some(request) = queued.recv().await {
                 // What it changed comes back as a change; a refusal is logged.
                 let done = match &request {
                     BluetoothRequest::Switch(adapter, switch, on) => {
@@ -2332,6 +2326,7 @@ mod linux {
                         bluez.forget(adapter, device).await
                     }
                     BluetoothRequest::Rename(device, name) => bluez.rename(device, name).await,
+                    // `answer_first` answers these and never queues one.
                     BluetoothRequest::Answer(..) => Ok(()),
                 };
                 if let Err(error) = &done {
@@ -2349,9 +2344,30 @@ mod linux {
                 }
             }
         };
-        let (watched, (), (), ()) = tokio::join!(bluez.watch(&snapshots), forward, ask, act);
+        let (watched, (), (), (), ()) =
+            tokio::join!(bluez.watch(&snapshots), forward, ask, route, act);
         if let Err(error) = watched {
             tracing::warn!("bluetooth: BlueZ stopped answering: {error}");
+        }
+    }
+
+    /// Answers each pairing question the moment its answer arrives, and
+    /// queues every other request for `actions`. BlueZ asks while the `Pair`
+    /// that raised the question is still running, so an answer queued behind
+    /// it would wait until BlueZ gave up and the pairing failed.
+    async fn answer_first(
+        mut requests: UnboundedReceiver<BluetoothRequest>,
+        actions: UnboundedSender<BluetoothRequest>,
+        questions: &std::cell::RefCell<Questions>,
+    ) {
+        while let Some(request) = requests.recv().await {
+            if let BluetoothRequest::Answer(id, reply) = request {
+                if !questions.borrow_mut().answer(id, reply) {
+                    tracing::debug!("bluetooth: question {id} was answered after BlueZ gave up");
+                }
+            } else if actions.send(request).is_err() {
+                break;
+            }
         }
     }
 
@@ -2567,6 +2583,45 @@ mod linux {
             }
         };
         tokio::join!(forward, act);
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use std::cell::RefCell;
+
+        use lyr_core::bluetooth_menu::{DeviceAction, Reply};
+        use lyr_sources::bluetooth::linux::agent::Questions;
+        use tokio::sync::{mpsc, oneshot};
+
+        use super::{BluetoothRequest, answer_first};
+
+        /// Nothing reads the queued `Pair` here, as nothing does while
+        /// BlueZ waits on the agent: the answer must get through regardless.
+        #[test]
+        fn an_answer_reaches_bluez_while_its_pair_waits() {
+            let questions = RefCell::new(Questions::default());
+            let (answer, mut answered) = oneshot::channel();
+            let id = questions.borrow_mut().ask(answer);
+            let (send, requests) = mpsc::unbounded_channel();
+            let (actions, mut queued) = mpsc::unbounded_channel();
+            let pair = BluetoothRequest::Device("/org/bluez/hci0/dev_1".into(), DeviceAction::Pair);
+            send.send(pair).unwrap();
+            send.send(BluetoothRequest::Answer(id, Reply::Yes)).unwrap();
+            drop(send);
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .build()
+                .unwrap();
+            runtime.block_on(answer_first(requests, actions, &questions));
+            assert_eq!(answered.try_recv(), Ok(Reply::Yes));
+            assert!(matches!(
+                queued.try_recv(),
+                Ok(BluetoothRequest::Device(_, DeviceAction::Pair))
+            ));
+            assert!(
+                queued.try_recv().is_err(),
+                "an answer was queued as an action"
+            );
+        }
     }
 }
 

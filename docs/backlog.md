@@ -566,16 +566,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Known gaps in the design
 
-- **Linux: a pairing question cannot be answered while Pair runs.** In
-  `apps/lyr/src/sources.rs` (`linux::bluetooth`), the `act` loop reads
-  `BluetoothRequest::Answer` from the same channel whose `Device(.., Pair)` it
-  is awaiting, so an Answer sent while BlueZ waits on lyr's agent for it sits
-  queued until BlueZ gives up, and the pairing fails though the user answered.
-  Read on main (2026-11-28) and found by the review of PR #20, which makes it
-  visible (a spinner, then a red failure); not run. Pairing with no question is
-  unaffected. Fix: take Answers off the act loop (their own channel, or a
-  `select!` that keeps reading Answers while a Device request is pending).
-
 - **`[bar] output` matches only `MonitorInfo::name`.** `lyr_shell::bars`'s
   `wanted` compares each configured output with the monitor's `name`. crcbl
   0.20.0 added `MonitorInfo::connector` (the compositor's `wl_output.name` or
