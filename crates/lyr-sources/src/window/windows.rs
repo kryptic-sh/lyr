@@ -6,6 +6,8 @@
 //! (`WINEVENT_SKIPOWNPROCESS`), so opening a menu keeps the window it was
 //! opened over.
 
+pub mod focus;
+
 use std::cell::RefCell;
 use std::io;
 use std::sync::mpsc;

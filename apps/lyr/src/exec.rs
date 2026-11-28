@@ -54,6 +54,20 @@ pub fn open_url(url: &str) -> io::Result<()> {
     start(command)
 }
 
+/// Opens `target` through Explorer, as the shell opens what is typed into
+/// Run: `target` is its one argument and no shell is in between. What may be
+/// opened is the caller's to decide.
+///
+/// # Errors
+///
+/// When Explorer cannot be started.
+#[cfg(windows)]
+pub fn open_shell(target: &str) -> io::Result<()> {
+    let mut command = child("explorer.exe");
+    command.arg(target);
+    start(command)
+}
+
 /// [`Command::new`], opening no console window for the child on Windows:
 /// the workspace's `clippy.toml` disallows the plain constructor, so a new
 /// child goes through here.

@@ -727,8 +727,11 @@ impl App {
 
     /// Windows: lyr draws no toasts, so this is a click on a clock-panel
     /// entry, one of Windows' notifications. Dismissing it dismisses it in
-    /// Windows. Windows' notifications carry no actions lyr can invoke, and
-    /// a click on the body does nothing yet. Never invokes an action.
+    /// Windows. A click on the body brings the sender's frontmost window
+    /// forward, or starts the sender when it has none; it cannot do what the
+    /// toast's own click does (open that email), since Windows lets no other
+    /// program activate a toast. Windows' notifications carry no actions lyr
+    /// can invoke, so this never invokes one.
     #[cfg(windows)]
     fn toast_clicked(
         &self,
@@ -736,11 +739,44 @@ impl App {
         _window: Option<WindowId>,
         clicked: Option<Clicked>,
     ) -> bool {
-        if let Some(Clicked::Dismiss(id)) = clicked {
-            self.commands
-                .close_notification(id, lyr_core::notifications::CloseReason::Dismissed);
+        use lyr_sources::window::windows::focus;
+        match clicked {
+            Some(Clicked::Invoke(id)) => {
+                let Some((aumid, names)) = self.sender(id) else {
+                    return false;
+                };
+                let names: Vec<&str> = names.iter().map(String::as_str).collect();
+                if !focus::focus(|program| lyr_wm::app::is_app(program, &names)) {
+                    tracing::info!("notifications: no window of {aumid} came forward; starting it");
+                    let started = focus::start_target(&aumid)
+                        .and_then(|target| crate::exec::open_shell(&target));
+                    if let Err(error) = started {
+                        tracing::warn!("notifications: starting {aumid}: {error}");
+                    }
+                }
+            }
+            Some(Clicked::Dismiss(id)) => {
+                self.commands
+                    .close_notification(id, lyr_core::notifications::CloseReason::Dismissed);
+            }
+            Some(Clicked::Action(..) | Clicked::Link(..)) | None => {}
         }
         false
+    }
+
+    /// Windows: the AppUserModelID of the application that sent
+    /// notification `id`, and the names its windows' programs may go by;
+    /// `None` when the notification is gone or names no sender.
+    #[cfg(windows)]
+    fn sender(&self, id: u32) -> Option<(String, Vec<String>)> {
+        let store = self.data.notifications.as_ref()?;
+        let store = store
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let content = &store.get(id)?.content;
+        let aumid = content.desktop_entry.clone()?;
+        let names = lyr_sources::notifications::windows::sender_names(&aumid, &content.app_name);
+        Some((aumid, names))
     }
 
     /// macOS has no toasts: lyr is not its notification daemon.

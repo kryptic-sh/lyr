@@ -693,14 +693,31 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     toast freezes the list rather than emptying it. Seen on this machine: a
     toast sent from Windows PowerShell and a Chrome one listed, the body's `<b>`
     and `&` shown as text, and a middle click removed the PowerShell one from
-    Windows' own list (read back through the listener) and from the panel. Left
-    to do: move to crcbl's `Notifications::listing()` once released, which skips
-    an unreadable toast and counts it in `Listing::unreadable` (crcbl is
-    building it, the shape agreed 2026-11-28), and log that count; and a click
-    on an entry's body, which does nothing yet: it is to focus the sender
-    (`SetForegroundWindow`), matching its windows with `lyr_wm::app::is_app` on
-    the executable or AppUserModelID, or start it by its AppUserModelID when it
-    has no window. No toast that fails to read has been found to test with.
+    Windows' own list (read back through the listener) and from the panel. A
+    click on an entry's body (the Windows `toast_clicked` in
+    `apps/lyr/src/bar/events.rs`) brings forward the frontmost top-level window
+    whose program `lyr_wm::app::is_app` matches against
+    `lyr_sources::notifications::windows::sender_names` (the AppUserModelID, the
+    program a path-like one names, a packaged one's package name, and the
+    display name), through `lyr_sources::window::windows::focus`; with none, it
+    starts the sender as `shell:AppsFolder\<id>` through Explorer
+    (`exec::open_shell`), refusing an id with `..`, `:`, `/` or a quote. Seen on
+    this machine: a click on Chrome's entry (id `Chrome`) brought the Chrome
+    window forward over Windows Terminal, and one on a PowerShell toast, with no
+    `powershell.exe` window open, started Windows PowerShell (inside Windows
+    Terminal, this machine's default terminal). Not matched, so started instead:
+    a program whose id is a hash rather than its name (Firefox's and
+    Thunderbird's), and a packaged app whose program is named apart from its
+    package (new Outlook's `olk.exe`); starting such a running app usually
+    brings it forward or opens a new window of it. Reading each window's own
+    AppUserModelID (`SHGetPropertyStoreForWindow`, `PKEY_AppUserModel_ID`) would
+    match those; it needs COM interface bindings lyr does not have yet
+    (`windows-bindgen` makes them for Bluetooth). Not tried: a UWP app, whose
+    windows belong to `ApplicationFrameHost.exe`. Left to do: move to crcbl's
+    `Notifications::listing()` once released, which skips an unreadable toast
+    and counts it in `Listing::unreadable` (crcbl is building it, the shape
+    agreed 2026-11-28), and log that count. No toast that fails to read has been
+    found to test with.
   - macOS: as on Windows, lyr draws no notifications.
 
 - **The media player card: where it still differs from swaync's.** The card

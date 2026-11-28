@@ -198,9 +198,11 @@ reads the toasts other programs have shown through WinRT's
 once Windows' notification-access privacy setting allows it. It has no change
 event outside a package, so lyr polls it. The clock panel lists them under the
 calendar as the Linux history is listed, and dismissing one there dismisses it
-in Windows. The bell shows whether any are waiting, and a click opens the
-notification centre with the `ms-actioncenter:` URI. There is no public API to
-toggle Do Not Disturb or Focus, so the panel has no do-not-disturb row.
+in Windows. Clicking one brings its sender's window forward, or starts the
+sender when it has none. The bell shows whether any are waiting, and a click
+opens the notification centre with the `ms-actioncenter:` URI. There is no
+public API to toggle Do Not Disturb or Focus, so the panel has no do-not-disturb
+row.
 
 ## macOS
 

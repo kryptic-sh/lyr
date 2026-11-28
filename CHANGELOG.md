@@ -31,12 +31,16 @@ and this project adheres to
 - On Windows, the clock panel lists Windows' own notifications under the
   calendar, read every two seconds through crcbl-notify once Windows'
   notification-access privacy setting allows it. Clear All, an entry's close
-  button and a middle click dismiss them in Windows too, as does `lyr clear`.
-  The notifications module's bell shows whether any are waiting. There is no
-  do-not-disturb row: lyr cannot reach Windows' own. For users of the library
-  crates: `lyr_core::notifications` gains `Mirror`, which keeps a `Store` in
-  step with snapshots of another program's notifications, and `lyr-sources`
-  gains `notifications::windows`.
+  button and a middle click dismiss them in Windows too, as does `lyr clear`. A
+  click on an entry brings the sender's frontmost window forward, found by its
+  program's name against the sender's AppUserModelID and name, or starts the
+  sender through the Start menu's Applications folder when it has no window; it
+  cannot open what the toast itself would, since Windows lets no other program
+  activate a toast. The notifications module's bell shows whether any are
+  waiting. There is no do-not-disturb row: lyr cannot reach Windows' own. For
+  users of the library crates: `lyr_core::notifications` gains `Mirror`, which
+  keeps a `Store` in step with snapshots of another program's notifications, and
+  `lyr-sources` gains `notifications::windows` and `window::windows::focus`.
 
 - A button in the Bluetooth, Wi-Fi and audio menus shows pushed in while the
   pointer holds it down: its fill darkens until the button is let go, so a click
