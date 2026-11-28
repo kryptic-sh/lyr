@@ -194,6 +194,13 @@ fn on_a_short_output_it_opens_on_the_month() {
     let mut bare = self::setup();
     bare.lay_out(400.0);
     assert_eq!(bare.panel.mode, Mode::Year, "with no centre, the year");
+    bare.store = Some(Store::default());
+    bare.lay_out(400.0);
+    assert_eq!(
+        bare.panel.mode,
+        Mode::Month,
+        "a centre that comes later is still fitted"
+    );
 }
 
 #[test]
@@ -261,6 +268,30 @@ fn a_right_click_switches_the_mode_and_scrolling_moves_by_it() {
         "a month in month mode"
     );
     assert!(setup.panel.ready(), "redrawn");
+}
+
+#[test]
+fn a_calendar_scrolled_through_keeps_its_mode_when_the_centre_comes() {
+    let mut setup = setup();
+    setup.lay_out(400.0);
+    let window = setup.panel.window;
+    let at = PhysicalPoint { x: 50.0, y: 50.0 };
+    setup
+        .shell
+        .move_pointer(window, at, (0.0, 0.0))
+        .expect("moved");
+    setup
+        .shell
+        .scroll(window, ScrollDelta::Lines { x: 0.0, y: 1.0 }, Some(at))
+        .expect("scrolled");
+    setup.pump();
+    setup.store = Some(Store::default());
+    setup.lay_out(400.0);
+    assert_eq!(
+        setup.panel.mode,
+        Mode::Year,
+        "the year the user is looking through"
+    );
 }
 
 #[test]

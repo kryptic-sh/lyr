@@ -63,8 +63,9 @@ pub struct ClockPanel {
     /// The month the calendar shows, and how.
     shown: Date,
     mode: Mode,
-    /// Whether the first layout has chosen between the year and the month,
-    /// after which only a right click switches them.
+    /// Whether the year or the month was chosen, by the first layout with
+    /// the centre to fit or by the user switching or scrolling the calendar;
+    /// after that only a right click switches them.
     mode_chosen: bool,
     /// Logical pixels: what it shows needs, held to the output.
     size: Size,
@@ -293,6 +294,8 @@ impl ClockPanel {
                         Press::Left | Press::Middle => false,
                     };
                     if moved {
+                        // Once looked through, it stays as the user sees it.
+                        self.mode_chosen = true;
                         self.rebuild(look, contents);
                     }
                 }
@@ -351,46 +354,28 @@ impl ClockPanel {
     /// below the calendar, at the size they need, and asks the window
     /// system for that size when it changed.
     fn rebuild(&mut self, look: &Look<'_>, contents: &Contents<'_>) {
-        if !self.mode_chosen {
+        if !self.mode_chosen && contents.store.is_some() {
             self.mode_chosen = true;
             if !self.year_leaves_room(look, contents) {
                 self.mode = Mode::Month;
             }
         }
-        let (calendar, calendar_size) = calendar::draw::draw(
-            self.shown,
-            self.mode,
-            self.first,
-            contents.today,
-            look.measure_in,
-            look.calendar_line_height,
-            look.theme,
-        );
-        let inset = BORDER + PADDING;
-        self.calendar_bottom = inset + calendar_size.height;
-        let mut width = calendar_size.width + 2.0 * inset;
-        let mut height = self.calendar_bottom + inset;
-        let centre = contents.store.map(|store| {
-            width = width.max(CENTRE_WIDTH);
-            let top = self.calendar_bottom + centre::GAP;
-            let shown = centre::Shown {
-                store,
-                players: contents.players,
-                now: contents.now,
-                hovered: self.hovered,
-                dnd_switch: contents.dnd_switch,
-            };
-            let drawn = centre::draw(
-                &shown,
-                width - 2.0 * inset,
-                look.measure_in,
-                look.lay_out,
-                look.line_height,
-                look.theme,
-            );
-            height = top + drawn.1.height + inset;
-            (top, drawn)
+        let shown = contents.store.map(|store| centre::Shown {
+            store,
+            players: contents.players,
+            now: contents.now,
+            hovered: self.hovered,
+            dnd_switch: contents.dnd_switch,
         });
+        let Laid {
+            calendar,
+            calendar_height,
+            width,
+            height,
+            centre,
+        } = self.lay_out(self.mode, shown.as_ref(), look, contents.today);
+        let inset = BORDER + PADDING;
+        self.calendar_bottom = inset + calendar_height;
         self.size = Size {
             width,
             height: height.min(self.place.max_height()),
@@ -407,7 +392,13 @@ impl ClockPanel {
                 .map(|item| item.offset(inset, inset)),
         );
         self.centre = Regions::default();
-        if let Some((top, (list, centre_size, regions))) = centre {
+        if let Some(LaidCentre {
+            top,
+            list,
+            size: centre_size,
+            regions,
+        }) = centre
+        {
             self.centre_view = Rect {
                 x: inset,
                 y: top,
@@ -444,25 +435,61 @@ impl ClockPanel {
         self.dirty = true;
     }
 
-    /// Whether the year's calendar leaves the centre, if there is one, room
-    /// for itself with nothing in it: its title, Clear All and the
-    /// do-not-disturb row. On a short output it does not, and the panel
-    /// opens on the month instead, so the centre is more than a sliver.
-    fn year_leaves_room(&self, look: &Look<'_>, contents: &Contents<'_>) -> bool {
-        if contents.store.is_none() {
-            return true;
-        }
-        let (_, year) = calendar::draw::draw(
+    /// The calendar for `mode` and, below it, the centre showing `shown`,
+    /// laid out at the size they need, before the output holds it.
+    fn lay_out(
+        &self,
+        mode: Mode,
+        shown: Option<&centre::Shown<'_>>,
+        look: &Look<'_>,
+        today: Date,
+    ) -> Laid {
+        let (calendar, calendar_size) = calendar::draw::draw(
             self.shown,
-            Mode::Year,
+            mode,
             self.first,
-            contents.today,
+            today,
             look.measure_in,
             look.calendar_line_height,
             look.theme,
         );
         let inset = BORDER + PADDING;
-        let width = (year.width + 2.0 * inset).max(CENTRE_WIDTH);
+        let calendar_bottom = inset + calendar_size.height;
+        let mut width = calendar_size.width + 2.0 * inset;
+        let mut height = calendar_bottom + inset;
+        let centre = shown.map(|shown| {
+            width = width.max(CENTRE_WIDTH);
+            let top = calendar_bottom + centre::GAP;
+            let (list, size, regions) = centre::draw(
+                shown,
+                width - 2.0 * inset,
+                look.measure_in,
+                look.lay_out,
+                look.line_height,
+                look.theme,
+            );
+            height = top + size.height + inset;
+            LaidCentre {
+                top,
+                list,
+                size,
+                regions,
+            }
+        });
+        Laid {
+            calendar,
+            calendar_height: calendar_size.height,
+            width,
+            height,
+            centre,
+        }
+    }
+
+    /// Whether the year's calendar leaves the centre room for itself with
+    /// nothing in it: its title, Clear All and the do-not-disturb row. On a
+    /// short output it does not, and the panel opens on the month instead,
+    /// so the centre is more than a sliver.
+    fn year_leaves_room(&self, look: &Look<'_>, contents: &Contents<'_>) -> bool {
         let empty = centre::Shown {
             store: &Store::default(),
             players: &[],
@@ -470,15 +497,9 @@ impl ClockPanel {
             hovered: None,
             dnd_switch: contents.dnd_switch,
         };
-        let (_, centre, _) = centre::draw(
-            &empty,
-            width - 2.0 * inset,
-            look.measure_in,
-            look.lay_out,
-            look.line_height,
-            look.theme,
-        );
-        inset + year.height + centre::GAP + centre.height + inset <= self.place.max_height()
+        self.lay_out(Mode::Year, Some(&empty), look, contents.today)
+            .height
+            <= self.place.max_height()
     }
 
     /// Asks the window system for the size the panel needs, if that
@@ -514,6 +535,25 @@ impl ClockPanel {
         }
         Ok(())
     }
+}
+
+/// What [`ClockPanel::lay_out`] drew: the calendar and its height, the
+/// panel's size before the output holds it, and the centre.
+struct Laid {
+    calendar: DrawList,
+    calendar_height: f32,
+    width: f32,
+    height: f32,
+    centre: Option<LaidCentre>,
+}
+
+/// The centre as [`ClockPanel::lay_out`] drew it: its top in the panel, its
+/// drawing at its whole size, and what each click lands on.
+struct LaidCentre {
+    top: f32,
+    list: DrawList,
+    size: Size,
+    regions: Regions<Target>,
 }
 
 /// The panel's background and border at `size`.
