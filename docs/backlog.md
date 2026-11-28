@@ -565,7 +565,19 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   current size, no `Resized` comes and the panel waits, undrawn. The same holds
   for the bar's `size_on` after a reload. Raised by the 2026-11-29 review, the
   same in crcbl 0.21 and 0.22; not checked whether lyr's panel sizes are ever
-  fractional, not reproduced.
+  fractional, not reproduced. crcbl's answer (2026-11-29): when a panel on
+  screen asks for a size of its own that differs from the one it has,
+  `set_panel` pushes that size's `Resized` onto the event queue itself, so the
+  next pump hands it over. When the size stands, no `Resized` comes, and that is
+  right. Only a stretched axis (a bar's length) or a panel off screen waits for
+  the compositor's configure. So lyr need not predict the size: after
+  `set_panel` it can hold its frame until the next pump only, then draw at
+  whatever size the window has. That way no rounding is copied. A bar's reload
+  still waits for the configure along its length. lyr's panels are sized to
+  their content, so the frame must still not be drawn before that pump, or new
+  content lands in the old swapchain. crcbl recommends the owner decline a
+  `set_panel` that returns the size, as it would repeat what the queued
+  `Resized` says. Not built; the stall is still unreproduced.
 - **`exec::child` finds a program by its bare name** (`apps/lyr/src/exec.rs`):
   `cmd`, `sh`, `xdg-open` and `explorer.exe` are named without a path, and on
   Windows Rust's `Command` looks in the directory of lyr's own executable before
