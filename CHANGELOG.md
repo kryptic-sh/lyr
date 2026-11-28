@@ -84,9 +84,11 @@ and this project adheres to
 - On a bar too narrow for a module's text, a format with no `{icon}` falls back
   to the glyph written before its first value, as one with `{icon}` falls back
   to the icon: the mic shows its microphone, and a muted volume its muted
-  speaker, rather than the glyph over a cut-off percentage. For users of the
-  library crates: `lyr_config::Format` gains `lead`, and `lyr_core::audio::mic`
-  fills its view's `compact`.
+  speaker, rather than the glyph over a cut-off percentage. Text that holds a
+  letter or digit (`BAT {capacity}%`) is not taken for a glyph, since it says
+  nothing without its value. For users of the library crates:
+  `lyr_config::Format` gains `lead`, and `lyr_core::audio::mic` fills its view's
+  `compact`.
 - On a side bar, a tray item's menu opens level with the item clicked, beside
   the bar, rather than at the top of the tray's column, which on a long tray
   could be far from it.

@@ -22,16 +22,21 @@ pub fn pick<'a>(icons: &'a NamedIcons, names: &[&str], value: u32) -> &'a str {
 /// The compact form of a label `format` rendered as `text`, with `icon` in
 /// its `{icon}`, for a bar too narrow for the text: the icon alone, or for a
 /// format with no `{icon}` the glyph written before its first placeholder
-/// (the mic's `\u{F130} {volume}%`). `None` when that is empty or is all the
-/// label shows.
+/// (the mic's `\u{F130} {volume}%`), but not a word (`BAT {capacity}%`),
+/// which says nothing without its value. `None` when there is neither or it
+/// is all the label shows.
 #[must_use]
 pub fn compact(format: &Format, icon: &str, text: &str) -> Option<String> {
     let short = if format.placeholders().any(|name| name == "icon") {
-        icon
+        icon.trim()
     } else {
-        format.lead()
-    }
-    .trim();
+        let lead = format.lead().trim();
+        if lead.chars().any(char::is_alphanumeric) {
+            ""
+        } else {
+            lead
+        }
+    };
     (!short.is_empty() && short != text).then(|| short.to_owned())
 }
 
@@ -95,16 +100,25 @@ mod tests {
         assert_eq!(compact(&volume, "v", "v 40%").as_deref(), Some("v"));
         assert_eq!(compact(&format("{icon}"), "v", "v"), None, "the icon only");
         assert_eq!(
-            compact(&format("m {volume}%"), "v", "m 40%").as_deref(),
-            Some("m"),
-            "no `{{icon}}`: what is written before the value"
+            compact(&format("\u{F130} {volume}%"), "v", "\u{F130} 40%").as_deref(),
+            Some("\u{F130}"),
+            "no `{{icon}}`: the glyph written before the value"
         );
         assert_eq!(
-            compact(&format("{volume}% m"), "v", "40% m"),
+            compact(&format("BAT {capacity}%"), "v", "BAT 40%"),
+            None,
+            "a word says nothing without its value"
+        );
+        assert_eq!(
+            compact(&format("{volume}% \u{F130}"), "v", "40% \u{F130}"),
             None,
             "nothing written before it"
         );
-        assert_eq!(compact(&format("m"), "v", "m"), None, "the glyph only");
+        assert_eq!(
+            compact(&format("\u{F130}"), "v", "\u{F130}"),
+            None,
+            "the glyph only"
+        );
         assert_eq!(compact(&volume, "", " 40%"), None, "no icon picked");
     }
 

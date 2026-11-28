@@ -646,9 +646,21 @@ mod tests {
                 volume: 40,
                 ..lyr_core::audio::Sink::default()
             }),
+            source: Some(lyr_core::audio::Source {
+                volume: 40,
+                muted: false,
+                description: String::new(),
+            }),
             ..Data::default()
         };
-        for name in ["battery", "power_profile", "network", "bluetooth", "volume"] {
+        for name in [
+            "battery",
+            "power_profile",
+            "network",
+            "bluetooth",
+            "volume",
+            "mic",
+        ] {
             let left = entries(
                 &[LayoutItem::Named(name.to_owned())],
                 &config,
