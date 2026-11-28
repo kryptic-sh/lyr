@@ -504,7 +504,7 @@ impl App {
         let contents = Contents {
             today: jiff::ZonedDateTime::now().date(),
             store: store.as_deref(),
-            dnd_switch: cfg!(target_os = "linux"),
+            dnd_switch: crate::clock_panel::DND_SWITCH,
             players: &self.data.players,
             now: Instant::now(),
         };
@@ -746,12 +746,22 @@ impl App {
                     return false;
                 };
                 let names: Vec<&str> = names.iter().map(String::as_str).collect();
-                if !focus::focus(|program| lyr_wm::app::is_app(program, &names)) {
-                    tracing::info!("notifications: no window of {aumid} came forward; starting it");
-                    let started = focus::start_target(&aumid)
-                        .and_then(|target| crate::exec::open_shell(&target));
-                    if let Err(error) = started {
-                        tracing::warn!("notifications: starting {aumid}: {error}");
+                match focus::focus(|program| lyr_wm::app::is_app(program, &names)) {
+                    Ok(focus::Focused::Forward) => {}
+                    // Starting it again would open a second one.
+                    Ok(focus::Focused::Refused) => {
+                        tracing::info!("notifications: Windows kept {aumid}'s window back");
+                    }
+                    Ok(focus::Focused::NoWindow) => {
+                        tracing::info!("notifications: {aumid} has no window; starting it");
+                        let started = focus::start_target(&aumid)
+                            .and_then(|target| crate::exec::open_shell(&target));
+                        if let Err(error) = started {
+                            tracing::warn!("notifications: starting {aumid}: {error}");
+                        }
+                    }
+                    Err(error) => {
+                        tracing::warn!("notifications: listing windows for {aumid}: {error}");
                     }
                 }
             }

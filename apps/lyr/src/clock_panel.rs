@@ -49,6 +49,10 @@ const RADIUS: f32 = 8.0;
 const FIRST_WEEKDAY: Weekday = Weekday::Monday;
 /// Lines the centre scrolls per wheel step.
 const SCROLL_LINES: f32 = 3.0;
+/// Whether the centre draws lyr's do-not-disturb switch on this platform
+/// ([`Contents::dnd_switch`]): only on Linux, where lyr is the daemon and the
+/// switch holds back its own toasts.
+pub const DND_SWITCH: bool = cfg!(target_os = "linux");
 
 /// The open clock panel.
 pub struct ClockPanel {

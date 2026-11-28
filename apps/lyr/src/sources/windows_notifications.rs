@@ -4,18 +4,21 @@
 //!
 //! Windows tells an unpackaged program nothing when its notifications
 //! change, so they are read again every [`POLL`], and at once after a
-//! dismissal. A store lyr may not read yet, which Windows' notification-access
+//! dismissal. A store lyr may not read, which Windows' notification-access
 //! privacy setting decides, is tried again at the same rate, so the panel
-//! lists them once access is granted.
+//! lists them once access is granted; access taken away again drops lyr's
+//! handle on the store, the last snapshot still listed, until access is
+//! granted again.
 
+use std::hash::Hash;
 use std::sync::{Arc, Mutex, PoisonError, mpsc};
 use std::time::{Duration, Instant, SystemTime};
 
 use crcbl_shell::ShellWaker;
 use lyr_core::notifications::{Mirror, Store};
-use lyr_sources::notifications::windows::{Notifications, incoming};
+use lyr_sources::notifications::windows::{NotificationError, Notifications, incoming};
 
-use super::Update;
+use super::{Update, deliver};
 
 /// How often Windows' notifications are read.
 const POLL: Duration = Duration::from_secs(2);
@@ -57,10 +60,12 @@ pub(super) fn start(
                             tracing::info!("notifications: reading Windows' notifications");
                             opened = Some(store);
                         }
-                        Err(error) => fail(
-                            &mut failure,
-                            format!("Windows' notifications cannot be read: {error}"),
-                        ),
+                        Err(error) => {
+                            fail(
+                                &mut failure,
+                                format!("Windows' notifications cannot be read: {error}"),
+                            );
+                        }
                     }
                 }
                 if let Some(notifications) = &opened {
@@ -74,17 +79,32 @@ pub(super) fn start(
                                 listed,
                             );
                             if changed || !handed {
-                                if !deliver(&sender, waker.as_ref(), &store) {
+                                if !deliver(
+                                    &sender,
+                                    waker.as_ref(),
+                                    Update::Notifications(Arc::clone(&store)),
+                                ) {
                                     break;
                                 }
                                 handed = true;
                             }
                         }
-                        // The last snapshot stays listed rather than none.
-                        Err(error) => fail(
-                            &mut failure,
-                            format!("reading Windows' notifications: {error}"),
-                        ),
+                        Err(error) => {
+                            // `list` says only that it failed; `open` reads
+                            // whether access was taken away, and the store is
+                            // opened again once it is granted.
+                            if matches!(
+                                Notifications::open(),
+                                Err(NotificationError::Denied | NotificationError::Undecided)
+                            ) {
+                                opened = None;
+                            }
+                            // The last snapshot stays listed rather than none.
+                            fail(
+                                &mut failure,
+                                format!("reading Windows' notifications: {error}"),
+                            );
+                        }
                     }
                 }
                 let first = match incoming_work.recv_timeout(POLL) {
@@ -92,18 +112,19 @@ pub(super) fn start(
                     Err(mpsc::RecvTimeoutError::Timeout) => continue,
                     Err(mpsc::RecvTimeoutError::Disconnected) => break,
                 };
+                let asked: Vec<Work> = std::iter::once(first)
+                    .chain(incoming_work.try_iter())
+                    .collect();
                 let Some(notifications) = &opened else {
+                    fail(
+                        &mut failure,
+                        "not dismissing: Windows' notifications cannot be read".to_owned(),
+                    );
                     continue;
                 };
-                for asked in std::iter::once(first).chain(incoming_work.try_iter()) {
-                    let ids = match asked {
-                        Work::Dismiss(id) => mirror.key(id).copied().into_iter().collect(),
-                        Work::Clear => mirror.keys().copied().collect::<Vec<_>>(),
-                    };
-                    for id in ids {
-                        if let Err(error) = notifications.dismiss(id) {
-                            tracing::warn!("notifications: dismissing one: {error}");
-                        }
+                for id in asked.iter().flat_map(|asked| targets(asked, &mirror)) {
+                    if let Err(error) = notifications.dismiss(id) {
+                        fail(&mut failure, format!("dismissing a notification: {error}"));
                     }
                 }
             }
@@ -111,26 +132,68 @@ pub(super) fn start(
     Ok(work)
 }
 
-/// Logs `what` unless it is the `last` failure logged.
-fn fail(last: &mut Option<String>, what: String) {
-    if last.as_ref() != Some(&what) {
-        tracing::warn!("notifications: {what}");
-        *last = Some(what);
+/// The keys `asked` dismisses among those `mirror` holds: the one lyr's id
+/// names, or every one.
+fn targets<K: Copy + Eq + Hash>(asked: &Work, mirror: &Mirror<K>) -> Vec<K> {
+    match *asked {
+        Work::Dismiss(id) => mirror.key(id).copied().into_iter().collect(),
+        Work::Clear => mirror.keys().copied().collect(),
     }
 }
 
-/// Hands `store` to the main loop and wakes it. `false` once the main loop
-/// has gone.
-fn deliver(
-    sender: &mpsc::Sender<Update>,
-    waker: Option<&ShellWaker>,
-    store: &Arc<Mutex<Store>>,
-) -> bool {
-    let delivered = sender
-        .send(Update::Notifications(Arc::clone(store)))
-        .is_ok();
-    if let Some(waker) = waker {
-        waker.wake();
+/// Logs `what` unless it is the `last` failure logged, and returns whether
+/// it was logged.
+fn fail(last: &mut Option<String>, what: String) -> bool {
+    if last.as_ref() == Some(&what) {
+        return false;
     }
-    delivered
+    tracing::warn!("notifications: {what}");
+    *last = Some(what);
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Instant;
+
+    use lyr_core::notifications::{Incoming, Mirror, Store};
+
+    use super::{Work, fail, targets};
+
+    #[test]
+    fn a_dismissal_names_its_own_key_and_clear_all_of_them() {
+        let mut store = Store::default();
+        let mut mirror = Mirror::default();
+        let now = Instant::now();
+        mirror.apply(
+            &mut store,
+            vec![
+                (7_u8, Incoming::default(), now),
+                (9, Incoming::default(), now),
+            ],
+        );
+        let id = |key| {
+            (1..=2)
+                .find(|&id| mirror.key(id) == Some(&key))
+                .expect("listed")
+        };
+        assert_eq!(targets(&Work::Dismiss(id(9)), &mirror), [9]);
+        assert_eq!(
+            targets(&Work::Dismiss(3), &mirror),
+            Vec::<u8>::new(),
+            "an id lyr did not hand out dismisses nothing"
+        );
+        let mut all = targets(&Work::Clear, &mirror);
+        all.sort_unstable();
+        assert_eq!(all, [7, 9]);
+    }
+
+    #[test]
+    fn a_failure_is_logged_once_until_another_comes() {
+        let mut last = None;
+        assert!(fail(&mut last, "a".to_owned()));
+        assert!(!fail(&mut last, "a".to_owned()), "the same again");
+        assert!(fail(&mut last, "b".to_owned()));
+        assert!(fail(&mut last, "a".to_owned()), "a after b is new");
+    }
 }

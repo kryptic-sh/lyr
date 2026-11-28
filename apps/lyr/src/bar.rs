@@ -378,7 +378,7 @@ impl App {
         let contents = Contents {
             today: ZonedDateTime::now().date(),
             store: store.as_deref(),
-            dnd_switch: cfg!(target_os = "linux"),
+            dnd_switch: crate::clock_panel::DND_SWITCH,
             players: &self.data.players,
             now: Instant::now(),
         };

@@ -994,12 +994,23 @@ mod macos {
     }
 }
 
-/// The sources Windows has so far: the battery, the network, the power
-/// profile, the audio devices and streams, Wi-Fi, Bluetooth and the
-/// foreground window.
+/// Hands `update` to the main loop, and wakes it when `waker` is given.
+/// `false` once the main loop has gone.
+#[cfg(any(target_os = "linux", windows))]
+fn deliver(sender: &mpsc::Sender<Update>, waker: Option<&ShellWaker>, update: Update) -> bool {
+    let delivered = sender.send(update).is_ok();
+    if let Some(waker) = waker {
+        waker.wake();
+    }
+    delivered
+}
+
 #[cfg(windows)]
 mod windows_notifications;
 
+/// The sources Windows has so far: the battery, the network, the power
+/// profile, the audio devices and streams, Wi-Fi, Bluetooth and the
+/// foreground window.
 #[cfg(windows)]
 mod windows {
     use std::sync::mpsc;
@@ -1007,7 +1018,7 @@ mod windows {
     use crcbl_shell::ShellWaker;
     use lyr_sources::battery::windows::{Watch, status};
 
-    use super::{AUDIO_BACK, AUDIO_GONE, AUDIO_RETRY_FIRST, Update, audio_retry_after};
+    use super::{AUDIO_BACK, AUDIO_GONE, AUDIO_RETRY_FIRST, Update, audio_retry_after, deliver};
 
     /// What the Bluetooth source's thread is handed: a change to read, or
     /// what the menu asks.
@@ -1636,16 +1647,6 @@ mod windows {
         }
     }
 
-    /// Hands `update` to the main loop, and wakes it when `waker` is given.
-    /// `false` once the main loop has gone.
-    fn deliver(sender: &mpsc::Sender<Update>, waker: Option<&ShellWaker>, update: Update) -> bool {
-        let delivered = sender.send(update).is_ok();
-        if let Some(waker) = waker {
-            waker.wake();
-        }
-        delivered
-    }
-
     /// Tries `open` until the audio service is back, waiting longer after
     /// each failure as Linux does; what the bar asks meanwhile is refused.
     /// `None` once the bar has gone.
@@ -1815,6 +1816,7 @@ mod linux {
     use super::{
         AUDIO_BACK, AUDIO_GONE, AUDIO_RETRY_FIRST, AudioRequest, BluetoothRequest, JoinRequest,
         NotificationRequest, TrayRequest, Update, WifiRequest, WmRequest, audio_retry_after,
+        deliver,
     };
     use crate::wifi_menu::Joined;
 
@@ -1824,16 +1826,6 @@ mod linux {
     /// (`lyr_render::pictures`), so neither the size setting nor an output's
     /// scale has to reach the host.
     const TRAY_PICTURE_SIZE: u32 = 64;
-
-    /// Hands `update` to the main loop and wakes it. `false` once the main
-    /// loop has gone.
-    fn deliver(sender: &mpsc::Sender<Update>, waker: Option<&ShellWaker>, update: Update) -> bool {
-        let delivered = sender.send(update).is_ok();
-        if let Some(waker) = waker {
-            waker.wake();
-        }
-        delivered
-    }
 
     /// Where each task reads what the bar asks of it.
     pub(super) struct Requests {
