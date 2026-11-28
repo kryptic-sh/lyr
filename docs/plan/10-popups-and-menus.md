@@ -45,6 +45,13 @@ with no bar showing the module opens at the output's left edge.
 All of them share one renderer and theme, and draw the same `DrawList`
 ([04](04-rendering-and-theme.md)) as the bar.
 
+In the Wi-Fi, Bluetooth and audio menus, a button the pointer holds down shows
+pushed in until it is let go: `MenuPanel` lays a dark translucent shade
+(`lyr_core::menu::PRESSED_SHADE`) over its region, so it darkens whatever the
+theme's colours are. A click acts when the button goes down, so the shade is
+feedback that it landed, not a chance to back out. A slider being dragged is not
+shaded.
+
 How a panel closes on an outside click is not settled. It closes on `Escape`, on
 a second click on its module, and on the same binding again. Closing when it
 loses keyboard focus (S17) covers a click on another window, but not a click on
@@ -234,6 +241,8 @@ It replaces bluetui in a floating terminal, over BlueZ's D-Bus API
 (`org.bluez.Adapter1`, `Device1`, `Battery1`).
 
 - The adapter's power, pairable and discoverable switches, and a scan toggle.
+  While the power is off only its switch shows, with a line saying so, as in the
+  Wi-Fi menu.
 - Paired devices first, then new ones found by the scan, each with its battery
   where `Battery1` reports one.
 - Connect, disconnect, pair, trust, forget and rename, and mark a device as a
@@ -242,6 +251,20 @@ It replaces bluetui in a floating terminal, over BlueZ's D-Bus API
   PIN entry happen in the menu.
 - `Escape` closes it, as the dotfiles set bluetui's `esc_quit` to make every
   menu close the same way.
+- **A device action shows until it is answered.** BlueZ has no "connecting"
+  state to read, so lyr keeps its own: from the click until the source answers
+  (`Update::BluetoothDone`, sent once for every device request, by the pairing's
+  thread on Windows), the button's icon is a spinner and that device's buttons
+  take no clicks, as the Wi-Fi menu's rows wait while it joins. A device's
+  buttons are icons in squares a row tall, so the spinner changes no width; a
+  word such as "Disconnecting…" widened the whole menu (the owner's call,
+  2026-11-26). Each icon button names itself in a tooltip over the menu, the
+  bar's tooltip code and timing (`tooltips::Tooltips`, over any target), opened
+  through `MenuPanel::with_tooltips`. Other devices stay usable; BlueZ's
+  requests run one after another, so theirs wait behind it.
+- **A failure shows in red** at the top of the menu until OK, with BlueZ's own
+  reason, behind the pairing agent's question and a rename; with the menu closed
+  it is a notification, as a failed Wi-Fi join is.
 
 The list matches bluetui 0.8.2's documented actions (its README and default key
 bindings, read 2026-10-18): adapter power, pairing and discovery, a scan toggle,

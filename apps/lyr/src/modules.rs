@@ -33,6 +33,9 @@ pub struct Data {
     /// The pairing agent's question waiting for an answer: its id, the
     /// device's path, and the question.
     pub bluetooth_ask: Option<(u64, String, lyr_core::bluetooth_menu::Question)>,
+    /// What the Bluetooth menu asked of which device, by its path, that the
+    /// platform has not answered yet.
+    pub bluetooth_busy: Vec<(String, lyr_core::bluetooth_menu::DeviceAction)>,
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     pub workspaces: Option<lyr_wm::State>,
     /// The system time zone's name, from timedate1.
@@ -127,6 +130,16 @@ impl Data {
             }
             #[cfg(any(target_os = "linux", windows))]
             Update::BluetoothCancel => self.bluetooth_ask = None,
+            #[cfg(any(target_os = "linux", windows))]
+            Update::BluetoothDone(device, action, _) => {
+                if let Some(at) = self
+                    .bluetooth_busy
+                    .iter()
+                    .position(|busy| *busy == (device.clone(), action))
+                {
+                    self.bluetooth_busy.remove(at);
+                }
+            }
             Update::Bluetooth(snapshot) => {
                 self.bluetooth = snapshot.reading;
                 // macOS shows the module only.
@@ -856,5 +869,31 @@ mod bluetooth_tests {
         assert!(data.bluetooth_question().is_some());
         data.apply(Update::BluetoothCancel);
         assert_eq!(data.bluetooth_question(), None);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_device_waits_until_its_action_is_answered() {
+        use lyr_core::bluetooth_menu::DeviceAction;
+
+        use crate::sources::Update;
+        let mut data = Data::default();
+        let path = "/org/bluez/hci0/dev_1".to_owned();
+        data.bluetooth_busy
+            .push((path.clone(), DeviceAction::Connect));
+        data.bluetooth_busy
+            .push((path.clone(), DeviceAction::Trust));
+        data.apply(Update::BluetoothDone(
+            path.clone(),
+            DeviceAction::Connect,
+            Err("Host is down".to_owned()),
+        ));
+        assert_eq!(
+            data.bluetooth_busy,
+            [(path.clone(), DeviceAction::Trust)],
+            "only the action answered goes, failed or not"
+        );
+        data.apply(Update::BluetoothDone(path, DeviceAction::Trust, Ok(())));
+        assert!(data.bluetooth_busy.is_empty());
     }
 }

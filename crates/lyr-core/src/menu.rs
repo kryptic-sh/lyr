@@ -13,6 +13,15 @@ pub const GAP: f32 = 6.0;
 /// Around a button's label, across and down.
 pub const BUTTON_PADDING: (f32, f32) = (8.0, 2.0);
 
+/// Laid over a button while the pointer holds it down, so it shows pushed
+/// in: its fill darkened, whatever the theme's colours.
+pub const PRESSED_SHADE: Colour = Colour {
+    r: 0,
+    g: 0,
+    b: 0,
+    a: 0x40,
+};
+
 /// The height of a row of text `line_height` tall, buttons included.
 #[must_use]
 pub fn row(line_height: f32) -> f32 {
@@ -58,12 +67,7 @@ pub fn button(
     theme: &Theme,
 ) -> [Item; 2] {
     [
-        Item::Box {
-            rect,
-            radius: theme.radius as f32,
-            fill: theme.toast_background,
-            border: Some((theme.border_width as f32, theme.panel_border)),
-        },
+        button_box(rect, theme),
         text(
             label.to_owned(),
             rect.x + BUTTON_PADDING.0,
@@ -73,6 +77,51 @@ pub fn button(
             theme.foreground,
         ),
     ]
+}
+
+/// A button's box, filling `rect`.
+const fn button_box(rect: Rect, theme: &Theme) -> Item {
+    Item::Box {
+        rect,
+        radius: theme.radius as f32,
+        fill: theme.toast_background,
+        border: Some((theme.border_width as f32, theme.panel_border)),
+    }
+}
+
+/// A button showing the icon `icon` centred in `rect`.
+#[must_use]
+pub fn icon_button(
+    rect: Rect,
+    icon: &str,
+    measure: &dyn Fn(&str) -> f32,
+    line_height: f32,
+    theme: &Theme,
+) -> [Item; 2] {
+    let x = rect.x + (rect.width - measure(icon)) / 2.0;
+    [
+        button_box(rect, theme),
+        text(
+            icon.to_owned(),
+            x,
+            rect.y,
+            measure,
+            line_height,
+            theme.foreground,
+        ),
+    ]
+}
+
+/// The shade over a button filling `rect`, its corners `radius` round,
+/// while the pointer holds it down.
+#[must_use]
+pub const fn pressed(rect: Rect, radius: f32) -> Item {
+    Item::Box {
+        rect,
+        radius,
+        fill: PRESSED_SHADE,
+        border: None,
+    }
 }
 
 /// A field for typing filling `rect`, showing `shown`. Its end shows,

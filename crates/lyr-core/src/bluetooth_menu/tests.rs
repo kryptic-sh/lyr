@@ -1,10 +1,11 @@
 use lyr_config::{Platform, Theme, from_sources};
 
 use super::{
-    Abilities, Adapter, Ask, Device, DeviceAction, GAP, Header, PADDING, Question, Switch, Target,
-    draw, order,
+    Abilities, Adapter, Ask, BUSY, CONNECT, DISCONNECT, Device, DeviceAction, FORGET, GAP, Header,
+    PADDING, PAIR, Question, RENAME, SETTINGS, Shown, Switch, TRUST, Target, UNTRUST, order,
 };
-use crate::draw::Item;
+use crate::draw::{DrawList, Item, Size};
+use crate::hit::Regions;
 
 fn theme() -> Theme {
     from_sources(None, Platform::Linux)
@@ -20,6 +21,25 @@ fn measure(text: &str) -> f32 {
 const LINE: f32 = 20.0;
 /// A row: a line and 2 px above and below.
 const ROW: f32 = LINE + 4.0;
+
+/// The menu for `adapter` and `devices` with nothing busy.
+fn draw(
+    adapter: &Adapter,
+    devices: &[Device],
+    header: Option<Header<'_>>,
+    focus: Option<Target>,
+    measure: &dyn Fn(&str) -> f32,
+    line_height: f32,
+    theme: &Theme,
+) -> (DrawList, Size, Regions<Target>) {
+    let shown = Shown {
+        adapter,
+        devices,
+        busy: &[],
+        header,
+    };
+    super::draw(&shown, focus, measure, line_height, theme)
+}
 
 fn adapter() -> Adapter {
     Adapter {
@@ -88,12 +108,12 @@ fn each_device_has_the_buttons_its_state_calls_for() {
     let names = ["Buds", "Phone"];
     assert_eq!(
         buttons_at(&list.items, first + 2.0, &names),
-        ["Disconnect", "Untrust", "Rename", "Forget"],
+        [DISCONNECT, UNTRUST, RENAME, FORGET],
         "Rename once paired"
     );
     assert_eq!(
         buttons_at(&list.items, second + 2.0, &names),
-        ["Connect", "Pair", "Trust", "Forget"]
+        [CONNECT, PAIR, TRUST, FORGET]
     );
     // Buttons start after the widest name ("Discoverable", 120 px).
     let x = PADDING + 120.0 + GAP + 1.0;
@@ -125,12 +145,12 @@ fn windows_draws_only_what_it_can_do() {
     let names = ["Buds", "Phone"];
     assert_eq!(
         buttons_at(&list.items, first + 2.0, &names),
-        ["Settings", "Forget"],
+        [SETTINGS, FORGET],
         "a paired device connects in Settings"
     );
     assert_eq!(
         buttons_at(&list.items, second + 2.0, &names),
-        ["Pair"],
+        [PAIR],
         "a found device can only pair"
     );
     let labels: Vec<&str> = list
@@ -141,15 +161,46 @@ fn windows_draws_only_what_it_can_do() {
             _ => None,
         })
         .collect();
-    assert!(labels.contains(&"Power") && labels.contains(&"Scan"));
+    assert!(labels.contains(&"Bluetooth") && labels.contains(&"Scan"));
     assert!(!labels.contains(&"Discoverable") && !labels.contains(&"Pairable"));
-    // Buttons start after the widest name ("Phone", 50 px).
-    let x = PADDING + 50.0 + GAP + 1.0;
+    // Buttons start after the widest label ("Bluetooth", 90 px).
+    let x = PADDING + 90.0 + GAP + 1.0;
     assert_eq!(regions.hit(x, first + 1.0), Some(&Target::Settings));
     assert_eq!(
         regions.hit(x, second + 1.0),
         Some(&Target::Device(1, DeviceAction::Pair))
     );
+}
+
+#[test]
+fn off_it_shows_only_its_switch_and_says_so() {
+    let theme = theme();
+    let off = Adapter {
+        powered: false,
+        ..adapter()
+    };
+    let devices = [device("Buds", true, true, true)];
+    let (list, size, regions) = draw(&off, &devices, None, None, &measure, LINE, &theme);
+    let texts: Vec<&str> = list
+        .items
+        .iter()
+        .filter_map(|item| match item {
+            Item::Text { text, .. } => Some(text.as_str()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(texts, ["Bluetooth", "Bluetooth is off"]);
+    let x = size.width - PADDING - 1.0;
+    assert_eq!(
+        regions.hit(x, PADDING + 1.0),
+        Some(&Target::Switch(Switch::Powered)),
+        "it can be turned back on"
+    );
+    let below = PADDING + ROW + GAP;
+    let clickable = (0..(size.height as usize))
+        .filter(|y| (*y as f32) > below)
+        .any(|y| (0..(size.width as usize)).any(|x| regions.hit(x as f32, y as f32).is_some()));
+    assert!(!clickable, "nothing else takes a click");
 }
 
 #[test]
@@ -375,4 +426,78 @@ fn the_focused_target_is_outlined_in_the_active_colour() {
         border.map(|(_, colour)| colour),
         Some(theme.workspace_active)
     );
+}
+
+#[test]
+fn a_busy_device_says_so_and_waits() {
+    let theme = theme();
+    let devices = [
+        device("Buds", true, false, true),
+        device("Mouse", true, false, true),
+    ];
+    let busy = [("/org/bluez/hci0/Buds".to_owned(), DeviceAction::Connect)];
+    let shown = Shown {
+        adapter: &adapter(),
+        devices: &devices,
+        busy: &busy,
+        header: None,
+    };
+    let (list, _, regions) = super::draw(&shown, None, &measure, LINE, &theme);
+    let first = PADDING + 4.0 * (ROW + GAP) + GAP;
+    let second = first + ROW + GAP;
+    let names = ["Buds", "Mouse"];
+    assert_eq!(
+        buttons_at(&list.items, first + 2.0, &names),
+        [BUSY, UNTRUST, RENAME, FORGET]
+    );
+    let x = PADDING + 120.0 + GAP + 1.0;
+    assert_eq!(regions.hit(x, first + 1.0), None, "Buds waits");
+    assert!(
+        !regions.targets().any(|target| matches!(
+            target,
+            Target::Device(0, _) | Target::Rename(0) | Target::Forget(0)
+        )),
+        "none of its buttons takes a click"
+    );
+    assert_eq!(
+        regions.hit(x, second + 1.0),
+        Some(&Target::Device(1, DeviceAction::Connect)),
+        "the other device does not wait"
+    );
+
+    // The spinner takes the icon's square: nothing moves.
+    let (_, idle, _) = draw(&adapter(), &devices, None, None, &measure, LINE, &theme);
+    let (_, waiting, _) = super::draw(&shown, None, &measure, LINE, &theme);
+    assert_eq!(waiting, idle);
+}
+
+#[test]
+fn a_failure_shows_in_red_until_ok() {
+    let theme = theme();
+    let message = DeviceAction::Connect.failed("Buds", "Host is down");
+    assert_eq!(message, "Connecting Buds failed: Host is down");
+    let header = Header::Failed(&message);
+    assert_eq!(header.typed(), None);
+    let (list, _, regions) = draw(&adapter(), &[], Some(header), None, &measure, LINE, &theme);
+    assert!(list.items.iter().any(|item| matches!(
+        item,
+        Item::Text { text, colour, .. } if *text == message && *colour == theme.battery_critical
+    )));
+    let answers: Vec<Target> = regions
+        .targets()
+        .copied()
+        .filter(|target| matches!(target, Target::Answer(_)))
+        .collect();
+    assert_eq!(answers, [Target::Answer(true)], "OK alone");
+}
+
+#[test]
+fn an_icon_button_s_tooltip_is_its_word() {
+    assert_eq!(
+        Target::Device(0, DeviceAction::Disconnect).tooltip(),
+        Some("Disconnect")
+    );
+    assert_eq!(Target::Forget(2).tooltip(), Some("Forget"));
+    assert_eq!(Target::Scan.tooltip(), None, "labelled already");
+    assert_eq!(Target::Answer(true).tooltip(), None, "labelled already");
 }

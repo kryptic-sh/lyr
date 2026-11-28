@@ -5,14 +5,17 @@
 //! to, and so are the answer to the pairing agent's question and a paired
 //! device's new name, what is typed coming through the window system's text
 //! input; `Escape` (once a rename is cancelled), losing focus and the same
-//! click or binding again close it.
+//! click or binding again close it. A device's button says what is being
+//! done to it until the caller hears back, and a failure shows at the top
+//! until OK.
 //!
 //! Its panel is [`MenuPanel`]'s, recreated when its size changes (a scan
 //! finding a device).
 
 use crcbl_shell::{Shell, ShellEvent, TextPurpose, WindowId};
 use lyr_core::bluetooth_menu::{
-    self, Adapter, Ask, Device, Header, PIN_LENGTH, Question, Reply, Target, order,
+    self, Adapter, Ask, Device, DeviceAction, Header, PIN_LENGTH, Question, Reply, Shown, Target,
+    order,
 };
 use lyr_render::text::Text;
 
@@ -32,6 +35,8 @@ pub struct BluetoothMenu {
     showing: Option<Showing>,
     /// What has been typed into the header's field.
     typed: String,
+    /// Why the last thing done to a device failed, until OK.
+    failed: Option<String>,
 }
 
 /// What the menu's header shows.
@@ -41,6 +46,8 @@ enum Showing {
     Ask(String, Question),
     /// A new name for the device at this path.
     Rename(String),
+    /// Why something done to a device failed.
+    Failed(String),
 }
 
 /// What an event did to the menu.
@@ -62,30 +69,32 @@ pub enum Outcome {
 }
 
 impl BluetoothMenu {
-    /// Opens the menu for `adapter` and its `devices` at `place`.
+    /// Opens the menu for `adapter` and its `devices` at `place`, those
+    /// `busy` waiting on what was asked of them.
     pub fn open(
         shell: &mut dyn Shell,
         place: Place,
         look: &Look<'_>,
         adapter: &Adapter,
         devices: &[Device],
+        busy: &[(String, DeviceAction)],
         ask: Option<Ask<'_>>,
     ) -> anyhow::Result<Self> {
-        let drawn = bluetooth_menu::draw(
+        let shown = Shown {
             adapter,
             devices,
-            ask.map(Header::Ask),
-            None,
-            look.measure,
-            look.line_height,
-            look.theme,
-        );
+            busy,
+            header: ask.map(Header::Ask),
+        };
+        let drawn = bluetooth_menu::draw(&shown, None, look.measure, look.line_height, look.theme);
         let menu = Self {
-            panel: MenuPanel::open(shell, place, look.line_height, drawn)?,
+            panel: MenuPanel::open(shell, place, look.line_height, drawn)?
+                .with_tooltips(Target::tooltip),
             paths: paths(devices),
             renaming: None,
             showing: ask.map(|ask| Showing::Ask(ask.device.to_owned(), ask.question)),
             typed: String::new(),
+            failed: None,
         };
         menu.take_typing(shell)?;
         Ok(menu)
@@ -96,8 +105,15 @@ impl BluetoothMenu {
         match self.showing {
             Some(Showing::Ask(_, Question::Pin)) => Some(TextPurpose::Pin),
             Some(Showing::Rename(_)) => Some(TextPurpose::Normal),
-            Some(Showing::Ask(..)) | None => None,
+            Some(Showing::Ask(..) | Showing::Failed(_)) | None => None,
         }
+    }
+
+    /// Shows why something done to a device failed, `message`, until OK;
+    /// the agent's question and a rename come first.
+    #[cfg_attr(target_os = "macos", allow(dead_code))]
+    pub fn failed(&mut self, message: String) {
+        self.failed = Some(message);
     }
 
     /// Has the window system's text input on while the header has a field.
@@ -120,7 +136,11 @@ impl BluetoothMenu {
         }
         let showing = match ask {
             Some(ask) => Some(Showing::Ask(ask.device.to_owned(), ask.question)),
-            None => self.renaming.clone().map(Showing::Rename),
+            None => self
+                .renaming
+                .clone()
+                .map(Showing::Rename)
+                .or_else(|| self.failed.clone().map(Showing::Failed)),
         };
         let changed = showing != self.showing;
         if changed {
@@ -131,7 +151,7 @@ impl BluetoothMenu {
     }
 
     /// The header for the agent's question `ask` or the rename, with what
-    /// was typed.
+    /// was typed, or else the last failure.
     fn header<'a>(&'a self, ask: Option<Ask<'a>>, devices: &'a [Device]) -> Option<Header<'a>> {
         if let Some(ask) = ask {
             return Some(Header::Ask(Ask {
@@ -139,12 +159,17 @@ impl BluetoothMenu {
                 ..ask
             }));
         }
-        let path = self.renaming.as_ref()?;
-        let device = devices.iter().find(|device| device.path == *path)?;
-        Some(Header::Rename {
-            device: &device.alias,
-            typed: &self.typed,
-        })
+        let renamed = self
+            .renaming
+            .as_ref()
+            .and_then(|path| devices.iter().find(|device| device.path == *path));
+        match renamed {
+            Some(device) => Some(Header::Rename {
+                device: &device.alias,
+                typed: &self.typed,
+            }),
+            None => self.failed.as_deref().map(Header::Failed),
+        }
     }
 
     /// Whether `window` is the menu.
@@ -163,13 +188,15 @@ impl BluetoothMenu {
     }
 
     /// Draws the menu again for `adapter` and `devices` as they are now,
-    /// recreating its window if its size changed.
+    /// those `busy` waiting on what was asked of them, recreating its
+    /// window if its size changed.
     pub fn refresh(
         &mut self,
         shell: &mut dyn Shell,
         look: &Look<'_>,
         adapter: &Adapter,
         devices: &[Device],
+        busy: &[(String, DeviceAction)],
         ask: Option<Ask<'_>>,
     ) -> anyhow::Result<()> {
         let new_header = self.follow(ask, devices);
@@ -178,10 +205,14 @@ impl BluetoothMenu {
             self.panel.unfocus();
         }
         self.paths = paths(devices);
-        let drawn = bluetooth_menu::draw(
+        let shown = Shown {
             adapter,
             devices,
-            self.header(ask, devices),
+            busy,
+            header: self.header(ask, devices),
+        };
+        let drawn = bluetooth_menu::draw(
+            &shown,
             self.panel.focused(),
             look.measure,
             look.line_height,
@@ -235,9 +266,9 @@ impl BluetoothMenu {
         })
     }
 
-    /// What choosing `target` does: a rename started, sent or cancelled,
-    /// an answer to the pairing agent, which for a PIN is what was typed
-    /// (nothing yet answers nothing), or the caller's to carry out.
+    /// What choosing `target` does: a failure seen, a rename started, sent
+    /// or cancelled, an answer to the pairing agent, which for a PIN is what
+    /// was typed (nothing yet answers nothing), or the caller's to carry out.
     fn act(&mut self, target: Target) -> Outcome {
         let pin = matches!(self.showing, Some(Showing::Ask(_, Question::Pin)));
         match (target, &self.showing) {
@@ -248,6 +279,10 @@ impl BluetoothMenu {
                 }
                 None => Outcome::Kept,
             },
+            (Target::Answer(_), Some(Showing::Failed(_))) => {
+                self.failed = None;
+                Outcome::Redraw
+            }
             (Target::Answer(yes), Some(Showing::Rename(path))) => {
                 let outcome = if yes {
                     Outcome::Rename(path.clone(), self.typed.clone())
@@ -265,9 +300,19 @@ impl BluetoothMenu {
         }
     }
 
-    /// Draws the menu if it has a frame to present.
-    pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
-        self.panel.draw(shell, text)
+    /// Draws the menu, and its tooltip, if they have frames to present.
+    pub fn draw(
+        &mut self,
+        shell: &mut dyn Shell,
+        text: &Text,
+        look: &Look<'_>,
+    ) -> anyhow::Result<()> {
+        self.panel.draw(shell, text, look)
+    }
+
+    /// When its tooltip next has something to do.
+    pub fn next_wake(&self) -> Option<std::time::Instant> {
+        self.panel.next_wake()
     }
 
     /// Closes the menu: its surface, then its window unless the window

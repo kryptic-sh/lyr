@@ -98,6 +98,26 @@ pub enum DeviceAction {
     Untrust,
 }
 
+impl DeviceAction {
+    /// Its verb as it goes on.
+    const fn doing(self) -> &'static str {
+        match self {
+            Self::Connect => "Connecting",
+            Self::Disconnect => "Disconnecting",
+            Self::Pair => "Pairing",
+            Self::Trust => "Trusting",
+            Self::Untrust => "Untrusting",
+        }
+    }
+
+    /// What the menu says when doing it to the device named `device` failed
+    /// because `why`.
+    #[must_use]
+    pub fn failed(self, device: &str, why: &str) -> String {
+        format!("{} {device} failed: {why}", self.doing())
+    }
+}
+
 /// What the pairing agent asks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Question {
@@ -156,6 +176,8 @@ pub enum Header<'a> {
     /// A new name for the device named `device`, `typed` so far. An empty
     /// one gives the device back the name it reports.
     Rename { device: &'a str, typed: &'a str },
+    /// What went wrong doing something to a device, until OK.
+    Failed(&'a str),
 }
 
 impl<'a> Header<'a> {
@@ -165,6 +187,16 @@ impl<'a> Header<'a> {
         match self {
             Self::Ask(ask) => ask.text(),
             Self::Rename { device, .. } => format!("Name for {device}"),
+            Self::Failed(message) => (*message).to_owned(),
+        }
+    }
+
+    /// Its buttons, left to right, with what each answers.
+    const fn answers(self) -> &'static [(&'static str, bool)] {
+        match self {
+            Self::Failed(_) => &[("OK", true)],
+            _ if self.typed().is_some() => &[("OK", true), ("Cancel", false)],
+            _ => &[("Yes", true), ("No", false)],
         }
     }
 
@@ -178,7 +210,7 @@ impl<'a> Header<'a> {
                 ..
             })
             | Self::Rename { typed, .. } => Some(typed),
-            Self::Ask(_) => None,
+            Self::Ask(_) | Self::Failed(_) => None,
         }
     }
 }
@@ -200,6 +232,25 @@ pub enum Target {
     Forget(usize),
     /// A paired device's Settings button, where the platform connects it.
     Settings,
+}
+
+impl Target {
+    /// The word a device's icon button stands for, shown as its tooltip;
+    /// the switches and the header's buttons are labelled already.
+    #[must_use]
+    pub const fn tooltip(&self) -> Option<&'static str> {
+        Some(match self {
+            Self::Device(_, DeviceAction::Connect) => "Connect",
+            Self::Device(_, DeviceAction::Disconnect) => "Disconnect",
+            Self::Device(_, DeviceAction::Pair) => "Pair",
+            Self::Device(_, DeviceAction::Trust) => "Trust",
+            Self::Device(_, DeviceAction::Untrust) => "Untrust",
+            Self::Rename(_) => "Rename",
+            Self::Forget(_) => "Forget",
+            Self::Settings => "Settings",
+            Self::Answer(_) | Self::Switch(_) | Self::Scan => return None,
+        })
+    }
 }
 
 /// The devices in the order the menu lists them: paired first, then those a
@@ -232,58 +283,109 @@ impl Button {
     }
 }
 
+// A device's buttons are icons, Nerd Font glyphs in the bar's font (named
+// as Nerd Fonts names them), so a busy one changes nothing's width.
+const CONNECT: &str = "\u{F0C1}"; // fa-link
+const DISCONNECT: &str = "\u{F127}"; // fa-unlink
+const PAIR: &str = "\u{F2B5}"; // fa-handshake_o
+const TRUST: &str = "\u{F510}"; // oct-shield_check
+const UNTRUST: &str = "\u{F512}"; // oct-shield_slash
+const RENAME: &str = "\u{F040}"; // fa-pencil
+const SETTINGS: &str = "\u{F013}"; // fa-gear
+const FORGET: &str = "\u{F1F8}"; // fa-trash
+/// What the menu says in place of the rest while the adapter is off.
+const OFF: &str = "Bluetooth is off";
+/// In place of the icon of what is being done to a device.
+const BUSY: &str = "\u{F110}"; // fa-spinner
+
 /// A device's buttons, left to right, those `abilities` allow: connect or
 /// disconnect, pair while it is not paired, trust or untrust, Rename once
 /// it is paired, as bluetui does, Settings once it is paired, then Forget.
-fn buttons(device: &Device, abilities: Abilities) -> Vec<(&'static str, Button)> {
+/// While `busy` is being carried out, its button shows [`BUSY`].
+fn buttons(
+    device: &Device,
+    abilities: Abilities,
+    busy: Option<DeviceAction>,
+) -> Vec<(&'static str, Button)> {
+    let action = |icon, action| {
+        let icon = if busy == Some(action) { BUSY } else { icon };
+        (icon, Button::Action(action))
+    };
     let mut buttons = Vec::new();
     if abilities.connect {
         buttons.push(if device.connected {
-            ("Disconnect", Button::Action(DeviceAction::Disconnect))
+            action(DISCONNECT, DeviceAction::Disconnect)
         } else {
-            ("Connect", Button::Action(DeviceAction::Connect))
+            action(CONNECT, DeviceAction::Connect)
         });
     }
     if !device.paired {
-        buttons.push(("Pair", Button::Action(DeviceAction::Pair)));
+        buttons.push(action(PAIR, DeviceAction::Pair));
     }
     if abilities.trust {
         buttons.push(if device.trusted {
-            ("Untrust", Button::Action(DeviceAction::Untrust))
+            action(UNTRUST, DeviceAction::Untrust)
         } else {
-            ("Trust", Button::Action(DeviceAction::Trust))
+            action(TRUST, DeviceAction::Trust)
         });
     }
     if device.paired && abilities.rename {
-        buttons.push(("Rename", Button::Rename));
+        buttons.push((RENAME, Button::Rename));
     }
     if device.paired && abilities.settings {
-        buttons.push(("Settings", Button::Settings));
+        buttons.push((SETTINGS, Button::Settings));
     }
     if device.paired || abilities.forget_unpaired {
-        buttons.push(("Forget", Button::Forget));
+        buttons.push((FORGET, Button::Forget));
     }
     buttons
 }
 
-/// The menu for `adapter` and its `devices`: its draw list, its size, and
-/// what each click lands on, its text measured by `measure` in lines
-/// `line_height` tall.
+/// What is being done to the device at `path`, of the `busy` actions BlueZ
+/// has not answered yet, by device path.
+fn busy_with(busy: &[(String, DeviceAction)], path: &str) -> Option<DeviceAction> {
+    busy.iter()
+        .find(|(device, _)| device == path)
+        .map(|&(_, action)| action)
+}
+
+/// What the menu shows.
+#[derive(Clone, Copy, Debug)]
+pub struct Shown<'a> {
+    pub adapter: &'a Adapter,
+    pub devices: &'a [Device],
+    /// What is being done to which device, by its path, that the platform
+    /// has not answered yet.
+    pub busy: &'a [(String, DeviceAction)],
+    pub header: Option<Header<'a>>,
+}
+
+/// The menu `shown`: its draw list, its size, and what each click lands
+/// on, its text measured by `measure` in lines `line_height` tall. A device
+/// that is busy says so on its button, and its buttons take no clicks until
+/// the platform answers.
 #[must_use]
 pub fn draw(
-    adapter: &Adapter,
-    devices: &[Device],
-    header: Option<Header<'_>>,
+    shown: &Shown<'_>,
     focus: Option<Target>,
     measure: &dyn Fn(&str) -> f32,
     line_height: f32,
     theme: &Theme,
 ) -> (DrawList, Size, Regions<Target>) {
+    let Shown {
+        adapter,
+        devices,
+        busy,
+        header,
+    } = *shown;
     let across = menu::BUTTON_PADDING.0;
     let row = menu::row(line_height);
     let abilities = adapter.abilities;
-    let mut switches = vec![("Power", Target::Switch(Switch::Powered), adapter.powered)];
-    if abilities.visibility {
+    // Off, the rest is hidden behind a line saying so, as in the Wi-Fi menu.
+    let on = adapter.powered;
+    let status = (!on).then_some(OFF);
+    let mut switches = vec![("Bluetooth", Target::Switch(Switch::Powered), on)];
+    if on && abilities.visibility {
         switches.push((
             "Discoverable",
             Target::Switch(Switch::Discoverable),
@@ -295,8 +397,10 @@ pub fn draw(
             adapter.pairable,
         ));
     }
-    switches.push(("Scan", Target::Scan, adapter.discovering));
-    let ordered = order(devices);
+    if on {
+        switches.push(("Scan", Target::Scan, adapter.discovering));
+    }
+    let ordered = if on { order(devices) } else { Vec::new() };
     let name = |device: &Device| match device.battery {
         Some(battery) => format!("{} {battery}%", device.alias),
         None => device.alias.clone(),
@@ -305,23 +409,19 @@ pub fn draw(
         .iter()
         .map(|(label, _, _)| measure(label))
         .chain(ordered.iter().map(|device| measure(&name(device))))
+        .chain(status.map(measure))
         .fold(0.0, f32::max);
     let button_width = |label: &str| button_width(label, measure);
+    // Every icon button is a square a row tall.
     let buttons_width = ordered
         .iter()
         .map(|device| {
-            buttons(device, abilities)
-                .iter()
-                .map(|(label, _)| button_width(label) + GAP)
-                .sum::<f32>()
+            let count = buttons(device, abilities, None).len();
+            count as f32 * (row + GAP)
         })
         .fold(2.0 * row, f32::max);
     let typed = header.and_then(|header| header.typed());
-    let answers = if typed.is_some() {
-        [("OK", true), ("Cancel", false)]
-    } else {
-        [("Yes", true), ("No", false)]
-    };
+    let answers = header.map_or(&[][..], Header::answers);
     // The field holds the longest PIN, so typing never resizes it; a longer
     // name scrolls in it.
     let field_width = measure(&"0".repeat(PIN_LENGTH)) + 2.0 * across;
@@ -345,7 +445,13 @@ pub fn draw(
     let mut y = PADDING;
     // The header first, where it cannot be missed.
     if let Some(header) = header {
-        items.push(text(header.text(), PADDING, y, theme.workspace_active));
+        // A failure in the Wi-Fi menu's red.
+        let colour = if matches!(header, Header::Failed(_)) {
+            theme.battery_critical
+        } else {
+            theme.workspace_active
+        };
+        items.push(text(header.text(), PADDING, y, colour));
         if let Some(typed) = typed {
             let field = Rect {
                 x: PADDING + measure(&header.text()) + GAP,
@@ -382,6 +488,10 @@ pub fn draw(
         regions.push(rect, target);
         y += row + GAP;
     }
+    if let Some(status) = status {
+        items.push(text(status.to_owned(), PADDING, y + GAP, theme.foreground));
+        y += GAP + row + GAP;
+    }
     for (index, device) in ordered.iter().enumerate() {
         y += if index == 0 { GAP } else { 0.0 };
         let colour = if device.connected {
@@ -391,15 +501,19 @@ pub fn draw(
         };
         items.push(text(name(device), PADDING, y, colour));
         let mut x = PADDING + label_width + GAP;
-        for (label, button) in buttons(device, abilities) {
+        let busy = busy_with(busy, &device.path);
+        for (icon, button) in buttons(device, abilities, busy) {
             let rect = Rect {
                 x,
                 y,
-                width: button_width(label),
+                width: row,
                 height: row,
             };
-            items.extend(menu::button(rect, label, measure, line_height, theme));
-            regions.push(rect, button.target(index));
+            items.extend(menu::icon_button(rect, icon, measure, line_height, theme));
+            // One thing at a time to a device, as the Wi-Fi menu waits.
+            if busy.is_none() {
+                regions.push(rect, button.target(index));
+            }
             x += rect.width + GAP;
         }
         y += row + GAP;

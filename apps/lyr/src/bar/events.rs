@@ -23,7 +23,7 @@ use crate::input::{self, Pointer};
 use crate::list_popup::Outcome;
 use crate::power_menu::PowerMenu;
 use crate::toasts::Clicked;
-use crate::tooltips::{Look, Tooltips};
+use crate::tooltips::{self, Look, Tooltips};
 
 impl App {
     /// Applies `event`, which arrived at `instant`.
@@ -196,9 +196,10 @@ impl App {
                 if window.hovered() != window.hovered {
                     window.dirty = true;
                 }
+                let hovered = window.pointer.target(&window.regions);
                 window
                     .tooltips
-                    .hover(window.pointer.target(&window.regions), instant);
+                    .hover(hovered.filter(|target| tooltips::on_bar(target)), instant);
                 if !presses.is_empty() {
                     window.tooltips.press(instant);
                 }
@@ -352,7 +353,11 @@ impl App {
                     menu.close(shell, outcome == BluetoothOutcome::Closed)?;
                 }
             }
-            BluetoothOutcome::Act(target) => self.bluetooth_act(target),
+            BluetoothOutcome::Act(target) => {
+                self.bluetooth_act(target);
+                // A device's button says what is being done to it.
+                self.refresh_bluetooth_menu(shell)?;
+            }
             BluetoothOutcome::Answer(reply) => {
                 self.bluetooth_answer(reply);
                 // The question goes from the menu.
@@ -393,7 +398,15 @@ impl App {
                 let Some(device) = devices.get(index) else {
                     return;
                 };
-                BluetoothRequest::Device(device.path.clone(), action)
+                let path = device.path.clone();
+                // Its buttons wait for the answer every device action gets.
+                if self
+                    .commands
+                    .bluetooth(BluetoothRequest::Device(path.clone(), action))
+                {
+                    self.data.bluetooth_busy.push((path, action));
+                }
+                return;
             }
             Target::Rename(_) => return,
             // Where Windows connects a paired device; BlueZ's menu draws no

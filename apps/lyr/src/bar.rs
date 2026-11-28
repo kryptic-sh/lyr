@@ -257,7 +257,8 @@ pub fn run(config_path: Option<&Path>, log_stats: bool) -> anyhow::Result<()> {
 impl App {
     /// How long the loop may sleep. A bar or tooltip still to draw (a frame
     /// the swapchain swallowed) goes round again at once; otherwise the loop
-    /// sleeps until the clock's next tick or a tooltip's delay is up.
+    /// sleeps until the clock's next tick or a tooltip's delay is up, the
+    /// Bluetooth menu's buttons' included.
     fn wait(&self) -> Duration {
         if self
             .windows
@@ -282,6 +283,11 @@ impl App {
             .filter_map(|window| window.tooltips.next_wake())
             .chain(self.toasts.next_wake())
             .chain(self.wifi_wake())
+            .chain(
+                self.bluetooth_menu
+                    .as_ref()
+                    .and_then(BluetoothMenu::next_wake),
+            )
             .fold(self.next_tick, Instant::min);
         wake.saturating_duration_since(Instant::now())
     }
@@ -316,6 +322,10 @@ impl App {
 
     /// Applies a source's update.
     fn update(&mut self, update: Update, now: Instant) {
+        #[cfg(any(target_os = "linux", windows))]
+        if let Update::BluetoothDone(device, action, Err(why)) = &update {
+            self.bluetooth_failed(device, *action, why);
+        }
         #[cfg(windows)]
         if let Update::WifiJoined(joined) = &update {
             self.wifi_joined(joined.clone());
@@ -432,6 +442,7 @@ impl App {
                 &look,
                 adapter,
                 &self.data.bluetooth_devices,
+                &self.data.bluetooth_busy,
                 self.data.bluetooth_question(),
             )
             .context("opening the Bluetooth menu")?,
@@ -471,8 +482,38 @@ impl App {
             &look,
             adapter,
             &self.data.bluetooth_devices,
+            &self.data.bluetooth_busy,
             self.data.bluetooth_question(),
         )
+    }
+
+    /// Shows that doing `action` to the device at `device` failed, `why`,
+    /// in the Bluetooth menu; with the menu closed, a notice on Linux, and
+    /// logged on Windows, which has no daemon of lyr's to show one.
+    #[cfg(any(target_os = "linux", windows))]
+    fn bluetooth_failed(
+        &mut self,
+        device: &str,
+        action: lyr_core::bluetooth_menu::DeviceAction,
+        why: &str,
+    ) {
+        let name = self
+            .data
+            .bluetooth_devices
+            .iter()
+            .find(|known| known.path == device)
+            .map_or(device, |known| known.alias.as_str());
+        let message = action.failed(name, why);
+        match &mut self.bluetooth_menu {
+            Some(menu) => menu.failed(message),
+            None => {
+                tracing::warn!("bluetooth: {message}");
+                // It names the device, which is anyone's text.
+                #[cfg(target_os = "linux")]
+                self.commands
+                    .notify("Bluetooth".to_owned(), lyr_core::markup::escape(&message));
+            }
+        }
     }
 
     /// Runs the shown custom modules' scripts for the bars there are, and
@@ -627,8 +668,9 @@ impl App {
         };
         for (&bar, window) in windows.iter_mut() {
             let anchor = Anchor {
-                bar,
+                parent: bar,
                 regions: &window.regions,
+                scroll: 0.0,
                 position: config.bar.position,
             };
             let monitor = window.monitor.as_deref();
@@ -648,13 +690,13 @@ impl App {
             panel.draw(shell, text)?;
         }
         if let Some(menu) = bluetooth_menu {
-            menu.draw(shell, text)?;
+            menu.draw(shell, text, &look)?;
         }
         if let Some(menu) = wifi_menu {
-            menu.draw(shell, text)?;
+            menu.draw(shell, text, &look)?;
         }
         if let Some(menu) = audio_menu {
-            menu.draw(shell, text)?;
+            menu.draw(shell, text, &look)?;
         }
         if let Some(menu) = tray_menu {
             menu.draw(shell, text)?;

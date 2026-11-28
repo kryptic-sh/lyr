@@ -8,8 +8,34 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- A button in the Bluetooth, Wi-Fi and audio menus shows pushed in while the
+  pointer holds it down: its fill darkens until the button is let go, so a click
+  shows it landed. A slider being dragged does not. For users of the library
+  crates: `lyr_core::menu` gains `pressed` and `PRESSED_SHADE`.
+- The Bluetooth menu's device buttons are icons (link, unlink, handshake,
+  shield, pencil, gear and trash, from the bar's Nerd Font), each a square a row
+  tall. While what a click asked is carried out, until BlueZ (or Windows, for a
+  pairing) answers, its icon is a spinner in the same square, so the menu keeps
+  its size, and that device's buttons wait. A failure shows in red at the top of
+  the menu until OK, naming the device and BlueZ's reason ("Connecting Buds
+  failed: …"), or as a notification when the menu is closed; before, it was only
+  logged. For users of the library crates: `lyr_core::bluetooth_menu::draw`
+  takes a `Shown` in place of the adapter, devices and header, `Header` gains
+  `Failed`, and `lyr_core::menu` gains `icon_button`.
+- Each of the Bluetooth menu's icon buttons names itself in a tooltip
+  ("Connect", "Forget", …) when the pointer rests on it, timed as the bar's
+  tooltips are: 500 ms, quicker when moving from one to the next, hidden by a
+  click. For users of the library crates: `lyr_core::bluetooth_menu::Target`
+  gains `tooltip`.
+
 ### Changed
 
+- The Bluetooth menu's on/off switch is labelled "Bluetooth", not "Power", as
+  the Wi-Fi menu's is labelled "Wi-Fi". While Bluetooth is off the menu shows
+  only that switch and "Bluetooth is off", hiding the other switches and the
+  devices, as the Wi-Fi menu does.
 - Built on crcbl 0.20.0 (from 0.17.2). The bar's system fonts are now
   memory-mapped instead of copied onto the heap wherever crcbl allows it. For
   users of the library crates: `lyr_shell::bars::Bars` takes a

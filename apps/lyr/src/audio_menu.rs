@@ -311,8 +311,13 @@ impl AudioMenu {
     }
 
     /// Draws the menu and its dropdown if they have frames to present.
-    pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
-        self.panel.draw(shell, text)?;
+    pub fn draw(
+        &mut self,
+        shell: &mut dyn Shell,
+        text: &Text,
+        look: &Look<'_>,
+    ) -> anyhow::Result<()> {
+        self.panel.draw(shell, text, look)?;
         if let Some(choice) = &mut self.choice {
             choice.popup.draw(shell, text)?;
         }

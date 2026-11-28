@@ -6,7 +6,7 @@ use lyr_core::draw::Target;
 use lyr_core::hit::{Rect, Regions};
 use lyr_core::tooltip::HOVER_DELAY;
 
-use super::{Anchor, Look, Tooltips};
+use super::{Anchor, Look, Tooltips, on_bar};
 
 fn theme() -> Theme {
     from_sources(None, Platform::Linux)
@@ -64,8 +64,9 @@ impl Setup {
             .sync(
                 &mut self.shell,
                 &Anchor {
-                    bar: self.bar,
+                    parent: self.bar,
                     regions: &self.regions,
+                    scroll: 0.0,
                     position: Position::Top,
                 },
                 &Look {
@@ -143,13 +144,12 @@ fn nothing_opens_without_text_a_box_or_a_module() {
         None,
         "no box"
     );
-    let mut tooltips = Tooltips::default();
-    tooltips.hover(Some(&Target::Button(Module::Workspaces, 0)), start);
-    assert_eq!(tooltips.next_wake(), None, "a workspace button has none");
-    tooltips.hover(Some(&Target::Button(Module::Tray, 0)), start);
-    assert_eq!(
-        tooltips.next_wake(),
-        Some(start + HOVER_DELAY),
+    assert!(
+        !on_bar(&Target::Button(Module::Workspaces, 0)),
+        "a workspace button has none"
+    );
+    assert!(
+        on_bar(&Target::Button(Module::Tray, 0)),
         "a tray button has one"
     );
 }
@@ -237,4 +237,40 @@ fn without_repositioning_a_moved_tooltip_is_opened_again() {
         .expect("a popup");
     assert_ne!(again, popup);
     assert!(!setup.open(popup) && setup.open(again));
+}
+
+#[test]
+fn a_tooltip_opens_where_its_target_is_scrolled_to() {
+    let mut setup = setup();
+    let mut tooltips = Tooltips::default();
+    let start = Instant::now();
+    tooltips.hover(Some(&Target::Module(Module::Clock)), start);
+    let look = Look {
+        theme: &setup.theme,
+        measure: &measure,
+        measure_in: &|text, _| measure(text),
+        lay_out: &|_, _| Vec::new(),
+        line_height: 20.0,
+        calendar_line_height: 20.0,
+    };
+    // A menu scrolled 100 px: the box drawn 10 px down its content is
+    // 90 px above the window's top.
+    tooltips
+        .sync(
+            &mut setup.shell,
+            &Anchor {
+                parent: setup.bar,
+                regions: &setup.regions,
+                scroll: 100.0,
+                position: Position::Top,
+            },
+            &look,
+            |_: &Target<Module>| Some("Connect".to_owned()),
+            start + HOVER_DELAY,
+        )
+        .expect("synced");
+    assert_eq!(
+        tooltips.popup.as_ref().map(|popup| popup.anchor.y),
+        Some(-90.0)
+    );
 }

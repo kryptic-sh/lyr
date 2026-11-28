@@ -25,6 +25,7 @@ use lyr_shell::bars::NAMESPACE;
 use crate::input::Pointer;
 use crate::keys::{self, Key};
 use crate::toasts::EDGE_MARGIN;
+use crate::tooltips::{Anchor, Look, Tooltips};
 
 /// An open menu's panel.
 pub struct MenuPanel<T> {
@@ -51,6 +52,12 @@ pub struct MenuPanel<T> {
     /// The target the left button went down on, while it is held, when it
     /// is one [`Self::drags`] takes.
     dragging: Option<T>,
+    /// The target the left button went down on, while it is held, drawn
+    /// pushed in; not one [`Self::drags`] takes, which is no button.
+    pressed: Option<T>,
+    /// The tooltip of the target under the pointer, from `tooltip_of`.
+    tooltips: Tooltips<T>,
+    tooltip_of: fn(&T) -> Option<&'static str>,
     scale: f32,
     surface: Option<Surface>,
     dirty: bool,
@@ -326,7 +333,7 @@ fn create(shell: &mut dyn Shell, size: Size, place: Place) -> anyhow::Result<Win
     })?)
 }
 
-impl<T: Copy> MenuPanel<T> {
+impl<T: Copy + PartialEq> MenuPanel<T> {
     /// Opens a panel showing `list`, `size` big, with its input `regions`,
     /// at `place`; text in it is `line_height` a line.
     pub fn open(
@@ -349,6 +356,9 @@ impl<T: Copy> MenuPanel<T> {
             picked_at: None,
             drags: |_| false,
             dragging: None,
+            pressed: None,
+            tooltips: Tooltips::default(),
+            tooltip_of: |_| None,
             pointer: Pointer::default(),
             scale: 1.0,
             surface: None,
@@ -364,9 +374,22 @@ impl<T: Copy> MenuPanel<T> {
         self
     }
 
-    /// Whether `window` is the panel's.
+    /// Has a target `tooltip_of` names show that tooltip while the pointer
+    /// rests on it, as a module's shows on the bar: an icon button's word.
+    #[must_use]
+    pub fn with_tooltips(mut self, tooltip_of: fn(&T) -> Option<&'static str>) -> Self {
+        self.tooltip_of = tooltip_of;
+        self
+    }
+
+    /// Whether `window` is the panel's, or its tooltip's.
     pub fn owns(&self, window: WindowId) -> bool {
-        self.window == window
+        self.window == window || self.tooltips.owns(window)
+    }
+
+    /// When its tooltip next has something to do.
+    pub fn next_wake(&self) -> Option<std::time::Instant> {
+        self.tooltips.next_wake()
     }
 
     /// Its window, which a popup over it is anchored to.
@@ -380,17 +403,19 @@ impl<T: Copy> MenuPanel<T> {
         self.size
     }
 
-    /// Reads one shell event for its surface's frame request.
+    /// Reads one shell event for its surface's frame request, and its
+    /// tooltip's.
     pub fn observe(&mut self, event: &ShellEvent) {
         if let Some(surface) = &mut self.surface {
             surface.observe(event);
         }
+        self.tooltips.observe(event);
     }
 
     /// Whether it has a frame to present that it can present now; one whose
     /// last frame's answer has not come waits for it rather than for nothing.
     pub fn ready(&self) -> bool {
-        self.dirty && self.surface.as_ref().is_none_or(Surface::frame_due)
+        self.dirty && self.surface.as_ref().is_none_or(Surface::frame_due) || self.tooltips.ready()
     }
 
     /// Where the last pick was clicked across `target`, 0 – 1 of its width;
@@ -489,13 +514,27 @@ impl<T: Copy> MenuPanel<T> {
         self.regions.hit(x, y + self.scroll)
     }
 
-    /// What the window shows: the list, or when it holds more than fits,
-    /// its frame at the window's size and the rest scrolled inside it.
+    /// What the window shows: the list with the held button pushed in, or
+    /// when it holds more than fits, its frame at the window's size and the
+    /// rest scrolled inside it.
     fn visible(&self) -> DrawList {
-        if self.scroll_max() <= 0.0 {
-            return self.list.clone();
-        }
         let mut items = self.list.items.clone();
+        if let Some(rect) = self
+            .pressed
+            .as_ref()
+            .and_then(|target| self.regions.rect(target))
+        {
+            // Its corners are the frame's, which `lyr_core::menu::frame`
+            // puts first: the theme's radius, as every button's.
+            let radius = match items.first() {
+                Some(Item::Box { radius, .. }) => *radius,
+                _ => 0.0,
+            };
+            items.push(lyr_core::menu::pressed(rect, radius));
+        }
+        if self.scroll_max() <= 0.0 {
+            return DrawList { items };
+        }
         let whole = |rect: &lyr_core::hit::Rect| {
             rect.x == 0.0
                 && rect.y == 0.0
@@ -549,6 +588,26 @@ impl<T: Copy> MenuPanel<T> {
     /// Applies an event for the panel's window. A menu that types takes
     /// its text, Backspace and its own Escape before this.
     pub fn event(&mut self, shell: &mut dyn Shell, event: &ShellEvent) -> anyhow::Result<Event<T>> {
+        // Its tooltip's window: sized, or gone with the panel.
+        if event
+            .window()
+            .is_some_and(|window| self.tooltips.owns(window))
+        {
+            match *event {
+                ShellEvent::Resized {
+                    size, scale_factor, ..
+                }
+                | ShellEvent::ScaleFactorChanged {
+                    size, scale_factor, ..
+                } => {
+                    self.tooltips
+                        .resized(shell, (size.width, size.height), scale_factor as f32)?
+                }
+                ShellEvent::WindowDestroyed { .. } => self.tooltips.destroyed()?,
+                _ => {}
+            }
+            return Ok(Event::Kept);
+        }
         if event.window() != Some(self.window) {
             return Ok(Event::Kept);
         }
@@ -600,7 +659,12 @@ impl<T: Copy> MenuPanel<T> {
                 button: PointerButton::Left,
                 state: ButtonState::Released,
                 ..
-            } => self.dragging = None,
+            } => {
+                self.dragging = None;
+                if self.pressed.take().is_some() {
+                    self.dirty = true;
+                }
+            }
             _ => {
                 let presses = self.pointer.handle(event, self.scale);
                 let scrolled = presses
@@ -617,11 +681,25 @@ impl<T: Copy> MenuPanel<T> {
                         self.dirty = true;
                     }
                 }
+                let now = std::time::Instant::now();
+                let tooltip_of = self.tooltip_of;
+                let hovered = self
+                    .under_pointer()
+                    .copied()
+                    .filter(|target| tooltip_of(target).is_some());
+                self.tooltips.hover(hovered.as_ref(), now);
+                if presses.contains(&Press::Left) {
+                    self.tooltips.press(now);
+                }
                 if presses.contains(&Press::Left)
                     && let Some(&target) = self.under_pointer()
                 {
                     self.picked_at = self.pointer.position();
                     self.dragging = (self.drags)(&target).then_some(target);
+                    if self.dragging.is_none() {
+                        self.pressed = Some(target);
+                        self.dirty = true;
+                    }
                     return Ok(Event::Pick(target));
                 }
                 if let (ShellEvent::PointerMotion { .. }, Some(target)) = (event, self.dragging) {
@@ -633,20 +711,46 @@ impl<T: Copy> MenuPanel<T> {
         Ok(Event::Kept)
     }
 
-    /// Draws the panel if it has a frame to present.
-    pub fn draw(&mut self, shell: &mut dyn Shell, text: &Text) -> anyhow::Result<()> {
+    /// Draws the panel if it has a frame to present, and opens, closes or
+    /// draws its tooltip, in `look`, as the pointer and the clock call for.
+    pub fn draw(
+        &mut self,
+        shell: &mut dyn Shell,
+        text: &Text,
+        look: &Look<'_>,
+    ) -> anyhow::Result<()> {
         if self.dirty {
             let visible = self.visible();
             if let Some(surface) = &mut self.surface {
                 self.dirty = !surface.draw_bar(shell, &visible, text)?;
             }
         }
-        Ok(())
+        let anchor = Anchor {
+            parent: self.window,
+            regions: &self.regions,
+            scroll: self.scroll,
+            position: self.place.edge,
+        };
+        let tooltip_of = self.tooltip_of;
+        self.tooltips.sync(
+            shell,
+            &anchor,
+            look,
+            |target| tooltip_of(target).map(str::to_owned),
+            std::time::Instant::now(),
+        )?;
+        self.tooltips.draw(shell, text)
     }
 
-    /// Closes the panel: its surface, then its window unless the window
-    /// system has closed it already (`window_gone`).
-    pub fn close(self, shell: &mut dyn Shell, window_gone: bool) -> anyhow::Result<()> {
+    /// Closes the panel: its tooltip and surface, then its window unless the
+    /// window system has closed it already (`window_gone`), and its tooltip
+    /// with it.
+    pub fn close(mut self, shell: &mut dyn Shell, window_gone: bool) -> anyhow::Result<()> {
+        if window_gone {
+            self.tooltips.destroyed()?;
+        } else {
+            self.tooltips.close(shell)?;
+        }
         if let Some(surface) = self.surface {
             surface.destroy()?;
         }
@@ -1016,6 +1120,91 @@ mod tests {
         panel.place.across = 1000.0;
         panel.size = held(panel.content, panel.place);
         assert_eq!(panel.visible(), panel.list);
+    }
+
+    /// Whether `panel` draws the pressed shade over `rect`.
+    fn shaded(panel: &MenuPanel<usize>, rect: Rect) -> bool {
+        panel.visible().items.iter().any(|item| {
+            matches!(item, Item::Box { rect: at, fill, .. }
+                if *at == rect && *fill == menu::PRESSED_SHADE)
+        })
+    }
+
+    #[test]
+    fn a_held_button_shows_pushed_in_until_it_is_let_go() {
+        let (mut panel, mut shell) = tall();
+        let window = panel.window;
+        panel.place.across = 1000.0;
+        panel.size = held(panel.content, panel.place);
+        let second = Rect {
+            x: 0.0,
+            y: 60.0,
+            width: 100.0,
+            height: 60.0,
+        };
+        assert!(!shaded(&panel, second), "nothing held yet");
+
+        let at = PhysicalPoint { x: 50.0, y: 70.0 };
+        shell.move_pointer(window, at, (0.0, 0.0)).expect("moved");
+        shell
+            .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
+            .expect("pressed");
+        assert!(pump(&mut panel, &mut shell).contains(&Event::Pick(1)));
+        assert!(shaded(&panel, second), "held down");
+        assert!(panel.dirty, "drawn again to show it");
+
+        panel.dirty = false;
+        shell
+            .button(window, PointerButton::Left, ButtonState::Released, Some(at))
+            .expect("released");
+        pump(&mut panel, &mut shell);
+        assert!(!shaded(&panel, second), "let go");
+        assert!(panel.dirty, "drawn again to show it");
+    }
+
+    #[test]
+    fn only_a_target_with_a_tooltip_starts_its_timer_and_a_click_stops_it() {
+        let (panel, mut shell) = tall();
+        let mut panel = panel.with_tooltips(|row| (*row == 1).then_some("Connect"));
+        let window = panel.window;
+        let over = |shell: &mut HeadlessShell, y| {
+            let at = PhysicalPoint { x: 50.0, y };
+            shell.move_pointer(window, at, (0.0, 0.0)).expect("moved");
+            at
+        };
+        over(&mut shell, 10.0);
+        pump(&mut panel, &mut shell);
+        assert_eq!(panel.next_wake(), None, "the first row has none");
+        let at = over(&mut shell, 70.0);
+        pump(&mut panel, &mut shell);
+        assert!(panel.next_wake().is_some(), "the second row has one");
+        shell
+            .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
+            .expect("pressed");
+        pump(&mut panel, &mut shell);
+        assert_eq!(panel.next_wake(), None, "a click hides it");
+    }
+
+    #[test]
+    fn a_dragged_target_is_not_shown_pushed_in() {
+        let (panel, mut shell) = tall();
+        let mut panel = panel.with_drags(|_| true);
+        let window = panel.window;
+        panel.place.across = 1000.0;
+        panel.size = held(panel.content, panel.place);
+        let at = PhysicalPoint { x: 50.0, y: 10.0 };
+        shell.move_pointer(window, at, (0.0, 0.0)).expect("moved");
+        shell
+            .button(window, PointerButton::Left, ButtonState::Pressed, Some(at))
+            .expect("pressed");
+        pump(&mut panel, &mut shell);
+        let first = Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 100.0,
+            height: 60.0,
+        };
+        assert!(!shaded(&panel, first), "a slider is not a button");
     }
 
     #[test]

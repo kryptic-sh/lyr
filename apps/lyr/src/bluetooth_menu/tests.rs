@@ -77,8 +77,16 @@ fn setup(devices: &[Device]) -> Setup {
         line_height: 20.0,
         calendar_line_height: 20.0,
     };
-    let menu = BluetoothMenu::open(&mut shell, Place::EDGE, &look, &adapter(), devices, None)
-        .expect("opened");
+    let menu = BluetoothMenu::open(
+        &mut shell,
+        Place::EDGE,
+        &look,
+        &adapter(),
+        devices,
+        &[],
+        None,
+    )
+    .expect("opened");
     Setup { shell, theme, menu }
 }
 
@@ -126,7 +134,7 @@ fn a_refresh_keeps_the_window_and_a_new_size_resizes_it() {
     };
     setup
         .menu
-        .refresh(&mut setup.shell, &look, &adapter(), &renamed, None)
+        .refresh(&mut setup.shell, &look, &adapter(), &renamed, &[], None)
         .expect("refreshed");
     assert_eq!(setup.menu.panel.window(), first, "the same size");
     let one = setup.menu.panel.size().height;
@@ -137,6 +145,7 @@ fn a_refresh_keeps_the_window_and_a_new_size_resizes_it() {
             &look,
             &adapter(),
             &[device("Buds"), device("Phone")],
+            &[],
             None,
         )
         .expect("refreshed");
@@ -226,7 +235,7 @@ fn a_pin_is_typed_with_the_text_input_on_and_sent_with_enter() {
     };
     setup
         .menu
-        .refresh(&mut setup.shell, &look, &adapter(), &[], Some(ask))
+        .refresh(&mut setup.shell, &look, &adapter(), &[], &[], Some(ask))
         .expect("refreshed");
     let window = setup.menu.panel.window();
     assert_eq!(
@@ -262,7 +271,7 @@ fn a_pin_is_typed_with_the_text_input_on_and_sent_with_enter() {
     assert_eq!(setup.menu.typed.chars().count(), PIN_LENGTH, "at most");
     setup
         .menu
-        .refresh(&mut setup.shell, &look, &adapter(), &[], None)
+        .refresh(&mut setup.shell, &look, &adapter(), &[], &[], None)
         .expect("refreshed");
     let window = setup.menu.panel.window();
     assert_eq!(setup.shell.text_input(window).expect("a window"), None);
@@ -295,6 +304,7 @@ fn a_new_question_of_the_same_size_still_turns_the_text_input_on() {
             &look,
             &adapter(),
             &devices,
+            &[],
             Some(ask(Question::Authorize)),
         )
         .expect("refreshed");
@@ -307,6 +317,7 @@ fn a_new_question_of_the_same_size_still_turns_the_text_input_on() {
             &look,
             &adapter(),
             &devices,
+            &[],
             Some(ask(Question::Pin)),
         )
         .expect("refreshed");
@@ -333,7 +344,7 @@ fn a_paired_device_is_renamed_through_a_field_and_escape_cancels_it() {
     let refresh = |setup: &mut Setup| {
         setup
             .menu
-            .refresh(&mut setup.shell, &look, &adapter(), &devices, None)
+            .refresh(&mut setup.shell, &look, &adapter(), &devices, &[], None)
             .expect("refreshed");
         let window = setup.menu.panel.window();
         setup.shell.text_input(window).expect("a window")
@@ -386,7 +397,7 @@ fn a_paired_device_is_renamed_through_a_field_and_escape_cancels_it() {
     refresh(&mut setup);
     setup
         .menu
-        .refresh(&mut setup.shell, &look, &adapter(), &[], None)
+        .refresh(&mut setup.shell, &look, &adapter(), &[], &[], None)
         .expect("refreshed");
     let window = setup.menu.panel.window();
     assert_eq!(
@@ -420,7 +431,14 @@ fn the_agent_s_question_takes_the_header_from_a_rename() {
     };
     setup
         .menu
-        .refresh(&mut setup.shell, &look, &adapter(), &devices, Some(ask))
+        .refresh(
+            &mut setup.shell,
+            &look,
+            &adapter(),
+            &devices,
+            &[],
+            Some(ask),
+        )
         .expect("refreshed");
     assert_eq!(setup.menu.renaming, None);
     let window = setup.menu.panel.window();
@@ -456,7 +474,7 @@ fn a_new_question_takes_enter_from_the_outline() {
     };
     setup
         .menu
-        .refresh(&mut setup.shell, &look, &adapter(), &[], Some(ask))
+        .refresh(&mut setup.shell, &look, &adapter(), &[], &[], Some(ask))
         .expect("refreshed");
     let window = setup.menu.panel.window();
     setup.shell.commit_text(window, "42").expect("typed");
@@ -466,4 +484,53 @@ fn a_new_question_takes_enter_from_the_outline() {
         .key_press(window, KeyCode::Enter)
         .expect("a key");
     assert_eq!(setup.pump(), Outcome::Answer(Reply::Pin("42".to_owned())));
+}
+
+#[test]
+fn a_failure_shows_until_ok_behind_the_agent_s_question() {
+    let devices = [device("Buds")];
+    let mut setup = setup(&devices);
+    let theme = setup.theme.clone();
+    let look = Look {
+        theme: &theme,
+        measure: &measure,
+        measure_in: &|text, _| measure(text),
+        lay_out: &|_, _| Vec::new(),
+        line_height: 20.0,
+        calendar_line_height: 20.0,
+    };
+    let message = "Connecting Buds failed: Host is down".to_owned();
+    setup.menu.failed(message.clone());
+    let ask = Ask {
+        device: "Kbd",
+        question: Question::Authorize,
+        typed: "",
+    };
+    setup
+        .menu
+        .refresh(
+            &mut setup.shell,
+            &look,
+            &adapter(),
+            &devices,
+            &[],
+            Some(ask),
+        )
+        .expect("refreshed");
+    assert_eq!(
+        setup.menu.act(Target::Answer(true)),
+        Outcome::Answer(Reply::Yes),
+        "the question first"
+    );
+    setup
+        .menu
+        .refresh(&mut setup.shell, &look, &adapter(), &devices, &[], None)
+        .expect("refreshed");
+    assert_eq!(setup.menu.showing, Some(super::Showing::Failed(message)));
+    assert_eq!(setup.menu.act(Target::Answer(true)), Outcome::Redraw, "OK");
+    setup
+        .menu
+        .refresh(&mut setup.shell, &look, &adapter(), &devices, &[], None)
+        .expect("refreshed");
+    assert_eq!(setup.menu.showing, None, "seen");
 }
