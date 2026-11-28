@@ -326,6 +326,13 @@ impl Surface {
         self.presenter.observe(event);
     }
 
+    /// Whether a new size asked through [`Surface::awaiting_size`] has not
+    /// come yet, so the window still has its old size.
+    #[must_use]
+    pub const fn awaits_size(&self) -> bool {
+        self.awaiting_size
+    }
+
     /// Whether [`Surface::draw`] would present now: `false` from a present
     /// until its answer is observed, and while a new size is awaited, when
     /// the bar has no reason to wake.
@@ -415,6 +422,7 @@ mod tests {
         let taller = (size.0, size.1 + 40);
         surface.awaiting_size(logical(taller));
         assert!(!surface.frame_due(), "not due while the size is awaited");
+        assert!(surface.awaits_size());
         assert!(
             !surface.draw(&mut shell, &list).expect("skipped"),
             "nothing presented into the old swapchain"
@@ -427,6 +435,7 @@ mod tests {
         surface.awaiting_size(logical(taller));
         surface.resize(taller, 1.0).expect("resized");
         assert!(surface.frame_due(), "due once the size came");
+        assert!(!surface.awaits_size());
         surface.awaiting_size(logical(taller));
         assert!(surface.frame_due(), "the size it has now");
         assert!(surface.draw(&mut shell, &list).expect("drawn"), "presented");

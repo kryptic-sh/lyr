@@ -1722,16 +1722,6 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   accent, or one person of a family emoji. Reasoned from the code, not seen.
   Cutting at cluster boundaries needs `unicode-segmentation` as a direct
   dependency (it is in the tree only through other crates): the owner's call.
-- **An edge-changing reload hit-tests over the old window size for a moment.**
-  When a reload moves the bar between a top or bottom edge and a side, each bar
-  window waits for its new size (`Window::size_on`, `awaiting_size`) and draws
-  nothing meanwhile, but its hit regions and `menu_panel::Place` are still those
-  of the last frame, laid out for the old edge and size. A click or hover in
-  that moment is matched against the old layout, so it may land on a module that
-  is no longer there, or open a menu placed for the old edge. Transient, until
-  the size arrives and the bar is drawn again; reasoned from the code, not seen.
-  A fix would skip hit-testing and menu placement while a window awaits its
-  size.
 - **The clock panel can be taller than the room below a top bar.** On a 720-tall
   output with a top bar, the panel does not fit below the bar and its bottom row
   (Do Not Disturb) is cut at the output's edge (office-lyr, Hyprland 0.57.1
@@ -1884,6 +1874,10 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Not yet verified
 
+- An edge-changing reload hit-testing over nothing until the bar's new size
+  arrives (`Surface::awaits_size`, `App::draw`'s filter, and the reload in
+  `bar::requests` clearing `regions`): reasoned from the code; no click has been
+  made in that moment to see it.
 - A module's tooltip held back while the menu or panel its click opened is up
   (`App::opened_from`, `Tooltips::hover_bar`'s `held`): the filter is
   unit-tested, the wiring in `bar::events` is not, and it has not been seen on

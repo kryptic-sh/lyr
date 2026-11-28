@@ -150,10 +150,14 @@ impl App {
                     self.bars
                         .reshape(shell, &new.bar)
                         .context("reshaping the bars")?;
-                    // Nothing is drawn at the old size meanwhile.
+                    // Nothing is drawn at the old size meanwhile, and a click
+                    // meets no module laid out for it.
                     for window in self.windows.values_mut() {
                         let size = window.size_on(self.config.bar.position, &new.bar);
                         window.surface.awaiting_size(size);
+                        if window.surface.awaits_size() {
+                            window.regions = lyr_core::hit::Regions::default();
+                        }
                     }
                     self.keep_bars(shell, &new.bar, None)
                         .context("creating the bars")?;

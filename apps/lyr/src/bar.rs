@@ -717,7 +717,13 @@ impl App {
         }
         toasts.sync(shell, &look, Instant::now())?;
         toasts.draw(shell, text)?;
-        for window in windows.values_mut().filter(|window| window.dirty) {
+        // A bar awaiting its new size (a reload moved it to another edge) is
+        // laid out once the size comes, and until then is hit-tested over
+        // nothing rather than over a layout for its old size.
+        for window in windows
+            .values_mut()
+            .filter(|window| window.dirty && !window.surface.awaits_size())
+        {
             let hovered = window.hovered();
             let drawn = modules::draw(
                 lyr_core::draw::Size {

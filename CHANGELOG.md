@@ -78,6 +78,10 @@ and this project adheres to
 
 ### Fixed
 
+- A click or hover in the moment after a reload moves the bar to another edge no
+  longer lands on a module laid out for the old edge, or opens a menu placed for
+  it: until the bar's new size arrives it is hit-tested over nothing. For users
+  of the library crates: `lyr_render::surface::Surface` gains `awaits_size`.
 - `[bar] output` matches an output by its connector (`DP-2`, `HDMI-A-1`) as well
   as by the name the window system shows, which on some backends is the
   monitor's model or a made-up `wl-output-N`, so a connector name now picks the
