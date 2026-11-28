@@ -232,43 +232,30 @@ implementation follows meanwhile.
   (`…HDMI1__sink.2`), which neither later switches nor the "off" profile undo
   (restarting WirePlumber did), so a live test waits for the old nodes to go.
 
-- **crcbl: Linux and Vulkan parity for 0.6 – 0.8.** Also at the owner's request
-  (2026-10-20): every crcbl feature developed on the Windows machine to be
-  implemented and tested on Wayland, X11 and Vulkan. The per-feature table is on
-  crcbl's main (its backlog, "Raised by lyr on 2026-10-20"). By crcbl's report
-  the same day, verified on this machine's Intel Vulkan: `Presenter::resize`
-  with frames in flight, `push_opacity` groups, premultiplied transparent
-  windows through sway, the real popup-reposition path on sway 1.12, and a layer
-  panel at 1.5 scale. lyr's own runs showed `set_panel` and the frame gate
-  working, the latter with an output turned off. The three rows left open then
-  are done in crcbl 0.21.0 (its backlog table, read at the tag on 2026-11-28):
-  pointer-leave between an app's own windows has e2e tests on Wayland and X11
-  (`crossing_into_another_of_our_windows_leaves_the_first`; the X11 one runs on
-  CI's Xvfb only), X11's `display_adapter` answers through Xwayland, and the
-  resize under load runs as `run_sandbox_resize` in both e2e scripts. lyr is on
-  crcbl 0.21.0 since 2026-11-28.
-
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
-  `=0.17.1` (2026-11-04). 0.17.0's breaking changes and 0.17.1's fix are in
-  crcbl's ragdoll and joint types, and its additions (`Shell::open_url`,
-  `Shell::set_idle_inhibit`) are new calls, none of which lyr uses; the
-  workspace's tests passed on Windows with it. 0.16.0 had no breaking changes;
-  its changes are in crcbl's animation, ragdoll and render crates. Neither
-  0.14.0 nor 0.15.0 broke anything lyr uses (their breaking changes are in
-  crcbl's renderer, animation, profiler, console and text-edit types); 0.14.0
-  added `crcbl-notify`, which lyr does not depend on yet (the Windows
-  notifications entry). Checked on the owner's desktop (RX 7900 XTX, Mesa): the
-  workspace's tests, the font tests that need the Nerd Font and a CJK font, and
-  the reference-image render test on both RADV and lavapipe. 0.13.0 (2026-10-29)
-  reads a fallback face whole only once its `cmap` maps a character drawn (the
-  Windows memory entry below). 0.12.1 (2026-10-27) brought lazy fallback faces
-  (`lyr_render::fonts`: 124 to 43 MB resident on the owner's laptop, whose bar
-  font has 17 fallback faces), a first start on the display's Vulkan driver
-  alone (in a nested Hyprland there: no `/dev/nvidia*` handle, 94 ms from the
-  shell to the first frame, where 0.12.0 held 12 handles for the process's life
-  and took 408 ms), the viewport fix for a resized panel (its own entry under
-  the audio menu below) and `RichLayout`. 0.12.0 (2026-10-26) brought
-  `GpuChoice`, which lyr saves between runs (`lyr_render::gpu`, the file
+  `=0.21.0` (2026-11-28, from 0.17.2): 0.20.0 added `MonitorInfo::connector`,
+  which `[bar] output` now matches; with 0.21.0, crcbl-image applies a picture's
+  EXIF orientation, and on Windows `crcbl_notify`'s `Backend::list` fails as a
+  whole when one toast cannot be read. 0.17.0's breaking changes and 0.17.1's
+  fix are in crcbl's ragdoll and joint types, and its additions
+  (`Shell::open_url`, `Shell::set_idle_inhibit`) are new calls, none of which
+  lyr uses; the workspace's tests passed on Windows with it. 0.16.0 had no
+  breaking changes; its changes are in crcbl's animation, ragdoll and render
+  crates. Neither 0.14.0 nor 0.15.0 broke anything lyr uses (their breaking
+  changes are in crcbl's renderer, animation, profiler, console and text-edit
+  types); 0.14.0 added `crcbl-notify`, which lyr's sources now depend on (the
+  Windows notifications entry). Checked on the owner's desktop (RX 7900 XTX,
+  Mesa): the workspace's tests, the font tests that need the Nerd Font and a CJK
+  font, and the reference-image render test on both RADV and lavapipe. 0.13.0
+  (2026-10-29) reads a fallback face whole only once its `cmap` maps a character
+  drawn (the Windows memory entry below). 0.12.1 (2026-10-27) brought lazy
+  fallback faces (`lyr_render::fonts`: 124 to 43 MB resident on the owner's
+  laptop, whose bar font has 17 fallback faces), a first start on the display's
+  Vulkan driver alone (in a nested Hyprland there: no `/dev/nvidia*` handle, 94
+  ms from the shell to the first frame, where 0.12.0 held 12 handles for the
+  process's life and took 408 ms), the viewport fix for a resized panel (its own
+  entry under the audio menu below) and `RichLayout`. 0.12.0 (2026-10-26)
+  brought `GpuChoice`, which lyr saves between runs (`lyr_render::gpu`, the file
   `gpu-choice` in lyr's state directory, `apps/lyr/src/gpu.rs`). With 0.12.1 the
   choice names its driver from the first start, so `lyr_render::gpu`'s locate
   thread no longer runs (seen: one save, no search); it is kept for a choice
@@ -574,6 +561,24 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   notification work (2026-11-28), not changed: it is every caller's, not that
   work's. Naming the system directory's copy on Windows (`GetSystemDirectoryW`,
   or `%SystemRoot%`) would close it.
+- **A bar's output is keyed by its shown name, not its connector, past
+  `[bar] output`.** `Window::monitor` is set from crcbl's `MonitorInfo::name` in
+  `bar/events.rs`. It is compared with the compositor's connector names, in the
+  per-output workspace filter (`modules.rs`, `workspace.monitor`) and in the
+  focused-output check in `bar/requests.rs`. It is also handed to scripts as
+  `WAYBAR_OUTPUT_NAME` / `LYR_OUTPUT_NAME` (`custom.rs`). Where a backend's
+  `name` is the monitor's model or `wl-output-N`, per-output workspaces and
+  scripts get the wrong key. The fix is to key them by `MonitorInfo::connector`
+  when it is known, as `lyr_shell::bars` now does for `[bar] output`. Raised by
+  the 2026-11-28 review and not reproduced; on sway and Hyprland `name` is the
+  connector.
+- **A bar can stay blank after a reload that keeps its size.** `bar/requests.rs`
+  marks every bar as awaiting its new size after a reload that changes `[bar]`.
+  If the compositor answers with the size the bar already had, crcbl sends no
+  `Resized`, and the bar is neither drawn nor hit-tested until a later resize.
+  It was not presented in that state before either; the hit-test half is new.
+  Raised by the 2026-11-28 review, not reproduced.
+
 - **Scope pull-request CI runs to the jobs a change needs** (asked by the owner,
   2026-11-28, through the crcbl session). A pull request runs every CI job,
   whatever files it touches; run only the jobs whose inputs changed, judged from
@@ -1939,9 +1944,11 @@ wayr would be the Linux backend again. Its gaps, read in its source on
   `bar::requests` clearing `regions`): reasoned from the code; no click has been
   made in that moment to see it.
 - A module's tooltip held back while the menu or panel its click opened is up
-  (`App::opened_from`, `Tooltips::hover_bar`'s `held`): the filter is
-  unit-tested, the wiring in `bar::events` is not, and it has not been seen on
-  Hyprland, where the tooltip was seen over its menu (2026-11-04).
+  (`App::held`, from `App::opened_from` or the open tray menu's item, and
+  `Tooltips::hover_bar`'s `held`): `hover_bar` and the tray lookup
+  (`bar::tray::button_of`) are unit-tested; `App::held` and its wiring in
+  `bar::events` are not, since `App` has no test harness, and it has not been
+  seen on Hyprland, where the tooltip was seen over its menu (2026-11-04).
 - First run on the owner's Hyprland 0.56.2 (Arch, 2026-10-20, Intel RPL-U GPU,
   one 2560 × 1440 output, next to the running waybar): the layer panel reserved
   its 50 px under waybar's, and drew the power button, battery, power profile,
