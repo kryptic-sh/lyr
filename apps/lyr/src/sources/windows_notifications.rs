@@ -53,6 +53,9 @@ pub(super) fn start(
             let mut handed = false;
             // The last failure logged, so one repeated is logged once.
             let mut failure: Option<String> = None;
+            // How many toasts the last read left out, logged when it changes
+            // to a count other than none.
+            let mut unreadable = 0;
             loop {
                 if opened.is_none() {
                     match Notifications::open() {
@@ -69,11 +72,16 @@ pub(super) fn start(
                     }
                 }
                 if let Some(notifications) = &opened {
-                    match notifications.list() {
-                        Ok(listed) => {
+                    match notifications.listing() {
+                        Ok(listing) => {
                             failure = None;
+                            skipped(&mut unreadable, listing.unreadable);
                             let now = (Instant::now(), SystemTime::now());
-                            let listed = listed.iter().map(|shown| incoming(shown, now)).collect();
+                            let listed = listing
+                                .notifications
+                                .iter()
+                                .map(|shown| incoming(shown, now))
+                                .collect();
                             let changed = mirror.apply(
                                 &mut store.lock().unwrap_or_else(PoisonError::into_inner),
                                 listed,
@@ -90,7 +98,7 @@ pub(super) fn start(
                             }
                         }
                         Err(error) => {
-                            // `list` says only that it failed; `open` reads
+                            // `listing` says only that it failed; `open` reads
                             // whether access was taken away, and the store is
                             // opened again once it is granted.
                             if matches!(
@@ -152,13 +160,27 @@ fn fail(last: &mut Option<String>, what: String) -> bool {
     true
 }
 
+/// Logs that a read left out `now` toasts it could not read, when that is
+/// not none and not the `last` count read, and returns whether it was
+/// logged. Reading them all again is not logged.
+fn skipped(last: &mut usize, now: usize) -> bool {
+    if *last == now {
+        return false;
+    }
+    *last = now;
+    if now > 0 {
+        tracing::warn!("notifications: {now} of Windows' notifications cannot be read, left out");
+    }
+    now > 0
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Instant;
 
     use lyr_core::notifications::{Incoming, Mirror, Store};
 
-    use super::{Work, fail, targets};
+    use super::{Work, fail, skipped, targets};
 
     #[test]
     fn a_dismissal_names_its_own_key_and_clear_all_of_them() {
@@ -195,5 +217,15 @@ mod tests {
         assert!(!fail(&mut last, "a".to_owned()), "the same again");
         assert!(fail(&mut last, "b".to_owned()));
         assert!(fail(&mut last, "a".to_owned()), "a after b is new");
+    }
+
+    #[test]
+    fn toasts_left_out_are_logged_as_their_count_changes() {
+        let mut last = 0;
+        assert!(!skipped(&mut last, 0), "none left out");
+        assert!(skipped(&mut last, 2));
+        assert!(!skipped(&mut last, 2), "the same count again");
+        assert!(!skipped(&mut last, 0), "all read again");
+        assert!(skipped(&mut last, 2), "left out again after that");
     }
 }

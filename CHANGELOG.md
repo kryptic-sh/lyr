@@ -30,13 +30,14 @@ and this project adheres to
 
 - On Windows, the clock panel lists Windows' own notifications under the
   calendar, polled through crcbl-notify once Windows' notification-access
-  privacy setting allows it. Clear All, an entry's close button and a middle
-  click dismiss them in Windows too, as does `lyr clear`. A click on an entry
-  brings a window of the sender's forward, found by its program's name against
-  the sender's AppUserModelID and name, or starts the sender through the Start
-  menu's Applications folder when it has no window; it cannot open what the
-  toast itself would, since Windows lets no other program activate a toast. The
-  notifications module's bell shows whether any are waiting. There is no
+  privacy setting allows it. A notification Windows cannot describe is left out,
+  and how many were left out is logged. Clear All, an entry's close button and a
+  middle click dismiss them in Windows too, as does `lyr clear`. A click on an
+  entry brings a window of the sender's forward, found by its program's name
+  against the sender's AppUserModelID and name, or starts the sender through the
+  Start menu's Applications folder when it has no window; it cannot open what
+  the toast itself would, since Windows lets no other program activate a toast.
+  The notifications module's bell shows whether any are waiting. There is no
   do-not-disturb row: lyr cannot reach Windows' own. For users of the library
   crates: `lyr_core::notifications` gains `Mirror`, which keeps a `Store` in
   step with snapshots of another program's notifications, and `lyr-sources`
@@ -68,13 +69,15 @@ and this project adheres to
   devices, as the Wi-Fi menu does.
 - A time zone change shows on the clock at the next tick on every platform, and
   at once on Linux when timedate1 reports it, rather than after a second.
-- Built on crcbl 0.21.0 (from 0.17.2). The bar's system fonts are now
-  memory-mapped instead of copied onto the heap wherever crcbl allows it. On
-  Linux, a PNG, JPEG or WebP picture with an EXIF orientation (a player's album
-  art, a notification's image, a tray icon) is shown turned upright, as an image
-  viewer shows it, rather than as stored. For users of the library crates:
-  `lyr_shell::bars::Bars` takes a `crcbl_shell::Shell`, so callers move to
-  crcbl-shell 0.21 with it.
+- Built on crcbl 0.22.0 (from 0.17.2). On Wayland, a menu or panel that changes
+  size shows its next frame at the new size, where Hyprland used to stretch the
+  old frame into it for a moment (a shrinking menu's rows squeezed). The bar's
+  system fonts are now memory-mapped instead of copied onto the heap wherever
+  crcbl allows it. On Linux, a PNG, JPEG or WebP picture with an EXIF
+  orientation (a player's album art, a notification's image, a tray icon) is
+  shown turned upright, as an image viewer shows it, rather than as stored. For
+  users of the library crates: `lyr_shell::bars::Bars` takes a
+  `crcbl_shell::Shell`, so callers move to crcbl-shell 0.22 with it.
 - Built on hjkl 0.46.0 (from 0.45.0) for `hjkl-config` and `hjkl-xdg`. hjkl's
   changes are in its terminal layer, so the config and path crates behave as
   before.

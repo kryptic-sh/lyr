@@ -233,47 +233,51 @@ implementation follows meanwhile.
   (restarting WirePlumber did), so a live test waits for the old nodes to go.
 
 - **crcbl: what lyr uses, and at which release.** lyr pins every crcbl crate at
-  `=0.21.0` (2026-11-28, from 0.17.2): 0.20.0 added `MonitorInfo::connector`,
+  `=0.22.0` (2026-11-29, from 0.17.2): 0.20.0 added `MonitorInfo::connector`,
   which `[bar] output` now matches; with 0.21.0, crcbl-image applies a picture's
-  EXIF orientation, and on Windows `crcbl_notify`'s `Backend::list` fails as a
-  whole when one toast cannot be read. 0.17.0's breaking changes and 0.17.1's
-  fix are in crcbl's ragdoll and joint types, and its additions
-  (`Shell::open_url`, `Shell::set_idle_inhibit`) are new calls, none of which
-  lyr uses; the workspace's tests passed on Windows with it. 0.16.0 had no
-  breaking changes; its changes are in crcbl's animation, ragdoll and render
-  crates. Neither 0.14.0 nor 0.15.0 broke anything lyr uses (their breaking
-  changes are in crcbl's renderer, animation, profiler, console and text-edit
-  types); 0.14.0 added `crcbl-notify`, which lyr's sources now depend on (the
-  Windows notifications entry). Checked on the owner's desktop (RX 7900 XTX,
-  Mesa): the workspace's tests, the font tests that need the Nerd Font and a CJK
-  font, and the reference-image render test on both RADV and lavapipe. 0.13.0
-  (2026-10-29) reads a fallback face whole only once its `cmap` maps a character
-  drawn (the Windows memory entry below). 0.12.1 (2026-10-27) brought lazy
-  fallback faces (`lyr_render::fonts`: 124 to 43 MB resident on the owner's
-  laptop, whose bar font has 17 fallback faces), a first start on the display's
-  Vulkan driver alone (in a nested Hyprland there: no `/dev/nvidia*` handle, 94
-  ms from the shell to the first frame, where 0.12.0 held 12 handles for the
-  process's life and took 408 ms), the viewport fix for a resized panel (its own
-  entry under the audio menu below) and `RichLayout`. 0.12.0 (2026-10-26)
-  brought `GpuChoice`, which lyr saves between runs (`lyr_render::gpu`, the file
-  `gpu-choice` in lyr's state directory, `apps/lyr/src/gpu.rs`). With 0.12.1 the
-  choice names its driver from the first start, so `lyr_render::gpu`'s locate
-  thread no longer runs (seen: one save, no search); it is kept for a choice
-  crcbl opened without naming a driver (a pin, a loader variable, or the
-  display's device refusing the window), where without it every start would load
-  every driver. 0.11.0 (0.10.0 was skipped, since its crates.io publish stopped
-  halfway) brought icon theme lookups that take the nearest size from a
-  per-theme index. 0.9.0 came 2026-10-23 for `SharedGpu` (that bump needed no
-  change in lyr's code; 0.8.0's `Presenter` drains before a reconfigure, so lyr
-  no longer does; 0.7.0 brought `set_panel`, frame pacing and `font::breaks`;
-  crcbl's `rust-version` is 1.98, and lyr's follows). 0.8.1 ran on Windows.
-  crcbl 0.4.0 (2026-10-18) brought `crcbl-app`, the window-plus-device crate lyr
-  asked for so that it links no engine, audio (cpal, ALSA) or physics; 0.5.0's
-  only breaking change is in crcbl-phys. M1 adds `crcbl-app`, `crcbl-hal`,
-  `crcbl-ui` (with `system-fonts`), `crcbl-frame`, `crcbl-font` and the backend
-  per platform (Vulkan on Linux, D3D12 on Windows, Metal on macOS), each pinned
-  exactly, and `crcbl-image` with M6. The GPU path, as crcbl reported it (not
-  read yet at 0.4.0 or later; read before M1 relies on it):
+  EXIF orientation; with 0.22.0, `crcbl_notify`'s `list` skips a toast it cannot
+  read rather than failing as a whole, `Notifications::listing` counts the
+  skipped ones, and on Wayland `set_panel` sends a panel's own new size as
+  `Resized` at once, with each frame carrying the geometry it was drawn at.
+  0.22.0's one breaking change is in crcbl-rand, which lyr does not use.
+  0.17.0's breaking changes and 0.17.1's fix are in crcbl's ragdoll and joint
+  types, and its additions (`Shell::open_url`, `Shell::set_idle_inhibit`) are
+  new calls, none of which lyr uses; the workspace's tests passed on Windows
+  with it. 0.16.0 had no breaking changes; its changes are in crcbl's animation,
+  ragdoll and render crates. Neither 0.14.0 nor 0.15.0 broke anything lyr uses
+  (their breaking changes are in crcbl's renderer, animation, profiler, console
+  and text-edit types); 0.14.0 added `crcbl-notify`, which lyr's sources now
+  depend on (the Windows notifications entry). Checked on the owner's desktop
+  (RX 7900 XTX, Mesa): the workspace's tests, the font tests that need the Nerd
+  Font and a CJK font, and the reference-image render test on both RADV and
+  lavapipe. 0.13.0 (2026-10-29) reads a fallback face whole only once its `cmap`
+  maps a character drawn (the Windows memory entry below). 0.12.1 (2026-10-27)
+  brought lazy fallback faces (`lyr_render::fonts`: 124 to 43 MB resident on the
+  owner's laptop, whose bar font has 17 fallback faces), a first start on the
+  display's Vulkan driver alone (in a nested Hyprland there: no `/dev/nvidia*`
+  handle, 94 ms from the shell to the first frame, where 0.12.0 held 12 handles
+  for the process's life and took 408 ms), the viewport fix for a resized panel
+  (its own entry under the audio menu below) and `RichLayout`. 0.12.0
+  (2026-10-26) brought `GpuChoice`, which lyr saves between runs
+  (`lyr_render::gpu`, the file `gpu-choice` in lyr's state directory,
+  `apps/lyr/src/gpu.rs`). With 0.12.1 the choice names its driver from the first
+  start, so `lyr_render::gpu`'s locate thread no longer runs (seen: one save, no
+  search); it is kept for a choice crcbl opened without naming a driver (a pin,
+  a loader variable, or the display's device refusing the window), where without
+  it every start would load every driver. 0.11.0 (0.10.0 was skipped, since its
+  crates.io publish stopped halfway) brought icon theme lookups that take the
+  nearest size from a per-theme index. 0.9.0 came 2026-10-23 for `SharedGpu`
+  (that bump needed no change in lyr's code; 0.8.0's `Presenter` drains before a
+  reconfigure, so lyr no longer does; 0.7.0 brought `set_panel`, frame pacing
+  and `font::breaks`; crcbl's `rust-version` is 1.98, and lyr's follows). 0.8.1
+  ran on Windows. crcbl 0.4.0 (2026-10-18) brought `crcbl-app`, the
+  window-plus-device crate lyr asked for so that it links no engine, audio
+  (cpal, ALSA) or physics; 0.5.0's only breaking change is in crcbl-phys. M1
+  adds `crcbl-app`, `crcbl-hal`, `crcbl-ui` (with `system-fonts`),
+  `crcbl-frame`, `crcbl-font` and the backend per platform (Vulkan on Linux,
+  D3D12 on Windows, Metal on macOS), each pinned exactly, and `crcbl-image` with
+  M6. The GPU path, as crcbl reported it (not read yet at 0.4.0 or later; read
+  before M1 relies on it):
   `crcbl_app::window::open_window(shell, elapsed, desc)`, `wait_for_configure`
   for the extent, then
   `crcbl_app::present::Presenter::open(&shell, window, extent, &PresenterDesc)`
@@ -404,16 +408,16 @@ implementation follows meanwhile.
   lyr's zbus 6, so turning the feature on in lyr puts two zbus versions in its
   build, and crcbl ignores three RustSec "unmaintained" advisories on zbus 5's
   crates meanwhile; whether lyr takes it before an `accesskit_unix` on zbus 6 is
-  the owner's call (0.21.0 still has zbus 5.19 there). In 0.21.0 (read at the
-  tag, 2026-11-28): X11 panels (`x11::panel`, dock windows reserving with
-  `_NET_WM_STRUT_PARTIAL`), popups (`x11::popup`) and transparency (a 32-bit
-  ARGB visual when something composites), each with `x11_e2e` tests; S21 has a
-  Wayland e2e test and a laptop run. crcbl lists as not done for X11: a strut on
-  an inner monitor edge reserves nothing, two reserving panels on one edge
-  overlap, and a popup does not follow a moving parent. Still open: AppKit
-  accessibility; AppKit's input-method switch, secure input and pre-edit; a
-  Hyprland CI job; FreeBSD is a compile-only check with no runner; no flash on
-  map on AppKit; cold-start timing (S13).
+  the owner's call (0.22.0 still has `accesskit_unix` 0.24, on zbus 5.19). In
+  0.21.0 (read at the tag, 2026-11-28): X11 panels (`x11::panel`, dock windows
+  reserving with `_NET_WM_STRUT_PARTIAL`), popups (`x11::popup`) and
+  transparency (a 32-bit ARGB visual when something composites), each with
+  `x11_e2e` tests; S21 has a Wayland e2e test and a laptop run. crcbl lists as
+  not done for X11: a strut on an inner monitor edge reserves nothing, two
+  reserving panels on one edge overlap, and a popup does not follow a moving
+  parent. Still open: AppKit accessibility; AppKit's input-method switch, secure
+  input and pre-edit; a Hyprland CI job; FreeBSD is a compile-only check with no
+  runner; no flash on map on AppKit; cold-start timing (S13).
 - **crcbl: gaps that bear on lyr's milestones.** S9: no pre-edit during a
   compose sequence, no surrounding text, and losing the keyboard mid-sequence is
   untested (crcbl judges the Wi-Fi password field needs none of it). S17: a
@@ -508,7 +512,7 @@ implementation follows meanwhile.
   capacity), every other job green. It no longer builds on stable as CI runs it:
   Rust 1.100 (2026-11-09) fails it on clippy's `map_unwrap_or` and cargo's
   `redundant_homepage`, fixed on main by `fix: build clean on Rust 1.100`. Main
-  has since moved to crcbl 0.21.0 and hjkl 0.46.0, under `[Unreleased]`. Either
+  has since moved to crcbl 0.22.0 and hjkl 0.46.0, under `[Unreleased]`. Either
   tag be22b4a `v0.7.0` without a green run on today's toolchain, or fold those
   entries into 0.7.0 (or cut 0.7.1 from main) so the tag gets a green run. Then
   check every publish target: the GitHub release, crates.io (all seven crates),
@@ -519,7 +523,7 @@ implementation follows meanwhile.
   `windows-collections`, `windows-future`), with the Bluetooth source's WinRT
   APIs generated by `windows-bindgen` into
   `lyr_sources::bluetooth::windows::bindings` (2026-11-02). crcbl-mixer,
-  crcbl-dx12 and crcbl-dcomp (0.21.0, checked 2026-11-28) still depend on the
+  crcbl-dx12 and crcbl-dcomp (0.22.0, checked 2026-11-29) still depend on the
   umbrella `windows` 0.62, so `windows-core` 0.62 builds beside 0.100; no type
   crosses between them. It goes when crcbl moves them off the umbrella crate
   (crcbl's call). `windows-sys` stays at 0.61 until it has a 0.100. Not
@@ -553,6 +557,15 @@ wayr would be the Linux backend again. Its gaps, read in its source on
 
 ## Known gaps in the design
 
+- **`Surface::awaiting_size` may wait for a size crcbl never sends.**
+  `lyr_render::surface` rounds `logical * scale` to pixels, where crcbl-shell
+  first rounds the logical size to whole pixels (`round_logical`) and then
+  scales. At a fractional scale a fractional content size can come out a pixel
+  apart (200.4 at 1.5: lyr 301, crcbl 300); if crcbl's figure is the window's
+  current size, no `Resized` comes and the panel waits, undrawn. The same holds
+  for the bar's `size_on` after a reload. Raised by the 2026-11-29 review, the
+  same in crcbl 0.21 and 0.22; not checked whether lyr's panel sizes are ever
+  fractional, not reproduced.
 - **`exec::child` finds a program by its bare name** (`apps/lyr/src/exec.rs`):
   `cmd`, `sh`, `xdg-open` and `explorer.exe` are named without a path, and on
   Windows Rust's `Command` looks in the directory of lyr's own executable before
@@ -721,20 +734,20 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     `crates/crcbl-notify/src/windows.rs` (2026-11-01), `list` still returns on
     the first toast that fails, and the fix is still open on crcbl's backlog
     ("One unreadable toast fails the whole `list`"). Built in lyr (2026-11-28)
-    on crcbl-notify 0.21.0's `list`, which still lacks the skip:
+    on crcbl-notify's `list`, now `listing`, which skips an unreadable toast
+    since 0.22.0 (lyr is on it since 2026-11-29):
     `apps/lyr/src/sources/windows_notifications.rs` polls it on a worker and
     keeps the clock panel's store a copy of it through
     `lyr_core::notifications::Mirror`, keyed by `NotificationId`; Clear All, the
     close button, a middle click and `lyr clear` dismiss in Windows. A failed
-    read keeps the last snapshot listed and is logged once, so one unreadable
-    toast freezes the list rather than emptying it. Seen on this machine: a
-    toast sent from Windows PowerShell and a Chrome one listed, the body's `<b>`
-    and `&` shown as text, and a middle click removed the PowerShell one from
-    Windows' own list (read back through the listener) and from the panel. A
-    click on an entry's body (the Windows `toast_clicked` in
-    `apps/lyr/src/bar/events.rs`) brings forward the first top-level window
-    `EnumWindows` lists (frontmost first in practice, not documented) whose
-    program `lyr_wm::app::is_app` matches against
+    read (now only the listing itself failing) keeps the last snapshot listed
+    and is logged once. Seen on this machine: a toast sent from Windows
+    PowerShell and a Chrome one listed, the body's `<b>` and `&` shown as text,
+    and a middle click removed the PowerShell one from Windows' own list (read
+    back through the listener) and from the panel. A click on an entry's body
+    (the Windows `toast_clicked` in `apps/lyr/src/bar/events.rs`) brings forward
+    the first top-level window `EnumWindows` lists (frontmost first in practice,
+    not documented) whose program `lyr_wm::app::is_app` matches against
     `lyr_sources::notifications::windows::sender_names` (the AppUserModelID, the
     program a path-like one names, a packaged one's package name, and the
     display name), through `lyr_sources::window::windows::focus`; with none, it
@@ -761,14 +774,14 @@ wayr would be the Linux backend again. Its gaps, read in its source on
     test, since they act on the real desktop; only their
     found-and-brought-forward and no-window paths were run, on this machine. Not
     run anywhere: a window Windows keeps back (`Focused::Refused`), a failed
-    `EnumWindows`, and access withdrawn while lyr runs, which a failed `list`
-    checks by opening the store again (crcbl's `list` reports only that it
-    failed). Left to do: move to crcbl's `Notifications::listing()` once
-    released, which skips an unreadable toast and counts it in
-    `Listing::unreadable` (on crcbl's main at 35e600239, 2026-11-28, not
-    released yet: crcbl holds its release until a Wayland present seam lands,
-    and will say which version carries it), and log that count. No toast that
-    fails to read has been found to test with.
+    `EnumWindows`, and access withdrawn while lyr runs, which a failed `listing`
+    checks by opening the store again (crcbl's `listing` reports only that it
+    failed). The poller reads `Notifications::listing()` and logs its
+    `Listing::unreadable` count when it changes to one other than none
+    (`skipped`, whose unit test runs on Windows CI only). No toast that fails to
+    read has been found to test the skip with, and the switch to `listing` was
+    made from Linux (2026-11-29) and checked there by cross-target clippy only;
+    it has not run on Windows.
   - macOS: as on Windows, lyr draws no notifications.
 
 - **The media player card: where it still differs from swaync's.** The card
